@@ -506,8 +506,9 @@ function drawForm(){
   const [rp,rh]=slaOf(t.uutien);
 
   const step0=`<div class="form-grid">
-    <div class="readbox"><div>Mã ticket: <b>${esc(t.id)}</b></div><div>Luồng (tự ánh xạ): <b>${esc(t.luong)}</b></div><div>SLA: <b>phản hồi ${rp}′ · xử lý ${rh}h</b></div></div>
+    <div class="readbox"><div>Mã ticket: <b>${esc(t.id)}</b></div><div>SLA: <b>phản hồi ${rp}′ · xử lý ${rh}h</b></div></div>
     <div class="f"><label>Loại công việc <span class="req">*</span></label>${sel("loai",CAT.loai,"EDIT.luong=window.flowOf(this.value);drawForm()")}</div>
+    <div class="f"><label>Luồng công việc <span class="hint" style="font-weight:400">(tự động theo loại)</span></label><input value="${esc(t.luong)}" disabled style="background:#f0f4f2;color:var(--ink-2);font-weight:600"></div>
     <div class="f"><label>Đơn vị / Khách hàng yêu cầu <span class="req">*</span></label>${sel("donvi",CAT.donvi)}</div>
     <div class="f"><label>Người yêu cầu <span class="req">*</span></label>${inp("nguoiYC","text","Nguyễn Văn A")}</div>
     <div class="f"><label>SĐT <span class="req">*</span></label>${inp("sdt","text","0901234567")}</div>
@@ -569,6 +570,7 @@ function drawForm(){
 window.flowOf=flowOf;
 async function saveTicket(){
   const t=EDIT;
+  if(!t.loai){toast("Vui lòng chọn Loại công việc",true);FSTEP=0;drawForm();return;}
   if(!t.nguoiYC||!t.noidung){toast("Vui lòng nhập Người yêu cầu và Nội dung",true);FSTEP=0;drawForm();return;}
   const isNew=!DB.tickets.some(x=>x.id===t.id);
   t.luong=flowOf(t.loai);
