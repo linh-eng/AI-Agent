@@ -78,15 +78,36 @@ Nếu IP đổi, các phòng ban phải gõ địa chỉ mới.
 - Windows: chạy `set PORT=8080 && node server.js`
 - Linux/macOS: chạy `PORT=8080 node server.js`
 
-### 4. Tự chạy lại khi khởi động máy / khi lỗi (khuyến nghị cho vận hành thật)
-Dùng **PM2** để máy chủ tự bật cùng Windows và tự khởi động lại nếu lỗi:
+### 4. Tự chạy nền + tự bật khi khởi động máy (khuyến nghị cho vận hành thật) — dùng PM2
 
+Với PM2, máy chủ **chạy nền** (không cần giữ cửa sổ đen), **tự bật lại khi lỗi** và
+**tự khởi động cùng Windows**.
+
+**Cách dễ nhất — chạy file có sẵn:**
+1. Đóng cửa sổ đen đang chạy `node server.js` (nếu có) để tránh trùng cổng 3000.
+2. Chuột phải **`install-pm2-windows.bat`** → **Run as administrator**.
+3. Làm theo hướng dẫn trên màn hình. Xong là máy chủ tự chạy nền.
+
+**Hoặc gõ tay** (PowerShell **quyền Administrator**, tại thư mục app):
 ```
-npm install -g pm2
+npm install -g pm2 pm2-windows-startup
 pm2 start server.js --name ho-tro-thng
 pm2 save
+pm2-startup install
+pm2 save
 ```
-*(PM2 cần internet để cài lần đầu.)*
+*(Cần internet để cài lần đầu.)*
+
+**Các lệnh quản lý PM2 thường dùng:**
+| Lệnh | Tác dụng |
+|---|---|
+| `pm2 list` | Xem máy chủ đang chạy không |
+| `pm2 logs ho-tro-thng` | Xem nhật ký / lỗi |
+| `pm2 restart ho-tro-thng` | Khởi động lại (VD sau khi cập nhật mã) |
+| `pm2 stop ho-tro-thng` | Tạm dừng |
+| `pm2 delete ho-tro-thng` | Gỡ khỏi PM2 |
+
+> Gỡ tự-khởi-động: `pm2-startup uninstall`.
 
 ---
 
