@@ -1,0 +1,5 @@
+# Dữ liệu chạy thực tế — KHÔNG đưa lên git (mỗi nơi cài có dữ liệu riêng)
+data.json
+data.json.tmp
+# Bản sao lưu
+backup-*.json

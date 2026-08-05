@@ -1,0 +1,112 @@
+# Hệ thống Hỗ trợ THNG — Bản máy chủ nội bộ (LAN)
+
+Cài trên **1 máy chủ**, tất cả phòng ban truy cập bằng **trình duyệt** qua mạng nội bộ.
+Dữ liệu **dùng chung**: ai nhập gì mọi người đều thấy (tự đồng bộ mỗi 15 giây).
+
+- ✅ Chỉ cần cài **Node.js** — không cần internet, không cần cài thêm gói nào.
+- ✅ Chạy được trên **Windows / Linux / macOS**.
+- ✅ Dữ liệu lưu trong 1 file `data.json` trên máy chủ → dễ sao lưu.
+
+---
+
+## A. Cài trên MÁY CHỦ (làm 1 lần)
+
+### Bước 1 — Cài Node.js
+- Tải bản **LTS** tại <https://nodejs.org> rồi cài như phần mềm thường (Next → Next → Finish).
+- Kiểm tra: mở **Command Prompt** (Windows) hoặc **Terminal**, gõ `node -v` — hiện ra số phiên bản là được.
+
+### Bước 2 — Chép thư mục này vào máy chủ
+Chép cả thư mục `ho-tro-thng-server` vào máy chủ, ví dụ `C:\ho-tro-thng-server`.
+
+### Bước 3 — Khởi động máy chủ
+- **Windows:** nhấp đúp **`start-windows.bat`**
+- **Linux/macOS:** mở Terminal tại thư mục, chạy `bash start.sh`
+  *(hoặc `node server.js` ở bất kỳ hệ nào)*
+
+Cửa sổ sẽ hiện các địa chỉ truy cập, ví dụ:
+
+```
+• Trên máy chủ này:            http://localhost:3000
+• Các phòng ban trong LAN mở:  http://192.168.1.50:3000
+```
+
+> ⚠️ **Để nguyên cửa sổ này chạy.** Đóng cửa sổ = tắt máy chủ.
+
+---
+
+## B. Các phòng ban TRUY CẬP
+
+Trên máy bất kỳ **cùng mạng nội bộ**, mở trình duyệt (Chrome/Edge/Cốc Cốc) và gõ địa
+chỉ máy chủ, ví dụ:
+
+```
+http://192.168.1.50:3000
+```
+
+> Thay `192.168.1.50` bằng địa chỉ IP thật của máy chủ (xem ở cửa sổ Bước 3).
+> Nên tạo **bookmark** để lần sau vào nhanh.
+
+---
+
+## C. Vài thiết lập nên làm
+
+### 1. Cho phép qua tường lửa (Windows)
+Lần đầu chạy, Windows có thể hỏi **"Allow access"** → chọn **Allow / Cho phép**
+(cả Private network). Nếu không thấy hỏi mà máy khác vào không được, mở
+*Windows Defender Firewall → Allow an app* và cho phép **Node.js**, hoặc mở cổng **3000**.
+
+### 2. Đặt IP tĩnh cho máy chủ
+Nên đặt **IP tĩnh** cho máy chủ để địa chỉ không đổi (nhờ IT, hoặc đặt trong router).
+Nếu IP đổi, các phòng ban phải gõ địa chỉ mới.
+
+### 3. Đổi cổng (nếu 3000 bị trùng)
+- Windows: chạy `set PORT=8080 && node server.js`
+- Linux/macOS: chạy `PORT=8080 node server.js`
+
+### 4. Tự chạy lại khi khởi động máy / khi lỗi (khuyến nghị cho vận hành thật)
+Dùng **PM2** để máy chủ tự bật cùng Windows và tự khởi động lại nếu lỗi:
+
+```
+npm install -g pm2
+pm2 start server.js --name ho-tro-thng
+pm2 save
+```
+*(PM2 cần internet để cài lần đầu.)*
+
+---
+
+## D. Sao lưu & khôi phục dữ liệu
+
+- Toàn bộ dữ liệu nằm trong file **`data.json`** (cùng thư mục `server.js`).
+- **Sao lưu:** chỉ cần copy file `data.json` sang nơi an toàn (định kỳ hằng ngày/tuần).
+- **Khôi phục:** tắt máy chủ → chép `data.json` bản sao lưu đè vào → bật lại.
+- Trong ứng dụng có nút **"Xuất dữ liệu"** (JSON) và **"Xuất CSV"** để lưu thêm bản đối chiếu.
+
+---
+
+## E. Câu hỏi thường gặp
+
+**Máy khác không vào được?**
+1. Đúng địa chỉ IP máy chủ chưa? (xem cửa sổ Bước 3)
+2. Máy chủ còn đang chạy không? (cửa sổ chưa đóng)
+3. Cùng một mạng nội bộ / Wi-Fi công ty chưa?
+4. Tường lửa đã cho phép chưa? (mục C.1)
+
+**Nhiều người sửa cùng lúc có sao không?**
+Máy chủ xử lý tuần tự và ghi file an toàn nên dữ liệu không hỏng. Với quy mô một phòng
+ban thì hoàn toàn ổn. Nếu sau này cần phân quyền theo người dùng, đăng nhập, nhật ký
+chỉnh sửa, đính kèm file thật, email nhắc SLA… thì nâng lên bản dùng cơ sở dữ liệu
+(PostgreSQL) — cho em biết khi cần.
+
+**Có mất dữ liệu khi tắt máy chủ không?**
+Không. Dữ liệu đã lưu trong `data.json`, bật lại là còn nguyên.
+
+---
+
+## Thông tin kỹ thuật (cho IT)
+
+- Node.js thuần, **không phụ thuộc gói ngoài**; máy chủ HTTP + REST API đơn giản.
+- Frontend tĩnh trong `public/`, gọi API `/api/*`.
+- Lưu trữ: `data.json` (ghi kiểu atomic: ghi file `.tmp` rồi đổi tên).
+- API: `GET /api/data`, `POST/PUT/DELETE /api/tickets[/:id]`, `POST/PUT/DELETE /api/ps[/:id]`.
+- SLA tính theo giờ làm việc 08–12 & 13–17, Thứ 2–Thứ 6 (sửa trong `public/index.html`).
