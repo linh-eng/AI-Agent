@@ -6,7 +6,10 @@ Có **đăng nhập & phân quyền theo vai trò**.
 
 - ✅ Chỉ cần cài **Node.js** — không cần internet, không cần cài thêm gói nào.
 - ✅ Chạy được trên **Windows / Linux / macOS**.
-- ✅ Dữ liệu + tài khoản lưu trong 1 file `data.json` trên máy chủ → dễ sao lưu.
+- ✅ Dùng **cơ sở dữ liệu SQLite** (file `data.db`) — bền, nhanh, chịu được nhiều dữ liệu.
+- ✅ Nếu trước đây đã chạy bản cũ (`data.json`), **dữ liệu tự chuyển sang `data.db`** ở lần chạy đầu.
+
+> ⚙️ **Yêu cầu:** Node.js **22.5 trở lên** (khuyến nghị **24 LTS**) — vì dùng SQLite tích hợp sẵn của Node.
 
 ## Tài khoản dùng thử (tạo sẵn lần đầu)
 
@@ -113,9 +116,12 @@ pm2 save
 
 ## D. Sao lưu & khôi phục dữ liệu
 
-- Toàn bộ dữ liệu nằm trong file **`data.json`** (cùng thư mục `server.js`).
-- **Sao lưu:** chỉ cần copy file `data.json` sang nơi an toàn (định kỳ hằng ngày/tuần).
-- **Khôi phục:** tắt máy chủ → chép `data.json` bản sao lưu đè vào → bật lại.
+- Toàn bộ dữ liệu nằm trong file **`data.db`** (cùng thư mục `server.js`).
+- **Sao lưu:** tốt nhất **tắt máy chủ** (`pm2 stop ho-tro-thng`) rồi copy `data.db` sang nơi an toàn,
+  sau đó bật lại (`pm2 start ho-tro-thng`). *(Nếu copy lúc đang chạy, nhớ copy kèm cả `data.db-wal`
+  và `data.db-shm` nếu có.)*
+- **Khôi phục:** tắt máy chủ → chép `data.db` bản sao lưu đè vào (xóa `data.db-wal`, `data.db-shm` nếu có) → bật lại.
+- Ngoài ra trong ứng dụng có nút **Xuất dữ liệu (JSON)** và **Xuất CSV** để lưu thêm bản đối chiếu.
 - Trong ứng dụng có nút **"Xuất dữ liệu"** (JSON) và **"Xuất CSV"** để lưu thêm bản đối chiếu.
 
 ---
@@ -135,7 +141,7 @@ chỉnh sửa, đính kèm file thật, email nhắc SLA… thì nâng lên bả
 (PostgreSQL) — cho em biết khi cần.
 
 **Có mất dữ liệu khi tắt máy chủ không?**
-Không. Dữ liệu đã lưu trong `data.json`, bật lại là còn nguyên.
+Không. Dữ liệu đã lưu trong `data.db`, bật lại là còn nguyên.
 
 ---
 
@@ -143,6 +149,6 @@ Không. Dữ liệu đã lưu trong `data.json`, bật lại là còn nguyên.
 
 - Node.js thuần, **không phụ thuộc gói ngoài**; máy chủ HTTP + REST API đơn giản.
 - Frontend tĩnh trong `public/`, gọi API `/api/*`.
-- Lưu trữ: `data.json` (ghi kiểu atomic: ghi file `.tmp` rồi đổi tên).
+- Lưu trữ: **SQLite** qua `node:sqlite` (file `data.db`, chế độ WAL). Tự di trú từ `data.json` cũ.
 - API: `GET /api/data`, `POST/PUT/DELETE /api/tickets[/:id]`, `POST/PUT/DELETE /api/ps[/:id]`.
 - SLA tính theo giờ làm việc 08–12 & 13–17, Thứ 2–Thứ 6 (sửa trong `public/index.html`).

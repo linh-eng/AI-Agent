@@ -1,5 +1,10 @@
 # Dữ liệu chạy thực tế — KHÔNG đưa lên git (mỗi nơi cài có dữ liệu riêng)
+data.db
+data.db-wal
+data.db-shm
 data.json
 data.json.tmp
+data.json.imported
 # Bản sao lưu
 backup-*.json
+backup-*.db
