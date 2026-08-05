@@ -2,10 +2,25 @@
 
 Cài trên **1 máy chủ**, tất cả phòng ban truy cập bằng **trình duyệt** qua mạng nội bộ.
 Dữ liệu **dùng chung**: ai nhập gì mọi người đều thấy (tự đồng bộ mỗi 15 giây).
+Có **đăng nhập & phân quyền theo vai trò**.
 
 - ✅ Chỉ cần cài **Node.js** — không cần internet, không cần cài thêm gói nào.
 - ✅ Chạy được trên **Windows / Linux / macOS**.
-- ✅ Dữ liệu lưu trong 1 file `data.json` trên máy chủ → dễ sao lưu.
+- ✅ Dữ liệu + tài khoản lưu trong 1 file `data.json` trên máy chủ → dễ sao lưu.
+
+## Tài khoản dùng thử (tạo sẵn lần đầu)
+
+| Tên đăng nhập | Mật khẩu | Vai trò | Quyền |
+|---|---|---|---|
+| `admin` | `admin123` | Quản trị hệ thống | Toàn quyền + quản lý người dùng |
+| `dieuphoi` | `123456` | Điều phối / Trưởng bộ phận | Xem tất cả, phân công, **duyệt phát sinh**, xóa |
+| `xuly1` | `123456` | Nhân viên xử lý | Xem & cập nhật ticket, ghi phát sinh |
+| `kinhdoanh` | `123456` | Người yêu cầu (P. Kinh doanh) | Tạo & **chỉ xem ticket phòng mình** |
+| `giamdoc` | `123456` | Ban giám đốc | **Chỉ xem** toàn bộ (không sửa) |
+
+> 🔐 **Đổi mật khẩu `admin` ngay sau lần đăng nhập đầu** (nút *Đổi mật khẩu* ở góc dưới trái).
+> Quản trị viên vào menu **Người dùng** để thêm/sửa/xóa tài khoản cho từng nhân viên & phòng ban.
+> Người "Người yêu cầu" chỉ thấy ticket có **Đơn vị** trùng phòng ban của họ (hoặc do họ tạo).
 
 ---
 

@@ -161,6 +161,39 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
 .catcol .h{font-weight:700;color:var(--green-800);font-size:13px;margin-bottom:4px}
 .catcol .i{font-size:12.5px;color:var(--ink-2);padding:5px 10px;background:var(--green-50);border-radius:8px}
 @media(max-width:1000px){.app{grid-template-columns:1fr}.side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center}.nav{flex-direction:row;flex-wrap:wrap}.side-foot{display:none}.form-grid,.dl{grid-template-columns:1fr}}
+
+/* ---- user area in sidebar ---- */
+.userbox{margin-top:auto;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.userbox .who{display:flex;align-items:center;gap:10px}
+.userbox .av{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--green-400),var(--green-600));display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px;flex:none}
+.userbox .nm{color:#fff;font-weight:600;font-size:13px;line-height:1.2}
+.userbox .rl{color:var(--green-300);font-size:11px;margin-top:2px}
+.userbox .acts{display:flex;gap:6px}
+.userbox button{flex:1;background:rgba(255,255,255,.09);border:0;color:#dff1e9;padding:7px;border-radius:8px;font-size:12px;font-weight:600}
+.userbox button:hover{background:rgba(255,255,255,.18);color:#fff}
+
+/* ---- login screen ---- */
+.login{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:20px;
+  background:radial-gradient(1200px 600px at 20% -10%,rgba(26,157,112,.25),transparent),linear-gradient(135deg,var(--green-900),#04241a)}
+.login.show{display:flex}
+.login-card{background:var(--card);border-radius:20px;box-shadow:0 40px 100px -20px rgba(0,0,0,.6);width:100%;max-width:400px;overflow:hidden}
+.login-top{background:linear-gradient(135deg,var(--green-700),var(--green-800));padding:26px 28px;color:#fff;display:flex;align-items:center;gap:14px}
+.login-top .logo{width:46px;height:46px;border-radius:13px;background:rgba(255,255,255,.15);display:grid;place-items:center}
+.login-top .logo svg{width:26px;height:26px}
+.login-top b{font-size:18px;display:block;line-height:1.1}
+.login-top span{font-size:11.5px;color:var(--green-300);letter-spacing:.06em;text-transform:uppercase}
+.login-body{padding:26px 28px 22px}
+.login-body h2{font-size:16px;margin-bottom:4px}
+.login-body p{color:var(--ink-3);font-size:13px;margin:0 0 18px}
+.login-body .f{margin-bottom:14px}
+.login-err{background:var(--red-bg);color:var(--red);padding:9px 12px;border-radius:9px;font-size:12.5px;font-weight:600;margin-bottom:14px;display:none}
+.login-err.show{display:block}
+.login-body .btn.primary{width:100%;justify-content:center;padding:11px}
+.login-hint{margin-top:16px;font-size:11.5px;color:var(--ink-3);background:var(--green-50);border-radius:10px;padding:11px 13px;line-height:1.6}
+.login-hint b{color:var(--green-800)}
+.role-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.role-admin{background:#fdeaea;color:#b3341f} .role-dieuphoi{background:#eaf1fd;color:#2f6fd6}
+.role-xuly{background:var(--green-50);color:var(--green-700)} .role-yeucau{background:#fff6e0;color:#8a6500} .role-giamdoc{background:#eef1f0;color:var(--ink-2)}
 </style>
 
 <div class="app">
@@ -170,7 +203,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
       <div><b>Hỗ trợ THNG</b><span>Support Desk</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
-    <div class="side-foot">Máy chủ nội bộ · Dữ liệu dùng chung toàn phòng ban.<br>Phiên bản 2.0 · 2026</div>
+    <div class="userbox" id="userbox"></div>
   </aside>
 
   <div class="main">
@@ -179,7 +212,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
       <div class="spacer"></div>
       <span class="pill green" id="connDot"><span class="dot"></span>Đang kết nối…</span>
       <button class="btn" onclick="exportData()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Xuất dữ liệu</button>
-      <button class="btn primary" onclick="openForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 5v14M5 12h14"/></svg>Tạo ticket</button>
+      <button class="btn primary" id="btnNewTop" onclick="openForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 5v14M5 12h14"/></svg>Tạo ticket</button>
     </div>
     <div class="content" id="view"></div>
   </div>
@@ -187,6 +220,28 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
 
 <div class="overlay" id="overlay"></div>
 <div class="toast" id="toast"></div>
+
+<div class="login" id="login">
+  <div class="login-card">
+    <div class="login-top">
+      <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk</span></div>
+    </div>
+    <div class="login-body">
+      <h2>Đăng nhập hệ thống</h2>
+      <p>Vui lòng đăng nhập bằng tài khoản được cấp.</p>
+      <div class="login-err" id="loginErr"></div>
+      <form id="loginForm" onsubmit="doLogin(event)">
+        <div class="f"><label>Tên đăng nhập</label><input id="lgUser" autocomplete="username" autofocus></div>
+        <div class="f"><label>Mật khẩu</label><input id="lgPass" type="password" autocomplete="current-password"></div>
+        <button class="btn primary" type="submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>Đăng nhập</button>
+      </form>
+      <div class="login-hint" id="loginHint"><b>Tài khoản dùng thử:</b><br>
+        admin / admin123 &nbsp;·&nbsp; dieuphoi / 123456 &nbsp;·&nbsp; xuly1 / 123456<br>
+        kinhdoanh / 123456 &nbsp;·&nbsp; giamdoc / 123456</div>
+    </div>
+  </div>
+</div>
 
 <script>
 /* ============================ DỮ LIỆU DANH MỤC ============================ */
@@ -210,18 +265,26 @@ const slaOf = p => SLA[p] || [60,8];
 const WY_WARN = 0.8; // ngưỡng vàng
 const WORK = {mStart:8,mEnd:12,aStart:13,aEnd:17}; // giờ làm việc
 
-/* ============================ STORE (máy chủ) ============================ */
+/* ============================ STORE + AUTH (máy chủ) ============================ */
 let DB={tickets:[],ps:[],seq:{}};
+let ME=null;            // {username,name,role,dept}
+let CAP={};             // quyền của vai trò hiện tại
+let ROLELABEL="";
 let ONLINE=true;
+const ROLE_VI={admin:"Quản trị hệ thống",dieuphoi:"Điều phối / Trưởng bộ phận",xuly:"Nhân viên xử lý",yeucau:"Người yêu cầu",giamdoc:"Ban giám đốc"};
+function can(act){return !!CAP[act];}
 async function api(method,url,body){
   const r=await fetch(url,{method,headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
-  if(!r.ok) throw new Error("HTTP "+r.status);
-  return r.json();
+  if(r.status===401){showLogin();throw new Error("401");}
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(data.error||("HTTP "+r.status));
+  return data;
 }
 async function refresh(){DB=await api("GET","/api/data");ONLINE=true;}
 function ymd(d){return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;}
 // Tự đồng bộ: 15 giây tải lại 1 lần để các phòng thấy cập nhật của nhau (bỏ qua khi đang mở form)
 function startPoll(){setInterval(async()=>{
+  if(!ME)return;
   if(document.getElementById("overlay").classList.contains("show"))return;
   try{const old=JSON.stringify(DB);await refresh();if(JSON.stringify(DB)!==old){buildNav();render();}setOnline(true);}catch(e){setOnline(false);}
 },15000);}
@@ -275,19 +338,31 @@ const PAGES=[
   {id:"dash",label:"Dashboard",sub:"Tổng quan chỉ số nghiệp vụ hỗ trợ",title:"Dashboard điều hành",icon:'<path d="M3 13h8V3H3v10zm10 8h8V3h-8v18zM3 21h8v-6H3v6z"/>'},
   {id:"tickets",label:"Danh sách ticket",sub:"Nhật ký theo dõi ticket hỗ trợ",title:"Danh sách ticket",icon:'<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>'},
   {id:"ps",label:"Phát sinh & Duyệt",sub:"Ghi nhận phát sinh & luồng phê duyệt",title:"Phát sinh & Phê duyệt",icon:'<path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>'},
-  {id:"cat",label:"Danh mục & SLA",sub:"Danh mục chuẩn hóa & cấu hình SLA",title:"Danh mục & Cấu hình SLA",icon:'<path d="M4 6h16M4 12h16M4 18h10"/>'}
+  {id:"cat",label:"Danh mục & SLA",sub:"Danh mục chuẩn hóa & cấu hình SLA",title:"Danh mục & Cấu hình SLA",icon:'<path d="M4 6h16M4 12h16M4 18h10"/>'},
+  {id:"users",label:"Người dùng",sub:"Quản lý tài khoản & phân quyền",title:"Quản lý người dùng",icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>',cap:"users"}
 ];
+function pagesForMe(){return PAGES.filter(p=>!p.cap||can(p.cap));}
 let PAGE="dash";
 function buildNav(){
-  document.getElementById("nav").innerHTML=PAGES.map(p=>{
+  document.getElementById("nav").innerHTML=pagesForMe().map(p=>{
     const badge=p.id==="tickets"?`<span class="badge">${DB.tickets.length}</span>`:p.id==="ps"?`<span class="badge">${DB.ps.length}</span>`:"";
     return `<button class="${p.id===PAGE?'active':''}" onclick="go('${p.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">${p.icon}</svg>${p.label}${badge}</button>`;
   }).join("");
+  buildUserBox();
 }
-function go(id){PAGE=id;const p=PAGES.find(x=>x.id===id);document.getElementById("pageTitle").textContent=p.title;document.getElementById("pageSub").textContent=p.sub;buildNav();render();window.scrollTo(0,0);}
+function buildUserBox(){
+  const el=document.getElementById("userbox");if(!el||!ME)return;
+  const initials=(ME.name||ME.username).trim().split(/\s+/).slice(-2).map(w=>w[0]).join("").toUpperCase();
+  el.innerHTML=`<div class="who"><div class="av">${esc(initials)}</div>
+    <div><div class="nm">${esc(ME.name)}</div><div class="rl">${esc(ROLELABEL||ROLE_VI[ME.role]||ME.role)}${ME.dept?" · "+esc(ME.dept):""}</div></div></div>
+    <div class="acts"><button onclick="openChangePw()">Đổi mật khẩu</button><button onclick="doLogout()">Đăng xuất</button></div>`;
+}
+function go(id){PAGE=id;const p=PAGES.find(x=>x.id===id);document.getElementById("pageTitle").textContent=p.title;document.getElementById("pageSub").textContent=p.sub;
+  const b=document.getElementById("btnNewTop");if(b)b.style.display=can("create")?"":"none";
+  buildNav();render();window.scrollTo(0,0);}
 
 /* ============================ RENDER ROUTER ============================ */
-function render(){({dash:renderDash,tickets:renderTickets,ps:renderPS,cat:renderCat}[PAGE])();}
+function render(){({dash:renderDash,tickets:renderTickets,ps:renderPS,cat:renderCat,users:renderUsers}[PAGE]||renderDash)();}
 
 /* ---------- DASHBOARD ---------- */
 function renderDash(){
@@ -367,7 +442,7 @@ function renderTickets(){
       <select class="field-sel" onchange="TFILTER.pr=this.value;renderTickets()"><option value="">Tất cả ưu tiên</option>${opt(CAT.uutien,TFILTER.pr)}</select>
       <div class="spacer" style="flex:1"></div>
       <button class="btn sm" onclick="exportCSV()">Xuất CSV</button>
-      <button class="btn primary sm" onclick="openForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 5v14M5 12h14"/></svg>Tạo ticket</button>
+      ${can('create')?`<button class="btn primary sm" onclick="openForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 5v14M5 12h14"/></svg>Tạo ticket</button>`:''}
     </div>
     <div class="panel"><div class="table-wrap"><table>
       <thead><tr><th>Mã Ticket</th><th>Nội dung / Loại</th><th>Đơn vị YC</th><th>Ưu tiên</th><th>Người xử lý</th><th>Trạng thái</th><th>SLA xử lý</th></tr></thead>
@@ -380,7 +455,8 @@ function stPill(s){const map={"1":"gray","2":"blue","3":"blue","4":"amber","5":"
 function renderPS(){
   const rows=DB.ps.length?DB.ps.map(p=>{
     const t=DB.tickets.find(x=>x.id===p.ticketId);
-    return `<tr onclick="${t?`openDetail('${p.ticketId}','ps')`:''}">
+    const clk=can('approve')?`openPS('${p.ticketId}','${p.id}')`:(t?`openDetail('${p.ticketId}','ps')`:'');
+    return `<tr onclick="${clk}">
       <td class="mono">${p.id}</td><td class="mono">${esc(p.ticketId)}</td>
       <td><div class="ell" title="${esc(p.mota)}">${esc(p.mota)}</div><div class="muted" style="font-size:11.5px">${esc(p.loai)}</div></td>
       <td>${esc(p.nguoiXL||'–')}</td><td>${fmtVnd(p.chiphiDX)}</td><td>${fmtVnd(p.chiphiDuyet)}</td>
@@ -389,7 +465,7 @@ function renderPS(){
   const wait=DB.ps.filter(p=>p.duyet==="Chờ duyệt").length;
   document.getElementById("view").innerHTML=`
     <div class="toolbar"><div class="muted">Tổng ${DB.ps.length} phát sinh · <b style="color:var(--amber)">${wait} chờ duyệt</b></div>
-      <div class="spacer" style="flex:1"></div><button class="btn primary sm" onclick="openPS()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 5v14M5 12h14"/></svg>Ghi nhận phát sinh</button></div>
+      <div class="spacer" style="flex:1"></div>${can('ps')?`<button class="btn primary sm" onclick="openPS()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 5v14M5 12h14"/></svg>Ghi nhận phát sinh</button>`:''}</div>
     <div class="panel"><div class="table-wrap"><table>
       <thead><tr><th>Mã PS</th><th>Ticket</th><th>Mô tả</th><th>Người xử lý</th><th>CP đề xuất</th><th>CP duyệt</th><th>Phê duyệt</th></tr></thead>
       <tbody>${rows}</tbody></table></div></div>`;
@@ -550,15 +626,16 @@ function openDetail(id,tab){
     ${row("Nhận xét",esc(t.nhanxet))}
     ${row("Ngày đóng",fmtDT(t.tClose))}
   </dl>`;
+  const psRow=p=>{const clk=can('approve')?`onclick="openPS('${p.ticketId}','${p.id}')" style="cursor:pointer"`:'';return `<tr ${clk}><td class="mono">${p.id}</td><td>${esc(p.loai)}</td><td>${esc(p.mota)}</td><td>${fmtVnd(p.chiphiDX)}</td><td>${duyetPill(p.duyet)}</td></tr>`;};
+  const addPsBtn=can('ps')?`<button class="btn sm" style="margin-top:14px" onclick="openPS('${id}')">+ Ghi nhận phát sinh</button>`:'';
   const psTab=ps.length?`<div class="table-wrap"><table><thead><tr><th>Mã PS</th><th>Loại</th><th>Mô tả</th><th>CP đề xuất</th><th>Duyệt</th></tr></thead>
-    <tbody>${ps.map(p=>`<tr><td class="mono">${p.id}</td><td>${esc(p.loai)}</td><td>${esc(p.mota)}</td><td>${fmtVnd(p.chiphiDX)}</td><td>${duyetPill(p.duyet)}</td></tr>`).join("")}</tbody></table></div>
-    <button class="btn sm" style="margin-top:14px" onclick="openPS('${id}')">+ Thêm phát sinh cho ticket này</button>`
-    :`<div class="empty" style="padding:34px"><div>Ticket chưa có phát sinh.</div><button class="btn sm" style="margin-top:14px" onclick="openPS('${id}')">+ Ghi nhận phát sinh</button></div>`;
+    <tbody>${ps.map(psRow).join("")}</tbody></table></div>${addPsBtn}${can('approve')?'<div class="hint" style="margin-top:8px">Nhấp vào dòng phát sinh để phê duyệt / cập nhật.</div>':''}`
+    :`<div class="empty" style="padding:34px"><div>Ticket chưa có phát sinh.</div>${addPsBtn}</div>`;
 
   document.getElementById("overlay").innerHTML=`<div class="modal">
     <div class="modal-h"><h3 class="mono" style="color:var(--green-800)">${esc(t.id)}</h3>
       <span class="pill ${s.color}"><span class="dot"></span>${s.label}</span>${stPill(t.trangthai)}
-      <div class="spacer"></div><button class="btn sm" onclick="openForm('${t.id}')">Chỉnh sửa</button><button class="x" onclick="closeModal()">✕</button></div>
+      <div class="spacer"></div>${can('edit')?`<button class="btn sm" onclick="openForm('${t.id}')">Chỉnh sửa</button>`:''}<button class="x" onclick="closeModal()">✕</button></div>
     <div class="modal-b">
       <div class="tabs">
         <button class="${TAB==='info'?'active':''}" onclick="openDetail('${id}','info')">Thông tin chung</button>
@@ -571,10 +648,12 @@ function openDetail(id,tab){
 }
 
 /* ============================ FORM PHÁT SINH ============================ */
-let EDITPS=null;
-function openPS(ticketId){
+let EDITPS=null, PS_EDITING=false;
+function openPS(ticketId,psId){
+  if(psId){const ex=DB.ps.find(x=>x.id===psId);if(ex){EDITPS=JSON.parse(JSON.stringify(ex));PS_EDITING=true;drawPS();document.getElementById("overlay").classList.add("show");return;}}
   const tid=ticketId||(DB.tickets[0]&&DB.tickets[0].id)||"";
   const t=DB.tickets.find(x=>x.id===tid);
+  PS_EDITING=false;
   EDITPS={id:"(tự sinh)",ticketId:tid,ngay:new Date().toISOString().slice(0,10),loai:CAT.loaiPS[0],mota:"",nguyennhan:"",anhhuong:"Trung bình",chiphiDX:"",chiphiDuyet:"",duyet:"Chờ duyệt",attach:"",nguoiXL:t?t.assignee:""};
   drawPS();document.getElementById("overlay").classList.add("show");
 }
@@ -583,7 +662,7 @@ function drawPS(){
   const sel=(n,arr)=>`<select onchange="EDITPS.${n}=this.value">${arr.map(x=>`<option ${x===p[n]?'selected':''}>${esc(x)}</option>`).join("")}</select>`;
   const inp=(n,type="text",ph="")=>`<input type="${type}" value="${esc(p[n]??'')}" placeholder="${ph}" oninput="EDITPS.${n}=this.value">`;
   document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:720px">
-    <div class="modal-h"><h3>Ghi nhận phát sinh</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
+    <div class="modal-h"><h3>${PS_EDITING?"Phê duyệt / cập nhật phát sinh "+esc(p.id):"Ghi nhận phát sinh"}</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
     <div class="modal-b"><div class="form-grid">
       <div class="f"><label>Mã Ticket liên quan <span class="req">*</span></label><select onchange="EDITPS.ticketId=this.value">${DB.tickets.map(t=>`<option value="${t.id}" ${t.id===p.ticketId?'selected':''}>${t.id} — ${esc(t.noidung.slice(0,30))}</option>`).join("")}</select></div>
       <div class="f"><label>Ngày phát sinh</label>${inp("ngay","date")}</div>
@@ -601,8 +680,11 @@ function drawPS(){
 }
 async function savePS(){
   const p=EDITPS;if(!p.ticketId||!p.mota){toast("Chọn ticket và nhập mô tả",true);return;}
-  try{delete p.id;await api("POST","/api/ps",p);await refresh();closeModal();buildNav();render();toast("Đã ghi nhận phát sinh");}
-  catch(e){toast("Lỗi lưu (kiểm tra kết nối)",true);}
+  try{
+    if(PS_EDITING){await api("PUT","/api/ps/"+encodeURIComponent(p.id),p);}
+    else{delete p.id;await api("POST","/api/ps",p);}
+    await refresh();closeModal();buildNav();render();toast(PS_EDITING?"Đã cập nhật phát sinh":"Đã ghi nhận phát sinh");
+  }catch(e){toast(e.message||"Lỗi lưu",true);}
 }
 
 /* ============================ HÀM CHUNG ============================ */
@@ -622,15 +704,119 @@ function exportCSV(){
 }
 function dl(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 
+/* ============================ QUẢN LÝ NGƯỜI DÙNG ============================ */
+let USERS=[];
+async function renderUsers(){
+  if(!can("users")){document.getElementById("view").innerHTML='<div class="empty">Bạn không có quyền truy cập trang này.</div>';return;}
+  try{USERS=await api("GET","/api/users");}catch(e){return;}
+  const rows=USERS.map(u=>`<tr>
+    <td class="mono">${esc(u.username)}${u.username===ME.username?' <span class="muted">(bạn)</span>':''}</td>
+    <td>${esc(u.name)}</td>
+    <td><span class="role-badge role-${u.role}">${esc(ROLE_VI[u.role]||u.role)}</span></td>
+    <td>${esc(u.dept||'–')}</td>
+    <td style="text-align:right;white-space:nowrap">
+      <button class="btn sm" onclick="openUser('${esc(u.username)}')">Sửa</button>
+      ${u.username!==ME.username?`<button class="btn sm danger" onclick="delUser('${esc(u.username)}')">Xóa</button>`:''}
+    </td></tr>`).join("");
+  document.getElementById("view").innerHTML=`
+    <div class="toolbar"><div class="muted">Tổng ${USERS.length} tài khoản</div><div class="spacer" style="flex:1"></div>
+      <button class="btn primary sm" onclick="openUser()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 5v14M5 12h14"/></svg>Thêm người dùng</button></div>
+    <div class="panel"><div class="table-wrap"><table>
+      <thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Phòng ban</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table></div></div>
+    <div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Giải thích vai trò</h3></div><div class="panel-b" style="display:grid;gap:8px;font-size:13px">
+      <div><span class="role-badge role-admin">Quản trị hệ thống</span> — toàn quyền + quản lý người dùng.</div>
+      <div><span class="role-badge role-dieuphoi">Điều phối / Trưởng bộ phận</span> — xem tất cả, phân công, phê duyệt phát sinh, xóa.</div>
+      <div><span class="role-badge role-xuly">Nhân viên xử lý</span> — xem &amp; cập nhật ticket, ghi phát sinh (không phê duyệt/xóa).</div>
+      <div><span class="role-badge role-yeucau">Người yêu cầu</span> — tạo &amp; xem ticket của phòng mình.</div>
+      <div><span class="role-badge role-giamdoc">Ban giám đốc</span> — chỉ xem toàn bộ (không chỉnh sửa).</div>
+    </div></div>`;
+}
+let EDITU=null,U_EDITING=false;
+function openUser(username){
+  const ex=username?USERS.find(u=>u.username===username):null;
+  U_EDITING=!!ex;
+  EDITU=ex?{username:ex.username,name:ex.name,role:ex.role,dept:ex.dept||"",password:""}:{username:"",name:"",role:"yeucau",dept:"",password:""};
+  const roleOpts=Object.keys(ROLE_VI).map(r=>`<option value="${r}" ${r===EDITU.role?'selected':''}>${ROLE_VI[r]}</option>`).join("");
+  document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:560px">
+    <div class="modal-h"><h3>${U_EDITING?"Sửa người dùng "+esc(EDITU.username):"Thêm người dùng"}</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
+    <div class="modal-b"><div class="form-grid">
+      <div class="f"><label>Tên đăng nhập <span class="req">*</span></label><input value="${esc(EDITU.username)}" ${U_EDITING?'disabled style="background:#f0f4f2;color:var(--ink-3)"':''} oninput="EDITU.username=this.value"></div>
+      <div class="f"><label>Họ tên</label><input value="${esc(EDITU.name)}" oninput="EDITU.name=this.value"></div>
+      <div class="f"><label>Vai trò <span class="req">*</span></label><select onchange="EDITU.role=this.value">${roleOpts}</select></div>
+      <div class="f"><label>Phòng ban</label><input value="${esc(EDITU.dept)}" placeholder="VD: P. Kinh doanh" oninput="EDITU.dept=this.value"></div>
+      <div class="f full"><label>${U_EDITING?"Đặt lại mật khẩu (để trống nếu giữ nguyên)":"Mật khẩu"} ${U_EDITING?'':'<span class="req">*</span>'}</label><input type="text" value="" placeholder="Tối thiểu 6 ký tự" oninput="EDITU.password=this.value"></div>
+      ${EDITU.role==='yeucau'?'<div class="hint" style="grid-column:1/-1">Người yêu cầu chỉ thấy ticket có <b>Đơn vị</b> trùng phòng ban ở trên (hoặc do chính họ tạo).</div>':''}
+    </div></div>
+    <div class="modal-f"><button class="btn" onclick="closeModal()">Hủy</button><button class="btn primary" onclick="saveUser()">Lưu</button></div></div>`;
+  document.getElementById("overlay").classList.add("show");
+}
+async function saveUser(){
+  const u=EDITU;
+  if(!U_EDITING){if(!u.username.trim()||!u.password){toast("Nhập tên đăng nhập và mật khẩu",true);return;}}
+  try{
+    if(U_EDITING){await api("PUT","/api/users/"+encodeURIComponent(u.username),{name:u.name,role:u.role,dept:u.dept,password:u.password||undefined});}
+    else{await api("POST","/api/users",u);}
+    closeModal();renderUsers();toast("Đã lưu người dùng");
+  }catch(e){toast(e.message||"Lỗi lưu",true);}
+}
+async function delUser(username){
+  if(!confirm("Xóa tài khoản "+username+"?"))return;
+  try{await api("DELETE","/api/users/"+encodeURIComponent(username));renderUsers();toast("Đã xóa tài khoản");}
+  catch(e){toast(e.message||"Lỗi xóa",true);}
+}
+
+/* ============================ ĐĂNG NHẬP / ĐĂNG XUẤT ============================ */
+function showLogin(){document.getElementById("login").classList.add("show");ME=null;}
+function hideLogin(){document.getElementById("login").classList.remove("show");}
+async function doLogin(ev){
+  ev.preventDefault();
+  const err=document.getElementById("loginErr");err.classList.remove("show");
+  const username=document.getElementById("lgUser").value.trim();
+  const password=document.getElementById("lgPass").value;
+  try{
+    const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password})});
+    const d=await r.json();
+    if(!r.ok){err.textContent=d.error||"Đăng nhập thất bại";err.classList.add("show");return;}
+    ME=d.user;CAP=d.cap;ROLELABEL=d.roleLabel;
+    hideLogin();document.getElementById("lgPass").value="";
+    await startApp();
+    if(d.mustChange)setTimeout(()=>toast("Bạn nên đổi mật khẩu mặc định (nút Đổi mật khẩu ở góc dưới trái)",true),600);
+  }catch(e){err.textContent="Không kết nối được máy chủ";err.classList.add("show");}
+}
+async function doLogout(){try{await fetch("/api/logout",{method:"POST"});}catch(e){}ME=null;CAP={};showLogin();}
+function openChangePw(force){
+  document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:460px">
+    <div class="modal-h"><h3>Đổi mật khẩu</h3><div class="spacer"></div>${force?'':'<button class="x" onclick="closeModal()">✕</button>'}</div>
+    <div class="modal-b"><div class="form-grid">
+      <div class="f full"><label>Mật khẩu hiện tại</label><input id="cpOld" type="password"></div>
+      <div class="f full"><label>Mật khẩu mới (≥ 6 ký tự)</label><input id="cpNew" type="password"></div>
+      <div class="f full"><label>Nhập lại mật khẩu mới</label><input id="cpNew2" type="password"></div>
+    </div></div>
+    <div class="modal-f">${force?'':'<button class="btn" onclick="closeModal()">Để sau</button>'}<button class="btn primary" onclick="saveChangePw()">Đổi mật khẩu</button></div></div>`;
+  document.getElementById("overlay").classList.add("show");
+}
+async function saveChangePw(){
+  const o=document.getElementById("cpOld").value,n=document.getElementById("cpNew").value,n2=document.getElementById("cpNew2").value;
+  if(n!==n2){toast("Mật khẩu nhập lại không khớp",true);return;}
+  try{await api("POST","/api/change-password",{oldPassword:o,newPassword:n});closeModal();toast("Đã đổi mật khẩu");}
+  catch(e){toast(e.message||"Lỗi đổi mật khẩu",true);}
+}
+
 /* ============================ INIT ============================ */
+async function startApp(){
+  try{await refresh();}catch(e){setOnline(false);return;}
+  PAGE="dash";go("dash");setOnline(true);
+}
+let POLL_STARTED=false;
 (async function init(){
-  try{await refresh();}
-  catch(e){
-    document.getElementById("view").innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.58 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01"/></svg>
-      <div style="font-size:15px;font-weight:600;color:var(--ink)">Chưa kết nối được máy chủ</div>
-      <div style="margin-top:6px">Hãy chắc chắn máy chủ đang chạy (node server.js) và mở lại trang.</div></div>`;
-    setOnline(false);return;
-  }
-  buildNav();go("dash");startPoll();setOnline(true);
+  try{
+    const r=await fetch("/api/me");
+    if(!r.ok){showLogin();return;}
+    const d=await r.json();ME=d.user;CAP=d.cap;ROLELABEL=d.roleLabel;
+    await startApp();
+    if(d.mustChange)setTimeout(()=>toast("Bạn nên đổi mật khẩu mặc định (nút Đổi mật khẩu ở góc dưới trái)",true),600);
+  }catch(e){showLogin();}
+  finally{if(!POLL_STARTED){POLL_STARTED=true;startPoll();}}
 })();
 </script>
