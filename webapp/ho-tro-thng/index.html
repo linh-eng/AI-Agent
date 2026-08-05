@@ -6,8 +6,8 @@
 <style>
 /* ============ THNG Support — green corporate theme ============ */
 :root{
-  --green-900:#063d2b; --green-800:#0a5138; --green-700:#0f6e4e; --green-600:#14875f;
-  --green-500:#1a9d70; --green-400:#37b98a; --green-300:#7fd7b6; --green-50:#e9f7f0;
+  --green-900:#081f38; --green-800:#0f3157; --green-700:#1b4f86; --green-600:#2563b8;
+  --green-500:#2f6fd6; --green-400:#4f8ce8; --green-300:#a7c6ee; --green-50:#eaf1fc;
   --amber:#e0a400; --amber-bg:#fff6e0; --red:#d64545; --red-bg:#fdeaea;
   --blue:#2f6fd6; --blue-bg:#eaf1fd;
   --ink:#122019; --ink-2:#3f5349; --ink-3:#6b7d74; --line:#dbe7e0; --line-2:#eef4f0;
@@ -24,14 +24,14 @@ a{color:var(--green-700)}
 
 /* layout */
 .app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
-.side{background:linear-gradient(180deg,var(--green-900),var(--green-800));color:#dff1e9;padding:22px 16px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+.side{background:linear-gradient(180deg,var(--green-800),var(--green-900));color:#dbe9fb;padding:22px 16px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
 .brand{display:flex;align-items:center;gap:12px;padding:4px 8px 20px}
 .brand .logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--green-400),var(--green-600));display:grid;place-items:center;box-shadow:0 6px 16px -6px rgba(0,0,0,.5)}
 .brand .logo svg{width:24px;height:24px}
 .brand b{font-size:16px;color:#fff;letter-spacing:-.02em;display:block;line-height:1.1}
 .brand span{font-size:11px;color:var(--green-300);letter-spacing:.08em;text-transform:uppercase}
 .nav{display:flex;flex-direction:column;gap:3px;margin-top:6px}
-.nav button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:transparent;border:0;color:#cfe8dd;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:500;transition:.15s}
+.nav button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:transparent;border:0;color:#cfe0f5;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:500;transition:.15s}
 .nav button svg{width:18px;height:18px;opacity:.85}
 .nav button:hover{background:rgba(255,255,255,.07);color:#fff}
 .nav button.active{background:rgba(255,255,255,.14);color:#fff;font-weight:600}
@@ -96,7 +96,7 @@ tbody tr{cursor:pointer}
 /* pills */
 .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
 .pill .dot{width:7px;height:7px;border-radius:50%}
-.pill.green{background:var(--green-50);color:var(--green-700)} .pill.green .dot{background:var(--green-500)}
+.pill.green{background:#e7f6ee;color:#1a7a4f} .pill.green .dot{background:#25a56a}
 .pill.amber{background:var(--amber-bg);color:#8a6500} .pill.amber .dot{background:var(--amber)}
 .pill.red{background:var(--red-bg);color:var(--red)} .pill.red .dot{background:var(--red)}
 .pill.blue{background:var(--blue-bg);color:var(--blue)} .pill.blue .dot{background:var(--blue)}
