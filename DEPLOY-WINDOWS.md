@@ -47,15 +47,37 @@ Thấy chữ `CREATE DATABASE` là xong. Gõ `\q` rồi Enter để thoát.
 
 ## BƯỚC 3 — Tạo file cấu hình `.env`
 
-Trong thư mục app, tạo file tên **`.env`** (copy từ `.env.example` rồi sửa). Nội dung:
+> ⚠️ Đây là **nội dung một FILE**, KHÔNG phải lệnh để gõ từng dòng vào PowerShell.
+> Gõ từng dòng sẽ báo lỗi *"is not recognized as the name of a cmdlet"*.
+
+**Cách nhanh nhất — dán NGUYÊN KHỐI lệnh sau vào PowerShell** (đang ở trong thư mục app).
+Lệnh tự tạo file `.env` kèm AUTH_SECRET ngẫu nhiên (nhớ sửa mật khẩu postgres cho đúng):
+
+```powershell
+$secret = [Convert]::ToBase64String((1..48 | ForEach-Object {Get-Random -Maximum 256}))
+@"
+DATABASE_URL="postgresql://postgres:THNG%24%2409xx@localhost:5432/thng_warehouse?schema=public"
+AUTH_SECRET="$secret"
+COOKIE_SECURE="false"
+SESSION_MAX_AGE="28800"
+PORT="7000"
+"@ | Set-Content -Encoding ascii .env
+```
+
+Kiểm tra file vừa tạo: `Get-Content .env`
+
+Nội dung file `.env` gồm 5 dòng như sau (thay `THNG%24%2409xx` = mật khẩu đã mã hóa của chị):
 
 ```ini
-DATABASE_URL="postgresql://postgres:Thng@2026@localhost:5432/thng_warehouse?schema=public"
-AUTH_SECRET="dan-mot-chuoi-ngau-nhien-that-dai-vao-day"
+DATABASE_URL="postgresql://postgres:THNG%24%2409xx@localhost:5432/thng_warehouse?schema=public"
+AUTH_SECRET="<chuỗi ngẫu nhiên>"
 COOKIE_SECURE="false"
 SESSION_MAX_AGE="28800"
 PORT="7000"
 ```
+
+> Cách khác (thủ công): chạy `notepad .env` → dán 5 dòng trên → Ctrl+S.
+> Khi lưu chọn *Save as type = All Files* để không bị thành `.env.txt`.
 
 - Thay **`Thng@2026`** bằng đúng mật khẩu postgres của chị.
   ⚠️ **Mật khẩu có ký tự đặc biệt PHẢI mã hóa trong DATABASE_URL** (chỉ ở dòng này;
