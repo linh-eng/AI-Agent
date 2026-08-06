@@ -39,8 +39,12 @@ enum TrackingMode {
   LICENSE // Windows, Office, phần mềm bản quyền — mã key + hạn
 }
 
-/// Vòng đời serial (mục 3d) — chỉ chuyển trạng thái, không xóa
+/// Vòng đời serial (mục 3d, 5H v1.5) — chỉ chuyển trạng thái, không xóa
+/// CHO_KIEM=PENDING_INSPECTION, TRONG_KHO=IN_STOCK, DANG_GIU=RESERVED, DA_BAN=SOLD,
+/// DANG_BAO_HANH=IN_WARRANTY_INTAKE/AT_VENDOR, CHO_MUON=RENTED, HU_HONG=DAMAGED,
+/// DA_THAY_THE=REPLACED, DA_THAO_RA=DISASSEMBLED, DA_THANH_LY=SCRAPPED, DA_HUY=CANCELLED
 enum SerialStatus {
+  PENDING_INSPECTION // CHO_KIEM — đã về Zone TN, chưa tính tồn khả dụng (5A-2)
   IN_STOCK
   WIP
   RESERVED
@@ -53,6 +57,7 @@ enum SerialStatus {
   REPLACED
   DISASSEMBLED
   SCRAPPED
+  CANCELLED // DA_HUY
 }
 
 /// Grade tình trạng cho hàng tháo máy / tân trang
@@ -169,17 +174,160 @@ enum DamageResolution {
 }
 
 // ----------------------------------------------------------------------------
+// ENUMS v1.5 — Lớp yêu cầu, YCKT, công nợ, mail, nhập liệu (mục 5A-0, 5A-2, 5L, 6, 5M)
+// ----------------------------------------------------------------------------
+
+/// Loại yêu cầu (5A-0). YCKT = tiếp nhận & kiểm tra trước nhập (5A-2).
+enum RequestType {
+  YCN // Yêu cầu nhập kho -> phiếu N1..N12
+  YCX // Yêu cầu xuất kho -> phiếu X1..X11
+  YCC // Yêu cầu chuyển kho nội bộ -> X7
+  YCM // Yêu cầu mua hàng -> PO -> YCN
+  YCK // Yêu cầu kiểm kê đột xuất
+  YCU // Yêu cầu mở khóa hàng dự án
+  YCT // Yêu cầu tra cứu/xác minh serial
+  YCKT // Yêu cầu nhận hàng & kiểm tra (5A-2)
+}
+
+/// Vòng đời yêu cầu (5A-0) — bảy trạng thái, có nhánh quay lại
+enum RequestStatus {
+  DRAFT // Nháp
+  PENDING_RECEIPT // Chờ tiếp nhận (đồng hồ SLA bắt đầu)
+  RECEIVED // Đã tiếp nhận (gán người phụ trách)
+  IN_PROGRESS // Đang thực hiện (đã sinh phiếu)
+  PENDING_SUPPLEMENT // Chờ bổ sung (trả lại bổ sung / bị từ chối) — SLA tạm dừng
+  PENDING_ACCEPTANCE // Chờ nghiệm thu
+  DONE // Hoàn tất
+  REJECTED // Từ chối
+  CANCELLED // Đã hủy
+}
+
+/// Mức ưu tiên yêu cầu (5A-0)
+enum RequestPriority {
+  P1 // Gấp — trong ngày (bắt buộc ghi lý do)
+  P2 // Bình thường — theo SLA
+  P3 // Thấp — khi rảnh
+}
+
+/// Trạng thái lô nhận hàng ở Zone TN (5A-2)
+enum ReceivingStatus {
+  PENDING_INSPECTION // CHO_KIEM
+  CONCLUDED // đã có kết luận testing
+  RECEIVED_OFFICIAL // đã nhập chính thức (TRONG_KHO)
+  REJECTED // testing không đạt -> K-HH
+}
+
+/// Kết luận testing (5A-2)
+enum TestingConclusion {
+  PASS // Đạt
+  PASS_CONDITIONAL // Đạt có điều kiện (ghi rõ điều kiện)
+  FAIL // Không đạt
+}
+
+/// Loại hồ sơ hàng (5A-1)
+enum ItemDossierType {
+  NHAP_MOI // hàng nhập mới
+  HANG_ROI_THAO_DO // hàng rời phát sinh từ tháo dỡ
+}
+
+/// Kiểu điều khoản thanh toán (5L)
+enum PaymentTermType {
+  PREPAY_100 // Trả trước 100%
+  DEPOSIT // Đặt cọc %
+  POSTPAY // Trả sau N ngày
+  BY_MILESTONE // Theo tiến độ dự án
+}
+
+/// Bốn tình huống dòng tiền (5L): NCC trả trước/sau × khách thu trước/sau
+enum CashFlowSituation {
+  A // Trả NCC trước — thu khách trước (rủi ro thấp)
+  B // Trả NCC sau — thu khách trước (dòng tiền dương)
+  C // Trả NCC trước — thu khách sau (rủi ro cao nhất — R2)
+  D // Trả NCC sau — thu khách sau (dễ vỡ nếu khách chậm)
+}
+
+/// Trạng thái công nợ (AP/AR)
+enum PayableStatus {
+  UNPAID // Chưa trả
+  PARTIAL // Trả một phần
+  PAID // Đã trả
+}
+
+/// Loại ghi nhận thanh toán
+enum PaymentRecordType {
+  AP // phải trả NCC
+  AR // phải thu khách
+}
+
+/// Nguồn số liệu công nợ (5L)
+enum PaymentSource {
+  MANUAL // nhập tay
+  IMPORT_EXCEL // nhập từ Excel
+  ACCOUNTING_API // từ phần mềm kế toán
+}
+
+/// Trạng thái mốc giao dự án (5D-1)
+enum MilestoneStatus {
+  NOT_DUE // Chưa đến hạn
+  READY // Sẵn sàng
+  DELIVERING // Đang giao
+  PARTIAL // Đã giao một phần
+  DELIVERED // Đã giao
+  LATE // Trễ
+}
+
+/// Trạng thái bản soạn mail (mục 6)
+enum MailDraftStatus {
+  PENDING // Chờ gửi
+  SENT // Đã gửi
+  NOT_NEEDED // Không cần gửi (ghi lý do)
+  MISS // Quá hạn chưa gửi
+}
+
+/// Trạng thái lô nạp file (5M)
+enum ImportBatchStatus {
+  VALIDATING // đang kiểm tra
+  COMMITTED // đã ghi vào hệ thống
+  REJECTED // bị từ chối (sai phiên bản/công nợ có lỗi)
+  REVOKED // đã thu hồi trong 24h
+}
+
+/// Kết quả từng dòng khi nạp file (5M)
+enum ImportRowResult {
+  VALID // Hợp lệ
+  WARNING // Cảnh báo
+  ERROR // Lỗi
+  DUPLICATE_REJECTED // trùng khóa -> từ chối, không ghi đè
+}
+
+/// Chu kỳ mẫu báo cáo (5J)
+enum ReportCycle {
+  DAY
+  WEEK
+  MONTH
+  QUARTER
+  YEAR
+}
+
+// ----------------------------------------------------------------------------
 // AUTH & RBAC
 // ----------------------------------------------------------------------------
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
-  passwordHash String
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                        String   @id @default(cuid())
+  email                     String   @unique
+  name                      String
+  passwordHash              String
+  /// Phòng ban (5A-0: tự điền vào yêu cầu, khai một lần ở hồ sơ)
+  department                String?
+  phone                     String?
+  isActive                  Boolean  @default(true)
+  /// Bắt buộc đổi mật khẩu lần đăng nhập đầu (mục 12)
+  mustChangePassword        Boolean  @default(false)
+  /// Được tạo yêu cầu thay cho phòng ban khác (5A-0: Trợ lý GĐ, Điều phối dự án)
+  canCreateRequestForOthers Boolean  @default(false)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   roles     UserRole[]
   auditLogs AuditLog[]
@@ -305,18 +453,24 @@ model Project {
 }
 
 model Partner {
-  id          String      @id @default(cuid())
-  code        String      @unique
-  name        String
-  type        PartnerType
-  taxCode     String?
-  phone       String?
-  email       String?
-  address     String?
+  id                     String           @id @default(cuid())
+  code                   String           @unique
+  name                   String
+  type                   PartnerType
+  taxCode                String?
+  phone                  String?
+  email                  String?
+  address                String?
   /// Hạn mức công nợ (VND) — kế toán kiểm tra khi duyệt xuất
-  creditLimit Decimal?    @db.Decimal(18, 2)
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
+  creditLimit            Decimal?         @db.Decimal(18, 2)
+  /// Điều khoản thanh toán mặc định (5L) — ghi đè được trên từng chứng từ
+  defaultPaymentTermType PaymentTermType?
+  defaultDepositRate     Decimal?         @db.Decimal(5, 2) // % cọc
+  defaultPaymentDays     Int? // N ngày trả sau
+  /// Kinh doanh phụ trách khách này (C55 — phân quyền xem công nợ)
+  salesOwnerId           String?
+  isActive               Boolean          @default(true)
+  createdAt              DateTime         @default(now())
 
   projectsAsCustomer Project[]       @relation("ProjectCustomer")
   serialsAsSupplier  Serial[]        @relation("SerialSupplier")
@@ -329,21 +483,29 @@ model Partner {
 }
 
 model Product {
-  id           String       @id @default(cuid())
-  sku          String       @unique
-  barcode      String?      @unique
-  name         String
-  model        String?
-  brand        String?
-  category     String?
-  trackingMode TrackingMode
-  uom          String       @default("Cái") // đơn vị tính
-  weight       Decimal?     @db.Decimal(12, 3)
-  dimensions   String? // DxRxC
+  id               String       @id @default(cuid())
+  sku              String       @unique
+  barcode          String?      @unique
+  name             String
+  /// Part Number — bắt buộc nhận biết nguồn gốc (NT1/C16, v1.1)
+  partNumber       String?
+  model            String?
+  brand            String?
+  category         String?
+  /// Nhóm hàng (dùng cho miễn kiểm YCKT + báo cáo)
+  productGroup     String?
+  trackingMode     TrackingMode
+  uom              String       @default("Cái") // đơn vị tính
+  weight           Decimal?     @db.Decimal(12, 3)
+  dimensions       String? // DxRxC
   /// Tồn tối thiểu để cảnh báo (đặc biệt cho linh kiện K-LK)
-  minStock     Int?
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now())
+  minStock         Int?
+  /// Giá vốn tham chiếu (v1.1 — tính giá trị tồn R1..R9)
+  refCostPrice     Decimal?     @db.Decimal(18, 2)
+  /// Nhóm hàng miễn kiểm YCKT — testing tự kết luận Đạt (5A-2)
+  inspectionExempt Boolean      @default(false)
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
 
   serials       Serial[]
   lots          Lot[]
@@ -382,6 +544,43 @@ model Serial {
   weight            Decimal? @db.Decimal(12, 3)
   dimensions        String?
 
+  // --- Nhận dạng & xuất xứ v1.1 (NT1, NT12) ---
+  /// Số tham chiếu cho hàng không serial (LOT/QTY/LICENSE) — [phiếu]-[dòng]-[stt]
+  refNo      String?
+  /// Part Number bắt buộc (NT1/C16)
+  partNumber String?
+  /// Model bắt buộc (NT1/C16)
+  model      String?
+  /// Giá vốn tham chiếu (tính R1..R9)
+  costPrice  Decimal? @db.Decimal(18, 2)
+
+  // --- Chứng từ đầu vào (NT9) ---
+  docInType  String? // loại chứng từ nhập
+  docInNo    String? // số chứng từ nhập
+  docInId    String? // id chứng từ nhập
+  receivedAt DateTime? // ngày nhập kho chính thức
+
+  // --- Bảo hành hai tầng lưu thẳng trên serial (NT10) — song song bảng Warranty ---
+  vendorWarrantyFrom           DateTime?
+  vendorWarrantyTo             DateTime?
+  /// Lý do không có bảo hành hãng (bắt buộc nếu để trống mốc — C21)
+  vendorWarrantyEmptyReason    String?
+  thngWarrantyFrom             DateTime?
+  thngWarrantyTo               DateTime?
+  /// Lý do bảo hành THNG khác mặc định
+  thngWarrantyNonDefaultReason String?
+
+  // --- Hàng rời từ tháo dỡ (5A-1) ---
+  /// Serial máy mẹ đã tháo ra (nguồn gốc linh kiện rời)
+  sourceParentSerialId String?
+  /// Hồ sơ hàng (item_dossiers)
+  dossierId            String?
+
+  // --- Giữ hàng theo dự án/mốc (5D-1) ---
+  reservationProjectId   String?
+  reservationMilestoneId String?
+  reservationHold        DateTime? // hạn giữ
+
   binId String?
 
   // Quan hệ cha–con & thay thế (mục 3d) — TỰ THAM CHIẾU
@@ -418,6 +617,12 @@ model Serial {
   @@index([status])
   @@index([projectId])
   @@index([parentSerialId])
+  @@index([refNo])
+  @@index([partNumber])
+  @@index([warehouseId, status])
+  @@index([vendorWarrantyTo])
+  @@index([sourceParentSerialId])
+  @@index([dossierId])
   @@map("serials")
 }
 
@@ -559,18 +764,18 @@ model InboundLine {
 }
 
 model OutboundOrder {
-  id          String         @id @default(cuid())
-  number      String         @unique
-  type        OutboundType
-  customerId  String?
-  projectId   String?
-  status      DocumentStatus @default(DRAFT)
-  approvedBy  String?
-  approvedAt  DateTime?
+  id           String         @id @default(cuid())
+  number       String         @unique
+  type         OutboundType
+  customerId   String?
+  projectId    String?
+  status       DocumentStatus @default(DRAFT)
+  approvedBy   String?
+  approvedAt   DateTime?
   rejectReason String?
-  deliveredAt DateTime?
-  note        String?
-  createdAt   DateTime       @default(now())
+  deliveredAt  DateTime?
+  note         String?
+  createdAt    DateTime       @default(now())
 
   customer        Partner?         @relation(fields: [customerId], references: [id])
   project         Project?         @relation(fields: [projectId], references: [id])
@@ -900,4 +1105,492 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ============================================================================
+// v1.5 — LỚP YÊU CẦU (5A-0)
+// Quan hệ FK dùng id scalar (không @relation) theo đúng quy ước các model
+// nghiệp vụ hiện có (WarrantyIntake/VendorRma...) để giữ thay đổi additive.
+// ============================================================================
+
+model Request {
+  id       String          @id @default(cuid())
+  code     String          @unique // YCX-2026-0001 (theo ngày TẠO, không theo ngày lưu)
+  type     RequestType
+  status   RequestStatus   @default(DRAFT)
+  priority RequestPriority @default(P2)
+  p1Reason String? // bắt buộc nếu P1 (C25)
+
+  // Người gửi (tự điền từ hồ sơ) + tạo thay
+  requesterId    String
+  requesterDept  String?
+  createdForDept String? // yêu cầu tính cho phòng ban này (tạo thay)
+  createdById    String? // người thực tế tạo (khi tạo thay)
+
+  // Nội dung chung
+  neededBy DateTime? // thời gian cần có hàng
+  content  String? // nội dung/lý do
+
+  // Đối tượng
+  projectId         String?
+  partnerId         String?
+  isCommercialStock Boolean @default(false)
+  deliveryLocation  String?
+
+  // Chứng từ
+  relatedDocCode  String? // hợp đồng, PO, đơn hàng, ticket Hỗ trợ
+  supportTicketId String? // điểm nối Module Hỗ trợ (mục 8)
+
+  // Tiếp nhận & phụ trách
+  receivedById String?
+  assigneeId   String?
+  receivedAt   DateTime?
+
+  // SLA (đồng hồ dừng khi CHO_BO_SUNG — cộng dồn, không reset)
+  slaDeadline           DateTime?
+  slaPausedAt           DateTime?
+  slaPausedTotalMinutes Int       @default(0)
+
+  // Trả lại / từ chối
+  supplementReason  String? // trả lại bổ sung: cần bổ sung gì
+  rejectReasonGroup String? // nhóm lý do từ chối
+  rejectReasonNote  String? // diễn giải từ chối
+
+  // Điểm chất lượng phục vụ kho (4 thành phần) + đánh giá
+  scoreSla     Boolean? // đạt SLA
+  scoreCorrect Boolean? // đúng số lượng & đúng hàng
+  scoreNoRedo  Boolean? // không bị trả lại do lỗi kho
+  ratingStars  Int? // 1..5
+  ratingNote   String?
+
+  createdAt  DateTime  @default(now())
+  closedAt   DateTime?
+  closedById String?
+
+  lines    RequestLine[]
+  comments RequestComment[]
+  events   RequestEvent[]
+
+  @@index([status, slaDeadline])
+  @@index([assigneeId])
+  @@index([type, createdAt])
+  @@index([requesterId])
+  @@map("requests")
+}
+
+model RequestLine {
+  id               String  @id @default(cuid())
+  requestId        String
+  productId        String?
+  productText      String? // khi chưa có mã sản phẩm
+  quantity         Int     @default(1)
+  designatedSerial String? // serial chỉ định (nếu có)
+  techNote         String?
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@map("request_lines")
+}
+
+model RequestComment {
+  id          String   @id @default(cuid())
+  requestId   String
+  userId      String
+  content     String
+  mentions    String? // @tên người (JSON/CSV) -> sinh mail (mục 6)
+  attachments String?
+  createdAt   DateTime @default(now())
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@map("request_comments")
+}
+
+model RequestEvent {
+  id           String         @id @default(cuid())
+  requestId    String
+  fromStatus   RequestStatus?
+  toStatus     RequestStatus?
+  userId       String?
+  reason       String?
+  snapshotPath String? // bản chụp PDF (mục 6.3)
+  createdAt    DateTime       @default(now())
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@map("request_events")
+}
+
+// ============================================================================
+// v1.5 — TIẾP NHẬN & KIỂM TRA TRƯỚC NHẬP (5A-2)
+// ============================================================================
+
+model ReceivingBatch {
+  id                  String          @id @default(cuid())
+  number              String          @unique // TN-2026-0001
+  requestId           String? // YCKT
+  po                  String?
+  supplierId          String?
+  invoiceNumber       String?
+  packingList         String?
+  /// Ngày hàng về VẬT LÝ — mốc chạy đồng hồ đòi đổi NCC 7 ngày (KHÔNG dùng ngày nhập)
+  physicalArrivalDate DateTime?
+  packageCount        Int?
+  conditionPhotos     String?
+  zoneTnWarehouseId   String? // K-TN
+  receiverId          String?
+  inspectionRequest   String? // yêu cầu kiểm tra gì (mở hộp, chạy thử, burn-in...)
+  status              ReceivingStatus @default(PENDING_INSPECTION)
+  createdAt           DateTime        @default(now())
+
+  testingReports TestingReport[]
+
+  @@index([physicalArrivalDate, status])
+  @@map("receiving_batches")
+}
+
+model TestingReport {
+  id                String             @id @default(cuid())
+  receivingBatchId  String
+  serialId          String?
+  refNo             String?
+  // Bộ trường phiếu kiểm tra hàng BP. Kỹ thuật (giữ nguyên)
+  itemCode          String?
+  itemName          String?
+  quantity          Int?
+  weight            Decimal?           @db.Decimal(12, 3)
+  dimensions        String?
+  yearOfManufacture Int?
+  originCountry     String?
+  serialNumber      String?
+  // Kết luận
+  inspectionContent String?
+  conclusion        TestingConclusion?
+  condition         String? // điều kiện khi Đạt có điều kiện (C34)
+  burnInHours       Int?
+  inspectorId       String?
+  inspectedAt       DateTime?
+  attachments       String?
+  // Miễn kiểm theo nhóm hàng (5A-2)
+  isExempt          Boolean            @default(false)
+  exemptReason      String?
+  createdAt         DateTime           @default(now())
+
+  receivingBatch ReceivingBatch @relation(fields: [receivingBatchId], references: [id], onDelete: Cascade)
+
+  @@index([receivingBatchId])
+  @@index([serialId])
+  @@map("testing_reports")
+}
+
+// ============================================================================
+// v1.5 — HỒ SƠ HÀNG RỜI (5A-1)
+// ============================================================================
+
+model ItemDossier {
+  id                   String          @id @default(cuid())
+  code                 String          @unique // HS-RA-... / HS-N-...
+  type                 ItemDossierType
+  serialId             String?
+  parentSerialId       String? // serial máy mẹ khi là hàng rời (NOT NULL enforce ở service)
+  disassemblyOrderId   String?
+  projectId            String?
+  partnerId            String?
+  // Chứng từ đầu vào gốc (truy ngược qua serial linh kiện)
+  docInType            String?
+  docInNo              String?
+  po                   String?
+  invoiceNumber        String?
+  coCq                 String?
+  customsDeclarationNo String?
+  // Bảo hành kế thừa
+  vendorWarrantyTo     DateTime?
+  thngWarrantyTo       DateTime?
+  grade                ConditionGrade?
+  note                 String?
+  photos               String?
+  createdById          String?
+  createdAt            DateTime        @default(now())
+
+  @@index([parentSerialId])
+  @@index([serialId])
+  @@map("item_dossiers")
+}
+
+// ============================================================================
+// v1.5 — KẾ HOẠCH GIAO DỰ ÁN THEO MỐC (5D-1)
+// ============================================================================
+
+model ProjectMilestone {
+  id               String          @id @default(cuid())
+  projectId        String
+  name             String
+  plannedDate      DateTime?
+  location         String?
+  customerReceiver String?
+  precondition     String? // điều kiện tiên quyết (đã tạm ứng, mặt bằng...)
+  status           MilestoneStatus @default(NOT_DUE)
+  createdAt        DateTime        @default(now())
+
+  lines MilestoneLine[]
+
+  @@index([projectId, plannedDate])
+  @@map("project_milestones")
+}
+
+model MilestoneLine {
+  id                String  @id @default(cuid())
+  milestoneId       String
+  productId         String?
+  quantity          Int     @default(1)
+  techRequirement   String? // đã cài phần mềm, đã dán tem, đã burn-in
+  quantityDelivered Int     @default(0)
+
+  milestone ProjectMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@index([milestoneId])
+  @@map("milestone_lines")
+}
+
+model Reservation {
+  id            String    @id @default(cuid())
+  serialId      String?
+  productId     String?
+  projectId     String?
+  milestoneId   String?
+  quantity      Int       @default(1)
+  holdUntil     DateTime? // hạn giữ (mặc định ngày giao + 15)
+  reservedById  String?
+  releaseReason String?
+  releasedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([projectId, holdUntil])
+  @@index([serialId])
+  @@map("reservations")
+}
+
+// ============================================================================
+// v1.5 — CÔNG NỢ & THANH TOÁN (5L) — lớp mỏng
+// ============================================================================
+
+model PaymentTerm {
+  id          String          @id @default(cuid())
+  partnerId   String?
+  type        PaymentTermType
+  depositRate Decimal?        @db.Decimal(5, 2)
+  days        Int?
+  note        String?
+  isDefault   Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+
+  @@index([partnerId])
+  @@map("payment_terms")
+}
+
+model Payable {
+  id               String             @id @default(cuid())
+  inboundOrderId   String?
+  po               String?
+  supplierId       String?
+  value            Decimal            @db.Decimal(18, 2)
+  paid             Decimal            @default(0) @db.Decimal(18, 2)
+  remaining        Decimal            @default(0) @db.Decimal(18, 2)
+  dueDate          DateTime?
+  status           PayableStatus      @default(UNPAID)
+  cashFlow         CashFlowSituation?
+  prepaidDate      DateTime? // ngày trả trước (R8)
+  goodsArrivedDate DateTime?
+  createdAt        DateTime           @default(now())
+
+  @@index([dueDate, status])
+  @@index([supplierId])
+  @@map("payables")
+}
+
+model Receivable {
+  id              String        @id @default(cuid())
+  outboundOrderId String?
+  milestoneId     String?
+  partnerId       String?
+  projectId       String?
+  value           Decimal       @db.Decimal(18, 2)
+  collected       Decimal       @default(0) @db.Decimal(18, 2)
+  remaining       Decimal       @default(0) @db.Decimal(18, 2)
+  dueDate         DateTime?
+  ageDays         Int           @default(0)
+  status          PayableStatus @default(UNPAID)
+  createdAt       DateTime      @default(now())
+
+  @@index([dueDate, ageDays])
+  @@index([partnerId])
+  @@map("receivables")
+}
+
+model PaymentRecord {
+  id           String            @id @default(cuid())
+  type         PaymentRecordType
+  payableId    String?
+  receivableId String?
+  amount       Decimal           @db.Decimal(18, 2)
+  date         DateTime?
+  document     String? // số chứng từ thanh toán (bắt buộc — C42)
+  recordedById String?
+  source       PaymentSource // nguồn số liệu (bắt buộc — C42)
+  createdAt    DateTime          @default(now())
+
+  @@index([payableId])
+  @@index([receivableId])
+  @@map("payment_records")
+}
+
+// ============================================================================
+// v1.5 — SOẠN MAIL THEO SỰ KIỆN & GHI NHẬN GỬI (mục 6)
+// ============================================================================
+
+model MailTemplate {
+  id          String   @id @default(cuid())
+  event       String   @unique // khóa sự kiện ở bảng 6.4
+  subjectTpl  String
+  bodyTpl     String   @db.Text
+  variables   String? // danh sách biến {so_phieu}...
+  version     Int      @default(1)
+  isActive    Boolean  @default(true)
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@map("mail_templates")
+}
+
+model MailDraft {
+  id              String          @id @default(cuid())
+  event           String // sự kiện (bảng 6.4)
+  docType         String? // loại chứng từ liên quan
+  docId           String?
+  requestId       String?
+  toRecipients    String // người nhận chính
+  ccRecipients    String? // CC
+  subject         String
+  body            String          @db.Text
+  snapshotPath    String? // bản chụp PDF một trang (6.3)
+  templateId      String?
+  status          MailDraftStatus @default(PENDING)
+  mustSendById    String? // người phải gửi
+  confirmedById   String?
+  confirmedAt     DateTime?
+  notNeededReason String? // C49
+  confirmDeadline DateTime? // sinh + 4 giờ làm việc -> quá hạn = MISS
+  createdAt       DateTime        @default(now())
+
+  @@index([status, confirmDeadline])
+  @@index([mustSendById])
+  @@map("mail_drafts")
+}
+
+// ============================================================================
+// v1.5 — NHẬP LIỆU TỪ FILE & THƯ VIỆN MẪU (5M)
+// ============================================================================
+
+model FileTemplate {
+  id              String   @id @default(cuid())
+  dataGroup       String // nhóm dữ liệu
+  name            String
+  version         Int      @default(1)
+  filePath        String?
+  description     String?
+  requiredColumns String? // cột bắt buộc (JSON)
+  isActive        Boolean  @default(true)
+  updatedById     String?
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
+
+  @@index([dataGroup])
+  @@map("file_templates")
+}
+
+model ImportBatch {
+  id               String            @id @default(cuid())
+  code             String            @unique // IMP-2026-0001
+  dataGroup        String
+  templateId       String?
+  templateVersion  Int?
+  fileName         String?
+  originalFilePath String?
+  uploadedById     String?
+  rowsAccepted     Int               @default(0)
+  rowsError        Int               @default(0)
+  status           ImportBatchStatus @default(VALIDATING)
+  revokedAt        DateTime?
+  revokedById      String?
+  createdAt        DateTime          @default(now())
+
+  rows ImportRow[]
+
+  @@index([dataGroup, createdAt])
+  @@map("import_batches")
+}
+
+model ImportRow {
+  id              String          @id @default(cuid())
+  importBatchId   String
+  rowNumber       Int // số dòng trong file
+  rawData         Json // nguyên trạng dòng, kể cả dòng lỗi
+  result          ImportRowResult
+  errorDetail     String?
+  createdRecordId String? // id bản ghi đã tạo
+  createdAt       DateTime        @default(now())
+
+  importBatch ImportBatch @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+
+  @@index([importBatchId])
+  @@map("import_rows")
+}
+
+model ReportTemplate {
+  id           String      @id @default(cuid())
+  business     String // nghiệp vụ
+  cycle        ReportCycle
+  name         String
+  columnConfig Json?
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+
+  @@index([business, cycle])
+  @@map("report_templates")
+}
+
+// ============================================================================
+// v1.5 — GHI NỐI TIẾP / KHÔNG GHI ĐÈ (NT13): mọi sửa = bản ghi điều chỉnh
+// ============================================================================
+
+model Adjustment {
+  id             String   @id @default(cuid())
+  sourceTable    String // bảng gốc
+  sourceRecordId String // bản ghi gốc
+  field          String
+  oldValue       String?
+  newValue       String?
+  reason         String // bắt buộc (C43/C47)
+  adjustedById   String?
+  createdAt      DateTime @default(now())
+
+  @@index([sourceTable, sourceRecordId])
+  @@map("adjustments")
+}
+
+model Attachment {
+  id           String   @id @default(cuid())
+  entityType   String
+  entityId     String
+  fileName     String
+  path         String
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@map("attachments")
 }

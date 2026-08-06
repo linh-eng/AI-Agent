@@ -23,6 +23,9 @@ export const WAREHOUSE_CATALOG: WarehouseDef[] = [
   { code: "K-DEMO", name: "Demo/cho mượn/cho thuê", description: "Hàng demo, cho mượn, cho thuê", countsAsAvailable: true },
   { code: "K-SW", name: "Bản quyền phần mềm", description: "License phần mềm bản quyền", countsAsAvailable: true },
   { code: "K-TL", name: "Thanh lý/chờ hủy", description: "Hàng chờ thanh lý/hủy", countsAsAvailable: false },
+  // v1.5 — Zone TN: khu vực tiếp nhận & kiểm tra trước khi nhập (5A-2). Hàng CHO_KIEM
+  // đã về công ty nhưng CHƯA tính tồn khả dụng, chưa xuất/cấp phát được.
+  { code: "K-TN", name: "Tiếp nhận & kiểm tra (Zone TN)", description: "Hàng chờ kiểm tra (CHO_KIEM) trước khi nhập chính thức — 5A-2", countsAsAvailable: false },
 ];
 
 /** Các kho KHÔNG tính vào tồn khả dụng bán (quy tắc cứng mục 3a). */

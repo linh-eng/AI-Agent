@@ -56,6 +56,20 @@ export const PERMISSIONS = {
   DISASSEMBLY_APPROVE: "disassembly.approve",
   STOCKCOUNT_APPROVE: "stockcount.approve",
   USER_MANAGE: "user.manage",
+
+  // --- v1.5 ---
+  REQUEST_WRITE: "request.write", // tạo/gửi yêu cầu (5A-0)
+  REQUEST_RECEIVE: "request.receive", // tiếp nhận & gán người phụ trách (kho)
+  UNLOCK_APPROVE: "unlock.approve", // duyệt mở khóa hàng dự án (YCU / C8)
+  RECEIVING_WRITE: "receiving.write", // nhận hàng vật lý Zone TN (5A-2)
+  TESTING_WRITE: "testing.write", // nhập biên bản testing (5A-2)
+  MILESTONE_WRITE: "milestone.write", // kế hoạch giao dự án theo mốc (5D-1)
+  FINANCE_READ: "finance.read", // xem số tiền công nợ (5L)
+  FINANCE_WRITE: "finance.write", // ghi nhận thanh toán AP/AR (5L)
+  IMPORT_CATALOG: "import.catalog", // nạp file danh mục (5M-D)
+  IMPORT_SERIAL: "import.serial", // nạp file serial/testing (5M-D)
+  IMPORT_FINANCE: "import.finance", // nạp file công nợ (5M-D)
+  MAIL_MANAGE: "mail.manage", // quản trị mẫu mail (mục 6.5)
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -78,19 +92,29 @@ const CATALOG_READ: PermissionCode[] = [
 export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
   ADMIN: ALL_PERMISSIONS,
 
-  // BGĐ: xem tất cả + các quyền duyệt
+  // BGĐ: xem tất cả + các quyền duyệt (gồm mở khóa, xem tiền)
   BOD: [
     ...CATALOG_READ,
     PERMISSIONS.INBOUND_WRITE,
     PERMISSIONS.OUTBOUND_APPROVE,
     PERMISSIONS.DISASSEMBLY_APPROVE,
     PERMISSIONS.STOCKCOUNT_APPROVE,
+    PERMISSIONS.REQUEST_WRITE,
+    PERMISSIONS.UNLOCK_APPROVE,
+    PERMISSIONS.FINANCE_READ,
   ],
 
-  // Mua hàng: tạo PO/đề nghị nhập
-  PURCHASING: [...CATALOG_READ, PERMISSIONS.PARTNER_WRITE, PERMISSIONS.INBOUND_WRITE],
+  // Mua hàng: tạo PO/đề nghị nhập, tạo YCKT, xem công nợ phải trả NCC
+  PURCHASING: [
+    ...CATALOG_READ,
+    PERMISSIONS.PARTNER_WRITE,
+    PERMISSIONS.INBOUND_WRITE,
+    PERMISSIONS.REQUEST_WRITE,
+    PERMISSIONS.RECEIVING_WRITE,
+    PERMISSIONS.FINANCE_READ, // chỉ AP — lọc ở tầng server (5L)
+  ],
 
-  // Kế toán kho: nhập hệ thống, gán SKU/barcode, duyệt xuất
+  // Kế toán kho: nhập hệ thống, tiếp nhận yêu cầu, duyệt xuất, quản công nợ đầy đủ, nạp file
   WH_ACCOUNTANT: [
     ...CATALOG_READ,
     PERMISSIONS.PRODUCT_WRITE,
@@ -98,28 +122,51 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PARTNER_WRITE,
     PERMISSIONS.INBOUND_WRITE,
     PERMISSIONS.OUTBOUND_APPROVE,
+    PERMISSIONS.REQUEST_RECEIVE,
+    PERMISSIONS.FINANCE_READ,
+    PERMISSIONS.FINANCE_WRITE,
+    PERMISSIONS.IMPORT_CATALOG,
+    PERMISSIONS.IMPORT_FINANCE,
   ],
 
-  // Thủ kho: nhận hàng, quét serial, scan-to-bin
+  // Thủ kho: nhận hàng, quét serial, scan-to-bin, tiếp nhận yêu cầu, nhận vật lý Zone TN
   WAREHOUSE_KEEPER: [
     ...CATALOG_READ,
     PERMISSIONS.WAREHOUSE_WRITE,
     PERMISSIONS.BIN_WRITE,
     PERMISSIONS.INBOUND_WRITE,
     PERMISSIONS.OUTBOUND_WRITE,
+    PERMISSIONS.REQUEST_RECEIVE,
+    PERMISSIONS.RECEIVING_WRITE,
+    PERMISSIONS.IMPORT_SERIAL,
   ],
 
-  // Kỹ thuật/Lắp ráp
-  TECH: [...CATALOG_READ, PERMISSIONS.WORKORDER_WRITE, PERMISSIONS.QC_WRITE],
+  // Kỹ thuật/Lắp ráp: + testing (5A-2), tạo yêu cầu (linh kiện lắp ráp)
+  TECH: [
+    ...CATALOG_READ,
+    PERMISSIONS.WORKORDER_WRITE,
+    PERMISSIONS.QC_WRITE,
+    PERMISSIONS.REQUEST_WRITE,
+    PERMISSIONS.TESTING_WRITE,
+    PERMISSIONS.IMPORT_SERIAL,
+  ],
 
-  // QC
-  QC: [...CATALOG_READ, PERMISSIONS.QC_WRITE],
+  // QC: + testing
+  QC: [...CATALOG_READ, PERMISSIONS.QC_WRITE, PERMISSIONS.TESTING_WRITE],
 
-  // Kinh doanh: tạo SO, lệnh lắp ráp
-  SALES: [...CATALOG_READ, PERMISSIONS.OUTBOUND_WRITE, PERMISSIONS.WORKORDER_WRITE],
+  // Kinh doanh: tạo SO, lệnh lắp ráp, tạo yêu cầu, mở khóa/giữ hàng dự án, kế hoạch mốc, xem công nợ khách mình
+  SALES: [
+    ...CATALOG_READ,
+    PERMISSIONS.OUTBOUND_WRITE,
+    PERMISSIONS.WORKORDER_WRITE,
+    PERMISSIONS.REQUEST_WRITE,
+    PERMISSIONS.UNLOCK_APPROVE,
+    PERMISSIONS.MILESTONE_WRITE,
+    PERMISSIONS.FINANCE_READ, // chỉ khách mình phụ trách — lọc ở server (C55)
+  ],
 
-  // Bảo hành/Dịch vụ
-  WARRANTY: [...CATALOG_READ, PERMISSIONS.WARRANTY_WRITE],
+  // Bảo hành/Dịch vụ: + tạo yêu cầu
+  WARRANTY: [...CATALOG_READ, PERMISSIONS.WARRANTY_WRITE, PERMISSIONS.REQUEST_WRITE],
 };
 
 /** Kiểm tra tập quyền có chứa quyền yêu cầu. */
