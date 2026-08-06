@@ -43,8 +43,29 @@ Tham chiếu yêu cầu đầy đủ: bản mô tả 10 module (M1–M10) và l�
   In ấn chứng từ/tem (`src/lib/print.ts`): **in tem serial** (M3) từ màn truy vết, **in biên bản bàn giao**
   (M8) từ phiếu xuất.
 
-Toàn bộ lộ trình 7 phase đã hoàn tất. Chỉ số "giá trị" (tiền) hiện dựa trên số lượng vì schema chưa có
-trường giá vốn — có thể bổ sung trường giá để tính giá trị nhập/tồn/thu hồi sau.
+Toàn bộ lộ trình 7 phase (bản gốc) đã hoàn tất.
+
+## Nâng cấp theo đặc tả v1.5 (đang triển khai)
+
+Đặc tả mới `DACTAYEUCAUWebAppKhoTHNGv1_5.pdf` mở rộng lớn (11 phase, 14 nguyên tắc bất biến NT1–NT14,
+50 quy tắc chặn C1–C50, 70 tiêu chí nghiệm thu). Tiến độ:
+
+- **✅ Nền tảng dữ liệu:** schema bổ sung (additive) cho toàn bộ mục 9 — enum + trường mới trên
+  User/Product/Partner/Serial + 21 model mới (Request/RequestLine/RequestComment/RequestEvent,
+  ReceivingBatch/TestingReport, ItemDossier, ProjectMilestone/MilestoneLine/Reservation,
+  PaymentTerm/Payable/Receivable/PaymentRecord, MailTemplate/MailDraft, FileTemplate/ImportBatch/
+  ImportRow/ReportTemplate, Adjustment, Attachment). Kho +K-TN (Zone TN). RBAC +quyền v1.5.
+- **✅ Lớp Yêu cầu 5A-0:** 8 loại YC, 7 trạng thái + nhánh quay lại, 4 cơ chế hai chiều (trả lại bổ
+  sung dừng SLA / từ chối có lý do / trao đổi @nhắc / cập nhật ngược), đồng hồ SLA giờ-làm-việc
+  (`src/lib/sla.ts`), điểm phục vụ kho 4 thành phần, xung đột P1. `src/lib/requests.ts`,
+  `request-service.ts`; API `/api/requests/*`; UI `/requests` + `/requests/[id]`.
+- **✅ Cưỡng chế nhận dạng (NT1/NT9/NT10/NT12):** P/N+Model bắt buộc, giá vốn tham chiếu, ref_no tự
+  sinh cho hàng không serial, doc gắn stock_moves, bảo hành 2 tầng + lý do. (inbound-service).
+- **⏳ Còn lại:** 5A-2 YCKT/testing · 5A-1 hồ sơ hàng rời · 5C-1 R1–R9 · 5D-1 mốc dự án · 5L công
+  nợ AP/AR · mục 6 soạn mail+MISS · 5M nhập file+thư viện mẫu · 5J mẫu báo cáo · mục 12 siết bảo mật.
+
+DB vẫn dùng **PostgreSQL** (đã triển khai trên máy chủ Windows) — đặc tả v1.5 §11 gợi ý SQLite cho
+LAN tối giản, có thể chuyển sau qua `datasource provider` nếu cần.
 
 ## Tech stack
 
