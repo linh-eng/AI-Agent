@@ -53,8 +53,12 @@ db.exec(`
 function ymd(d) { return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`; }
 const qSeqGet = db.prepare("SELECT v FROM seq WHERE k = ?");
 const qSeqSet = db.prepare("INSERT INTO seq(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v = excluded.v");
-function seqNext(pfx) { const k = pfx + ymd(new Date()); const cur = qSeqGet.get(k); const v = (cur ? cur.v : 0) + 1; qSeqSet.run(k, v); return v; }
-function genId(pfx) { const day = new Date(); return `${pfx}-${ymd(day)}-${String(seqNext(pfx)).padStart(4,"0")}`; }
+function seqNext(pfx, day) { const k = pfx + ymd(day); const cur = qSeqGet.get(k); const v = (cur ? cur.v : 0) + 1; qSeqSet.run(k, v); return v; }
+// Mã ticket lấy theo NGÀY TIẾP NHẬN (ngày tạo phiếu), không phải ngày lưu bản ghi.
+function genId(pfx, day) { day = day || new Date(); return `${pfx}-${ymd(day)}-${String(seqNext(pfx, day)).padStart(4,"0")}`; }
+// Kiểm tra mật khẩu: tối thiểu 8 ký tự, có cả chữ và số
+function validPw(pw) { pw = String(pw || ""); return pw.length >= 8 && /[A-Za-z]/.test(pw) && /[0-9]/.test(pw); }
+const PW_MSG = "Mật khẩu phải từ 8 ký tự trở lên và có cả chữ lẫn số";
 
 /* ---- Lớp truy cập dữ liệu (DAL) ---- */
 const S = {
@@ -126,7 +130,8 @@ function migrateFromJson() {
 /* ============================ DỮ LIỆU MẪU LẦN ĐẦU ============================ */
 function seedUsers() {
   if (S.cntUsers.get().c > 0) return;
-  const mk = (username, pw, name, role, dept) => { const { salt, hash } = hashPw(pw); S.userIns.run(username, name, role, dept||"", salt, hash, username==="admin"?1:0); };
+  // mustChange=1 cho MỌI tài khoản mẫu — bắt buộc đổi mật khẩu ở lần đăng nhập đầu tiên
+  const mk = (username, pw, name, role, dept) => { const { salt, hash } = hashPw(pw); S.userIns.run(username, name, role, dept||"", salt, hash, 1); };
   mk("admin", "admin123", "Quản trị viên", "admin", "Phòng Hỗ trợ");
   mk("dieuphoi", "123456", "Trưởng bộ phận Hỗ trợ", "dieuphoi", "Phòng Hỗ trợ");
   mk("xuly1", "123456", "Trần Văn B", "xuly", "Phòng Hỗ trợ");
@@ -139,7 +144,7 @@ function seedTickets() {
   qSeqSet.run("TK"+ymd(d), 0); qSeqSet.run("PS"+ymd(d), 0);
   const extern = new Set(["Sự cố dịch vụ - gián đoạn vận hành","Bảo trì - bảo dưỡng định kỳ","Sửa chữa - khắc phục hỏng hóc","Giao nhận hàng hóa cho khách hàng","Lắp đặt - nghiệm thu tại điểm khách hàng","Khiếu nại - yêu cầu xử lý của khách hàng"]);
   const loai = "Giao nhận hàng hóa cho khách hàng";
-  const id = genId("TK");
+  const id = genId("TK", d);
   const t = { id, tCreate: d.toISOString(), createdBy: "kinhdoanh", loai, luong: extern.has(loai)?"Hỗ trợ Khách hàng bên ngoài":"Hỗ trợ Nội bộ",
     donvi:"P. Kinh doanh", nguoiYC:"Nguyễn Văn A", sdt:"0901234567", email:"a.nguyen@congty.vn", watchers:"Trưởng P.KD; KT trưởng",
     noidung:"Giao hàng mẫu cho khách hàng ABC theo HĐ 125/HĐKT", soluong:20, dvt:"Thùng", quycach:"Carton 40x30x30cm, hàng dễ vỡ, không xếp chồng",
@@ -150,7 +155,7 @@ function seedTickets() {
     dexuat:"Đổi 01 thùng mới giao trong ngày 04/08; phổ biến lại quy tắc bốc xếp", dathuchien:"Đã lập biên bản với khách, nhập lại kho 01 thùng lỗi",
     attach:"BBGN_08.pdf; anh_thung_mop.jpg", csat:4, nhanxet:"Xử lý nhanh, cần cẩn thận khâu bốc xếp", tClose:"2026-08-04T09:00", moLai:0, ghichu:"" };
   saveTicketRow(t, true);
-  const psId = genId("PS");
+  const psId = genId("PS", d);
   savePSRow({ id: psId, ticketId:id, ngay:"2026-08-03", loai:"Sự cố hàng hóa (hư hỏng/thiếu/mất)",
     mota:"01/20 thùng bị móp góc, khách hàng ABC từ chối nhận", nguyennhan:"Xếp chồng quá 3 lớp khi bốc xếp lên xe",
     anhhuong:"Trung bình", chiphiDX:50000, chiphiDuyet:50000, duyet:"Đã duyệt", attach:"BBGN_08.pdf; anh_thung_mop.jpg", nguoiXL:"Trần Văn B" }, true);
@@ -190,7 +195,7 @@ const server = http.createServer(async (req, res) => {
       if (p === "/api/change-password" && req.method === "POST") {
         const { oldPassword, newPassword } = await readBody(req);
         if (!verifyPw(oldPassword, me.salt, me.hash)) return sendJSON(res, 400, { error: "Mật khẩu hiện tại không đúng" });
-        if (!newPassword || String(newPassword).length < 6) return sendJSON(res, 400, { error: "Mật khẩu mới tối thiểu 6 ký tự" });
+        if (!validPw(newPassword)) return sendJSON(res, 400, { error: PW_MSG });
         const { salt, hash } = hashPw(newPassword); S.userUpd.run(me.name, me.role, me.dept||"", salt, hash, 0, me.username);
         return sendJSON(res, 200, { ok: true });
       }
@@ -245,8 +250,10 @@ const server = http.createServer(async (req, res) => {
           if (!un || !b.password) return sendJSON(res, 400, { error: "Thiếu tên đăng nhập hoặc mật khẩu" });
           if (S.user.get(un)) return sendJSON(res, 400, { error: "Tên đăng nhập đã tồn tại" });
           if (!ROLES[b.role]) return sendJSON(res, 400, { error: "Vai trò không hợp lệ" });
+          if (!validPw(b.password)) return sendJSON(res, 400, { error: PW_MSG });
           const { salt, hash } = hashPw(b.password);
-          S.userIns.run(un, b.name||un, b.role, b.dept||"", salt, hash, 0); return sendJSON(res, 201, { ok: true });
+          // Người dùng mới do admin tạo phải đổi mật khẩu ở lần đăng nhập đầu
+          S.userIns.run(un, b.name||un, b.role, b.dept||"", salt, hash, 1); return sendJSON(res, 201, { ok: true });
         }
       }
       if ((m = p.match(/^\/api\/users\/(.+)$/))) {
@@ -259,7 +266,7 @@ const server = http.createServer(async (req, res) => {
           const role = (b.role && ROLES[b.role]) ? b.role : u.role;
           const dept = b.dept != null ? b.dept : u.dept;
           let salt = u.salt, hash = u.hash, mustChange = u.mustChange;
-          if (b.password) { const h = hashPw(b.password); salt = h.salt; hash = h.hash; mustChange = 0; }
+          if (b.password) { if (!validPw(b.password)) return sendJSON(res, 400, { error: PW_MSG }); const h = hashPw(b.password); salt = h.salt; hash = h.hash; mustChange = 1; }
           S.userUpd.run(name, role, dept, salt, hash, mustChange, un); return sendJSON(res, 200, { ok: true });
         }
         if (req.method === "DELETE") {

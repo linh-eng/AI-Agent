@@ -236,9 +236,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
         <div class="f"><label>Mật khẩu</label><input id="lgPass" type="password" autocomplete="current-password"></div>
         <button class="btn primary" type="submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>Đăng nhập</button>
       </form>
-      <div class="login-hint" id="loginHint"><b>Tài khoản dùng thử:</b><br>
-        admin / admin123 &nbsp;·&nbsp; dieuphoi / 123456 &nbsp;·&nbsp; xuly1 / 123456<br>
-        kinhdoanh / 123456 &nbsp;·&nbsp; giamdoc / 123456</div>
+      <div class="login-hint" id="loginHint">Chưa có tài khoản? Vui lòng liên hệ <b>Quản trị hệ thống</b> hoặc bộ phận <b>IT</b> để được cấp.</div>
     </div>
   </div>
 </div>
@@ -314,6 +312,8 @@ function segOverlap(dayStart,end,h1,h2){
   const hi=Math.min(end.getTime(),b.getTime());
   return hi>lo ? (hi-lo)/60000 : 0;
 }
+// Ticket đã đóng (kết thúc vòng đời): Hoàn tất hoặc Từ chối
+function isClosed(s){return ["6. Hoàn tất","Hoàn tất","Từ chối","Từ chối (đóng)"].includes(s);}
 // Trả về {pct, used, deadline, color, label} cho SLA xử lý
 function slaStatus(t){
   const [,resH]=slaOf(t.uutien);
@@ -367,12 +367,15 @@ function render(){({dash:renderDash,tickets:renderTickets,ps:renderPS,cat:render
 /* ---------- DASHBOARD ---------- */
 function renderDash(){
   const T=DB.tickets;
-  const done=T.filter(t=>["6. Hoàn tất","5. Đã xử lý"].includes(t.trangthai)).length;
+  const done=T.filter(t=>isClosed(t.trangthai)).length;
   const open=T.length-done;
   const waiting=T.filter(t=>t.trangthai==="4. Chờ phản hồi/Chờ duyệt").length;
-  let red=0,amber=0,slaOk=0,doneCnt=0,csatSum=0,csatN=0,reopen=0,sumH=0,sumHn=0;
-  T.forEach(t=>{const s=slaStatus(t);if(s.color==="red")red++;if(s.color==="amber")amber++;
-    if(["6. Hoàn tất","5. Đã xử lý"].includes(t.trangthai)){doneCnt++;if(s.pct<=1)slaOk++;sumH+=s.used;sumHn++;}
+  let dangQuaHan=0,daViPham=0,amber=0,slaOk=0,doneCnt=0,csatSum=0,csatN=0,reopen=0,sumH=0,sumHn=0;
+  T.forEach(t=>{const s=slaStatus(t);const closed=isClosed(t.trangthai);
+    if(!closed && s.color==="red") dangQuaHan++;          // đang quá hạn, CHƯA đóng — cần xử lý ngay
+    if(closed && s.pct>1) daViPham++;                     // đã đóng nhưng từng vi phạm SLA (thống kê)
+    if(!closed && s.color==="amber") amber++;
+    if(closed){doneCnt++;if(s.pct<=1)slaOk++;sumH+=s.used;sumHn++;}
     if(t.csat){csatSum+=+t.csat;csatN++;} reopen+=(+t.moLai||0);});
   const psWait=DB.ps.filter(p=>p.duyet==="Chờ duyệt").length;
   const costDX=DB.ps.reduce((a,p)=>a+(+p.chiphiDX||0),0);
@@ -396,7 +399,8 @@ function renderDash(){
     <div class="grid kpis" style="margin-bottom:22px">
       ${kpi("Tổng ticket tiếp nhận",T.length,"accent","Kỳ hiện tại",'<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>','rgba(255,255,255,.18)')}
       ${kpi("Đã hoàn tất / đóng",done,"","Đang mở: "+open,'<path d="M20 6L9 17l-5-5"/>')}
-      ${kpi("Quá hạn SLA (Đỏ)",red,red?"bad":"","Cần xử lý ngay",'<path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>',red?'var(--red)':null)}
+      ${kpi("Đang quá hạn SLA",dangQuaHan,dangQuaHan?"bad":"","Chưa đóng · cần xử lý ngay",'<path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>',dangQuaHan?'var(--red)':null)}
+      ${kpi("Đã vi phạm SLA",daViPham,"","Ticket đã đóng từng trễ",'<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>')}
       ${kpi("Sắp đến hạn (Vàng)",amber,amber?"warn":"","Theo dõi sát",'<path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>',amber?'var(--amber)':null)}
       ${kpi("Đạt SLA xử lý",slaPct+"%","","Trên "+doneCnt+" ticket đã xong",'<path d="M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3"/>')}
       ${kpi("Chờ phản hồi/duyệt",waiting,"","Đang tạm dừng SLA",'<path d="M12 6v6l4 2"/>')}
@@ -690,7 +694,7 @@ async function savePS(){
 }
 
 /* ============================ HÀM CHUNG ============================ */
-function closeModal(){document.getElementById("overlay").classList.remove("show");}
+function closeModal(){if(FORCE_PW)return;document.getElementById("overlay").classList.remove("show");}
 document.getElementById("overlay").addEventListener("click",e=>{if(e.target.id==="overlay")closeModal();});
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function fmtVnd(n){n=+n||0;return n?n.toLocaleString("vi-VN")+" ₫":"–";}
@@ -747,7 +751,7 @@ function openUser(username){
       <div class="f"><label>Họ tên</label><input value="${esc(EDITU.name)}" oninput="EDITU.name=this.value"></div>
       <div class="f"><label>Vai trò <span class="req">*</span></label><select onchange="EDITU.role=this.value">${roleOpts}</select></div>
       <div class="f"><label>Phòng ban</label><input value="${esc(EDITU.dept)}" placeholder="VD: P. Kinh doanh" oninput="EDITU.dept=this.value"></div>
-      <div class="f full"><label>${U_EDITING?"Đặt lại mật khẩu (để trống nếu giữ nguyên)":"Mật khẩu"} ${U_EDITING?'':'<span class="req">*</span>'}</label><input type="text" value="" placeholder="Tối thiểu 6 ký tự" oninput="EDITU.password=this.value"></div>
+      <div class="f full"><label>${U_EDITING?"Đặt lại mật khẩu (để trống nếu giữ nguyên)":"Mật khẩu"} ${U_EDITING?'':'<span class="req">*</span>'}</label><input type="text" value="" placeholder="Tối thiểu 8 ký tự, có chữ và số" oninput="EDITU.password=this.value"><div class="hint">Người dùng sẽ được yêu cầu đổi mật khẩu ở lần đăng nhập đầu.</div></div>
       ${EDITU.role==='yeucau'?'<div class="hint" style="grid-column:1/-1">Người yêu cầu chỉ thấy ticket có <b>Đơn vị</b> trùng phòng ban ở trên (hoặc do chính họ tạo).</div>':''}
     </div></div>
     <div class="modal-f"><button class="btn" onclick="closeModal()">Hủy</button><button class="btn primary" onclick="saveUser()">Lưu</button></div></div>`;
@@ -756,6 +760,7 @@ function openUser(username){
 async function saveUser(){
   const u=EDITU;
   if(!U_EDITING){if(!u.username.trim()||!u.password){toast("Nhập tên đăng nhập và mật khẩu",true);return;}}
+  if(u.password && !pwOk(u.password)){toast("Mật khẩu phải từ 8 ký tự, có cả chữ và số",true);return;}
   try{
     if(U_EDITING){await api("PUT","/api/users/"+encodeURIComponent(u.username),{name:u.name,role:u.role,dept:u.dept,password:u.password||undefined});}
     else{await api("POST","/api/users",u);}
@@ -783,32 +788,48 @@ async function doLogin(ev){
     ME=d.user;CAP=d.cap;ROLELABEL=d.roleLabel;
     hideLogin();document.getElementById("lgPass").value="";
     await startApp();
-    if(d.mustChange)setTimeout(()=>toast("Bạn nên đổi mật khẩu mặc định (nút Đổi mật khẩu ở góc dưới trái)",true),600);
+    if(d.mustChange)setTimeout(()=>openChangePw(true),400);
   }catch(e){err.textContent="Không kết nối được máy chủ";err.classList.add("show");}
 }
 async function doLogout(){try{await fetch("/api/logout",{method:"POST"});}catch(e){}ME=null;CAP={};showLogin();}
+let FORCE_PW=false;
 function openChangePw(force){
+  FORCE_PW=!!force;
   document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:460px">
     <div class="modal-h"><h3>Đổi mật khẩu</h3><div class="spacer"></div>${force?'':'<button class="x" onclick="closeModal()">✕</button>'}</div>
-    <div class="modal-b"><div class="form-grid">
-      <div class="f full"><label>Mật khẩu hiện tại</label><input id="cpOld" type="password"></div>
-      <div class="f full"><label>Mật khẩu mới (≥ 6 ký tự)</label><input id="cpNew" type="password"></div>
-      <div class="f full"><label>Nhập lại mật khẩu mới</label><input id="cpNew2" type="password"></div>
+    <div class="modal-b">
+      ${force?`<div class="login-err show" style="background:var(--amber-bg);color:#8a6500;margin-bottom:14px">Đây là lần đăng nhập đầu tiên — bạn cần đổi mật khẩu mặc định trước khi sử dụng hệ thống.</div>`:''}
+      <div class="form-grid">
+      <div class="f full"><label>Mật khẩu hiện tại</label><input id="cpOld" type="password" autocomplete="current-password"></div>
+      <div class="f full"><label>Mật khẩu mới</label><input id="cpNew" type="password" autocomplete="new-password"><div class="hint">Tối thiểu 8 ký tự, có cả chữ và số.</div></div>
+      <div class="f full"><label>Nhập lại mật khẩu mới</label><input id="cpNew2" type="password" autocomplete="new-password"></div>
     </div></div>
     <div class="modal-f">${force?'':'<button class="btn" onclick="closeModal()">Để sau</button>'}<button class="btn primary" onclick="saveChangePw()">Đổi mật khẩu</button></div></div>`;
   document.getElementById("overlay").classList.add("show");
 }
+function pwOk(p){return String(p).length>=8 && /[A-Za-z]/.test(p) && /[0-9]/.test(p);}
 async function saveChangePw(){
   const o=document.getElementById("cpOld").value,n=document.getElementById("cpNew").value,n2=document.getElementById("cpNew2").value;
+  if(!pwOk(n)){toast("Mật khẩu mới phải từ 8 ký tự, có cả chữ và số",true);return;}
   if(n!==n2){toast("Mật khẩu nhập lại không khớp",true);return;}
-  try{await api("POST","/api/change-password",{oldPassword:o,newPassword:n});closeModal();toast("Đã đổi mật khẩu");}
+  try{await api("POST","/api/change-password",{oldPassword:o,newPassword:n});FORCE_PW=false;closeModal();toast("Đã đổi mật khẩu");}
   catch(e){toast(e.message||"Lỗi đổi mật khẩu",true);}
 }
+
+/* ============================ TỰ ĐỘNG ĐĂNG XUẤT ============================ */
+const IDLE_MS=20*60*1000; // 20 phút không hoạt động
+let idleTimer=null;
+function resetIdle(){
+  if(!ME)return;
+  clearTimeout(idleTimer);
+  idleTimer=setTimeout(async()=>{ if(!ME)return; toast("Đã tự đăng xuất do không hoạt động",true); await doLogout(); }, IDLE_MS);
+}
+["click","keydown","mousemove","scroll","touchstart"].forEach(ev=>document.addEventListener(ev,resetIdle,{passive:true}));
 
 /* ============================ INIT ============================ */
 async function startApp(){
   try{await refresh();}catch(e){setOnline(false);return;}
-  PAGE="dash";go("dash");setOnline(true);
+  PAGE="dash";go("dash");setOnline(true);resetIdle();
 }
 let POLL_STARTED=false;
 (async function init(){
@@ -817,7 +838,7 @@ let POLL_STARTED=false;
     if(!r.ok){showLogin();return;}
     const d=await r.json();ME=d.user;CAP=d.cap;ROLELABEL=d.roleLabel;
     await startApp();
-    if(d.mustChange)setTimeout(()=>toast("Bạn nên đổi mật khẩu mặc định (nút Đổi mật khẩu ở góc dưới trái)",true),600);
+    if(d.mustChange)setTimeout(()=>openChangePw(true),400);
   }catch(e){showLogin();}
   finally{if(!POLL_STARTED){POLL_STARTED=true;startPoll();}}
 })();
