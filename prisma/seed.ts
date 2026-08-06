@@ -172,19 +172,35 @@ async function main() {
     trackingMode: "SERIAL" | "LOT" | "QUANTITY" | "LICENSE";
     uom?: string;
     minStock?: number;
+    refCostPrice?: number;
+    inspectionExempt?: boolean;
   }) {
+    // NT1 — P/N + Model bắt buộc: suy ra P/N từ model/sku nếu không khai riêng.
+    const partNumber = data.model ?? data.sku;
+    const productGroup = data.category ?? null;
     return prisma.product.upsert({
       where: { sku: data.sku },
-      update: { name: data.name },
+      update: {
+        name: data.name,
+        partNumber,
+        model: data.model ?? data.sku,
+        productGroup,
+        refCostPrice: data.refCostPrice ?? null,
+        inspectionExempt: data.inspectionExempt ?? false,
+      },
       create: {
         sku: data.sku,
         name: data.name,
         brand: data.brand,
-        model: data.model,
+        partNumber,
+        model: data.model ?? data.sku,
         category: data.category,
+        productGroup,
         trackingMode: data.trackingMode,
         uom: data.uom ?? "Cái",
         minStock: data.minStock,
+        refCostPrice: data.refCostPrice ?? null,
+        inspectionExempt: data.inspectionExempt ?? false,
       },
     });
   }
@@ -196,16 +212,17 @@ async function main() {
     model: "WS-PRO-2026",
     category: "Máy trạm",
     trackingMode: "SERIAL",
+    refCostPrice: 45000000,
   });
   // Linh kiện SERIAL
-  const pCpu = await ensureProduct({ sku: "LK-CPU-I9", name: "CPU Intel Core i9-14900K", brand: "Intel", model: "i9-14900K", category: "CPU", trackingMode: "SERIAL", minStock: 5 });
-  const pSsd = await ensureProduct({ sku: "LK-SSD-2TB", name: "SSD Samsung 990 Pro 2TB", brand: "Samsung", model: "990PRO-2TB", category: "SSD", trackingMode: "SERIAL", minStock: 10 });
+  const pCpu = await ensureProduct({ sku: "LK-CPU-I9", name: "CPU Intel Core i9-14900K", brand: "Intel", model: "i9-14900K", category: "CPU", trackingMode: "SERIAL", minStock: 5, refCostPrice: 15000000 });
+  const pSsd = await ensureProduct({ sku: "LK-SSD-2TB", name: "SSD Samsung 990 Pro 2TB", brand: "Samsung", model: "990PRO-2TB", category: "SSD", trackingMode: "SERIAL", minStock: 10, refCostPrice: 5000000 });
   // Linh kiện LOT
-  const pRam = await ensureProduct({ sku: "LK-RAM-32G", name: "RAM Kingston Fury 32GB DDR5", brand: "Kingston", model: "KF556-32", category: "RAM", trackingMode: "LOT", minStock: 20 });
-  // Phụ kiện QUANTITY
-  await ensureProduct({ sku: "PK-CABLE-C13", name: "Cáp nguồn C13 1.8m", category: "Phụ kiện", trackingMode: "QUANTITY", uom: "Sợi", minStock: 50 });
+  const pRam = await ensureProduct({ sku: "LK-RAM-32G", name: "RAM Kingston Fury 32GB DDR5", brand: "Kingston", model: "KF556-32", category: "RAM", trackingMode: "LOT", minStock: 20, refCostPrice: 3000000 });
+  // Phụ kiện QUANTITY — nhóm hàng miễn kiểm (5A-2)
+  await ensureProduct({ sku: "PK-CABLE-C13", name: "Cáp nguồn C13 1.8m", category: "Phụ kiện", trackingMode: "QUANTITY", uom: "Sợi", minStock: 50, refCostPrice: 50000, inspectionExempt: true });
   // LICENSE
-  const pWin = await ensureProduct({ sku: "SW-WIN11-PRO", name: "Windows 11 Pro OEM", brand: "Microsoft", trackingMode: "LICENSE", uom: "Key" });
+  const pWin = await ensureProduct({ sku: "SW-WIN11-PRO", name: "Windows 11 Pro OEM", brand: "Microsoft", trackingMode: "LICENSE", uom: "Key", refCostPrice: 2500000 });
 
   // --- 9. MÁY LẮP RÁP HOÀN CHỈNH -------------------------------------------
   // Xóa dữ liệu demo cũ (idempotent) trước khi dựng lại quan hệ cha-con.

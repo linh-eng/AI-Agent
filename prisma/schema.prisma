@@ -629,6 +629,8 @@ model Serial {
 model Lot {
   id                String    @id @default(cuid())
   lotNumber         String
+  /// Số tham chiếu truy nguồn (NT12) — [phiếu nhập]-[dòng]-[stt]
+  refNo             String?
   productId         String
   warehouseId       String // BẮT BUỘC
   manufactureDate   DateTime?
@@ -888,8 +890,10 @@ model StockMovement {
   quantity        Int          @default(1)
   fromWarehouseId String?
   toWarehouseId   String?
-  documentType    String? // tham chiếu loại chứng từ
+  documentType    String? // tham chiếu loại chứng từ (NT9 — bắt buộc ở tầng service)
   documentNumber  String?
+  /// Số tham chiếu cho hàng không serial (NT12)
+  refNo           String?
   note            String?
   createdBy       String?
   createdAt       DateTime     @default(now())

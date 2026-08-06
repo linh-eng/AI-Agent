@@ -118,6 +118,9 @@ const warrantyInput = z.object({
 
 const receiveSerialItem = z.object({
   serialNumber: z.string().min(1, "Thiếu serial"),
+  // Nhận dạng bắt buộc (NT1/C16) — nếu bỏ trống sẽ lấy từ sản phẩm; thiếu cả hai -> chặn.
+  partNumber: z.string().optional().nullable(),
+  model: z.string().optional().nullable(),
   condition: z.string().optional().nullable(),
   grade: z.enum(["A", "B", "C"]).optional().nullable(),
   binId: z.string().optional().nullable(),
@@ -126,6 +129,9 @@ const receiveSerialItem = z.object({
   origin: originInput.optional().nullable(),
   vendorWarranty: warrantyInput.optional().nullable(),
   thngWarranty: warrantyInput.optional().nullable(),
+  /// Lý do không có bảo hành hãng/NCC (bắt buộc nếu để trống mốc — NT10/C21)
+  vendorWarrantyEmptyReason: z.string().optional().nullable(),
+  thngWarrantyNonDefaultReason: z.string().optional().nullable(),
 });
 
 const receiveLineSchema = z

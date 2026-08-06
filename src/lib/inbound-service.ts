@@ -114,18 +114,31 @@ export async function receiveInbound(
   const lineById = new Map(order.lines.map((l) => [l.id, l]));
 
   const result = await prisma.$transaction(async (tx) => {
+    const now = new Date();
     const createdSerials: string[] = [];
     const createdLots: string[] = [];
 
     for (const rl of input.lines) {
       const line = lineById.get(rl.lineId);
       if (!line) throw new HttpError(422, `Dòng ${rl.lineId} không thuộc phiếu`);
+      const orderLineIndex = order.lines.findIndex((l) => l.id === rl.lineId) + 1;
 
       const targetWhId = rl.isDefective && damagedWh ? damagedWh.id : destWh.id;
 
       // --- SERIAL ---
       if (rl.serials?.length) {
         for (const s of rl.serials) {
+          // NT1/C16 — Part Number + Model bắt buộc (lấy từ dòng nhập hoặc sản phẩm)
+          const partNumber = s.partNumber ?? line.product.partNumber ?? null;
+          const model = s.model ?? line.product.model ?? null;
+          if (!partNumber || !model) {
+            throw new HttpError(422, `Phải nhập Part Number và Model để nhận biết nguồn gốc hàng hóa (serial ${s.serialNumber}).`);
+          }
+          // NT10/C21 — bảo hành hãng: có mốc HOẶC ghi lý do không có
+          const hasVendorWarranty = !!(s.vendorWarranty?.startDate || s.vendorWarranty?.endDate);
+          if (!hasVendorWarranty && !s.vendorWarrantyEmptyReason) {
+            throw new HttpError(422, `Phải nhập hạn bảo hành hãng/NCC, hoặc chọn lý do không có bảo hành (serial ${s.serialNumber}).`);
+          }
           const serial = await tx.serial.create({
             data: {
               serialNumber: s.serialNumber,
@@ -142,6 +155,20 @@ export async function receiveInbound(
               yearOfManufacture: s.yearOfManufacture ?? line.yearOfManufacture ?? null,
               originCountry: s.originCountry ?? line.originCountry ?? null,
               binId: s.binId ?? null,
+              // v1.5 — nhận dạng, giá vốn, chứng từ, bảo hành 2 tầng lưu thẳng trên serial
+              partNumber,
+              model,
+              costPrice: line.product.refCostPrice ?? null,
+              docInType: "INBOUND_ORDER",
+              docInNo: order.number,
+              docInId: order.id,
+              receivedAt: now,
+              vendorWarrantyFrom: toDate(s.vendorWarranty?.startDate),
+              vendorWarrantyTo: toDate(s.vendorWarranty?.endDate),
+              vendorWarrantyEmptyReason: hasVendorWarranty ? null : s.vendorWarrantyEmptyReason,
+              thngWarrantyFrom: toDate(s.thngWarranty?.startDate),
+              thngWarrantyTo: toDate(s.thngWarranty?.endDate),
+              thngWarrantyNonDefaultReason: s.thngWarrantyNonDefaultReason ?? null,
             },
           });
           createdSerials.push(serial.serialNumber);
@@ -210,6 +237,8 @@ export async function receiveInbound(
 
       // --- LOT ---
       if (rl.lot) {
+        // NT12 — số tham chiếu truy nguồn: [phiếu]-[dòng]-[stt]
+        const lotRefNo = `${order.number}-${orderLineIndex}-1`;
         const lot = await tx.lot.upsert({
           where: {
             productId_lotNumber_warehouseId: {
@@ -222,6 +251,7 @@ export async function receiveInbound(
           create: {
             productId: line.productId,
             lotNumber: rl.lot.lotNumber,
+            refNo: lotRefNo,
             warehouseId: targetWhId,
             quantity: rl.lot.quantity,
             supplierId: line.supplierId,
@@ -265,6 +295,7 @@ export async function receiveInbound(
             toWarehouseId: targetWhId,
             documentType: "INBOUND_ORDER",
             documentNumber: order.number,
+            refNo: lotRefNo,
             note: "Nhập lô",
             createdBy: userId,
           },
@@ -273,6 +304,8 @@ export async function receiveInbound(
 
       // --- QUANTITY (không quản serial/lô) ---
       if (rl.quantity && !rl.serials?.length && !rl.lot) {
+        // NT12 — số tham chiếu cho hàng QTY
+        const qtyRefNo = `${order.number}-${orderLineIndex}-1`;
         await tx.stockMovement.create({
           data: {
             type: "INBOUND",
@@ -280,6 +313,7 @@ export async function receiveInbound(
             toWarehouseId: targetWhId,
             documentType: "INBOUND_ORDER",
             documentNumber: order.number,
+            refNo: qtyRefNo,
             note: `Nhập số lượng (${line.product.sku})`,
             createdBy: userId,
           },

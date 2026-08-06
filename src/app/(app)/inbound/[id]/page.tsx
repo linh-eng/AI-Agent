@@ -47,6 +47,7 @@ interface RecvState {
   vendorEnd: string;
   thngStart: string;
   thngEnd: string;
+  noWarrantyReason: string; // NT10/C21 — lý do nếu không có BH hãng
   // LOT
   lotNumber: string;
   lotQty: string;
@@ -57,7 +58,7 @@ interface RecvState {
 }
 const emptyRecv: RecvState = {
   isDefective: false, binId: "", serialText: "", originCountry: "", coNumber: "", cqNumber: "",
-  customsDeclarationNo: "", vendorStart: "", vendorEnd: "", thngStart: "", thngEnd: "",
+  customsDeclarationNo: "", vendorStart: "", vendorEnd: "", thngStart: "", thngEnd: "", noWarrantyReason: "",
   lotNumber: "", lotQty: "", mfgDate: "", expDate: "", qty: "",
 };
 
@@ -119,6 +120,7 @@ export default function InboundDetailPage() {
             origin,
             vendorWarranty,
             thngWarranty,
+            vendorWarrantyEmptyReason: vendorWarranty ? null : r.noWarrantyReason || null,
           }));
         } else if (mode === "LOT") {
           base.lot = {
@@ -243,6 +245,18 @@ export default function InboundDetailPage() {
                         <div className="space-y-1.5"><Label className="text-xs">BH THNG từ</Label><Input type="date" value={r.thngStart} onChange={(e) => upd(line.id, { thngStart: e.target.value })} /></div>
                         <div className="space-y-1.5"><Label className="text-xs">BH THNG đến</Label><Input type="date" value={r.thngEnd} onChange={(e) => upd(line.id, { thngEnd: e.target.value })} /></div>
                       </div>
+                      {!r.vendorStart && !r.vendorEnd && (
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Lý do không có bảo hành hãng (bắt buộc nếu để trống mốc BH — NT10)</Label>
+                          <Select value={r.noWarrantyReason} onChange={(e) => upd(line.id, { noWarrantyReason: e.target.value })}>
+                            <option value="">— Chọn lý do —</option>
+                            <option value="Hàng tân trang hết hạn bảo hành hãng">Hàng tân trang hết hạn BH hãng</option>
+                            <option value="Hàng mẫu/demo không có bảo hành">Hàng mẫu/demo không có BH</option>
+                            <option value="Hết bảo hành hãng">Hết bảo hành hãng</option>
+                            <option value="NCC không cấp bảo hành">NCC không cấp bảo hành</option>
+                          </Select>
+                        </div>
+                      )}
                     </>
                   )}
 
