@@ -831,7 +831,7 @@ function openDetail(id,tab){
   document.getElementById("overlay").innerHTML=`<div class="modal">
     <div class="modal-h"><h3 class="mono" style="color:var(--green-800)">${esc(t.id)}</h3>
       <span class="pill ${s.color}"><span class="dot"></span>${s.label}</span>${stPill(t.trangthai)}
-      <div class="spacer"></div>${can('edit')?`<button class="btn sm" onclick="openForm('${t.id}')">Chỉnh sửa</button>`:''}<button class="x" onclick="closeModal()">✕</button></div>
+      <div class="spacer"></div>${can('edit')?`<button class="btn sm" onclick="openNotify('${id}')">📨 Gửi thông báo${notiPending(t)?' <span style="color:#ffd21e">●</span>':''}</button>`:''}${can('edit')?`<button class="btn sm" onclick="openForm('${t.id}')">Chỉnh sửa</button>`:''}<button class="x" onclick="closeModal()">✕</button></div>
     <div class="modal-b">
       ${actionsBar}
       <div class="tabs">
@@ -1062,6 +1062,64 @@ async function applyConflict(n){
     const dl=document.getElementById("cfDeadline").value; if(!dl){toast('Chọn thời hạn mới',true);return;}
     await assignTo(id,name,{tGiaoYC:dl, giaHan:true}, {...log, ketQua:'Gia hạn có phê duyệt đến '+dl});
   }
+}
+
+/* ============================ THÔNG BÁO CHUYỂN BƯỚC (v3 mục 5D — thủ công) ============================ */
+function notiSuggest(t){
+  const s=baseStatus(t.trangthai);
+  const map={
+    "Tạo mới":{to:"Điều phối",next:"Tiếp nhận và phân loại"},
+    "Đã tiếp nhận":{to:t.assignee||"Người thực hiện",next:"Lập kế hoạch và bắt đầu xử lý"},
+    "Trả lại bổ sung":{to:t.nguoiYC,next:"Bổ sung thông tin còn thiếu"},
+    "Từ chối":{to:t.nguoiYC,next:"Xem lý do từ chối"},
+    "Đang xử lý":{to:t.nguoiYC,next:"Theo dõi tiến độ"},
+    "Chờ phản hồi":{to:t.nguoiYC,next:"Phản hồi thông tin còn thiếu"},
+    "Chờ duyệt":{to:"Điều phối / Quản trị",next:"Phê duyệt phát sinh"},
+    "Tạm dừng":{to:(t.nguoiYC||"")+", Điều phối",next:"Xem xét, phân loại lại"},
+    "Đã xử lý":{to:t.nguoiYC,next:"Nghiệm thu và chấm CSAT"},
+    "Mở lại":{to:t.assignee||"Người thực hiện",next:"Xử lý lại theo điểm chưa đạt"},
+    "Hoàn tất":{to:(t.nguoiYC||"")+", "+(t.assignee||""),next:"Lưu hồ sơ"},
+  };
+  return map[s]||{to:t.nguoiYC||"",next:"Theo dõi"};
+}
+function notiPending(t){
+  const h=Array.isArray(t.history)&&t.history.length?t.history[t.history.length-1].at:null;
+  const n=Array.isArray(t.notiLog)&&t.notiLog.length?t.notiLog[t.notiLog.length-1].at:null;
+  if(!h)return false; return !n || new Date(h)>new Date(n);
+}
+function openNotify(id){
+  const t=DB.tickets.find(x=>x.id===id); if(!t)return;
+  const sg=notiSuggest(t); const pri=(t.uutien||"").split(" ")[0];
+  const tieude=`[Hỗ trợ THNG] [${pri}] ${t.id} — ${sg.next}`;
+  const noidung=`Mã ticket: ${t.id}\nLoại công việc: ${loaiText(t)}\nĐơn vị yêu cầu: ${t.donvi} — Người yêu cầu: ${t.nguoiYC}\nMức ưu tiên: ${t.uutien}\nTrạng thái hiện tại: ${baseStatus(t.trangthai)}\n\nViệc cần làm tiếp: ${sg.next}`;
+  document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:600px">
+    <div class="modal-h"><h3>Gửi thông báo chuyển bước</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
+    <div class="modal-b">
+      <div class="hint" style="margin-bottom:12px">Bước kế tiếp: <b>${esc(sg.next)}</b> — người phụ trách gợi ý: <b>${esc(sg.to)}</b>. Bạn có thể sửa nội dung trước khi gửi.</div>
+      <div class="form-grid">
+        <div class="f"><label>Người nhận chính</label><input id="ntTo" value="${esc(sg.to)}"></div>
+        <div class="f"><label>Đồng gửi (CC)</label><input id="ntCc" value="${esc((t.nguoiYC||'')+'; Điều phối')}"></div>
+        <div class="f full"><label>Tiêu đề</label><input id="ntSub" value="${esc(tieude)}"></div>
+        <div class="f full"><label>Nội dung</label><textarea id="ntBody" style="min-height:120px">${esc(noidung)}</textarea></div>
+        <div class="f full"><label>Lời nhắn thêm</label><textarea id="ntNote" placeholder="Dặn dò cụ thể (nếu có)…" style="min-height:60px"></textarea></div>
+      </div>
+      <div class="hint" style="margin-top:8px">Hệ thống chưa gắn máy chủ email. Bạn bấm <b>Sao chép nội dung</b> để gửi qua email/Zalo của mình, rồi <b>Đánh dấu đã gửi</b> để ghi nhận.</div>
+    </div>
+    <div class="modal-f"><button class="btn" onclick="closeModal()">Bỏ qua</button><button class="btn" onclick="copyNotify()">Sao chép nội dung</button><button class="btn primary" onclick="markNotified('${id}')">Đánh dấu đã gửi</button></div></div>`;
+  document.getElementById("overlay").classList.add("show");
+}
+function copyNotify(){
+  const to=document.getElementById("ntTo").value, cc=document.getElementById("ntCc").value, sub=document.getElementById("ntSub").value, body=document.getElementById("ntBody").value, note=document.getElementById("ntNote").value;
+  const txt=`Đến: ${to}\nCC: ${cc}\nTiêu đề: ${sub}\n\n${body}${note?"\n\nLời nhắn: "+note:""}`;
+  const ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");toast("Đã sao chép nội dung thông báo");}catch(e){toast("Không sao chép được, hãy chọn & copy thủ công",true);}document.body.removeChild(ta);
+}
+async function markNotified(id){
+  const src=DB.tickets.find(x=>x.id===id); if(!src)return;
+  const t=JSON.parse(JSON.stringify(src));
+  t.notiLog=Array.isArray(t.notiLog)?t.notiLog:[];
+  t.notiLog.push({at:new Date().toISOString(), by:ME.username, to:document.getElementById("ntTo").value, buoc:baseStatus(t.trangthai)});
+  try{ await api("PUT","/api/tickets/"+encodeURIComponent(id),t); await refresh(); render(); openDetail(id,'info'); toast("Đã ghi nhận: đã thông báo"); }
+  catch(e){ toast(e.message||"Lỗi",true); }
 }
 
 /* ============================ FORM PHÁT SINH ============================ */
