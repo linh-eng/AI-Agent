@@ -443,7 +443,7 @@ function buildUserBox(){
   const initials=(ME.name||ME.username).trim().split(/\s+/).slice(-2).map(w=>w[0]).join("").toUpperCase();
   el.innerHTML=`<div class="who"><div class="av">${esc(initials)}</div>
     <div><div class="nm">${esc(ME.name)}</div><div class="rl">${esc(ROLELABEL||ROLE_VI[ME.role]||ME.role)}${ME.dept?" · "+esc(ME.dept):""}</div></div></div>
-    <div class="acts"><button onclick="openChangePw()">Đổi mật khẩu</button><button onclick="doLogout()">Đăng xuất</button></div>`;
+    <div class="acts" style="flex-wrap:wrap"><button onclick="openProfile()">Thông tin cá nhân</button><button onclick="openChangePw()">Đổi mật khẩu</button><button onclick="doLogout()">Đăng xuất</button></div>`;
 }
 function go(id){PAGE=id;const p=PAGES.find(x=>x.id===id);document.getElementById("pageTitle").textContent=p.title;document.getElementById("pageSub").textContent=p.sub;
   const b=document.getElementById("btnNewTop");if(b)b.style.display=can("create")?"":"none";
@@ -603,7 +603,10 @@ function openForm(id){
   FSTEP=0; drawForm();
   document.getElementById("overlay").classList.add("show");
 }
-function blankTicket(){const l0=CAT.loai[0];return {id:"(tự sinh khi lưu)",tCreate:"",loai:l0,luong:flowOf(l0),loaiKhac:"",moTaThem:"",donvi:CAT.donvi[2],nguoiYC:"",sdt:"",email:"",watchers:"",noidung:"",soluong:"",dvt:CAT.dvt[0],quycach:"",diadiemGiao:"",diadiemNhan:"",tGiaoYC:"",uutien:priOf(l0),doi:"",assignee:"",phoihop:"",tAssign:"",tStart:"",tDone:"",trangthai:CAT.trangthai[0],slThucte:"",diadiemThucte:"",nguoiNhan:"",nghiemthu:"",dexuat:"",dathuchien:"",attach:"",csat:"",nhanxet:"",tClose:"",moLai:0,ghichu:""};}
+function blankTicket(){const l0=CAT.loai[0];return {id:"(tự sinh khi lưu)",tCreate:"",loai:l0,luong:flowOf(l0),loaiKhac:"",moTaThem:"",
+  donvi:(ME&&ME.dept)||CAT.donvi[0],nguoiYC:(ME&&ME.name)||"",sdt:(ME&&ME.sdt)||"",email:(ME&&ME.email)||"",_taoThay:false,_khachNgoai:false,_proxyUser:"",
+  watchers:"",noidung:"",soluong:"",dvt:CAT.dvt[0],quycach:"",diadiemGiao:"",diadiemNhan:"",tGiaoYC:"",uutien:priOf(l0),doi:"",assignee:"",phoihop:"",tAssign:"",tStart:"",tDone:"",trangthai:CAT.trangthai[0],slThucte:"",diadiemThucte:"",nguoiNhan:"",nghiemthu:"",dexuat:"",dathuchien:"",attach:"",csat:"",nhanxet:"",tClose:"",moLai:0,ghichu:""};}
+function pickProxyUser(un){const u=PEOPLE.find(x=>x.username===un);EDIT._proxyUser=un;if(u){EDIT.donvi=u.dept;EDIT.nguoiYC=u.name;EDIT.sdt=u.sdt;EDIT.email=u.email;}drawForm();}
 
 function drawForm(){
   const t=EDIT;const isNew=!DB.tickets.some(x=>x.id===t.id);
@@ -611,18 +614,52 @@ function drawForm(){
   const inp=(name,type="text",ph="")=>`<input type="${type}" value="${esc(t[name]??'')}" placeholder="${ph}" oninput="EDIT.${name}=this.value">`;
   const ta=(name,ph="")=>`<textarea placeholder="${ph}" oninput="EDIT.${name}=this.value">${esc(t[name]??'')}</textarea>`;
   const [rp,rh]=slaOf(t.uutien);
+  const ro="background:#f0f4f2;color:var(--ink-2);font-weight:600";
+
+  // Khối định danh người yêu cầu (5C): bình thường (tự điền) / tạo thay / khách ngoài
+  let identityBlock;
+  if(!isNew){
+    identityBlock=`<div class="f"><label>Đơn vị / Khách hàng yêu cầu <span class="req">*</span></label>${sel("donvi",CAT.donvi)}</div>
+      <div class="f"><label>Người yêu cầu <span class="req">*</span></label>${inp("nguoiYC","text","Nguyễn Văn A")}</div>
+      <div class="f"><label>SĐT <span class="req">*</span></label>${inp("sdt")}</div>
+      <div class="f"><label>Email</label>${inp("email")}</div>`;
+  } else {
+    const modeRow=`<div class="f full" style="display:flex;gap:20px;flex-wrap:wrap;background:var(--green-50);padding:10px 12px;border-radius:10px">
+      ${ME.canProxy?`<label style="display:flex;gap:7px;align-items:center;cursor:pointer;font-size:13px"><input type="checkbox" ${t._taoThay?'checked':''} onchange="EDIT._taoThay=this.checked;EDIT._khachNgoai=false;drawForm()"> Tạo thay người khác</label>`:''}
+      <label style="display:flex;gap:7px;align-items:center;cursor:pointer;font-size:13px"><input type="checkbox" ${t._khachNgoai?'checked':''} onchange="EDIT._khachNgoai=this.checked;EDIT._taoThay=false;drawForm()"> Người yêu cầu là khách hàng bên ngoài</label></div>`;
+    if(t._khachNgoai){
+      identityBlock=`${modeRow}
+        <div class="f"><label>Tên khách hàng / công ty <span class="req">*</span></label>${inp("donvi","text","VD: Cty ABC")}</div>
+        <div class="f"><label>Người liên hệ <span class="req">*</span></label>${inp("nguoiYC")}</div>
+        <div class="f"><label>SĐT <span class="req">*</span></label>${inp("sdt")}</div>
+        <div class="f"><label>Email</label>${inp("email")}</div>`;
+    } else if(t._taoThay){
+      const opts=PEOPLE.map(u=>`<option value="${esc(u.username)}" ${t._proxyUser===u.username?'selected':''}>${esc(u.name)} — ${esc(u.dept)}</option>`).join("");
+      identityBlock=`${modeRow}
+        <div class="f full"><label>Chọn người yêu cầu thật <span class="req">*</span></label><select onchange="pickProxyUser(this.value)"><option value="">— Chọn từ danh sách —</option>${opts}</select></div>
+        <div class="f"><label>Đơn vị</label><input value="${esc(t.donvi)}" disabled style="${ro}"></div>
+        <div class="f"><label>Người yêu cầu</label><input value="${esc(t.nguoiYC)}" disabled style="${ro}"></div>
+        <div class="f"><label>SĐT</label><input value="${esc(t.sdt)}" disabled style="${ro}"></div>
+        <div class="f"><label>Email</label><input value="${esc(t.email)}" disabled style="${ro}"></div>
+        <div class="f full"><div class="hint">Người tạo phiếu ghi nhận là bạn (${esc(ME.name)}); người yêu cầu là người được chọn ở trên.</div></div>`;
+    } else {
+      identityBlock=`${modeRow}
+        <div class="f full"><div class="hint">Thông tin lấy từ hồ sơ tài khoản của bạn. Cần sửa: vào "Thông tin cá nhân" (góc dưới trái) hoặc liên hệ Quản trị.</div></div>
+        <div class="f"><label>Đơn vị yêu cầu</label><input value="${esc(t.donvi)}" disabled style="${ro}"></div>
+        <div class="f"><label>Người yêu cầu</label><input value="${esc(t.nguoiYC)}" disabled style="${ro}"></div>
+        <div class="f"><label>SĐT</label><input value="${esc(t.sdt)}" disabled style="${ro}"></div>
+        <div class="f"><label>Email</label><input value="${esc(t.email)}" disabled style="${ro}"></div>`;
+    }
+  }
 
   const step0=`<div class="form-grid">
     <div class="readbox"><div>Mã ticket: <b>${esc(t.id)}</b></div><div>SLA: <b>phản hồi ${rp}′ · xử lý ${rh}h</b></div></div>
     <div class="f"><label>Loại công việc <span class="req">*</span></label>${sel("loai",CAT.loai,"EDIT.luong=window.flowOf(this.value);EDIT.uutien=window.priOf(this.value);drawForm()")}</div>
-    <div class="f"><label>Luồng công việc <span class="hint" style="font-weight:400">(tự động theo loại)</span></label><input value="${esc(t.luong)|| (window.groupOf(t.loai)==='khac'?'(Điều phối chọn khi tiếp nhận)':'')}" disabled style="background:#f0f4f2;color:var(--ink-2);font-weight:600"></div>
+    <div class="f"><label>Luồng công việc <span class="hint" style="font-weight:400">(tự động theo loại)</span></label><input value="${esc(t.luong)|| (window.groupOf(t.loai)==='khac'?'(Điều phối chọn khi tiếp nhận)':'')}" disabled style="${ro}"></div>
     ${window.groupOf(t.loai)==='khac'?`<div class="f full"><label>Ghi rõ loại công việc <span class="req">*</span></label>${inp("loaiKhac","text","Nêu rõ đầu việc (tối thiểu 5 ký tự)…")}</div>
     <div class="f full"><label>Mô tả thêm về đầu việc</label>${ta("moTaThem","Diễn giải thêm nếu cần…")}</div>`:''}
-    <div class="f"><label>Đơn vị / Khách hàng yêu cầu <span class="req">*</span></label>${sel("donvi",CAT.donvi)}</div>
-    <div class="f"><label>Người yêu cầu <span class="req">*</span></label>${inp("nguoiYC","text","Nguyễn Văn A")}</div>
-    <div class="f"><label>SĐT <span class="req">*</span></label>${inp("sdt","text","0901234567")}</div>
-    <div class="f"><label>Email <span class="req">*</span></label>${inp("email","text","a.nguyen@congty.vn")}</div>
-    <div class="f"><label>Người theo dõi (Watchers/CC)</label>${inp("watchers","text","Trưởng phòng; Kế toán…")}</div>
+    ${identityBlock}
+    <div class="f full"><label>Người theo dõi (Watchers/CC)</label>${inp("watchers","text","Trưởng phòng; Kế toán…")}</div>
     <div class="f full"><label>Nội dung yêu cầu (chi tiết) <span class="req">*</span></label>${ta("noidung","Mô tả công việc cần hỗ trợ…")}</div>
     <div class="f"><label>Số lượng</label>${inp("soluong","number")}</div>
     <div class="f"><label>Đơn vị tính</label>${sel("dvt",CAT.dvt)}</div>
@@ -711,6 +748,7 @@ function openDetail(id,tab){
     ${row("Luồng",esc(t.luong))}
     ${row("Đơn vị / KH",esc(t.donvi))}
     ${row("Người yêu cầu",esc(t.nguoiYC)+` · ${esc(t.sdt)} · ${esc(t.email)}`)}
+    ${row("Người tạo phiếu",esc(t.createdBy||''))}
     ${row("Người theo dõi",esc(t.watchers))}
     ${row("Nội dung",esc(t.noidung))}
     ${row("Số lượng",(t.soluong||'–')+" "+esc(t.dvt||''))}
@@ -1087,9 +1125,11 @@ async function renderUsers(){
   try{USERS=await api("GET","/api/users");}catch(e){return;}
   const rows=USERS.map(u=>`<tr>
     <td class="mono">${esc(u.username)}${u.username===ME.username?' <span class="muted">(bạn)</span>':''}</td>
-    <td>${esc(u.name)}</td>
-    <td><span class="role-badge role-${u.role}">${esc(ROLE_VI[u.role]||u.role)}</span></td>
+    <td>${esc(u.name)}${u.chucdanh?`<div class="muted" style="font-size:11.5px">${esc(u.chucdanh)}</div>`:''}</td>
+    <td><span class="role-badge role-${u.role}">${esc(ROLE_VI[u.role]||u.role)}</span>${u.canProxy?'<div class="muted" style="font-size:11px;margin-top:2px">+ tạo thay</div>':''}</td>
     <td>${esc(u.dept||'–')}</td>
+    <td class="muted" style="font-size:12px">${esc(u.sdt||'')}${u.email?'<br>'+esc(u.email):''}</td>
+    <td>${(u.trangthai||'active')==='active'?'<span class="pill green"><span class="dot"></span>Hoạt động</span>':'<span class="pill gray"><span class="dot"></span>Ngưng</span>'}</td>
     <td style="text-align:right;white-space:nowrap">
       <button class="btn sm" onclick="openUser('${esc(u.username)}')">Sửa</button>
       ${u.username!==ME.username?`<button class="btn sm danger" onclick="delUser('${esc(u.username)}')">Xóa</button>`:''}
@@ -1098,7 +1138,7 @@ async function renderUsers(){
     <div class="toolbar"><div class="muted">Tổng ${USERS.length} tài khoản</div><div class="spacer" style="flex:1"></div>
       <button class="btn primary sm" onclick="openUser()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 5v14M5 12h14"/></svg>Thêm người dùng</button></div>
     <div class="panel"><div class="table-wrap"><table>
-      <thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Phòng ban</th><th></th></tr></thead>
+      <thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Phòng ban</th><th>Liên hệ</th><th>Trạng thái</th><th></th></tr></thead>
       <tbody>${rows}</tbody></table></div></div>
     <div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Giải thích vai trò</h3></div><div class="panel-b" style="display:grid;gap:8px;font-size:13px">
       <div><span class="role-badge role-admin">Quản trị hệ thống</span> — toàn quyền + quản lý người dùng.</div>
@@ -1112,15 +1152,23 @@ let EDITU=null,U_EDITING=false;
 function openUser(username){
   const ex=username?USERS.find(u=>u.username===username):null;
   U_EDITING=!!ex;
-  EDITU=ex?{username:ex.username,name:ex.name,role:ex.role,dept:ex.dept||"",password:""}:{username:"",name:"",role:"yeucau",dept:"",password:""};
+  EDITU=ex?{username:ex.username,name:ex.name,role:ex.role,dept:ex.dept||"",chucdanh:ex.chucdanh||"",sdt:ex.sdt||"",email:ex.email||"",trangthai:ex.trangthai||"active",canProxy:!!ex.canProxy,password:""}
+          :{username:"",name:"",role:"yeucau",dept:CAT.donvi[0],chucdanh:"",sdt:"",email:"",trangthai:"active",canProxy:false,password:""};
   const roleOpts=Object.keys(ROLE_VI).map(r=>`<option value="${r}" ${r===EDITU.role?'selected':''}>${ROLE_VI[r]}</option>`).join("");
-  document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:560px">
+  const deptList=["Phòng Hỗ trợ",...CAT.donvi];
+  const deptOpts=deptList.map(d=>`<option ${d===EDITU.dept?'selected':''}>${esc(d)}</option>`).join("");
+  document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:600px">
     <div class="modal-h"><h3>${U_EDITING?"Sửa người dùng "+esc(EDITU.username):"Thêm người dùng"}</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
     <div class="modal-b"><div class="form-grid">
       <div class="f"><label>Tên đăng nhập <span class="req">*</span></label><input value="${esc(EDITU.username)}" ${U_EDITING?'disabled style="background:#f0f4f2;color:var(--ink-3)"':''} oninput="EDITU.username=this.value"></div>
       <div class="f"><label>Họ tên</label><input value="${esc(EDITU.name)}" oninput="EDITU.name=this.value"></div>
+      <div class="f"><label>Chức danh</label><input value="${esc(EDITU.chucdanh)}" placeholder="VD: Nhân viên, Trưởng phòng" oninput="EDITU.chucdanh=this.value"></div>
+      <div class="f"><label>Phòng ban</label><select onchange="EDITU.dept=this.value">${deptOpts}</select></div>
       <div class="f"><label>Vai trò <span class="req">*</span></label><select onchange="EDITU.role=this.value">${roleOpts}</select></div>
-      <div class="f"><label>Phòng ban</label><input value="${esc(EDITU.dept)}" placeholder="VD: P. Kinh doanh" oninput="EDITU.dept=this.value"></div>
+      <div class="f"><label>Trạng thái</label><select onchange="EDITU.trangthai=this.value"><option value="active" ${EDITU.trangthai==='active'?'selected':''}>Đang hoạt động</option><option value="inactive" ${EDITU.trangthai==='inactive'?'selected':''}>Ngưng hoạt động</option></select></div>
+      <div class="f"><label>Số điện thoại</label><input value="${esc(EDITU.sdt)}" oninput="EDITU.sdt=this.value"></div>
+      <div class="f"><label>Email</label><input value="${esc(EDITU.email)}" oninput="EDITU.email=this.value"></div>
+      <div class="f full"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" ${EDITU.canProxy?'checked':''} onchange="EDITU.canProxy=this.checked"> Cho phép <b>tạo phiếu thay phòng ban khác</b> (Trợ lý GĐ, Điều phối…)</label></div>
       <div class="f full"><label>${U_EDITING?"Đặt lại mật khẩu (để trống nếu giữ nguyên)":"Mật khẩu"} ${U_EDITING?'':'<span class="req">*</span>'}</label><input type="text" value="" placeholder="Tối thiểu 8 ký tự, có chữ và số" oninput="EDITU.password=this.value"><div class="hint">Người dùng sẽ được yêu cầu đổi mật khẩu ở lần đăng nhập đầu.</div></div>
       ${EDITU.role==='yeucau'?'<div class="hint" style="grid-column:1/-1">Người yêu cầu chỉ thấy ticket có <b>Đơn vị</b> trùng phòng ban ở trên (hoặc do chính họ tạo).</div>':''}
     </div></div>
@@ -1141,6 +1189,29 @@ async function delUser(username){
   if(!confirm("Xóa tài khoản "+username+"?"))return;
   try{await api("DELETE","/api/users/"+encodeURIComponent(username));renderUsers();toast("Đã xóa tài khoản");}
   catch(e){toast(e.message||"Lỗi xóa",true);}
+}
+
+/* ============================ THÔNG TIN CÁ NHÂN (5C) ============================ */
+function openProfile(){
+  const roq="background:#f0f4f2;color:var(--ink-3)";
+  document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:480px">
+    <div class="modal-h"><h3>Thông tin cá nhân</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
+    <div class="modal-b"><div class="form-grid">
+      <div class="f"><label>Họ tên</label><input value="${esc(ME.name)}" disabled style="${roq}"></div>
+      <div class="f"><label>Chức danh</label><input value="${esc(ME.chucdanh||'')}" disabled style="${roq}"></div>
+      <div class="f"><label>Phòng ban</label><input value="${esc(ME.dept||'')}" disabled style="${roq}"></div>
+      <div class="f"><label>Vai trò</label><input value="${esc(ROLELABEL||ME.role)}" disabled style="${roq}"></div>
+      <div class="f"><label>Số điện thoại</label><input id="pfSdt" value="${esc(ME.sdt||'')}"></div>
+      <div class="f"><label>Email</label><input id="pfEmail" value="${esc(ME.email||'')}"></div>
+      <div class="f full"><div class="hint">Bạn chỉ sửa được SĐT và Email. Các thông tin khác do Quản trị quản lý.</div></div>
+    </div></div>
+    <div class="modal-f"><button class="btn" onclick="closeModal()">Hủy</button><button class="btn primary" id="pfOk">Lưu</button></div></div>`;
+  document.getElementById("overlay").classList.add("show");
+  document.getElementById("pfOk").onclick=async()=>{
+    const sdt=document.getElementById("pfSdt").value.trim(), email=document.getElementById("pfEmail").value.trim();
+    try{ await api("POST","/api/profile",{sdt,email}); ME.sdt=sdt; ME.email=email; closeModal(); toast("Đã cập nhật thông tin cá nhân"); }
+    catch(e){ toast(e.message||"Lỗi",true); }
+  };
 }
 
 /* ============================ ĐĂNG NHẬP / ĐĂNG XUẤT ============================ */
@@ -1197,8 +1268,10 @@ function resetIdle(){
 ["click","keydown","mousemove","scroll","touchstart"].forEach(ev=>document.addEventListener(ev,resetIdle,{passive:true}));
 
 /* ============================ INIT ============================ */
+let PEOPLE=[];
 async function startApp(){
   try{await refresh();}catch(e){setOnline(false);return;}
+  if(ME&&ME.canProxy){ try{PEOPLE=await api("GET","/api/people");}catch(e){PEOPLE=[];} }
   PAGE="dash";go("dash");setOnline(true);resetIdle();
 }
 let POLL_STARTED=false;

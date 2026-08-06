@@ -59,6 +59,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS ix_tickets_createdBy ON tickets(createdBy);
   CREATE INDEX IF NOT EXISTS ix_ps_ticketId ON ps(ticketId);
 `);
+// Bổ sung cột hồ sơ người dùng (5C) — an toàn nếu đã tồn tại
+for (const col of ["chucdanh TEXT DEFAULT ''","sdt TEXT DEFAULT ''","email TEXT DEFAULT ''","trangthai TEXT DEFAULT 'active'","canProxy INTEGER DEFAULT 0"]) {
+  try { db.exec("ALTER TABLE users ADD COLUMN " + col); } catch (e) {}
+}
 
 /* ---- Tiện ích ID ---- */
 function ymd(d) { return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`; }
@@ -75,8 +79,9 @@ const PW_MSG = "Mật khẩu phải từ 8 ký tự trở lên và có cả ch�
 const S = {
   users:      db.prepare("SELECT * FROM users"),
   user:       db.prepare("SELECT * FROM users WHERE username = ?"),
-  userIns:    db.prepare("INSERT INTO users(username,name,role,dept,salt,hash,mustChange) VALUES(?,?,?,?,?,?,?)"),
-  userUpd:    db.prepare("UPDATE users SET name=?,role=?,dept=?,salt=?,hash=?,mustChange=? WHERE username=?"),
+  userIns:    db.prepare("INSERT INTO users(username,name,role,dept,salt,hash,mustChange,chucdanh,sdt,email,trangthai,canProxy) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)"),
+  userUpd:    db.prepare("UPDATE users SET name=?,role=?,dept=?,salt=?,hash=?,mustChange=?,chucdanh=?,sdt=?,email=?,trangthai=?,canProxy=? WHERE username=?"),
+  userProfile:db.prepare("UPDATE users SET sdt=?,email=? WHERE username=?"),
   userDel:    db.prepare("DELETE FROM users WHERE username = ?"),
   tickets:    db.prepare("SELECT data FROM tickets ORDER BY rowid DESC"),
   ticketsFor: db.prepare("SELECT data FROM tickets WHERE donvi=? OR nguoiYC=? OR createdBy=? ORDER BY rowid DESC"),
@@ -108,7 +113,7 @@ function savePSRow(x, isNew) { if (isNew) S.psIns.run(x.id, x.ticketId||"", JSON
 /* ============================ MẬT KHẨU (scrypt) ============================ */
 function hashPw(pw, salt) { salt = salt || crypto.randomBytes(16).toString("hex"); const hash = crypto.scryptSync(String(pw), salt, 64).toString("hex"); return { salt, hash }; }
 function verifyPw(pw, salt, hash) { try { const h = crypto.scryptSync(String(pw), salt, 64).toString("hex"); return crypto.timingSafeEqual(Buffer.from(h), Buffer.from(hash)); } catch { return false; } }
-function sanitizeUser(u) { return { username: u.username, name: u.name, role: u.role, dept: u.dept || "" }; }
+function sanitizeUser(u) { return { username: u.username, name: u.name, role: u.role, dept: u.dept || "", chucdanh: u.chucdanh||"", sdt: u.sdt||"", email: u.email||"", trangthai: u.trangthai||"active", canProxy: !!u.canProxy }; }
 
 /* ============================ PHIÊN ĐĂNG NHẬP ============================ */
 const sessions = new Map();
@@ -142,12 +147,13 @@ function migrateFromJson() {
 function seedUsers() {
   if (S.cntUsers.get().c > 0) return;
   // mustChange=1 cho MỌI tài khoản mẫu — bắt buộc đổi mật khẩu ở lần đăng nhập đầu tiên
-  const mk = (username, pw, name, role, dept) => { const { salt, hash } = hashPw(pw); S.userIns.run(username, name, role, dept||"", salt, hash, 1); };
-  mk("admin", "admin123", "Quản trị viên", "admin", "Phòng Hỗ trợ");
-  mk("dieuphoi", "123456", "Trưởng bộ phận Hỗ trợ", "dieuphoi", "Phòng Hỗ trợ");
-  mk("xuly1", "123456", "Trần Văn B", "xuly", "Phòng Hỗ trợ");
-  mk("kinhdoanh", "123456", "Nguyễn Văn A", "yeucau", "Phòng Kinh doanh");
-  mk("giamdoc", "123456", "Ban Giám đốc", "giamdoc", "Ban Giám đốc");
+  const mk = (username, pw, name, role, dept, chucdanh, sdt, email, canProxy) => { const { salt, hash } = hashPw(pw); S.userIns.run(username, name, role, dept||"", salt, hash, 1, chucdanh||"", sdt||"", email||"", "active", canProxy?1:0); };
+  mk("admin", "admin123", "Quản trị viên", "admin", "Phòng Hỗ trợ", "Quản trị hệ thống", "0900000001", "admin@thng.vn", 1);
+  mk("dieuphoi", "123456", "Trưởng bộ phận Hỗ trợ", "dieuphoi", "Phòng Hỗ trợ", "Trưởng bộ phận", "0900000002", "dieuphoi@thng.vn", 1);
+  mk("xuly1", "123456", "Trần Văn B", "xuly", "Phòng Hỗ trợ", "Nhân viên", "0900000003", "tvb@thng.vn", 0);
+  mk("kinhdoanh", "123456", "Nguyễn Văn A", "yeucau", "Phòng Kinh doanh", "Nhân viên", "0901234567", "a.nguyen@thng.vn", 0);
+  mk("giamdoc", "123456", "Ban Giám đốc", "giamdoc", "Ban Giám đốc", "Giám đốc", "0900000009", "gd@thng.vn", 0);
+  mk("troly", "123456", "Trợ lý Giám đốc", "yeucau", "Trợ lý Giám đốc", "Trợ lý", "0900000010", "troly@thng.vn", 1);
 }
 function seedTickets() {
   if (S.cntTickets.get().c > 0) return;
@@ -195,6 +201,7 @@ const server = http.createServer(async (req, res) => {
         const { username, password } = await readBody(req);
         const u = S.user.get(String(username||"").trim());
         if (!u || !verifyPw(password, u.salt, u.hash)) return sendJSON(res, 401, { error: "Sai tên đăng nhập hoặc mật khẩu" });
+        if ((u.trangthai||"active") !== "active") return sendJSON(res, 403, { error: "Tài khoản đã ngưng hoạt động. Liên hệ Quản trị." });
         const token = newSession(u.username);
         return sendJSON(res, 200, { user: sanitizeUser(u), cap: capOf(u.role), roleLabel: ROLES[u.role].label, mustChange: !!u.mustChange },
           { "Set-Cookie": `sid=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_MS/1000}` });
@@ -214,8 +221,22 @@ const server = http.createServer(async (req, res) => {
         const { oldPassword, newPassword } = await readBody(req);
         if (!verifyPw(oldPassword, me.salt, me.hash)) return sendJSON(res, 400, { error: "Mật khẩu hiện tại không đúng" });
         if (!validPw(newPassword)) return sendJSON(res, 400, { error: PW_MSG });
-        const { salt, hash } = hashPw(newPassword); S.userUpd.run(me.name, me.role, me.dept||"", salt, hash, 0, me.username);
+        const { salt, hash } = hashPw(newPassword);
+        S.userUpd.run(me.name, me.role, me.dept||"", salt, hash, 0, me.chucdanh||"", me.sdt||"", me.email||"", me.trangthai||"active", me.canProxy?1:0, me.username);
         return sendJSON(res, 200, { ok: true });
+      }
+
+      // Người dùng tự cập nhật SĐT & Email của mình (5C - Thông tin cá nhân)
+      if (p === "/api/profile" && req.method === "POST") {
+        const b = await readBody(req);
+        S.userProfile.run(String(b.sdt||"").trim(), String(b.email||"").trim(), me.username);
+        return sendJSON(res, 200, { ok: true });
+      }
+
+      // Danh sách người dùng để "tạo thay" — chỉ cho tài khoản có quyền tạo & tạo thay
+      if (p === "/api/people" && req.method === "GET") {
+        if (!(can(me, "create") && me.canProxy)) return sendJSON(res, 403, { error: "Không có quyền tạo thay" });
+        return sendJSON(res, 200, S.users.all().filter(u => (u.trangthai||"active")==="active").map(sanitizeUser));
       }
 
       if (p === "/api/data" && req.method === "GET")
@@ -285,7 +306,8 @@ const server = http.createServer(async (req, res) => {
           if (!validPw(b.password)) return sendJSON(res, 400, { error: PW_MSG });
           const { salt, hash } = hashPw(b.password);
           // Người dùng mới do admin tạo phải đổi mật khẩu ở lần đăng nhập đầu
-          S.userIns.run(un, b.name||un, b.role, b.dept||"", salt, hash, 1); return sendJSON(res, 201, { ok: true });
+          S.userIns.run(un, b.name||un, b.role, b.dept||"", salt, hash, 1, b.chucdanh||"", b.sdt||"", b.email||"", b.trangthai||"active", b.canProxy?1:0);
+          return sendJSON(res, 201, { ok: true });
         }
       }
       if ((m = p.match(/^\/api\/users\/(.+)$/))) {
@@ -297,9 +319,15 @@ const server = http.createServer(async (req, res) => {
           const name = b.name != null ? b.name : u.name;
           const role = (b.role && ROLES[b.role]) ? b.role : u.role;
           const dept = b.dept != null ? b.dept : u.dept;
+          const chucdanh = b.chucdanh != null ? b.chucdanh : (u.chucdanh||"");
+          const sdt = b.sdt != null ? b.sdt : (u.sdt||"");
+          const email = b.email != null ? b.email : (u.email||"");
+          const trangthai = b.trangthai != null ? b.trangthai : (u.trangthai||"active");
+          const canProxy = b.canProxy != null ? (b.canProxy?1:0) : (u.canProxy?1:0);
           let salt = u.salt, hash = u.hash, mustChange = u.mustChange;
           if (b.password) { if (!validPw(b.password)) return sendJSON(res, 400, { error: PW_MSG }); const h = hashPw(b.password); salt = h.salt; hash = h.hash; mustChange = 1; }
-          S.userUpd.run(name, role, dept, salt, hash, mustChange, un); return sendJSON(res, 200, { ok: true });
+          S.userUpd.run(name, role, dept, salt, hash, mustChange, chucdanh, sdt, email, trangthai, canProxy, un);
+          return sendJSON(res, 200, { ok: true });
         }
         if (req.method === "DELETE") {
           if (un === me.username) return sendJSON(res, 400, { error: "Không thể tự xóa tài khoản đang dùng" });
