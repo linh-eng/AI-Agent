@@ -45,7 +45,7 @@ Cửa sổ sẽ hiện các địa chỉ truy cập, ví dụ:
 
 ```
 • Trên máy chủ này:            http://localhost:3000
-• Các phòng ban trong LAN mở:  http://192.168.1.50:3000
+• Các phòng ban trong LAN mở:  http://172.168.11.60:3000
 ```
 
 > ⚠️ **Để nguyên cửa sổ này chạy.** Đóng cửa sổ = tắt máy chủ.
@@ -58,10 +58,10 @@ Trên máy bất kỳ **cùng mạng nội bộ**, mở trình duyệt (Chrome/E
 chỉ máy chủ, ví dụ:
 
 ```
-http://192.168.1.50:3000
+http://172.168.11.60:3000
 ```
 
-> Thay `192.168.1.50` bằng địa chỉ IP thật của máy chủ (xem ở cửa sổ Bước 3).
+> Thay `172.168.11.60` bằng địa chỉ IP thật của máy chủ (xem ở cửa sổ Bước 3).
 > Nên tạo **bookmark** để lần sau vào nhanh.
 
 ---
@@ -122,7 +122,6 @@ pm2 save
   và `data.db-shm` nếu có.)*
 - **Khôi phục:** tắt máy chủ → chép `data.db` bản sao lưu đè vào (xóa `data.db-wal`, `data.db-shm` nếu có) → bật lại.
 - Ngoài ra trong ứng dụng có nút **Xuất dữ liệu (JSON)** và **Xuất CSV** để lưu thêm bản đối chiếu.
-- Trong ứng dụng có nút **"Xuất dữ liệu"** (JSON) và **"Xuất CSV"** để lưu thêm bản đối chiếu.
 
 ---
 
