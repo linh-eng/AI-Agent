@@ -21,11 +21,12 @@ import {
   ShieldCheck,
   Hammer,
   BarChart3,
+  UserCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
 import type { SessionPayload } from "@/lib/auth";
-import { ROLE_LABELS, type RoleCode } from "@/lib/rbac";
+import { ROLE_LABELS, PERMISSIONS, type RoleCode } from "@/lib/rbac";
 import { SessionProvider } from "@/components/session-provider";
 
 const NAV = [
@@ -45,6 +46,7 @@ const NAV = [
   { href: "/projects", label: "Dự án", icon: FolderKanban },
   { href: "/partners", label: "NCC / Khách hàng", icon: Users },
   { href: "/products", label: "Sản phẩm", icon: Package },
+  { href: "/users", label: "Người dùng", icon: UserCog, perm: PERMISSIONS.USER_MANAGE },
 ];
 
 export function AppShell({
@@ -84,7 +86,7 @@ export function AppShell({
           <span className="font-semibold">THNG Kho</span>
         </div>
         <nav className="space-y-1 p-3">
-          {NAV.map((item) => {
+          {NAV.filter((item) => !("perm" in item) || session.permissions.includes((item as any).perm)).map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
             return (

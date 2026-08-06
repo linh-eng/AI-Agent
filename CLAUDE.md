@@ -75,6 +75,7 @@ src/
       serials/       # Danh sách serial + truy vết hai chiều (+ in tem)
       lots/          # Danh sách lô hàng
       reports/       # Báo cáo tổng hợp (mục 7) + xuất CSV + in
+      users/         # Quản lý người dùng (Admin): tạo/đổi mật khẩu/vai trò/khóa
       projects/      # Dự án + báo cáo hàng theo dự án ([id])
       warehouses/    # Danh mục kho A1
       bins/          # Zone / Bin (Scan-to-Bin)

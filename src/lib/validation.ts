@@ -348,6 +348,23 @@ export const disassemblyExecuteSchema = z.object({
   note: z.string().optional().nullable(),
 });
 
+// ----- Quản lý người dùng -----
+export const userCreateSchema = z.object({
+  email: z.string().email("Email không hợp lệ"),
+  name: z.string().min(1, "Nhập họ tên"),
+  password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
+  roleCodes: z.array(z.string().min(1)).min(1, "Chọn ít nhất 1 vai trò"),
+  isActive: z.boolean().default(true),
+});
+
+export const userUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  isActive: z.boolean().optional(),
+  // Đặt lại mật khẩu (bỏ trống nếu không đổi)
+  password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự").optional().nullable(),
+  roleCodes: z.array(z.string().min(1)).min(1, "Chọn ít nhất 1 vai trò").optional(),
+});
+
 /** Parse an toàn, ném lỗi Zod để lớp handle() bắt. */
 export function parseJson<T>(schema: z.ZodType<T>, body: unknown): T {
   return schema.parse(body);
