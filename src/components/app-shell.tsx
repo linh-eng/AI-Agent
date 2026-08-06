@@ -22,6 +22,7 @@ import {
   Hammer,
   BarChart3,
   UserCog,
+  Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
@@ -31,6 +32,7 @@ import { SessionProvider } from "@/components/session-provider";
 
 const NAV = [
   { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
+  { href: "/requests", label: "Yêu cầu", icon: Inbox },
   { href: "/inventory", label: "Tồn kho", icon: Gauge },
   { href: "/inbound", label: "Nhập kho", icon: PackagePlus },
   { href: "/outbound", label: "Xuất kho", icon: PackageMinus },

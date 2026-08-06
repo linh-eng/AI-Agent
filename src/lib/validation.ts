@@ -365,6 +365,60 @@ export const userUpdateSchema = z.object({
   roleCodes: z.array(z.string().min(1)).min(1, "Chọn ít nhất 1 vai trò").optional(),
 });
 
+// ----- v1.5: Lớp Yêu cầu (5A-0) -----
+export const requestTypeEnum = z.enum(["YCN", "YCX", "YCC", "YCM", "YCK", "YCU", "YCT", "YCKT"]);
+export const requestPriorityEnum = z.enum(["P1", "P2", "P3"]);
+
+export const requestLineSchema = z.object({
+  productId: z.string().optional().nullable(),
+  productText: z.string().optional().nullable(),
+  quantity: z.coerce.number().int().min(1).default(1),
+  designatedSerial: z.string().optional().nullable(),
+  techNote: z.string().optional().nullable(),
+});
+
+export const requestCreateSchema = z.object({
+  type: requestTypeEnum,
+  priority: requestPriorityEnum.default("P2"),
+  p1Reason: z.string().optional().nullable(),
+  neededBy: z.string().optional().nullable(),
+  content: z.string().optional().nullable(),
+  projectId: z.string().optional().nullable(),
+  partnerId: z.string().optional().nullable(),
+  isCommercialStock: z.boolean().default(false),
+  deliveryLocation: z.string().optional().nullable(),
+  relatedDocCode: z.string().optional().nullable(),
+  supportTicketId: z.string().optional().nullable(),
+  createdForDept: z.string().optional().nullable(),
+  lines: z.array(requestLineSchema).default([]),
+});
+
+export const requestReceiveSchema = z.object({
+  assigneeId: z.string().min(1, "Chọn người phụ trách"),
+  conflictResolution: z.string().optional(),
+  conflictReason: z.string().optional(),
+});
+
+export const requestReturnSchema = z.object({
+  fields: z.array(z.string()).optional(),
+  note: z.string().min(1, "Nêu rõ cần bổ sung gì"),
+});
+
+export const requestRejectSchema = z.object({
+  reasonGroup: z.string().min(1, "Chọn nhóm lý do"),
+  note: z.string().min(1, "Ghi diễn giải lý do"),
+});
+
+export const requestAcceptSchema = z.object({
+  stars: z.coerce.number().int().min(1).max(5).optional(),
+  note: z.string().optional(),
+});
+
+export const requestCommentSchema = z.object({
+  content: z.string().min(1, "Nội dung trống"),
+  mentions: z.array(z.string()).optional(),
+});
+
 /** Parse an toàn, ném lỗi Zod để lớp handle() bắt. */
 export function parseJson<T>(schema: z.ZodType<T>, body: unknown): T {
   return schema.parse(body);
