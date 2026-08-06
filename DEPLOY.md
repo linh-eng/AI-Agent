@@ -1,5 +1,8 @@
 # Hướng dẫn triển khai cho MẠNG NỘI BỘ (LAN)
 
+> 🪟 **Máy chủ Windows + Node.js (không Docker)?** Xem hướng dẫn bấm-từng-bước riêng:
+> [`DEPLOY-WINDOWS.md`](./DEPLOY-WINDOWS.md).
+
 Mục tiêu: cài webapp lên **một máy chủ trong công ty** (một PC/server luôn bật),
 nhân viên các máy khác trong cùng mạng LAN mở trình duyệt vào
 `http://<IP-máy-chủ>:3000` để dùng.
