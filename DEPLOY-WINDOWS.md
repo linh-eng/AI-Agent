@@ -58,8 +58,24 @@ PORT="7000"
 ```
 
 - Thay **`Thng@2026`** bằng đúng mật khẩu postgres của chị.
-  ⚠️ Nếu mật khẩu có ký tự `@ : / #` thì phải mã hóa (vd `@` → `%40`), hoặc
-  **đặt mật khẩu chỉ gồm chữ và số** cho đơn giản (khuyên dùng cách này).
+  ⚠️ **Mật khẩu có ký tự đặc biệt PHẢI mã hóa trong DATABASE_URL** (chỉ ở dòng này;
+  khi đăng nhập psql/pgAdmin vẫn gõ mật khẩu gốc):
+
+  | Ký tự | Viết trong URL |
+  |---|---|
+  | `$` | `%24` |
+  | `@` | `%40` |
+  | `:` | `%3A` |
+  | `/` | `%2F` |
+  | `#` | `%23` |
+  | `?` | `%3F` |
+  | `%` | `%25` |
+
+  Ví dụ mật khẩu **`THNG$$09xx`** → viết **`THNG%24%2409xx`**, tức:
+  ```ini
+  DATABASE_URL="postgresql://postgres:THNG%24%2409xx@localhost:5432/thng_warehouse?schema=public"
+  ```
+  (Nếu viết thẳng `THNG$$09xx`, dấu `$` bị hiểu là biến → sai mật khẩu → không kết nối được DB.)
 - `AUTH_SECRET`: tạo chuỗi ngẫu nhiên — chạy trong PowerShell rồi dán kết quả vào:
   ```powershell
   [Convert]::ToBase64String((1..48 | ForEach-Object {Get-Random -Maximum 256}))
