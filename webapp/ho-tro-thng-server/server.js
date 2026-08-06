@@ -146,7 +146,7 @@ function seedUsers() {
   mk("admin", "admin123", "Quản trị viên", "admin", "Phòng Hỗ trợ");
   mk("dieuphoi", "123456", "Trưởng bộ phận Hỗ trợ", "dieuphoi", "Phòng Hỗ trợ");
   mk("xuly1", "123456", "Trần Văn B", "xuly", "Phòng Hỗ trợ");
-  mk("kinhdoanh", "123456", "Nguyễn Văn A", "yeucau", "P. Kinh doanh");
+  mk("kinhdoanh", "123456", "Nguyễn Văn A", "yeucau", "Phòng Kinh doanh");
   mk("giamdoc", "123456", "Ban Giám đốc", "giamdoc", "Ban Giám đốc");
 }
 function seedTickets() {
@@ -157,7 +157,7 @@ function seedTickets() {
   const loai = "Giao nhận hàng hóa cho khách hàng";
   const id = genId("TK", d);
   const t = { id, tCreate: d.toISOString(), createdBy: "kinhdoanh", loai, luong: extern.has(loai)?"Hỗ trợ Khách hàng bên ngoài":"Hỗ trợ Nội bộ",
-    donvi:"P. Kinh doanh", nguoiYC:"Nguyễn Văn A", sdt:"0901234567", email:"a.nguyen@congty.vn", watchers:"Trưởng P.KD; KT trưởng",
+    donvi:"Phòng Kinh doanh", nguoiYC:"Nguyễn Văn A", sdt:"0901234567", email:"a.nguyen@congty.vn", watchers:"Trưởng P.KD; KT trưởng",
     noidung:"Giao hàng mẫu cho khách hàng ABC theo HĐ 125/HĐKT", soluong:20, dvt:"Thùng", quycach:"Carton 40x30x30cm, hàng dễ vỡ, không xếp chồng",
     diadiemGiao:"Kho A - 12 Nguyễn Huệ, Q.1", diadiemNhan:"Cty ABC - 45 Lê Lợi, Q.3", tGiaoYC:"2026-08-03T10:00",
     uutien:"P2 - Ưu tiên cao", doi:"Đội Giao nhận 1", assignee:"Trần Văn B", phoihop:"Lê Văn E (bốc xếp)",

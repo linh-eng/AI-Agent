@@ -252,10 +252,32 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
 
 <script>
 /* ============================ DỮ LIỆU DANH MỤC ============================ */
+// Danh mục 16 loại công việc (5G): [mã, tên, luồng, ưu tiên mặc định, nhóm-trường-động]
+const WORKTYPES = [
+  ["KT01","Xử lý sự cố / lỗi sản phẩm","Hỗ trợ kỹ thuật","P2 - Ưu tiên cao","kt"],
+  ["KT02","Hỗ trợ cài đặt, cấu hình","Hỗ trợ kỹ thuật","P3 - Ưu tiên trung bình","kt"],
+  ["KT03","Hỗ trợ tư vấn kỹ thuật cho khách hàng","Hỗ trợ khách hàng","P3 - Ưu tiên trung bình","kt"],
+  ["KT04","Hỗ trợ kiểm thử (testing)","Hỗ trợ nội bộ","P3 - Ưu tiên trung bình","kt"],
+  ["TK01","Hỗ trợ triển khai tại khách hàng","Triển khai dự án","P2 - Ưu tiên cao","tk"],
+  ["TK02","Chuẩn bị thiết bị / vật tư cho dự án","Triển khai dự án","P3 - Ưu tiên trung bình","tk"],
+  ["TK03","Hỗ trợ nghiệm thu, bàn giao dự án","Triển khai dự án","P2 - Ưu tiên cao","tk"],
+  ["TK04","Khảo sát hiện trạng tại khách hàng","Triển khai dự án","P3 - Ưu tiên trung bình","tk"],
+  ["BH01","Tiếp nhận bảo hành, đổi trả thiết bị","Bảo hành","P2 - Ưu tiên cao","bh"],
+  ["BH02","Sửa chữa, thay thế linh kiện","Bảo hành","P2 - Ưu tiên cao","bh"],
+  ["BH03","Bảo trì định kỳ","Bảo hành","P4 - Thấp","bh"],
+  ["GN01","Giao nhận hàng hóa cho khách hàng","Hỗ trợ khách hàng bên ngoài","P2 - Ưu tiên cao","gn"],
+  ["GN02","Vận chuyển nội bộ giữa các kho/chi nhánh","Hỗ trợ nội bộ","P3 - Ưu tiên trung bình","gn"],
+  ["GN03","Nhận hàng từ nhà cung cấp","Hỗ trợ nội bộ","P3 - Ưu tiên trung bình","gn"],
+  ["HC01","Hỗ trợ chứng từ, hồ sơ thầu","Hỗ trợ nội bộ","P3 - Ưu tiên trung bình","hc"],
+  ["HC02","Hỗ trợ hồ sơ thanh toán, đối chiếu công nợ","Hỗ trợ nội bộ","P3 - Ưu tiên trung bình","hc"],
+  ["HC03","Hỗ trợ chuẩn bị họp, sự kiện","Hỗ trợ nội bộ","P4 - Thấp","hc"],
+  ["KH99","Khác (ghi rõ)","","P3 - Ưu tiên trung bình","khac"],
+];
+const WT = Object.fromEntries(WORKTYPES.map(w=>[w[1],{ma:w[0],luong:w[2],pri:w[3],group:w[4]}]));
 const CAT = {
-  loai: ["Sự cố dịch vụ - gián đoạn vận hành","Bảo trì - bảo dưỡng định kỳ","Sửa chữa - khắc phục hỏng hóc","Giao nhận hàng hóa cho khách hàng","Lắp đặt - nghiệm thu tại điểm khách hàng","Khiếu nại - yêu cầu xử lý của khách hàng","Luân chuyển chứng từ nội bộ","Di dời - điều chuyển tài sản, thiết bị","Hỗ trợ sự kiện - hội nghị","Hỗ trợ kho vận - xuất nhập kho","Vận chuyển tiền - tài sản có giá","Mua sắm - cấp phát vật dụng","Hỗ trợ nhân sự - phương tiện","Photo - in ấn - scan tài liệu","Khác"],
-  donvi: ["P. Kế toán","P. Kinh doanh","P. Nhân sự","P. Hành chính","P. Kho vận","P. Kỹ thuật","Ban Giám đốc","KH - Cty ABC","KH - Cty XYZ","Khác"],
-  doi: ["Đội Giao nhận 1","Đội Giao nhận 2","Đội Kỹ thuật - Bảo trì","Đội Kho vận","Đội Hành chính - Sự kiện","Đội trực khẩn cấp"],
+  loai: WORKTYPES.map(w=>w[1]),
+  donvi: ["Phòng Hành chính","Phòng Kế toán","Phòng Kinh doanh","Phòng Mua hàng","Phòng Triển khai","Phòng Testing","Phòng Bảo hành","Phòng Tư vấn kỹ thuật","Ban Giám đốc","Trợ lý Giám đốc"],
+  doi: ["Đội Kỹ thuật","Đội Triển khai","Đội Bảo hành","Đội Giao nhận","Đội Hành chính","Đội trực khẩn cấp"],
   uutien: ["P1 - Khẩn cấp","P2 - Ưu tiên cao","P3 - Ưu tiên trung bình","P4 - Thấp"],
   trangthai: ["Tạo mới","Trả lại bổ sung","Đã tiếp nhận","Đang xử lý","Chờ phản hồi","Chờ duyệt","Tạm dừng","Đã xử lý","Mở lại","Hoàn tất","Từ chối"],
   nghiemthu: ["Đạt - nghiệm thu đủ","Đạt - có điều chỉnh","Không đạt - phải làm lại","Hoàn thành một phần","Hủy yêu cầu"],
@@ -264,9 +286,13 @@ const CAT = {
   duyet: ["Chờ duyệt","Đã duyệt","Duyệt một phần","Từ chối","Yêu cầu bổ sung hồ sơ"],
   dvt: ["Thùng","Kiện","Bao","Cái","Bộ","Hộp","Tập","Kg","Chuyến","Lần","Người","Khác"]
 };
-// Ánh xạ Loại công việc -> Luồng (6 loại đầu = KH bên ngoài, còn lại = Nội bộ)
-const FLOW_EXTERNAL = new Set(CAT.loai.slice(0,6));
-const flowOf = l => FLOW_EXTERNAL.has(l) ? "Hỗ trợ Khách hàng bên ngoài" : "Hỗ trợ Nội bộ";
+// Ánh xạ Loại công việc -> Luồng (tự suy theo danh mục 5G; "Khác" để trống, Điều phối chọn khi tiếp nhận)
+const flowOf = l => (WT[l] ? WT[l].luong : "");
+const priOf = l => (WT[l] ? WT[l].pri : "P3 - Ưu tiên trung bình");
+const groupOf = l => (WT[l] ? WT[l].group : "");
+const isKhac = l => groupOf(l)==="khac";
+// Hiển thị loại công việc: "Khác — [nội dung người yêu cầu ghi]"
+const loaiText = t => isKhac(t.loai) ? ("Khác — "+(t.loaiKhac||"(chưa ghi rõ)")) : (t.loai||"");
 // SLA theo ưu tiên: [phản hồi phút, xử lý giờ]
 const SLA = {"P1 - Khẩn cấp":[15,2],"P2 - Ưu tiên cao":[30,4],"P3 - Ưu tiên trung bình":[60,8],"P4 - Thấp":[120,24]};
 const slaOf = p => SLA[p] || [60,8];
@@ -501,7 +527,7 @@ function renderTickets(){
     const s=slaStatus(t);const [rp]=t.uutien.split(" ");
     return `<tr onclick="openDetail('${t.id}')">
       <td class="mono">${t.id}</td>
-      <td><div class="ell" title="${esc(t.noidung)}">${esc(t.noidung)}</div><div class="muted" style="font-size:11.5px">${esc(t.loai)}</div></td>
+      <td><div class="ell" title="${esc(t.noidung)}">${esc(t.noidung)}</div><div class="muted" style="font-size:11.5px">${esc(loaiText(t))}</div></td>
       <td>${esc(t.donvi)}<div class="muted" style="font-size:11.5px">${esc(t.nguoiYC)}</div></td>
       <td><span class="pr ${rp}">${esc(t.uutien)}</span></td>
       <td>${esc(t.assignee||'<span class="muted">Chưa gán</span>')}</td>
@@ -577,7 +603,7 @@ function openForm(id){
   FSTEP=0; drawForm();
   document.getElementById("overlay").classList.add("show");
 }
-function blankTicket(){return {id:"(tự sinh khi lưu)",tCreate:"",loai:CAT.loai[3],luong:flowOf(CAT.loai[3]),donvi:CAT.donvi[1],nguoiYC:"",sdt:"",email:"",watchers:"",noidung:"",soluong:"",dvt:CAT.dvt[0],quycach:"",diadiemGiao:"",diadiemNhan:"",tGiaoYC:"",uutien:CAT.uutien[1],doi:"",assignee:"",phoihop:"",tAssign:"",tStart:"",tDone:"",trangthai:CAT.trangthai[0],slThucte:"",diadiemThucte:"",nguoiNhan:"",nghiemthu:"",dexuat:"",dathuchien:"",attach:"",csat:"",nhanxet:"",tClose:"",moLai:0,ghichu:""};}
+function blankTicket(){const l0=CAT.loai[0];return {id:"(tự sinh khi lưu)",tCreate:"",loai:l0,luong:flowOf(l0),loaiKhac:"",moTaThem:"",donvi:CAT.donvi[2],nguoiYC:"",sdt:"",email:"",watchers:"",noidung:"",soluong:"",dvt:CAT.dvt[0],quycach:"",diadiemGiao:"",diadiemNhan:"",tGiaoYC:"",uutien:priOf(l0),doi:"",assignee:"",phoihop:"",tAssign:"",tStart:"",tDone:"",trangthai:CAT.trangthai[0],slThucte:"",diadiemThucte:"",nguoiNhan:"",nghiemthu:"",dexuat:"",dathuchien:"",attach:"",csat:"",nhanxet:"",tClose:"",moLai:0,ghichu:""};}
 
 function drawForm(){
   const t=EDIT;const isNew=!DB.tickets.some(x=>x.id===t.id);
@@ -588,8 +614,10 @@ function drawForm(){
 
   const step0=`<div class="form-grid">
     <div class="readbox"><div>Mã ticket: <b>${esc(t.id)}</b></div><div>SLA: <b>phản hồi ${rp}′ · xử lý ${rh}h</b></div></div>
-    <div class="f"><label>Loại công việc <span class="req">*</span></label>${sel("loai",CAT.loai,"EDIT.luong=window.flowOf(this.value);drawForm()")}</div>
-    <div class="f"><label>Luồng công việc <span class="hint" style="font-weight:400">(tự động theo loại)</span></label><input value="${esc(t.luong)}" disabled style="background:#f0f4f2;color:var(--ink-2);font-weight:600"></div>
+    <div class="f"><label>Loại công việc <span class="req">*</span></label>${sel("loai",CAT.loai,"EDIT.luong=window.flowOf(this.value);EDIT.uutien=window.priOf(this.value);drawForm()")}</div>
+    <div class="f"><label>Luồng công việc <span class="hint" style="font-weight:400">(tự động theo loại)</span></label><input value="${esc(t.luong)|| (window.groupOf(t.loai)==='khac'?'(Điều phối chọn khi tiếp nhận)':'')}" disabled style="background:#f0f4f2;color:var(--ink-2);font-weight:600"></div>
+    ${window.groupOf(t.loai)==='khac'?`<div class="f full"><label>Ghi rõ loại công việc <span class="req">*</span></label>${inp("loaiKhac","text","Nêu rõ đầu việc (tối thiểu 5 ký tự)…")}</div>
+    <div class="f full"><label>Mô tả thêm về đầu việc</label>${ta("moTaThem","Diễn giải thêm nếu cần…")}</div>`:''}
     <div class="f"><label>Đơn vị / Khách hàng yêu cầu <span class="req">*</span></label>${sel("donvi",CAT.donvi)}</div>
     <div class="f"><label>Người yêu cầu <span class="req">*</span></label>${inp("nguoiYC","text","Nguyễn Văn A")}</div>
     <div class="f"><label>SĐT <span class="req">*</span></label>${inp("sdt","text","0901234567")}</div>
@@ -648,10 +676,11 @@ function drawForm(){
       <button class="btn primary" onclick="saveTicket()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Lưu ticket</button>
     </div></div>`;
 }
-window.flowOf=flowOf;
+window.flowOf=flowOf; window.priOf=priOf; window.groupOf=groupOf;
 async function saveTicket(){
   const t=EDIT;
   if(!t.loai){toast("Vui lòng chọn Loại công việc",true);FSTEP=0;drawForm();return;}
+  if(isKhac(t.loai) && String(t.loaiKhac||'').trim().length<5){toast("Với loại 'Khác', vui lòng ghi rõ loại công việc (tối thiểu 5 ký tự)",true);FSTEP=0;drawForm();return;}
   if(!t.nguoiYC||!t.noidung){toast("Vui lòng nhập Người yêu cầu và Nội dung",true);FSTEP=0;drawForm();return;}
   const isNew=!DB.tickets.some(x=>x.id===t.id);
   t.luong=flowOf(t.loai);
@@ -677,7 +706,8 @@ function openDetail(id,tab){
   const info=`<dl class="dl">
     ${row("Mã Ticket",`<b class="mono">${esc(t.id)}</b>`)}
     ${row("Thời gian tạo",fmtDT(t.tCreate))}
-    ${row("Loại công việc",esc(t.loai))}
+    ${row("Loại công việc",esc(loaiText(t)))}
+    ${t.moTaThem?row("Mô tả thêm",esc(t.moTaThem)):''}
     ${row("Luồng",esc(t.luong))}
     ${row("Đơn vị / KH",esc(t.donvi))}
     ${row("Người yêu cầu",esc(t.nguoiYC)+` · ${esc(t.sdt)} · ${esc(t.email)}`)}

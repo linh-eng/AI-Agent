@@ -44,9 +44,18 @@
 
 **→ GIAI ĐOẠN 2 HOÀN TẤT.**
 
-## Giai đoạn 3 — Hồ sơ & kết xuất
-- [ ] Nhật ký thay đổi (audit log) — không xóa vết
-- [ ] Đính kèm file thật (ảnh/PDF/Word/Excel), giới hạn cấu hình
-- [ ] Trang Báo cáo (điểm CL theo người/tháng/loại, SLA, phát sinh theo nguyên nhân, xung đột)
-- [ ] Xuất Excel; 5 biểu mẫu in PDF A4
-- [ ] Danh mục & SLA cấu hình được (loại việc, luồng, ưu tiên, ngưỡng SLA, giờ làm việc, trọng số)
+## Giai đoạn 3 — Hồ sơ & kết xuất (đã bổ sung theo v3_2)
+- [x] **3a**: Danh mục 10 phòng ban (5B) + 18 loại công việc (5G) mã/luồng/ưu tiên; ô "Khác (ghi rõ)"
+      bắt buộc + luồng để Điều phối chọn; tự điền luồng & gợi ý ưu tiên theo loại
+- [ ] **3b**: Hồ sơ người dùng (5C) tự điền vào phiếu; "Tạo thay người khác"; "Khách hàng bên ngoài"; Thông tin cá nhân
+- [ ] **3c**: Nhật ký thay đổi (audit log) — không xóa vết
+- [ ] **3d**: Thông tin dự án & triển khai (5H mới) — trường động G/H/I/K/L; Danh mục Dự án; chặn thiếu trường bắt buộc
+- [ ] **3e**: Thông báo chuyển bước 5D (thủ công) — nút "Gửi thông báo" + cửa sổ soạn sẵn + đánh dấu đã/chưa
+- [ ] **3f**: Đính kèm file thật; trường động bắt buộc theo loại
+- [ ] **3g**: Trang Báo cáo theo chu kỳ (9B) + xuất Excel + 5 biểu mẫu PDF
+- [ ] **3h**: Màn "Danh mục & Cấu hình" chỉnh được (danh mục, ngưỡng SLA, giờ làm T7, trọng số điểm CL, ngưỡng quá tải)
+
+### Ghi chú v3_2 (khác v3_1)
+- 5D: bỏ email tự động → nút "Gửi thông báo" thủ công (không cần máy chủ mail).
+- 5H (mới): thông tin dự án & triển khai (địa điểm/tầng/người nhận/điều kiện ra vào/yêu cầu KD).
+- Các mục khác giữ nguyên.
