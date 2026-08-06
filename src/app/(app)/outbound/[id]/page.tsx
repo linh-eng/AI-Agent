@@ -15,6 +15,8 @@ import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import { OUTBOUND_TYPES, type OutboundTypeCode } from "@/lib/outbound";
 import { DOC_STATUS_LABEL, DOC_STATUS_TONE } from "@/lib/labels";
+import { printDeliveryNote } from "@/lib/print";
+import { Printer } from "lucide-react";
 
 export default function OutboundDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -168,7 +170,7 @@ export default function OutboundDetailPage() {
           <CardHeader className="pb-2"><CardTitle className="text-base">Biên bản bàn giao</CardTitle></CardHeader>
           <CardContent className="p-0">
             <Table>
-              <THead><TR><TH>Số BB</TH><TH>Hình thức</TH><TH>Vận chuyển</TH><TH>Mã vận đơn</TH><TH>Serial đã giao</TH></TR></THead>
+              <THead><TR><TH>Số BB</TH><TH>Hình thức</TH><TH>Vận chuyển</TH><TH>Mã vận đơn</TH><TH>Serial đã giao</TH><TH></TH></TR></THead>
               <TBody>
                 {order.deliveryReports.map((d: any) => (
                   <TR key={d.id}>
@@ -177,6 +179,11 @@ export default function OutboundDetailPage() {
                     <TD>{d.carrier ?? "—"}</TD>
                     <TD className="font-mono">{d.trackingNumber ?? "—"}</TD>
                     <TD className="max-w-xs truncate font-mono text-xs">{d.serialNumbers ?? "—"}</TD>
+                    <TD>
+                      <Button size="sm" variant="outline" onClick={() => printDeliveryNote(order, d)}>
+                        <Printer className="h-3.5 w-3.5" /> In
+                      </Button>
+                    </TD>
                   </TR>
                 ))}
               </TBody>

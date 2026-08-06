@@ -34,3 +34,21 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/* In ấn: chỉ hiện phần .print-area, ẩn sidebar/nút. */
+@media print {
+  body {
+    background: #fff;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-area {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 16px;
+    background: #fff;
+  }
+}
+

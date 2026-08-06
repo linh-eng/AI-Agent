@@ -10,7 +10,7 @@ truy vết xuất xứ (CO/CQ, tờ khai HQ, lô) và bảo hành hai tầng (h�
 
 Tham chiếu yêu cầu đầy đủ: bản mô tả 10 module (M1–M10) và lộ trình 7 phase.
 
-## Current status — **Phase 6 hoàn tất**
+## Current status — **Hoàn tất toàn bộ 7 phase** 🎉
 
 - **Phase 1:** Auth + RBAC, schema Prisma đầy đủ cho toàn bộ mục 6, màn hình danh mục nền tảng.
 - **Phase 2:** Nhập kho (M1–M3) — tạo phiếu nhập theo mã nghiệp vụ N1–N12 (bung checklist chứng từ +
@@ -37,8 +37,14 @@ Tham chiếu yêu cầu đầy đủ: bản mô tả 10 module (M1–M10) và l�
   còn hạn hãng); chốt xử lý K-HH (thanh lý → SCRAPPED K-TL...). Rã máy: đề nghị → **BGĐ duyệt bắt buộc** →
   đối chiếu as-built → serial cha DISASSEMBLED, serial con thu hồi vào K-TMAY (grade) hoặc K-TL (hỏng).
   Bảng SLA cấu hình ở `src/lib/sla.ts`.
+- **Phase 7:** Báo cáo & in ấn (mục 7) — báo cáo tổng hợp (`src/lib/reports.ts`): Nhập–Xuất–Tồn theo kho,
+  theo NCC (tỷ lệ lỗi + số vụ RMA), tồn đọng K-HH & K-BH-NCC quá hạn, hiệu quả lắp ráp (tỷ lệ QC fail),
+  bảo hành tổng quan, kết quả rã máy; trang `/reports` + **xuất CSV** (Excel) + **in báo cáo** (print CSS).
+  In ấn chứng từ/tem (`src/lib/print.ts`): **in tem serial** (M3) từ màn truy vết, **in biên bản bàn giao**
+  (M8) từ phiếu xuất.
 
-Phase 7 (báo cáo + in ấn chứng từ/tem) chưa làm — schema đã có sẵn bảng cho chúng.
+Toàn bộ lộ trình 7 phase đã hoàn tất. Chỉ số "giá trị" (tiền) hiện dựa trên số lượng vì schema chưa có
+trường giá vốn — có thể bổ sung trường giá để tính giá trị nhập/tồn/thu hồi sau.
 
 ## Tech stack
 
@@ -66,8 +72,9 @@ src/
       warranty/      # Bảo hành/RMA: tiếp nhận + phân luồng + nhận về hãng + K-HH SLA
       disassembly/   # Rã máy: list + đề nghị + duyệt BGĐ + thực hiện ([id])
       stock-counts/  # Kiểm kê: list + tạo + quét đối chiếu + duyệt BGĐ
-      serials/       # Danh sách serial + truy vết hai chiều
+      serials/       # Danh sách serial + truy vết hai chiều (+ in tem)
       lots/          # Danh sách lô hàng
+      reports/       # Báo cáo tổng hợp (mục 7) + xuất CSV + in
       projects/      # Dự án + báo cáo hàng theo dự án ([id])
       warehouses/    # Danh mục kho A1
       bins/          # Zone / Bin (Scan-to-Bin)
@@ -81,7 +88,8 @@ src/
                      # (lắp ráp: allocate/qc/complete), inventory (tồn+cảnh báo),
                      # stockcount-service (kiểm kê), outbound + outbound-service
                      # (xuất: submit/approve/ship), warranty-service (M9),
-                     # disassembly-service (M10), sla (bảng SLA), labels
+                     # disassembly-service (M10), sla (bảng SLA), reports (báo cáo),
+                     # csv (xuất CSV), print (in tem/biên bản), labels
   middleware.ts      # Bảo vệ route: chưa đăng nhập -> /login hoặc 401
 ```
 

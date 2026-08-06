@@ -20,6 +20,7 @@ import {
   PackageMinus,
   ShieldCheck,
   Hammer,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
@@ -38,6 +39,7 @@ const NAV = [
   { href: "/stock-counts", label: "Kiểm kê", icon: ClipboardList },
   { href: "/serials", label: "Serial", icon: ScanBarcode },
   { href: "/lots", label: "Lô hàng", icon: Boxes },
+  { href: "/reports", label: "Báo cáo", icon: BarChart3 },
   { href: "/warehouses", label: "Danh mục kho", icon: Warehouse },
   { href: "/bins", label: "Vị trí kệ", icon: MapPin },
   { href: "/projects", label: "Dự án", icon: FolderKanban },

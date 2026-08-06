@@ -4,8 +4,9 @@ Hệ thống quản lý kho cho THNG: **Nhập – Xuất – Lắp ráp – Th�
 Quản lý tới Serial/IMEI, quan hệ serial cha–con của máy lắp ráp, xuất xứ (CO/CQ/tờ khai HQ),
 bảo hành hai tầng (hãng + THNG) và truy vết hai chiều.
 
-> Trạng thái: **Phase 1 hoàn tất** — Auth + RBAC, schema Prisma đầy đủ, và màn hình danh mục nền tảng
-> (kho A1, dự án, NCC/khách hàng, sản phẩm theo `tracking_mode`, vị trí kệ). Phase 2–7 sẽ bổ sung sau.
+> Trạng thái: **Hoàn tất toàn bộ 7 phase** — Auth/RBAC + danh mục, Nhập kho (M1–M3), Lắp ráp & as-built
+> BOM (M4), Tồn kho realtime + kiểm kê (M5), Xuất kho (M6–M8), Bảo hành/RMA/rã máy (M9–M10), Báo cáo & in
+> ấn (mục 7). Xem chi tiết từng phase trong `CLAUDE.md`.
 
 ## Công nghệ
 

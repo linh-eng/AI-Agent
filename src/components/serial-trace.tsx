@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ChevronRight, Cpu, Building2, FolderKanban, ShieldCheck, FileText } from "lucide-react";
+import { ChevronRight, Cpu, Building2, FolderKanban, ShieldCheck, FileText, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/client";
 import { formatDate } from "@/lib/utils";
 import { SERIAL_STATUS_LABEL, SERIAL_STATUS_TONE } from "@/lib/labels";
+import { printSerialLabel } from "@/lib/print";
 
 function ChildNode({ node, depth = 0 }: { node: any; depth?: number }) {
   return (
@@ -48,6 +50,21 @@ export function SerialTrace({ serialId }: { serialId: string }) {
         <span className="font-mono text-base font-semibold">{data.serialNumber}</span>
         <Badge tone={SERIAL_STATUS_TONE[data.status]}>{SERIAL_STATUS_LABEL[data.status]}</Badge>
         <span className="text-muted-foreground">{data.product?.name}</span>
+        <Button
+          size="sm"
+          variant="outline"
+          className="ml-auto"
+          onClick={() =>
+            printSerialLabel({
+              serialNumber: data.serialNumber,
+              sku: data.product?.sku,
+              product: data.product?.name,
+              warehouse: data.warehouse?.code,
+            })
+          }
+        >
+          <Printer className="h-3.5 w-3.5" /> In tem
+        </Button>
       </div>
       <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/30 p-3 text-xs sm:grid-cols-4">
         <div><div className="text-muted-foreground">Kho</div><div className="font-mono font-medium">{data.warehouse?.code}</div></div>
