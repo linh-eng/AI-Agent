@@ -47,13 +47,13 @@
 ## Giai đoạn 3 — Hồ sơ & kết xuất (đã bổ sung theo v3_2)
 - [x] **3a**: Danh mục 10 phòng ban (5B) + 18 loại công việc (5G) mã/luồng/ưu tiên; ô "Khác (ghi rõ)"
       bắt buộc + luồng để Điều phối chọn; tự điền luồng & gợi ý ưu tiên theo loại
-- [ ] **3b**: Hồ sơ người dùng (5C) tự điền vào phiếu; "Tạo thay người khác"; "Khách hàng bên ngoài"; Thông tin cá nhân
-- [ ] **3c**: Nhật ký thay đổi (audit log) — không xóa vết
-- [ ] **3d**: Thông tin dự án & triển khai (5H mới) — trường động G/H/I/K/L; Danh mục Dự án; chặn thiếu trường bắt buộc
-- [ ] **3e**: Thông báo chuyển bước 5D (thủ công) — nút "Gửi thông báo" + cửa sổ soạn sẵn + đánh dấu đã/chưa
-- [ ] **3f**: Đính kèm file thật; trường động bắt buộc theo loại
-- [ ] **3g**: Trang Báo cáo theo chu kỳ (9B) + xuất Excel + 5 biểu mẫu PDF
-- [ ] **3h**: Màn "Danh mục & Cấu hình" chỉnh được (danh mục, ngưỡng SLA, giờ làm T7, trọng số điểm CL, ngưỡng quá tải)
+- [x] **3b**: Hồ sơ người dùng (5C) tự điền vào phiếu; "Tạo thay người khác"; "Khách hàng bên ngoài"; Thông tin cá nhân; ngưng-hoạt-động chặn đăng nhập
+- [x] **3c**: Nhật ký thay đổi (audit log) — máy chủ ghi diff trường, tab riêng, không xóa vết
+- [ ] **3d**: Thông tin dự án & triển khai (5H mới) — trường động G/H/I/K/L; Danh mục Dự án; chặn thiếu trường bắt buộc *(CÒN LẠI — lớn)*
+- [x] **3e**: Thông báo chuyển bước 5D (thủ công) — nút "Gửi thông báo" + cửa sổ soạn sẵn + đánh dấu đã/chưa
+- [ ] **3f**: Đính kèm file thật; trường động bắt buộc theo loại *(CÒN LẠI — lớn)*
+- [ ] **3g**: Trang Báo cáo theo chu kỳ (9B) + xuất Excel + 5 biểu mẫu PDF *(CÒN LẠI — lớn)*
+- [x] **3h**: Màn "Danh mục & Cấu hình" chỉnh được (ngưỡng SLA, giờ làm T7, trọng số điểm CL, ngưỡng quá tải)
 
 ### Ghi chú v3_2 (khác v3_1)
 - 5D: bỏ email tự động → nút "Gửi thông báo" thủ công (không cần máy chủ mail).
