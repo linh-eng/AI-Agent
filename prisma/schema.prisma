@@ -344,10 +344,12 @@ model Product {
   isActive     Boolean      @default(true)
   createdAt    DateTime     @default(now())
 
-  serials    Serial[]
-  lots       Lot[]
-  licenses   License[]
-  bomPlanned BomPlanned[]
+  serials       Serial[]
+  lots          Lot[]
+  licenses      License[]
+  bomPlanned    BomPlanned[]
+  inboundLines  InboundLine[]
+  outboundLines OutboundLine[]
 
   @@map("products")
 }
@@ -547,6 +549,7 @@ model InboundLine {
   originCountry     String?
 
   inboundOrder InboundOrder @relation(fields: [inboundOrderId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id])
   project      Project?     @relation(fields: [projectId], references: [id])
 
   @@index([inboundOrderId])
@@ -576,6 +579,7 @@ model OutboundLine {
   quantity        Int
 
   outboundOrder OutboundOrder @relation(fields: [outboundOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
   project       Project?      @relation(fields: [projectId], references: [id])
 
   @@index([outboundOrderId])

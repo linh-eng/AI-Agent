@@ -87,6 +87,73 @@ export const inboundLineSchema = z
     path: ["projectId"],
   });
 
+// ----- Inbound (M1) -----
+export const inboundTypeEnum = z.enum([
+  "N1", "N2", "N3", "N4", "N5", "N6", "N7", "N8", "N9", "N10", "N11", "N12",
+]);
+
+export const inboundCreateSchema = z.object({
+  type: inboundTypeEnum,
+  supplierId: z.string().optional().nullable(),
+  poNumber: z.string().optional().nullable(),
+  invoiceNumber: z.string().optional().nullable(),
+  destinationWarehouseId: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+  lines: z.array(inboundLineSchema).min(1, "Phiếu nhập cần ít nhất 1 dòng"),
+});
+
+// ----- Receive (M2/M3): nhận hàng, sinh serial/lot + xuất xứ + bảo hành -----
+const originInput = z.object({
+  countryOfOrigin: z.string().optional().nullable(),
+  poNumber: z.string().optional().nullable(),
+  coNumber: z.string().optional().nullable(),
+  cqNumber: z.string().optional().nullable(),
+  customsDeclarationNo: z.string().optional().nullable(),
+});
+const warrantyInput = z.object({
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+  terms: z.string().optional().nullable(),
+});
+
+const receiveSerialItem = z.object({
+  serialNumber: z.string().min(1, "Thiếu serial"),
+  condition: z.string().optional().nullable(),
+  grade: z.enum(["A", "B", "C"]).optional().nullable(),
+  binId: z.string().optional().nullable(),
+  yearOfManufacture: z.coerce.number().int().optional().nullable(),
+  originCountry: z.string().optional().nullable(),
+  origin: originInput.optional().nullable(),
+  vendorWarranty: warrantyInput.optional().nullable(),
+  thngWarranty: warrantyInput.optional().nullable(),
+});
+
+const receiveLineSchema = z
+  .object({
+    lineId: z.string().min(1),
+    /** true = hàng lỗi -> chuyển thẳng K-HH (M2) */
+    isDefective: z.boolean().default(false),
+    serials: z.array(receiveSerialItem).optional(),
+    lot: z
+      .object({
+        lotNumber: z.string().min(1),
+        quantity: z.coerce.number().int().positive(),
+        manufactureDate: z.string().optional().nullable(),
+        expiryDate: z.string().optional().nullable(),
+        origin: originInput.optional().nullable(),
+        vendorWarranty: warrantyInput.optional().nullable(),
+      })
+      .optional(),
+    quantity: z.coerce.number().int().positive().optional(),
+  })
+  .refine((v) => !!v.serials?.length || !!v.lot || !!v.quantity, {
+    message: "Dòng nhận cần serial, lô hoặc số lượng",
+  });
+
+export const inboundReceiveSchema = z.object({
+  lines: z.array(receiveLineSchema).min(1),
+});
+
 /** Parse an toàn, ném lỗi Zod để lớp handle() bắt. */
 export function parseJson<T>(schema: z.ZodType<T>, body: unknown): T {
   return schema.parse(body);
