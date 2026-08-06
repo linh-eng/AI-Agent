@@ -505,7 +505,7 @@ function renderTickets(){
       <td>${esc(t.donvi)}<div class="muted" style="font-size:11.5px">${esc(t.nguoiYC)}</div></td>
       <td><span class="pr ${rp}">${esc(t.uutien)}</span></td>
       <td>${esc(t.assignee||'<span class="muted">Chưa gán</span>')}</td>
-      <td>${stPill(t.trangthai)}</td>
+      <td>${stPill(t.trangthai)}${(()=>{const pp=planProgress(t);return pp?`<div class="muted" style="font-size:11px;margin-top:3px">Đầu việc ${pp.done}/${pp.total} (${pp.pct}%)</div>`:'';})()}</td>
       <td><span class="pill ${s.color}"><span class="dot"></span>${s.label}</span><div class="muted" style="font-size:11px;margin-top:3px">${s.used}h / ${s.deadline}h</div></td>
     </tr>`;
   }).join(""):`<tr><td colspan="7"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg><div>Chưa có ticket phù hợp bộ lọc.</div></div></td></tr>`;
@@ -705,7 +705,19 @@ function openDetail(id,tab){
         <div class="qpart">Không PS chủ quan (10%): <b>${q.parts.ps}</b>${q.hasChuQuan?' <span class="pill red" style="font-size:10px">có PS chủ quan</span>':''}</div>
         <div class="qpart">Không mở lại (10%): <b>${q.parts.reopen}</b></div>
       </div></div>` : '';
-  const proc=`${qBlock}<dl class="dl">
+  const kh=t.keHoach; const pp=planProgress(t);
+  const planBlock = kh ? `<div style="margin:2px 0 16px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--card)">
+      <div style="font-weight:700;color:var(--green-800);font-size:14px;margin-bottom:8px">Kế hoạch thực hiện ${kh.confirmed?'<span class="pill green" style="font-size:11px">đã xác nhận nhận việc</span>':'<span class="pill amber" style="font-size:11px">chưa xác nhận</span>'}</div>
+      <dl class="dl" style="grid-template-columns:180px 1fr">
+        ${row("Bắt đầu → hoàn tất DK",(fmtDT(kh.tBatDauDK)||'–')+" → "+(fmtDT(kh.tHoanTatDK)||'–'))}
+        ${kh.phuongAn?row("Phương án",esc(kh.phuongAn)):''}
+        ${kh.dieuKien?row("Điều kiện tiên quyết",esc(kh.dieuKien)):''}
+        ${kh.ruiRo?row("Rủi ro",esc(kh.ruiRo)):''}
+        ${kh.lyDoTre?row("Lý do hoàn tất trễ",esc(kh.lyDoTre)):''}
+      </dl>
+      ${pp?`<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:12.5px"><span class="muted">Tiến độ đầu việc con</span><b>${pp.done}/${pp.total} (${pp.pct}%)</b></div><div class="track" style="margin-top:5px;height:12px"><div class="fill" style="width:${pp.pct}%"></div></div></div>`:''}
+    </div>` : '';
+  const proc=`${qBlock}${planBlock}<dl class="dl">
     ${row("Ưu tiên",`<span class="pr ${t.uutien.split(' ')[0]}">${esc(t.uutien)}</span>`)}
     ${row("SLA quy định",`Phản hồi ${rp} phút · Xử lý ${rh} giờ`)}
     ${row("Nhóm/Đội",esc(t.doi))}
@@ -767,7 +779,7 @@ function nextActions(t){
   const add=(to,label,need,cap)=>A.push({to,label,need:!!need,cap:cap||'edit'});
   if(s==='Tạo mới'){ add('Đã tiếp nhận','Tiếp nhận (đủ điều kiện)',false,'edit'); add('Trả lại bổ sung','Trả lại bổ sung',true,'edit'); add('Từ chối','Từ chối',true,'edit'); }
   else if(s==='Trả lại bổ sung'){ add('Tạo mới','Gửi lại (đã bổ sung)',false,'create'); }
-  else if(s==='Đã tiếp nhận'){ add('@assign','Phân công người thực hiện',false,'edit'); add('Đang xử lý','Bắt đầu xử lý',false,'edit'); add('Từ chối','Từ chối',true,'edit'); }
+  else if(s==='Đã tiếp nhận'){ add('@assign','Phân công người thực hiện',false,'edit'); add('@plan','Lập kế hoạch thực hiện',false,'edit'); add('Đang xử lý','Bắt đầu xử lý',false,'edit'); add('Từ chối','Từ chối',true,'edit'); }
   else if(s==='Đang xử lý'){ add('Đã xử lý','Hoàn thành xử lý',false,'edit'); add('Chờ phản hồi','Chờ phản hồi NYC',false,'edit'); add('Chờ duyệt','Chờ duyệt phát sinh',false,'edit'); add('Tạm dừng','Tạm dừng',true,'edit'); }
   else if(s==='Chờ phản hồi'||s==='Chờ duyệt'){ add('Đang xử lý','Tiếp tục xử lý',false,'edit'); }
   else if(s==='Tạm dừng'){ add('Đang xử lý','Tiếp tục xử lý',false,'edit'); add('Đã tiếp nhận','Phân loại lại (Bước 2)',true,'edit'); }
@@ -781,11 +793,13 @@ function doAction(id, idx){
   const a=(window.__acts||[])[idx]; if(!a)return;
   const t=DB.tickets.find(x=>x.id===id); if(!t)return; const to=a.to;
   if(to==='@assign'){ openAssign(id); return; }
+  if(to==='@plan'){ openPlan(id); return; }
   // Bước 2 — tiếp nhận: mở hộp chốt ưu tiên
   if(baseStatus(to)==='Đã tiếp nhận' && baseStatus(t.trangthai)==='Tạo mới'){ openReceive(id); return; }
-  // Chốt kế hoạch: phải có Người thực hiện trước khi Đang xử lý
-  if(baseStatus(t.trangthai)==='Đã tiếp nhận' && baseStatus(to)==='Đang xử lý' && !(t.assignee&&String(t.assignee).trim())){
-    toast('Cần phân công Người thực hiện (nút Chỉnh sửa) trước khi bắt đầu xử lý',true); return;
+  // Cổng Bước 3: phải có Người thực hiện + kế hoạch đã xác nhận trước khi Đang xử lý
+  if(baseStatus(t.trangthai)==='Đã tiếp nhận' && baseStatus(to)==='Đang xử lý'){
+    if(!(t.assignee&&String(t.assignee).trim())){ toast('Cần phân công Người thực hiện trước khi bắt đầu xử lý',true); return; }
+    if(!(t.keHoach&&t.keHoach.confirmed)){ toast('Cần lập & xác nhận kế hoạch thực hiện trước khi bắt đầu xử lý',true); openPlan(id); return; }
   }
   if(a.need){ askReason(a.label,(reason)=>applyStatus(id,to,reason,{})); return; }
   applyStatus(id,to,'',{});
@@ -828,6 +842,54 @@ function openReceive(id){
     applyStatus(id,'Đã tiếp nhận', reason||('Tiếp nhận, chốt '+pri), {uutien:pri});
   };
 }
+
+/* ============================ KẾ HOẠCH THỰC HIỆN (v3 mục 5E) ============================ */
+let EDITPLAN=null, EDITPLAN_ID=null;
+function openPlan(id){
+  const t=DB.tickets.find(x=>x.id===id); if(!t)return; EDITPLAN_ID=id;
+  const k=t.keHoach||{};
+  EDITPLAN={tBatDauDK:k.tBatDauDK||'',tHoanTatDK:k.tHoanTatDK||'',phuongAn:k.phuongAn||'',checklist:Array.isArray(k.checklist)?JSON.parse(JSON.stringify(k.checklist)):[],ruiRo:k.ruiRo||'',duPhong:k.duPhong||'',dieuKien:k.dieuKien||'',ghiChuNYC:k.ghiChuNYC||'',lyDoTre:k.lyDoTre||'',camKet:!!k.confirmed};
+  drawPlan();
+}
+function planAddItem(){ EDITPLAN.checklist.push({text:'',done:false}); drawPlan(); }
+function planDelItem(i){ EDITPLAN.checklist.splice(i,1); drawPlan(); }
+function drawPlan(){
+  const k=EDITPLAN;
+  const cl=k.checklist.map((c,i)=>`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><input type="checkbox" ${c.done?'checked':''} onchange="EDITPLAN.checklist[${i}].done=this.checked"><input value="${esc(c.text)}" oninput="EDITPLAN.checklist[${i}].text=this.value" style="flex:1" placeholder="Đầu việc con…"><button class="btn sm danger" onclick="planDelItem(${i})">✕</button></div>`).join("");
+  document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:640px">
+    <div class="modal-h"><h3>Lập kế hoạch thực hiện (Bước 3b)</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
+    <div class="modal-b"><div class="form-grid">
+      <div class="sec-title">Thời gian</div>
+      <div class="f"><label>Bắt đầu dự kiến</label><input type="datetime-local" value="${esc(k.tBatDauDK)}" oninput="EDITPLAN.tBatDauDK=this.value"></div>
+      <div class="f"><label>Hoàn tất dự kiến</label><input type="datetime-local" value="${esc(k.tHoanTatDK)}" oninput="EDITPLAN.tHoanTatDK=this.value"></div>
+      <div class="sec-title">Cách làm</div>
+      <div class="f full"><label>Phương án thực hiện</label><textarea oninput="EDITPLAN.phuongAn=this.value" placeholder="Mô tả cách triển khai…">${esc(k.phuongAn)}</textarea></div>
+      <div class="f full"><label>Các đầu việc con (checklist)</label>${cl||'<div class="hint">Chưa có đầu việc con.</div>'}<button class="btn sm" style="margin-top:6px" onclick="planAddItem()">+ Thêm đầu việc</button></div>
+      <div class="sec-title">Rủi ro & điều kiện</div>
+      <div class="f full"><label>Rủi ro nhận diện trước</label><textarea oninput="EDITPLAN.ruiRo=this.value">${esc(k.ruiRo)}</textarea></div>
+      <div class="f full"><label>Phương án dự phòng</label><textarea oninput="EDITPLAN.duPhong=this.value">${esc(k.duPhong)}</textarea></div>
+      <div class="f full"><label>Điều kiện tiên quyết (cần gì từ người yêu cầu / phòng khác)</label><textarea oninput="EDITPLAN.dieuKien=this.value">${esc(k.dieuKien)}</textarea></div>
+      <div class="f full"><label>Ghi chú gửi người yêu cầu</label><textarea oninput="EDITPLAN.ghiChuNYC=this.value">${esc(k.ghiChuNYC)}</textarea></div>
+      <div class="f full" id="lyDoTreWrap" style="display:none"><label>Lý do hoàn tất trễ hơn thời hạn mong muốn <span class="req">*</span></label><textarea id="planLyDoTre" oninput="EDITPLAN.lyDoTre=this.value" placeholder="Bắt buộc ghi lý do…">${esc(k.lyDoTre)}</textarea></div>
+      <div class="f full"><label style="display:flex;gap:9px;align-items:center;cursor:pointer"><input type="checkbox" id="planCamKet" ${k.camKet?'checked':''} onchange="EDITPLAN.camKet=this.checked"> <b>Người thực hiện xác nhận nhận việc</b> (bắt buộc để bắt đầu xử lý)</label></div>
+    </div></div>
+    <div class="modal-f"><button class="btn" onclick="closeModal()">Hủy</button><button class="btn primary" onclick="savePlan()">Lưu kế hoạch</button></div></div>`;
+  document.getElementById("overlay").classList.add("show");
+}
+async function savePlan(){
+  const k=EDITPLAN, id=EDITPLAN_ID, t=DB.tickets.find(x=>x.id===id); if(!t)return;
+  // Cảnh báo trễ so với thời hạn mong muốn của người yêu cầu
+  const tre = k.tHoanTatDK && t.tGiaoYC && new Date(k.tHoanTatDK) > new Date(t.tGiaoYC);
+  if(tre && String(k.lyDoTre||'').trim().length<5){
+    const w=document.getElementById("lyDoTreWrap"); if(w){w.style.display='block';}
+    toast('Kế hoạch hoàn tất trễ hơn thời hạn mong muốn — vui lòng ghi lý do',true); return;
+  }
+  const keHoach={tBatDauDK:k.tBatDauDK,tHoanTatDK:k.tHoanTatDK,phuongAn:k.phuongAn,checklist:k.checklist,ruiRo:k.ruiRo,duPhong:k.duPhong,dieuKien:k.dieuKien,ghiChuNYC:k.ghiChuNYC,lyDoTre:k.lyDoTre,confirmed:!!k.camKet};
+  const nt=JSON.parse(JSON.stringify(t)); nt.keHoach=keHoach;
+  try{ await api('PUT','/api/tickets/'+encodeURIComponent(id),nt); await refresh(); buildNav(); render(); openDetail(id,'proc'); toast(keHoach.confirmed?'Đã lưu & xác nhận kế hoạch':'Đã lưu kế hoạch (chưa xác nhận nhận việc)'); }
+  catch(e){ toast(e.message||'Lỗi lưu kế hoạch',true); }
+}
+function planProgress(t){ const c=t.keHoach&&Array.isArray(t.keHoach.checklist)?t.keHoach.checklist:[]; if(!c.length)return null; const done=c.filter(x=>x.done).length; return {done,total:c.length,pct:Math.round(done/c.length*100)}; }
 
 /* ============================ PHÂN CÔNG & XUNG ĐỘT ƯU TIÊN (v3 mục 3) ============================ */
 const OVERLOAD_N=3; // ngưỡng quá tải (P1/P2), cấu hình được (GĐ3)

@@ -36,8 +36,13 @@
       5 phương án; lý do ≥10 ký tự; tab "Lịch sử ưu tiên"; Dashboard "Xung đột ưu tiên"
 - [x] Phương án 4: SLA 30' — máy chủ tự áp phương án 2 khi quá hạn (quét mỗi phút)
 - [x] Dashboard bổ sung: Trả lại/Từ chối/Mở lại; biểu đồ vòng đời 10 trạng thái
-- [ ] **Kế hoạch thực hiện đầy đủ (5E)** — form kế hoạch (checklist đầu việc con, rủi ro, đối chiếu
-      kế hoạch↔thực tế). Hiện có cổng tối thiểu (phải có Người thực hiện). CÒN LẠI của GĐ2.
+- [x] **Kế hoạch thực hiện (5E)**: form kế hoạch (thời gian DK, phương án, checklist đầu việc con,
+      rủi ro, dự phòng, điều kiện tiên quyết, cam kết nhận việc); cổng bắt buộc: không có kế hoạch
+      xác nhận + Người thực hiện thì không sang "Đang xử lý"; cảnh báo & bắt lý do khi hoàn tất DK
+      trễ hơn thời hạn mong muốn; thanh tiến độ checklist ở chi tiết & danh sách.
+      (Đối chiếu kế hoạch↔thực tế tại nghiệm thu: bổ sung ở GĐ3 cùng Báo cáo.)
+
+**→ GIAI ĐOẠN 2 HOÀN TẤT.**
 
 ## Giai đoạn 3 — Hồ sơ & kết xuất
 - [ ] Nhật ký thay đổi (audit log) — không xóa vết
