@@ -1,0 +1,33 @@
+# Triển khai webapp THNG cho mạng nội bộ bằng Docker.
+# Chạy:  docker compose up -d --build
+# Nhân viên truy cập:  http://<IP-máy-chủ>:3000
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: thng
+      POSTGRES_PASSWORD: thng_secret_doi_lai
+      POSTGRES_DB: thng_warehouse
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    # Không mở cổng ra ngoài — chỉ app trong mạng docker truy cập.
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: "postgresql://thng:thng_secret_doi_lai@db:5432/thng_warehouse?schema=public"
+      # ĐỔI chuỗi này thành giá trị ngẫu nhiên dài (openssl rand -base64 48)
+      AUTH_SECRET: "${AUTH_SECRET:-DOI-CHUOI-BI-MAT-NAY-THANH-NGAU-NHIEN-DAI}"
+      # Mạng nội bộ http:// -> phải false; nếu có HTTPS thì đổi true
+      COOKIE_SECURE: "false"
+      SESSION_MAX_AGE: "28800"
+      PORT: "3000"
+    ports:
+      - "3000:3000" # đổi cổng bên trái nếu muốn (vd "8080:3000")
+
+volumes:
+  dbdata:

@@ -54,12 +54,23 @@ export async function verifySession(token: string): Promise<SessionPayload | nul
   }
 }
 
-/** Cấu hình cookie phiên (dùng khi set trong route handler). */
+/**
+ * Cấu hình cookie phiên (dùng khi set trong route handler).
+ *
+ * `secure`:
+ *   - Mặc định bật ở production (khi chạy sau HTTPS).
+ *   - Chạy mạng NỘI BỘ qua http:// (không HTTPS) PHẢI đặt `COOKIE_SECURE=false`,
+ *     nếu không trình duyệt sẽ không gửi lại cookie -> nhân viên đăng nhập không được.
+ */
 export function sessionCookieOptions(maxAge = MAX_AGE) {
+  const secure =
+    process.env.COOKIE_SECURE !== undefined
+      ? process.env.COOKIE_SECURE === "true"
+      : process.env.NODE_ENV === "production";
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    secure,
     path: "/",
     maxAge,
   };
