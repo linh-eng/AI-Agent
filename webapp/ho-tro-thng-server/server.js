@@ -382,7 +382,10 @@ const server = http.createServer(async (req, res) => {
   if (!full.startsWith(PUB)) { res.writeHead(403); return res.end("Forbidden"); }
   fs.readFile(full, (err, data) => {
     if (err) { res.writeHead(404, { "Content-Type":"text/html; charset=utf-8" }); return res.end("Không tìm thấy trang."); }
-    res.writeHead(200, { "Content-Type": MIME[path.extname(full)] || "application/octet-stream" });
+    const ext = path.extname(full);
+    // Không cache HTML/JS để mọi cập nhật giao diện hiện ngay, không cần Ctrl+F5
+    const cache = (ext === ".html" || ext === ".js") ? "no-store" : "no-cache";
+    res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream", "Cache-Control": cache });
     res.end(data);
   });
 });
