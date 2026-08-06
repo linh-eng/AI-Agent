@@ -224,6 +224,15 @@ export const workOrderCompleteSchema = z.object({
     .nullable(),
 });
 
+// ----- Kiểm kê (M5) -----
+export const stockCountCreateSchema = z.object({
+  warehouseId: z.string().min(1, "Chọn kho kiểm kê"),
+  note: z.string().optional().nullable(),
+});
+export const stockCountScanSchema = z.object({
+  serialNumbers: z.array(z.string().min(1)).min(1, "Chưa quét serial nào"),
+});
+
 /** Parse an toàn, ném lỗi Zod để lớp handle() bắt. */
 export function parseJson<T>(schema: z.ZodType<T>, body: unknown): T {
   return schema.parse(body);

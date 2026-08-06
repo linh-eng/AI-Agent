@@ -10,7 +10,7 @@ truy vết xuất xứ (CO/CQ, tờ khai HQ, lô) và bảo hành hai tầng (h�
 
 Tham chiếu yêu cầu đầy đủ: bản mô tả 10 module (M1–M10) và lộ trình 7 phase.
 
-## Current status — **Phase 3 hoàn tất**
+## Current status — **Phase 4 hoàn tất**
 
 - **Phase 1:** Auth + RBAC, schema Prisma đầy đủ cho toàn bộ mục 6, màn hình danh mục nền tảng.
 - **Phase 2:** Nhập kho (M1–M3) — tạo phiếu nhập theo mã nghiệp vụ N1–N12 (bung checklist chứng từ +
@@ -21,8 +21,12 @@ Tham chiếu yêu cầu đầy đủ: bản mô tả 10 module (M1–M10) và l�
   (quét serial → WIP `K-TAM`); QC/burn-in đầu ra (FAIL quay lại lắp ráp); hoàn thành sinh serial thành
   phẩm + **as-built BOM có version** (liên kết serial/lô/license con) + BH THNG + gán license (cài phần
   mềm); linh kiện thừa trả `K-LK`; nhập kho thành phẩm. Mọi bước ghi stock_movement + serial_event.
+- **Phase 4:** Tồn kho realtime & kiểm kê (M5) — dashboard tồn theo kho/sản phẩm (thực tế/khả dụng/giữ/WIP)
+  với **quy tắc khả dụng = IN_STOCK + không nằm trong máy (parentSerialId null) + kho tính tồn**; cảnh báo
+  (dưới tồn tối thiểu, hàng tồn lâu, linh kiện sắp hết BH NCC khi còn trong kho); báo cáo theo dự án; kiểm kê
+  (chụp serial kỳ vọng → quét thực tế → tự so lệch thiếu/thừa → BGĐ duyệt → bút toán ADJUSTMENT).
 
-Các phase 4–7 (tồn realtime/xuất/bảo hành/báo cáo) chưa làm — schema đã có sẵn bảng cho chúng.
+Các phase 5–7 (xuất/bảo hành/báo cáo) chưa làm — schema đã có sẵn bảng cho chúng.
 
 ## Tech stack
 
@@ -43,10 +47,13 @@ src/
     login/           # Trang đăng nhập
     (app)/           # Layout có sidebar + các trang sau đăng nhập
       dashboard/     # Tổng quan + tồn theo kho
+      inventory/     # Tồn kho realtime theo kho/sản phẩm + cảnh báo (M5)
       inbound/       # Nhập kho: list + tạo phiếu + màn nhận hàng (quét serial, scan-to-bin)
       work-orders/   # Lắp ráp: list + tạo lệnh + workbench (cấp phát/QC/hoàn thành as-built)
+      stock-counts/  # Kiểm kê: list + tạo + quét đối chiếu + duyệt BGĐ
       serials/       # Danh sách serial + truy vết hai chiều
       lots/          # Danh sách lô hàng
+      projects/      # Dự án + báo cáo hàng theo dự án ([id])
       warehouses/    # Danh mục kho A1
       bins/          # Zone / Bin (Scan-to-Bin)
       projects/      # Dự án
@@ -56,7 +63,8 @@ src/
   components/        # app-shell, page-header, session-provider, serial-trace, ui/*
   lib/               # prisma, auth, session, rbac, warehouses, validation, api, client, utils,
                      # inbound (cấu hình N1–N12), inbound-service (receive), workorder-service
-                     # (lắp ráp: allocate/qc/complete), labels
+                     # (lắp ráp: allocate/qc/complete), inventory (tồn+cảnh báo),
+                     # stockcount-service (kiểm kê), labels
   middleware.ts      # Bảo vệ route: chưa đăng nhập -> /login hoặc 401
 ```
 

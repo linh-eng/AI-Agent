@@ -15,6 +15,8 @@ import {
   ScanBarcode,
   Boxes,
   Wrench,
+  Gauge,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
@@ -24,8 +26,10 @@ import { SessionProvider } from "@/components/session-provider";
 
 const NAV = [
   { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
+  { href: "/inventory", label: "Tồn kho", icon: Gauge },
   { href: "/inbound", label: "Nhập kho", icon: PackagePlus },
   { href: "/work-orders", label: "Lắp ráp", icon: Wrench },
+  { href: "/stock-counts", label: "Kiểm kê", icon: ClipboardList },
   { href: "/serials", label: "Serial", icon: ScanBarcode },
   { href: "/lots", label: "Lô hàng", icon: Boxes },
   { href: "/warehouses", label: "Danh mục kho", icon: Warehouse },

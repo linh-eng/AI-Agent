@@ -718,9 +718,31 @@ model StockCount {
   status      StockCountStatus @default(DRAFT)
   note        String?
   approvedBy  String?
+  approvedAt  DateTime?
   createdAt   DateTime         @default(now())
 
+  lines StockCountLine[]
+
   @@map("stock_counts")
+}
+
+/// Dòng kiểm kê từng serial: hệ thống kỳ vọng có / thực tế quét được.
+model StockCountLine {
+  id           String   @id @default(cuid())
+  stockCountId String
+  serialId     String?
+  serialNumber String // lưu cả số serial để đối chiếu kể cả serial lạ
+  /// true: hệ thống kỳ vọng serial này ở kho khi bắt đầu kiểm kê
+  expected     Boolean  @default(false)
+  /// true: thực tế đã quét thấy
+  scanned      Boolean  @default(false)
+  note         String?
+  createdAt    DateTime @default(now())
+
+  stockCount StockCount @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
+
+  @@index([stockCountId])
+  @@map("stock_count_lines")
 }
 
 // ----------------------------------------------------------------------------

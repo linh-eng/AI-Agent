@@ -69,3 +69,19 @@ export const WO_MODE_LABEL: Record<string, string> = {
   TO_ORDER: "Lắp theo đơn",
   TO_STOCK: "Lắp để tồn kho",
 };
+
+export const COUNT_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Nháp",
+  COUNTING: "Đang kiểm",
+  PENDING_APPROVAL: "Chờ duyệt",
+  APPROVED: "Đã duyệt",
+  CANCELLED: "Đã hủy",
+};
+
+export const COUNT_STATUS_TONE: Record<string, Tone> = {
+  DRAFT: "muted",
+  COUNTING: "warning",
+  PENDING_APPROVAL: "warning",
+  APPROVED: "success",
+  CANCELLED: "muted",
+};

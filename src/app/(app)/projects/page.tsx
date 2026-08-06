@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -113,7 +114,11 @@ export default function ProjectsPage() {
               ) : (
                 rows.map((r) => (
                   <TR key={r.id}>
-                    <TD className="font-mono font-medium">{r.code}</TD>
+                    <TD>
+                      <Link href={`/projects/${r.id}`} className="font-mono font-medium text-primary hover:underline">
+                        {r.code}
+                      </Link>
+                    </TD>
                     <TD>{r.name}</TD>
                     <TD>{r.customer?.name ?? "—"}</TD>
                     <TD>{r.customerPo ?? "—"}</TD>
