@@ -76,6 +76,17 @@ db.exec(`
 for (const col of ["chucdanh TEXT DEFAULT ''","sdt TEXT DEFAULT ''","email TEXT DEFAULT ''","trangthai TEXT DEFAULT 'active'","canProxy INTEGER DEFAULT 0"]) {
   try { db.exec("ALTER TABLE users ADD COLUMN " + col); } catch (e) {}
 }
+db.exec("CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)");
+const qSetGet = db.prepare("SELECT v FROM settings WHERE k = ?");
+const qSetSet = db.prepare("INSERT INTO settings(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v = excluded.v");
+const DEFAULT_CONFIG = {
+  sla: { "P1 - Khẩn cấp":[15,2], "P2 - Ưu tiên cao":[30,4], "P3 - Ưu tiên trung bình":[60,8], "P4 - Thấp":[120,24] },
+  work: { mStart:8, mEnd:12, aStart:13, aEnd:17, sat:false }, // sat=true nếu làm Thứ 7
+  warn: 0.8, overload: 3,
+  quality: { csat:40, sla:25, sl:15, ps:10, reopen:10 }
+};
+function getConfig() { const r = qSetGet.get("config"); return r ? JSON.parse(r.v) : DEFAULT_CONFIG; }
+function seedConfig() { if (!qSetGet.get("config")) qSetSet.run("config", JSON.stringify(DEFAULT_CONFIG)); }
 
 /* ---- Tiện ích ID ---- */
 function ymd(d) { return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`; }
@@ -252,6 +263,13 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 200, S.users.all().filter(u => (u.trangthai||"active")==="active").map(sanitizeUser));
       }
 
+      if (p === "/api/config" && req.method === "GET")
+        return sendJSON(res, 200, getConfig());
+      if (p === "/api/config" && req.method === "PUT") {
+        if (!can(me, "users")) return sendJSON(res, 403, { error: "Chỉ quản trị viên" });
+        const b = await readBody(req); qSetSet.run("config", JSON.stringify(b)); return sendJSON(res, 200, { ok: true });
+      }
+
       if (p === "/api/data" && req.method === "GET")
         return sendJSON(res, 200, { tickets: ticketsForUser(me), ps: allPS(), seq: {} });
 
@@ -389,7 +407,7 @@ setInterval(() => {
 }, 60000);
 
 /* ============================ KHỞI ĐỘNG ============================ */
-migrateFromJson(); seedUsers(); seedTickets();
+migrateFromJson(); seedConfig(); seedUsers(); seedTickets();
 server.listen(PORT, HOST, () => {
   const nets = os.networkInterfaces(); const ips = [];
   for (const name of Object.keys(nets)) for (const ni of nets[name]) if (ni.family === "IPv4" && !ni.internal) ips.push(ni.address);

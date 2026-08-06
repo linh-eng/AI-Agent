@@ -293,11 +293,15 @@ const groupOf = l => (WT[l] ? WT[l].group : "");
 const isKhac = l => groupOf(l)==="khac";
 // Hiển thị loại công việc: "Khác — [nội dung người yêu cầu ghi]"
 const loaiText = t => isKhac(t.loai) ? ("Khác — "+(t.loaiKhac||"(chưa ghi rõ)")) : (t.loai||"");
-// SLA theo ưu tiên: [phản hồi phút, xử lý giờ]
-const SLA = {"P1 - Khẩn cấp":[15,2],"P2 - Ưu tiên cao":[30,4],"P3 - Ưu tiên trung bình":[60,8],"P4 - Thấp":[120,24]};
+// SLA theo ưu tiên: [phản hồi phút, xử lý giờ] — nạp từ Cấu hình máy chủ
+let SLA = {"P1 - Khẩn cấp":[15,2],"P2 - Ưu tiên cao":[30,4],"P3 - Ưu tiên trung bình":[60,8],"P4 - Thấp":[120,24]};
 const slaOf = p => SLA[p] || [60,8];
-const WY_WARN = 0.8; // ngưỡng vàng
-const WORK = {mStart:8,mEnd:12,aStart:13,aEnd:17}; // giờ làm việc
+let WY_WARN = 0.8; // ngưỡng vàng
+let WORK = {mStart:8,mEnd:12,aStart:13,aEnd:17,sat:false}; // giờ làm việc
+let QCONF={csat:40, sla:25, sl:15, ps:10, reopen:10}; // trọng số điểm chất lượng
+let OVERLOAD_N=3; // ngưỡng quá tải P1/P2
+let CFG=null;
+function applyConfig(c){ if(!c)return; CFG=c; if(c.sla)SLA=c.sla; if(c.work)WORK=Object.assign({sat:false},c.work); if(typeof c.warn==='number')WY_WARN=c.warn; if(typeof c.overload==='number')OVERLOAD_N=c.overload; if(c.quality)QCONF=c.quality; }
 
 /* ============================ STORE + AUTH (máy chủ) ============================ */
 let DB={tickets:[],ps:[],seq:{}};
@@ -332,7 +336,7 @@ function workingHours(start,end){
   let guard=0;
   while(cur<e && guard++<200000){
     const day=cur.getDay(); // 0=CN,6=T7
-    if(day>=1 && day<=5){ // T2-T6
+    if((day>=1 && day<=5) || (day===6 && WORK.sat)){ // T2-T6 (+ T7 nếu cấu hình)
       mins+=segOverlap(cur,e,WORK.mStart,WORK.mEnd);
       mins+=segOverlap(cur,e,WORK.aStart,WORK.aEnd);
     }
@@ -388,8 +392,7 @@ function slaStatus(t){
 }
 
 /* ============================ ĐIỂM CHẤT LƯỢNG TỔNG HỢP (v3) ============================ */
-// Trọng số mặc định theo đặc tả — sẽ cho chỉnh trong "Danh mục & Cấu hình" (GĐ3)
-const QCONF={csat:40, sla:25, sl:15, ps:10, reopen:10};
+// Trọng số điểm chất lượng — biến QCONF khai báo ở khối cấu hình phía trên (nạp từ máy chủ)
 // SLA phản hồi đạt? = thời gian từ "Đã tiếp nhận" đến "Đang xử lý" đầu tiên ≤ SLA phản hồi
 function responseMet(t){
   const [respMin]=slaOf(t.uutien);
@@ -579,20 +582,59 @@ function renderPS(){
 }
 function duyetPill(d){const m={"Chờ duyệt":"amber","Đã duyệt":"green","Duyệt một phần":"blue","Từ chối":"red","Yêu cầu bổ sung hồ sơ":"gray"};return `<span class="pill ${m[d]||'gray'}"><span class="dot"></span>${esc(d)}</span>`;}
 
-/* ---------- DANH MỤC & SLA ---------- */
+/* ---------- DANH MỤC & CẤU HÌNH ---------- */
+let EDITCFG=null;
 function renderCat(){
+  const admin=can("users");
+  EDITCFG=JSON.parse(JSON.stringify(CFG||{sla:SLA,work:WORK,warn:WY_WARN,overload:OVERLOAD_N,quality:QCONF}));
+  const c=EDITCFG;
+  const num=(val,path,w)=>`<input type="number" value="${val}" style="width:${w||70}px" oninput="cfgSet('${path}',this.value)">`;
+  const slaRows=Object.keys(c.sla).map(p=>`<tr><td><span class="pr ${p.split(' ')[0]}">${esc(p)}</span></td><td>${admin?num(c.sla[p][0],'sla.'+p+'.0'):c.sla[p][0]} phút</td><td>${admin?num(c.sla[p][1],'sla.'+p+'.1'):c.sla[p][1]} giờ</td></tr>`).join("");
+  const qsum=c.quality.csat+c.quality.sla+c.quality.sl+c.quality.ps+c.quality.reopen;
   const col=(h,arr)=>`<div class="catcol"><div class="h">${h}</div>${arr.map(x=>`<div class="i">${esc(x)}</div>`).join("")}</div>`;
-  const slaRows=Object.entries(SLA).map(([p,[r,h]])=>`<tr><td><span class="pr ${p.split(' ')[0]}">${esc(p)}</span></td><td class="mono">${r} phút</td><td class="mono">${h} giờ</td></tr>`).join("");
   document.getElementById("view").innerHTML=`
-    <div class="panel" style="margin-bottom:16px"><div class="panel-h"><h3>Cấu hình SLA theo mức độ ưu tiên</h3></div>
-      <div class="panel-b"><div class="table-wrap"><table style="max-width:560px"><thead><tr><th>Mức độ ưu tiên</th><th>Phản hồi đầu tiên</th><th>Thời gian xử lý</th></tr></thead><tbody>${slaRows}</tbody></table></div>
-      <div class="hint" style="margin-top:12px">Giờ làm việc: <b>08:00–12:00</b> & <b>13:00–17:00</b>, Thứ 2–Thứ 6. Ngưỡng cảnh báo Vàng khi dùng ≥ 80% SLA. Đỏ khi quá hạn.</div></div></div>
-    <div class="panel"><div class="panel-h"><h3>Danh mục chuẩn hóa</h3></div>
+    ${admin?'':'<div class="warn" style="margin-bottom:14px">Chỉ Quản trị mới chỉnh được cấu hình. Bạn đang xem ở chế độ chỉ đọc.</div>'}
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div class="panel"><div class="panel-h"><h3>Cấu hình SLA theo mức độ ưu tiên</h3></div>
+        <div class="panel-b"><div class="table-wrap"><table><thead><tr><th>Mức ưu tiên</th><th>Phản hồi đầu tiên</th><th>Thời gian xử lý</th></tr></thead><tbody>${slaRows}</tbody></table></div></div></div>
+      <div class="panel"><div class="panel-h"><h3>Giờ làm việc & ngưỡng</h3></div>
+        <div class="panel-b" style="display:flex;flex-direction:column;gap:10px;font-size:13.5px">
+          <div>Buổi sáng: ${admin?num(c.work.mStart,'work.mStart',55):c.work.mStart}h – ${admin?num(c.work.mEnd,'work.mEnd',55):c.work.mEnd}h</div>
+          <div>Buổi chiều: ${admin?num(c.work.aStart,'work.aStart',55):c.work.aStart}h – ${admin?num(c.work.aEnd,'work.aEnd',55):c.work.aEnd}h</div>
+          <div><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" ${c.work.sat?'checked':''} ${admin?'':'disabled'} onchange="cfgSet('work.sat',this.checked)"> Làm việc Thứ 7 (tính SLA)</label></div>
+          <div>Ngưỡng cảnh báo Vàng: ${admin?num(Math.round(c.warn*100),'warn%',60):Math.round(c.warn*100)}% SLA đã dùng</div>
+          <div>Ngưỡng quá tải (cảnh báo xung đột): ${admin?num(c.overload,'overload',55):c.overload} việc P1/P2</div>
+        </div></div>
+    </div>
+    <div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Trọng số điểm chất lượng (tổng nên = 100)</h3></div>
+      <div class="panel-b" style="display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px;align-items:center">
+        <div>CSAT: ${admin?num(c.quality.csat,'quality.csat',55):c.quality.csat}</div>
+        <div>Đạt SLA: ${admin?num(c.quality.sla,'quality.sla',55):c.quality.sla}</div>
+        <div>Số lượng: ${admin?num(c.quality.sl,'quality.sl',55):c.quality.sl}</div>
+        <div>Không PS chủ quan: ${admin?num(c.quality.ps,'quality.ps',55):c.quality.ps}</div>
+        <div>Không mở lại: ${admin?num(c.quality.reopen,'quality.reopen',55):c.quality.reopen}</div>
+        <div style="font-weight:700;color:${qsum===100?'var(--green)':'var(--red)'}">Tổng: <span id="qsum">${qsum}</span></div>
+      </div></div>
+    ${admin?`<div style="margin-top:16px"><button class="btn primary" onclick="saveConfig()">Lưu cấu hình</button> <span class="muted" style="font-size:12.5px">Áp dụng ngay cho toàn hệ thống.</span></div>`:''}
+    <div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Danh mục chuẩn hóa</h3></div>
       <div class="panel-b" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:20px">
-        ${col("Loại công việc",CAT.loai)}${col("Đơn vị / Khách hàng",CAT.donvi)}${col("Nhóm/Đội hỗ trợ",CAT.doi)}
+        ${col("Loại công việc (18)",CAT.loai)}${col("Phòng ban yêu cầu (10)",CAT.donvi)}${col("Nhóm/Đội hỗ trợ",CAT.doi)}
         ${col("Trạng thái ticket",CAT.trangthai)}${col("Kết quả nghiệm thu",CAT.nghiemthu)}${col("Loại phát sinh",CAT.loaiPS)}
-        ${col("Trạng thái phê duyệt",CAT.duyet)}${col("Đơn vị tính",CAT.dvt)}
+        ${col("Nhóm nguyên nhân PS",CAT.nhomNN)}${col("Đơn vị tính",CAT.dvt)}
       </div></div>`;
+}
+
+function cfgSet(path,val){
+  if(path==='warn%'){ EDITCFG.warn=(+val||0)/100; return; }
+  if(path==='overload'){ EDITCFG.overload=+val||0; return; }
+  const parts=path.split('.');
+  if(parts[0]==='sla'){ EDITCFG.sla[parts[1]][+parts[2]]=+val||0; return; }
+  if(parts[0]==='work'){ if(parts[1]==='sat')EDITCFG.work.sat=!!val; else EDITCFG.work[parts[1]]=+val||0; return; }
+  if(parts[0]==='quality'){ EDITCFG.quality[parts[1]]=+val||0; const q=EDITCFG.quality,s=q.csat+q.sla+q.sl+q.ps+q.reopen,el=document.getElementById('qsum'); if(el){el.textContent=s;el.parentElement.style.color=s===100?'var(--green)':'var(--red)';} return; }
+}
+async function saveConfig(){
+  try{ await api('PUT','/api/config',EDITCFG); applyConfig(EDITCFG); toast('Đã lưu cấu hình — áp dụng ngay'); render(); }
+  catch(e){ toast(e.message||'Lỗi lưu cấu hình',true); }
 }
 
 /* ============================ FORM TẠO/SỬA TICKET ============================ */
@@ -965,7 +1007,7 @@ async function savePlan(){
 function planProgress(t){ const c=t.keHoach&&Array.isArray(t.keHoach.checklist)?t.keHoach.checklist:[]; if(!c.length)return null; const done=c.filter(x=>x.done).length; return {done,total:c.length,pct:Math.round(done/c.length*100)}; }
 
 /* ============================ PHÂN CÔNG & XUNG ĐỘT ƯU TIÊN (v3 mục 3) ============================ */
-const OVERLOAD_N=3; // ngưỡng quá tải (P1/P2), cấu hình được (GĐ3)
+// OVERLOAD_N khai báo ở khối cấu hình phía trên (nạp từ máy chủ)
 function openTicketsOf(name,excludeId){ return DB.tickets.filter(x=>String(x.assignee||"").trim()===String(name).trim() && !isClosed(x.trangthai) && x.id!==excludeId); }
 function slaRemainHtml(t){ const s=slaStatus(t); const left=+(s.deadline-s.used).toFixed(1); return `<span class="pill ${s.color}"><span class="dot"></span>${left>=0?('còn '+left+'h'):('trễ '+Math.abs(left)+'h')}</span>`; }
 function openAssign(id){
@@ -1334,6 +1376,7 @@ function resetIdle(){
 let PEOPLE=[];
 async function startApp(){
   try{await refresh();}catch(e){setOnline(false);return;}
+  try{applyConfig(await api("GET","/api/config"));}catch(e){}
   if(ME&&ME.canProxy){ try{PEOPLE=await api("GET","/api/people");}catch(e){PEOPLE=[];} }
   PAGE="dash";go("dash");setOnline(true);resetIdle();
 }
