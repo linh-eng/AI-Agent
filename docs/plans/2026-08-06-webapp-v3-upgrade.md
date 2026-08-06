@@ -12,11 +12,22 @@
 - [x] Mã ticket theo NGÀY TIẾP NHẬN
 - [x] Dashboard tách "đang quá hạn (chưa đóng)" và "đã vi phạm (đã đóng)"
 
-### Đợt 1b (TIẾP THEO)
-- [ ] Quy trình 4 bước / 10 trạng thái, luồng hai chiều (trả lại/từ chối/tạm dừng/mở lại)
-- [ ] Bước 2 chốt ưu tiên chính thức (ghi lý do nếu hạ cấp)
-- [ ] Đồng hồ SLA dừng/chạy đúng + hiển thị tổng trôi / đã dừng / tính SLA thực tế
-- [ ] Lịch sử trạng thái (nền tảng cho SLA & audit)
+### Đợt 1b (XONG)
+- [x] Quy trình 4 bước / 10 trạng thái, luồng hai chiều (trả lại/từ chối/tạm dừng/mở lại)
+- [x] Panel "Hành động tiếp theo" theo trạng thái, bắt buộc ghi lý do cho thao tác lùi/từ chối/tạm dừng/mở lại
+- [x] Bước 2 chốt ưu tiên chính thức (ghi lý do nếu hạ cấp) — hộp Tiếp nhận
+- [x] Cổng kế hoạch tối thiểu: phải có Người thực hiện trước khi Đang xử lý (5E đầy đủ: GĐ2)
+- [x] Đồng hồ SLA dừng/chạy theo lịch sử + hiển thị tổng trôi / đã dừng / tính SLA thực tế
+- [x] Lịch sử trạng thái (nền tảng cho SLA & audit log)
+
+## Cập nhật theo đặc tả v3_1 (mở rộng) — xếp vào GĐ2/GĐ3
+- [ ] 5B: 10 phòng ban chuẩn, cấu hình được (thêm/sửa/ẩn)
+- [ ] 5C: Hồ sơ người dùng tự điền vào phiếu; "Tạo thay người khác"; "Khách hàng bên ngoài"
+- [ ] 5E: Kế hoạch thực hiện đầy đủ (đầu việc con/checklist, rủi ro, đối chiếu kế hoạch↔thực tế)
+- [ ] 5F: Nhập nhân sự hàng loạt từ Excel + tự sinh mật khẩu + ngưng-hoạt-động thay vì xóa
+- [ ] 5G: 16 loại công việc + ô "Khác" + trường động theo loại; thống kê "Khác" gợi ý bổ sung
+- [ ] 5D: Email theo sự kiện (18 sự kiện, snapshot PDF, digest, bản tin sáng, nhật ký mail) — CHỜ CHỐT (chị từng nói chưa cần; v3_1 đánh dấu bắt buộc)
+- [ ] 9B: Báo cáo theo chu kỳ ngày/tuần/tháng/năm + khoảng ngày, so sánh kỳ trước, xuất Excel/PDF
 
 ## Giai đoạn 2 — Ra quyết định
 - [ ] Cảnh báo xung đột ưu tiên (điều kiện A/B, 5 phương án, lý do ≥10 ký tự,

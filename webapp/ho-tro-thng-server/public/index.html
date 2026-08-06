@@ -194,6 +194,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
 .role-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
 .role-admin{background:#fdeaea;color:#b3341f} .role-dieuphoi{background:#eaf1fd;color:#2f6fd6}
 .role-xuly{background:var(--green-50);color:var(--green-700)} .role-yeucau{background:#fff6e0;color:#8a6500} .role-giamdoc{background:#eef1f0;color:var(--ink-2)}
+
+/* ---- action bar + lịch sử trạng thái ---- */
+.actbar{margin:2px 0 16px;padding:12px 14px;background:var(--green-50);border:1px solid var(--line);border-radius:12px}
+.actbar .lbl{font-size:12px;font-weight:700;color:var(--green-700);text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px}
+.actbar .row{display:flex;gap:8px;flex-wrap:wrap}
+.histbox{display:flex;flex-direction:column;gap:0;border-left:2px solid var(--line);margin-left:6px;padding-left:14px}
+.hrow{position:relative;padding:8px 0}
+.hrow .hdot{position:absolute;left:-21px;top:12px;width:10px;height:10px;border-radius:50%;background:var(--green-500);border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
 </style>
 
 <div class="app">
@@ -248,7 +256,7 @@ const CAT = {
   donvi: ["P. Kế toán","P. Kinh doanh","P. Nhân sự","P. Hành chính","P. Kho vận","P. Kỹ thuật","Ban Giám đốc","KH - Cty ABC","KH - Cty XYZ","Khác"],
   doi: ["Đội Giao nhận 1","Đội Giao nhận 2","Đội Kỹ thuật - Bảo trì","Đội Kho vận","Đội Hành chính - Sự kiện","Đội trực khẩn cấp"],
   uutien: ["P1 - Khẩn cấp","P2 - Ưu tiên cao","P3 - Ưu tiên trung bình","P4 - Thấp"],
-  trangthai: ["1. Tạo mới","2. Đã phân công","3. Đang xử lý","4. Chờ phản hồi/Chờ duyệt","5. Đã xử lý","6. Hoàn tất","7. Mở lại"],
+  trangthai: ["Tạo mới","Trả lại bổ sung","Đã tiếp nhận","Đang xử lý","Chờ phản hồi","Chờ duyệt","Tạm dừng","Đã xử lý","Mở lại","Hoàn tất","Từ chối"],
   nghiemthu: ["Đạt - nghiệm thu đủ","Đạt - có điều chỉnh","Không đạt - phải làm lại","Hoàn thành một phần","Hủy yêu cầu"],
   loaiPS: ["Chi phí phát sinh","Sự cố hàng hóa (hư hỏng/thiếu/mất)","Sai lệch chứng từ","Chậm trễ tiến độ","Thiếu nhân sự - phương tiện","Thay đổi yêu cầu từ NSD","Vượt phạm vi hỗ trợ","Khác"],
   duyet: ["Chờ duyệt","Đã duyệt","Duyệt một phần","Từ chối","Yêu cầu bổ sung hồ sơ"],
@@ -312,23 +320,43 @@ function segOverlap(dayStart,end,h1,h2){
   const hi=Math.min(end.getTime(),b.getTime());
   return hi>lo ? (hi-lo)/60000 : 0;
 }
-// Ticket đã đóng (kết thúc vòng đời): Hoàn tất hoặc Từ chối
-function isClosed(s){return ["6. Hoàn tất","Hoàn tất","Từ chối","Từ chối (đóng)"].includes(s);}
-// Trả về {pct, used, deadline, color, label} cho SLA xử lý
+/* ---- Trạng thái & quy trình (v3) ---- */
+function baseStatus(s){return String(s||"").replace(/^\d+\.\s*/,"").trim();}
+function isClosed(s){const b=baseStatus(s);return b==="Hoàn tất"||b==="Từ chối";}
+// Trạng thái đồng hồ SLA đang CHẠY (tích lũy thời gian xử lý)
+function isRunning(s){return ["Đã tiếp nhận","Đang xử lý","Mở lại"].includes(baseStatus(s));}
+// Trạng thái ĐANG DỪNG đồng hồ SLA (chờ/tạm dừng)
+function isStopped(s){return ["Chờ phản hồi","Chờ duyệt","Tạm dừng","Trả lại bổ sung"].includes(baseStatus(s));}
+// Trả về {pct, used, total, stopped, deadline, color, label} cho SLA xử lý — có dừng/chạy theo lịch sử
 function slaStatus(t){
   const [,resH]=slaOf(t.uutien);
-  const start=t.tStart||t.tAssign||t.tCreate;
-  const isDone=["5. Đã xử lý","6. Hoàn tất"].includes(t.trangthai);
-  const end=isDone&&t.tDone?t.tDone:new Date().toISOString();
-  const used=workingHours(start,end);
-  if(used===null) return {pct:0,used:0,deadline:resH,color:"gray",label:"Chưa tính"};
+  const closed=isClosed(t.trangthai);
+  const now=new Date().toISOString();
+  const endTime=closed ? (t.tClose||t.tDone||now) : now;
+  let used=0,total=0,stopped=0;
+  const hist=Array.isArray(t.history)?t.history:null;
+  if(hist && hist.length){
+    let tiepNhanSeen=false;
+    for(let i=0;i<hist.length;i++){
+      const from=hist[i].at, to=(i+1<hist.length?hist[i+1].at:endTime), st=hist[i].to;
+      const wh=workingHours(from,to)||0;
+      if(isRunning(st)) used+=wh;
+      if(baseStatus(st)==="Đã tiếp nhận") tiepNhanSeen=true;
+      if(tiepNhanSeen) total+=wh;
+    }
+    stopped=+(total-used).toFixed(2); used=+used.toFixed(2); total=+total.toFixed(2);
+  } else {
+    // Ticket cũ chưa có lịch sử: tính đơn giản
+    const start=t.tStart||t.tAssign||t.tCreate;
+    used=workingHours(start, closed?(t.tDone||endTime):now)||0; total=used;
+  }
   const pct=resH>0?used/resH:0;
   let color="green",label="Trong hạn";
-  if(pct>1){color="red";label="Đỏ - Vi phạm SLA";}
+  if(pct>1){color="red";label=closed?"Đã vi phạm SLA":"Đỏ - Vi phạm SLA";}
+  else if(!closed && isStopped(t.trangthai)){color="gray";label="Tạm dừng SLA";}
   else if(pct>=WY_WARN){color="amber";label="Vàng - Sắp đến hạn";}
-  else {color="green";label=isDone?"Đạt SLA":"Trong hạn";}
-  if(isDone && pct<=1){color="green";label="Đạt SLA";}
-  return {pct,used,deadline:resH,color,label};
+  else {color="green";label=closed?"Đạt SLA":"Trong hạn";}
+  return {pct,used,total,stopped,deadline:resH,color,label};
 }
 
 /* Dữ liệu mẫu do máy chủ tạo lần đầu — không xử lý ở trình duyệt nữa. */
@@ -420,7 +448,7 @@ function renderDash(){
 let TFILTER={q:"",st:"",pr:""};
 function renderTickets(){
   const rows=DB.tickets.filter(t=>{
-    if(TFILTER.st&&t.trangthai!==TFILTER.st)return false;
+    if(TFILTER.st&&baseStatus(t.trangthai)!==baseStatus(TFILTER.st))return false;
     if(TFILTER.pr&&t.uutien!==TFILTER.pr)return false;
     if(TFILTER.q){const s=(t.id+" "+t.nguoiYC+" "+t.donvi+" "+t.noidung+" "+(t.assignee||"")).toLowerCase();if(!s.includes(TFILTER.q.toLowerCase()))return false;}
     return true;
@@ -453,7 +481,13 @@ function renderTickets(){
       <tbody>${body}</tbody></table></div></div>
     <div class="muted" style="margin-top:12px;font-size:12.5px">Hiển thị ${rows.length}/${DB.tickets.length} ticket · Nhấp vào dòng để xem & cập nhật chi tiết.</div>`;
 }
-function stPill(s){const map={"1":"gray","2":"blue","3":"blue","4":"amber","5":"green","6":"green","7":"red"};const n=s.split(".")[0];return `<span class="pill ${map[n]||'gray'}"><span class="dot"></span>${esc(s)}</span>`;}
+function stColor(s){const b=baseStatus(s);
+  if(b==="Hoàn tất")return "green";
+  if(b==="Từ chối"||b==="Mở lại")return "red";
+  if(["Chờ phản hồi","Chờ duyệt","Tạm dừng","Trả lại bổ sung"].includes(b))return "amber";
+  if(["Đang xử lý","Đã tiếp nhận","Đã xử lý"].includes(b))return "blue";
+  return "gray";}
+function stPill(s){return `<span class="pill ${stColor(s)}"><span class="dot"></span>${esc(baseStatus(s))}</span>`;}
 
 /* ---------- PHÁT SINH ---------- */
 function renderPS(){
@@ -534,7 +568,7 @@ function drawForm(){
     <div class="f"><label>Người phối hợp</label>${inp("phoihop")}</div>
     <div class="f"><label>Thời gian phân công</label>${inp("tAssign","datetime-local")}</div>
     <div class="f"><label>Thời gian bắt đầu xử lý</label>${inp("tStart","datetime-local")}</div>
-    <div class="f"><label>Trạng thái ticket</label>${sel("trangthai",CAT.trangthai)}</div>
+    <div class="f"><label>Trạng thái hiện tại</label><input value="${esc(baseStatus(t.trangthai))}" disabled style="background:#f0f4f2;color:var(--ink-2);font-weight:600"><div class="hint">Đổi trạng thái bằng các nút thao tác trong màn hình chi tiết ticket.</div></div>
   </div>`;
   const step2=`<div class="form-grid">
     <div class="sec-title">Bước 3 · Thực hiện & nghiệm thu</div>
@@ -620,7 +654,9 @@ function openDetail(id,tab){
     ${row("TG phân công",fmtDT(t.tAssign))}
     ${row("TG bắt đầu xử lý",fmtDT(t.tStart))}
     ${row("TG hoàn tất",fmtDT(t.tDone))}
-    ${row("Đã dùng (giờ LV)",`<b>${s.used}h</b> / ${s.deadline}h`)}
+    ${row("Thời gian tính SLA (đã dùng)",`<b>${s.used}h</b> / ${s.deadline}h`)}
+    ${row("Tổng thời gian trôi (giờ LV)",`${s.total!=null?s.total:s.used}h`)}
+    ${row("Thời gian đã dừng (giờ LV)",`${s.stopped!=null?s.stopped:0}h`)}
     ${row("Trạng thái SLA",`<span class="pill ${s.color}"><span class="dot"></span>${s.label}</span>`)}
     ${row("Trạng thái ticket",stPill(t.trangthai))}
     ${row("SL thực tế",(t.slThucte||'–')+(t.slThucte&&t.soluong?` (lệch ${t.slThucte-t.soluong})`:''))}
@@ -631,18 +667,25 @@ function openDetail(id,tab){
     ${row("CSAT",t.csat?('★'.repeat(+t.csat)+`<span class="muted"> (${t.csat}/5)</span>`):'')}
     ${row("Nhận xét",esc(t.nhanxet))}
     ${row("Ngày đóng",fmtDT(t.tClose))}
-  </dl>`;
+  </dl>
+  ${(Array.isArray(t.history)&&t.history.length)?`<h4 style="margin:20px 0 8px;color:var(--green-800);font-size:14px">Lịch sử trạng thái</h4>
+    <div class="histbox">${t.history.slice().reverse().map(h=>`<div class="hrow"><div class="hdot"></div><div><b>${esc(baseStatus(h.to))}</b> <span class="muted" style="font-size:12.5px">· ${fmtDT(h.at)}${h.by?" · "+esc(h.by):""}</span>${h.note?`<div class="muted" style="font-size:12.5px">${esc(h.note)}</div>`:''}</div></div>`).join("")}</div>`:''}`;
   const psRow=p=>{const clk=can('approve')?`onclick="openPS('${p.ticketId}','${p.id}')" style="cursor:pointer"`:'';return `<tr ${clk}><td class="mono">${p.id}</td><td>${esc(p.loai)}</td><td>${esc(p.mota)}</td><td>${fmtVnd(p.chiphiDX)}</td><td>${duyetPill(p.duyet)}</td></tr>`;};
   const addPsBtn=can('ps')?`<button class="btn sm" style="margin-top:14px" onclick="openPS('${id}')">+ Ghi nhận phát sinh</button>`:'';
   const psTab=ps.length?`<div class="table-wrap"><table><thead><tr><th>Mã PS</th><th>Loại</th><th>Mô tả</th><th>CP đề xuất</th><th>Duyệt</th></tr></thead>
     <tbody>${ps.map(psRow).join("")}</tbody></table></div>${addPsBtn}${can('approve')?'<div class="hint" style="margin-top:8px">Nhấp vào dòng phát sinh để phê duyệt / cập nhật.</div>':''}`
     :`<div class="empty" style="padding:34px"><div>Ticket chưa có phát sinh.</div>${addPsBtn}</div>`;
 
+  const acts=nextActions(t).filter(actionAllowed); window.__acts=acts;
+  const actionsBar = acts.length
+    ? `<div class="actbar"><div class="lbl">Hành động tiếp theo</div><div class="row">${acts.map((a,i)=>`<button class="btn ${i===0?'primary':''} sm" onclick="doAction('${id}',${i})">${esc(a.label)}</button>`).join("")}</div></div>`
+    : (isClosed(t.trangthai)?`<div class="hint" style="margin:2px 0 14px">Ticket đã đóng — không còn thao tác chuyển trạng thái.</div>`:'');
   document.getElementById("overlay").innerHTML=`<div class="modal">
     <div class="modal-h"><h3 class="mono" style="color:var(--green-800)">${esc(t.id)}</h3>
       <span class="pill ${s.color}"><span class="dot"></span>${s.label}</span>${stPill(t.trangthai)}
       <div class="spacer"></div>${can('edit')?`<button class="btn sm" onclick="openForm('${t.id}')">Chỉnh sửa</button>`:''}<button class="x" onclick="closeModal()">✕</button></div>
     <div class="modal-b">
+      ${actionsBar}
       <div class="tabs">
         <button class="${TAB==='info'?'active':''}" onclick="openDetail('${id}','info')">Thông tin chung</button>
         <button class="${TAB==='proc'?'active':''}" onclick="openDetail('${id}','proc')">Xử lý & SLA</button>
@@ -651,6 +694,73 @@ function openDetail(id,tab){
       ${TAB==='info'?info:TAB==='proc'?proc:psTab}
     </div></div>`;
   document.getElementById("overlay").classList.add("show");
+}
+
+/* ============================ HÀNH ĐỘNG QUY TRÌNH (v3) ============================ */
+function nextActions(t){
+  const s=baseStatus(t.trangthai); const A=[];
+  const add=(to,label,need,cap)=>A.push({to,label,need:!!need,cap:cap||'edit'});
+  if(s==='Tạo mới'){ add('Đã tiếp nhận','Tiếp nhận (đủ điều kiện)',false,'edit'); add('Trả lại bổ sung','Trả lại bổ sung',true,'edit'); add('Từ chối','Từ chối',true,'edit'); }
+  else if(s==='Trả lại bổ sung'){ add('Tạo mới','Gửi lại (đã bổ sung)',false,'create'); }
+  else if(s==='Đã tiếp nhận'){ add('Đang xử lý','Bắt đầu xử lý',false,'edit'); add('Từ chối','Từ chối',true,'edit'); }
+  else if(s==='Đang xử lý'){ add('Đã xử lý','Hoàn thành xử lý',false,'edit'); add('Chờ phản hồi','Chờ phản hồi NYC',false,'edit'); add('Chờ duyệt','Chờ duyệt phát sinh',false,'edit'); add('Tạm dừng','Tạm dừng',true,'edit'); }
+  else if(s==='Chờ phản hồi'||s==='Chờ duyệt'){ add('Đang xử lý','Tiếp tục xử lý',false,'edit'); }
+  else if(s==='Tạm dừng'){ add('Đang xử lý','Tiếp tục xử lý',false,'edit'); add('Đã tiếp nhận','Phân loại lại (Bước 2)',true,'edit'); }
+  else if(s==='Đã xử lý'){ add('Hoàn tất','Nghiệm thu đạt → Hoàn tất',false,'edit'); add('Mở lại','Mở lại (chưa đạt)',true,'edit'); }
+  else if(s==='Mở lại'){ add('Đang xử lý','Tiếp tục xử lý',false,'edit'); }
+  else if(s==='Hoàn tất'){ add('Mở lại','Mở lại',true,'edit'); }
+  return A;
+}
+function actionAllowed(a){ return a.cap==='create' ? can('create') : can(a.cap); }
+function doAction(id, idx){
+  const a=(window.__acts||[])[idx]; if(!a)return;
+  const t=DB.tickets.find(x=>x.id===id); if(!t)return; const to=a.to;
+  // Bước 2 — tiếp nhận: mở hộp chốt ưu tiên
+  if(baseStatus(to)==='Đã tiếp nhận' && baseStatus(t.trangthai)==='Tạo mới'){ openReceive(id); return; }
+  // Chốt kế hoạch: phải có Người thực hiện trước khi Đang xử lý
+  if(baseStatus(t.trangthai)==='Đã tiếp nhận' && baseStatus(to)==='Đang xử lý' && !(t.assignee&&String(t.assignee).trim())){
+    toast('Cần phân công Người thực hiện (nút Chỉnh sửa) trước khi bắt đầu xử lý',true); return;
+  }
+  if(a.need){ askReason(a.label,(reason)=>applyStatus(id,to,reason,{})); return; }
+  applyStatus(id,to,'',{});
+}
+async function applyStatus(id,to,reason,extra){
+  const src=DB.tickets.find(x=>x.id===id); if(!src)return;
+  const t=JSON.parse(JSON.stringify(src));
+  t.trangthai=to; t._reason=reason||'';
+  if(baseStatus(to)==='Mở lại') t.moLai=(+t.moLai||0)+1;
+  if(baseStatus(to)==='Hoàn tất' && !t.tClose) t.tClose=new Date().toISOString().slice(0,16);
+  if(baseStatus(to)==='Đã xử lý' && !t.tDone) t.tDone=new Date().toISOString().slice(0,16);
+  Object.assign(t, extra||{});
+  try{ await api('PUT','/api/tickets/'+encodeURIComponent(id),t); await refresh(); buildNav(); render(); openDetail(id,'proc'); toast('Đã cập nhật: '+baseStatus(to)); }
+  catch(e){ toast(e.message||'Lỗi cập nhật',true); }
+}
+function askReason(title,cb){
+  document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:480px">
+    <div class="modal-h"><h3>${esc(title)}</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
+    <div class="modal-b"><div class="f"><label>Lý do <span class="req">*</span></label><textarea id="rsReason" placeholder="Nhập lý do (tối thiểu 5 ký tự)…" style="min-height:90px"></textarea><div class="hint">Bắt buộc ghi lý do — lưu vào lịch sử ticket, không xóa vết.</div></div></div>
+    <div class="modal-f"><button class="btn" onclick="closeModal()">Hủy</button><button class="btn primary" id="rsOk">Xác nhận</button></div></div>`;
+  document.getElementById("overlay").classList.add("show");
+  document.getElementById("rsOk").onclick=()=>{const v=document.getElementById("rsReason").value.trim(); if(v.length<5){toast('Vui lòng ghi lý do (tối thiểu 5 ký tự)',true);return;} cb(v);};
+}
+function priNum(x){const m=String(x).match(/P(\d)/);return m?+m[1]:3;}
+function openReceive(id){
+  const t=DB.tickets.find(x=>x.id===id); if(!t)return;
+  const deXuat=t.uutienDeXuat||t.uutien;
+  document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:520px">
+    <div class="modal-h"><h3>Tiếp nhận & phân loại (Bước 2)</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
+    <div class="modal-b">
+      <div class="hint" style="margin-bottom:12px">Mức ưu tiên người yêu cầu đề xuất: <b>${esc(deXuat)}</b></div>
+      <div class="f"><label>Mức ưu tiên chính thức <span class="req">*</span></label><select id="rcPri">${CAT.uutien.map(x=>`<option ${x===t.uutien?'selected':''}>${esc(x)}</option>`).join("")}</select></div>
+      <div class="f" style="margin-top:12px"><label>Lý do (bắt buộc nếu hạ cấp ưu tiên)</label><textarea id="rcReason" placeholder="VD: yêu cầu không gấp, có thể xếp lịch…" style="min-height:70px"></textarea></div>
+    </div>
+    <div class="modal-f"><button class="btn" onclick="closeModal()">Hủy</button><button class="btn primary" id="rcOk">Xác nhận tiếp nhận</button></div></div>`;
+  document.getElementById("overlay").classList.add("show");
+  document.getElementById("rcOk").onclick=()=>{
+    const pri=document.getElementById("rcPri").value; const reason=document.getElementById("rcReason").value.trim();
+    if(priNum(pri)>priNum(deXuat) && reason.length<5){ toast('Hạ cấp ưu tiên: vui lòng ghi lý do (tối thiểu 5 ký tự)',true); return; }
+    applyStatus(id,'Đã tiếp nhận', reason||('Tiếp nhận, chốt '+pri), {uutien:pri});
+  };
 }
 
 /* ============================ FORM PHÁT SINH ============================ */

@@ -36,6 +36,17 @@ const ROLES = {
 function can(user, act) { return !!(user && ROLES[user.role] && ROLES[user.role][act]); }
 function capOf(role) { const r = ROLES[role] || {}; const o = {}; for (const k in r) if (k !== "label") o[k] = r[k]; return o; }
 
+/* ---- Trạng thái & quy trình (v3) ---- */
+function baseStatus(s) { return String(s || "").replace(/^\d+\.\s*/, "").trim(); }
+function isClosedStatus(s) { const b = baseStatus(s); return b === "Hoàn tất" || b === "Từ chối"; }
+// Thao tác nào bắt buộc ghi lý do
+function needReason(from, to) {
+  const bt = baseStatus(to), bf = baseStatus(from);
+  if (["Từ chối", "Trả lại bổ sung", "Tạm dừng", "Mở lại"].includes(bt)) return true;
+  if (bf === "Tạm dừng" && bt === "Đã tiếp nhận") return true; // phân loại lại
+  return false;
+}
+
 /* ============================ SQLITE ============================ */
 const db = new DatabaseSync(DB_FILE);
 db.exec("PRAGMA journal_mode = WAL");
@@ -150,10 +161,17 @@ function seedTickets() {
     noidung:"Giao hàng mẫu cho khách hàng ABC theo HĐ 125/HĐKT", soluong:20, dvt:"Thùng", quycach:"Carton 40x30x30cm, hàng dễ vỡ, không xếp chồng",
     diadiemGiao:"Kho A - 12 Nguyễn Huệ, Q.1", diadiemNhan:"Cty ABC - 45 Lê Lợi, Q.3", tGiaoYC:"2026-08-03T10:00",
     uutien:"P2 - Ưu tiên cao", doi:"Đội Giao nhận 1", assignee:"Trần Văn B", phoihop:"Lê Văn E (bốc xếp)",
-    tAssign:"2026-08-03T08:25", tStart:"2026-08-03T09:30", tDone:"2026-08-03T16:20", trangthai:"6. Hoàn tất",
+    tAssign:"2026-08-03T08:25", tStart:"2026-08-03T09:30", tDone:"2026-08-03T16:20", trangthai:"Hoàn tất", uutienDeXuat:"P2 - Ưu tiên cao",
     slThucte:19, diadiemThucte:"Cty ABC - 45 Lê Lợi, Q.3", nguoiNhan:"Lê Thị C", nghiemthu:"Hoàn thành một phần",
     dexuat:"Đổi 01 thùng mới giao trong ngày 04/08; phổ biến lại quy tắc bốc xếp", dathuchien:"Đã lập biên bản với khách, nhập lại kho 01 thùng lỗi",
     attach:"BBGN_08.pdf; anh_thung_mop.jpg", csat:4, nhanxet:"Xử lý nhanh, cần cẩn thận khâu bốc xếp", tClose:"2026-08-04T09:00", moLai:0, ghichu:"" };
+  t.history = [
+    { at:"2026-08-03T08:15:00", from:"", to:"Tạo mới", by:"kinhdoanh", note:"Tạo phiếu yêu cầu" },
+    { at:"2026-08-03T08:25:00", from:"Tạo mới", to:"Đã tiếp nhận", by:"dieuphoi", note:"Đủ điều kiện, chốt P2" },
+    { at:"2026-08-03T09:30:00", from:"Đã tiếp nhận", to:"Đang xử lý", by:"xuly1", note:"Bắt đầu xử lý" },
+    { at:"2026-08-03T16:20:00", from:"Đang xử lý", to:"Đã xử lý", by:"xuly1", note:"Hoàn thành xử lý" },
+    { at:"2026-08-04T09:00:00", from:"Đã xử lý", to:"Hoàn tất", by:"kinhdoanh", note:"Nghiệm thu đạt" },
+  ];
   saveTicketRow(t, true);
   const psId = genId("PS", d);
   savePSRow({ id: psId, ticketId:id, ngay:"2026-08-03", loai:"Sự cố hàng hóa (hư hỏng/thiếu/mất)",
@@ -207,6 +225,9 @@ const server = http.createServer(async (req, res) => {
       if (p === "/api/tickets" && req.method === "POST") {
         if (!can(me, "create")) return sendJSON(res, 403, { error: "Không có quyền tạo ticket" });
         const t = await readBody(req); t.id = genId("TK"); t.tCreate = new Date().toISOString(); t.createdBy = me.username;
+        t.trangthai = "Tạo mới"; t.uutienDeXuat = t.uutien || ""; t.moLai = +t.moLai || 0;
+        t.history = [{ at: t.tCreate, from: "", to: "Tạo mới", by: me.username, note: "Tạo phiếu yêu cầu" }];
+        delete t._reason;
         saveTicketRow(t, true); return sendJSON(res, 201, t);
       }
       let m;
@@ -214,8 +235,19 @@ const server = http.createServer(async (req, res) => {
         const id = decodeURIComponent(m[1]); const cur = getTicket(id);
         if (!cur) return sendJSON(res, 404, { error: "not found" });
         if (req.method === "PUT") {
-          if (!can(me, "edit")) return sendJSON(res, 403, { error: "Không có quyền sửa ticket" });
-          const t = await readBody(req); t.id = id; t.createdBy = cur.createdBy; saveTicketRow(t, false); return sendJSON(res, 200, t);
+          // Người yêu cầu được sửa & gửi lại chính ticket của mình khi bị "Trả lại bổ sung"
+          const ownerResubmit = can(me, "create") && cur.createdBy === me.username && baseStatus(cur.trangthai) === "Trả lại bổ sung";
+          if (!can(me, "edit") && !ownerResubmit) return sendJSON(res, 403, { error: "Không có quyền sửa ticket" });
+          const t = await readBody(req); t.id = id; t.createdBy = cur.createdBy;
+          const note = String(t._reason || "").trim();
+          t.history = Array.isArray(cur.history) ? cur.history.slice() : [];
+          if (baseStatus(t.trangthai) !== baseStatus(cur.trangthai)) {
+            if (needReason(cur.trangthai, t.trangthai) && note.length < 5)
+              return sendJSON(res, 400, { error: "Vui lòng ghi lý do (tối thiểu 5 ký tự) cho thao tác này" });
+            t.history.push({ at: new Date().toISOString(), from: cur.trangthai, to: t.trangthai, by: me.username, note });
+          }
+          delete t._reason;
+          saveTicketRow(t, false); return sendJSON(res, 200, t);
         }
         if (req.method === "DELETE") {
           if (!can(me, "del")) return sendJSON(res, 403, { error: "Không có quyền xóa ticket" });
