@@ -10,15 +10,19 @@ truy vết xuất xứ (CO/CQ, tờ khai HQ, lô) và bảo hành hai tầng (h�
 
 Tham chiếu yêu cầu đầy đủ: bản mô tả 10 module (M1–M10) và lộ trình 7 phase.
 
-## Current status — **Phase 2 hoàn tất**
+## Current status — **Phase 3 hoàn tất**
 
 - **Phase 1:** Auth + RBAC, schema Prisma đầy đủ cho toàn bộ mục 6, màn hình danh mục nền tảng.
 - **Phase 2:** Nhập kho (M1–M3) — tạo phiếu nhập theo mã nghiệp vụ N1–N12 (bung checklist chứng từ +
   set kho đích), nhận hàng sinh serial/lot + xuất xứ (CO/CQ/tờ khai) + bảo hành 2 tầng (hãng + THNG) +
   biến động tồn + timeline serial; quét serial + Scan-to-Bin; luồng "hàng lỗi → K-HH". Quản lý serial/lô
   với **truy vết hai chiều** (xuôi: máy → cây linh kiện; ngược: linh kiện → máy → dự án → khách).
+- **Phase 3:** Lắp ráp (M4) — Work Order (lắp theo đơn / để tồn kho) + BOM kế hoạch; cấp phát linh kiện
+  (quét serial → WIP `K-TAM`); QC/burn-in đầu ra (FAIL quay lại lắp ráp); hoàn thành sinh serial thành
+  phẩm + **as-built BOM có version** (liên kết serial/lô/license con) + BH THNG + gán license (cài phần
+  mềm); linh kiện thừa trả `K-LK`; nhập kho thành phẩm. Mọi bước ghi stock_movement + serial_event.
 
-Các phase 3–7 (lắp ráp/tồn realtime/xuất/bảo hành/báo cáo) chưa làm — schema đã có sẵn bảng cho chúng.
+Các phase 4–7 (tồn realtime/xuất/bảo hành/báo cáo) chưa làm — schema đã có sẵn bảng cho chúng.
 
 ## Tech stack
 
@@ -40,6 +44,7 @@ src/
     (app)/           # Layout có sidebar + các trang sau đăng nhập
       dashboard/     # Tổng quan + tồn theo kho
       inbound/       # Nhập kho: list + tạo phiếu + màn nhận hàng (quét serial, scan-to-bin)
+      work-orders/   # Lắp ráp: list + tạo lệnh + workbench (cấp phát/QC/hoàn thành as-built)
       serials/       # Danh sách serial + truy vết hai chiều
       lots/          # Danh sách lô hàng
       warehouses/    # Danh mục kho A1
@@ -50,7 +55,8 @@ src/
     api/             # Route handlers REST (auth + CRUD danh mục + inbound/serials/lots)
   components/        # app-shell, page-header, session-provider, serial-trace, ui/*
   lib/               # prisma, auth, session, rbac, warehouses, validation, api, client, utils,
-                     # inbound (cấu hình N1–N12), inbound-service (receive transaction), labels
+                     # inbound (cấu hình N1–N12), inbound-service (receive), workorder-service
+                     # (lắp ráp: allocate/qc/complete), labels
   middleware.ts      # Bảo vệ route: chưa đăng nhập -> /login hoặc 401
 ```
 

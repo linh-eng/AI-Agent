@@ -154,6 +154,76 @@ export const inboundReceiveSchema = z.object({
   lines: z.array(receiveLineSchema).min(1),
 });
 
+// ----- Work Order (M4) -----
+export const workOrderCreateSchema = z.object({
+  mode: z.enum(["TO_ORDER", "TO_STOCK"]),
+  productId: z.string().optional().nullable(), // sản phẩm thành phẩm dự kiến
+  assembledBy: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+  bomPlanned: z
+    .array(
+      z.object({
+        productId: z.string().min(1),
+        quantity: z.coerce.number().int().positive(),
+      })
+    )
+    .default([]),
+});
+
+export const workOrderAllocateSchema = z.object({
+  // Quét serial linh kiện (theo số serial) để cấp phát -> WIP
+  serialNumbers: z.array(z.string().min(1)).default([]),
+  // Cấp phát theo lô
+  lots: z
+    .array(
+      z.object({
+        lotId: z.string().min(1),
+        quantity: z.coerce.number().int().positive(),
+      })
+    )
+    .default([]),
+});
+
+export const workOrderQcSchema = z.object({
+  result: z.enum(["PASS", "FAIL"]),
+  burnInHours: z.coerce.number().int().nonnegative().optional().nullable(),
+  details: z.record(z.any()).optional().nullable(),
+  photos: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+
+export const workOrderCompleteSchema = z.object({
+  finishedSerialNumber: z.string().min(1, "Thiếu serial thành phẩm"),
+  destinationWarehouseCode: z.string().default("K-TM"),
+  projectId: z.string().optional().nullable(),
+  isCommercialStock: z.boolean().default(false),
+  binId: z.string().optional().nullable(),
+  assembledBy: z.string().optional().nullable(),
+  yearOfManufacture: z.coerce.number().int().optional().nullable(),
+  // Linh kiện serial thực sự lắp vào máy (con)
+  consumedSerialNumbers: z.array(z.string().min(1)).default([]),
+  // Lô linh kiện lắp vào máy
+  consumedLots: z
+    .array(
+      z.object({
+        lotId: z.string().min(1),
+        quantity: z.coerce.number().int().positive(),
+      })
+    )
+    .default([]),
+  // License gán vào máy (cài phần mềm)
+  licenseIds: z.array(z.string().min(1)).default([]),
+  // Bảo hành THNG cấp cho khách (cho máy thành phẩm)
+  thngWarranty: z
+    .object({
+      startDate: z.string().optional().nullable(),
+      endDate: z.string().optional().nullable(),
+      terms: z.string().optional().nullable(),
+    })
+    .optional()
+    .nullable(),
+});
+
 /** Parse an toàn, ném lỗi Zod để lớp handle() bắt. */
 export function parseJson<T>(schema: z.ZodType<T>, body: unknown): T {
   return schema.parse(body);

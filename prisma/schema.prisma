@@ -350,6 +350,7 @@ model Product {
   bomPlanned    BomPlanned[]
   inboundLines  InboundLine[]
   outboundLines OutboundLine[]
+  workOrders    WorkOrder[]
 
   @@map("products")
 }
@@ -602,6 +603,7 @@ model WorkOrder {
   note        String?
   createdAt   DateTime        @default(now())
 
+  product    Product?     @relation(fields: [productId], references: [id])
   bomPlanned BomPlanned[]
   bomAsBuilt BomAsBuilt[]
   qcReports  QcReport[]

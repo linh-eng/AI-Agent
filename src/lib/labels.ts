@@ -46,3 +46,26 @@ export const DOC_STATUS_TONE: Record<string, Tone> = {
   REJECTED: "danger",
   CANCELLED: "muted",
 };
+
+export const WO_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Nháp",
+  ALLOCATING: "Đang cấp phát",
+  ASSEMBLING: "Đang lắp ráp",
+  QC: "Chờ/đạt QC",
+  DONE: "Hoàn thành",
+  CANCELLED: "Đã hủy",
+};
+
+export const WO_STATUS_TONE: Record<string, Tone> = {
+  DRAFT: "muted",
+  ALLOCATING: "warning",
+  ASSEMBLING: "warning",
+  QC: "default",
+  DONE: "success",
+  CANCELLED: "muted",
+};
+
+export const WO_MODE_LABEL: Record<string, string> = {
+  TO_ORDER: "Lắp theo đơn",
+  TO_STOCK: "Lắp để tồn kho",
+};
