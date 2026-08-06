@@ -174,7 +174,7 @@ function seedTickets() {
   ];
   saveTicketRow(t, true);
   const psId = genId("PS", d);
-  savePSRow({ id: psId, ticketId:id, ngay:"2026-08-03", loai:"Sự cố hàng hóa (hư hỏng/thiếu/mất)",
+  savePSRow({ id: psId, ticketId:id, ngay:"2026-08-03", loai:"Sự cố hàng hóa (hư hỏng/thiếu/mất)", nhomNN:"Chủ quan (do người thực hiện)",
     mota:"01/20 thùng bị móp góc, khách hàng ABC từ chối nhận", nguyennhan:"Xếp chồng quá 3 lớp khi bốc xếp lên xe",
     anhhuong:"Trung bình", chiphiDX:50000, chiphiDuyet:50000, duyet:"Đã duyệt", attach:"BBGN_08.pdf; anh_thung_mop.jpg", nguoiXL:"Trần Văn B" }, true);
 }
@@ -322,6 +322,25 @@ const server = http.createServer(async (req, res) => {
     res.end(data);
   });
 });
+
+/* ---- Tự áp phương án 2 khi quá 30' chuyển cấp quản lý không phản hồi (mục 3.4) ---- */
+setInterval(() => {
+  try {
+    const now = Date.now();
+    for (const t of allTickets()) {
+      const e = t.conflictEscalation;
+      if (e && e.deadline && new Date(e.deadline).getTime() < now) {
+        t.choDenLuot = true; delete t.conflictEscalation;
+        t.priHistory = Array.isArray(t.priHistory) ? t.priHistory : [];
+        t.priHistory.push({ at: new Date().toISOString(), by: "HỆ THỐNG", option: 2,
+          reason: "Quá 30 phút cấp quản lý không phản hồi — tự áp phương án 2 (giữ nguyên thứ tự)",
+          ketQua: "Tự động áp phương án 2", name: t.assignee || "" });
+        saveTicketRow(t, false);
+        console.log("  ⓘ Ticket " + t.id + ": tự áp phương án 2 sau 30' không phản hồi.");
+      }
+    }
+  } catch (e) {}
+}, 60000);
 
 /* ============================ KHỞI ĐỘNG ============================ */
 migrateFromJson(); seedUsers(); seedTickets();

@@ -30,11 +30,14 @@
 - [ ] 9B: Báo cáo theo chu kỳ ngày/tuần/tháng/năm + khoảng ngày, so sánh kỳ trước, xuất Excel/PDF
 
 ## Giai đoạn 2 — Ra quyết định
-- [ ] Cảnh báo xung đột ưu tiên (điều kiện A/B, 5 phương án, lý do ≥10 ký tự,
-      phương án 4 SLA 30' tự chuyển phương án 2), tab "Lịch sử ưu tiên",
-      thẻ Dashboard "Số lần xung đột ưu tiên"
-- [ ] Điểm chất lượng tổng hợp (5 thành phần, trọng số cấu hình được)
-- [ ] Phân loại nguyên nhân phát sinh (chủ quan/khách quan/do người yêu cầu)
+- [x] Phân loại nguyên nhân phát sinh (chủ quan/khách quan/do người yêu cầu) — bắt buộc chọn
+- [x] Điểm chất lượng tổng hợp (5 thành phần, trọng số QCONF; hiển thị vòng tròn + phân rã; Dashboard "Điểm chất lượng BQ")
+- [x] Cảnh báo xung đột ưu tiên: điều kiện A (P1 trùng) & B (≥3 P1/P2); hộp cảnh báo + danh sách việc đang mở;
+      5 phương án; lý do ≥10 ký tự; tab "Lịch sử ưu tiên"; Dashboard "Xung đột ưu tiên"
+- [x] Phương án 4: SLA 30' — máy chủ tự áp phương án 2 khi quá hạn (quét mỗi phút)
+- [x] Dashboard bổ sung: Trả lại/Từ chối/Mở lại; biểu đồ vòng đời 10 trạng thái
+- [ ] **Kế hoạch thực hiện đầy đủ (5E)** — form kế hoạch (checklist đầu việc con, rủi ro, đối chiếu
+      kế hoạch↔thực tế). Hiện có cổng tối thiểu (phải có Người thực hiện). CÒN LẠI của GĐ2.
 
 ## Giai đoạn 3 — Hồ sơ & kết xuất
 - [ ] Nhật ký thay đổi (audit log) — không xóa vết

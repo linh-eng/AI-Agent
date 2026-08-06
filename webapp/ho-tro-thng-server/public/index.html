@@ -202,6 +202,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
 .histbox{display:flex;flex-direction:column;gap:0;border-left:2px solid var(--line);margin-left:6px;padding-left:14px}
 .hrow{position:relative;padding:8px 0}
 .hrow .hdot{position:absolute;left:-21px;top:12px;width:10px;height:10px;border-radius:50%;background:var(--green-500);border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.qpart{background:var(--green-50);border-radius:8px;padding:6px 10px}
 </style>
 
 <div class="app">
@@ -259,6 +260,7 @@ const CAT = {
   trangthai: ["Tạo mới","Trả lại bổ sung","Đã tiếp nhận","Đang xử lý","Chờ phản hồi","Chờ duyệt","Tạm dừng","Đã xử lý","Mở lại","Hoàn tất","Từ chối"],
   nghiemthu: ["Đạt - nghiệm thu đủ","Đạt - có điều chỉnh","Không đạt - phải làm lại","Hoàn thành một phần","Hủy yêu cầu"],
   loaiPS: ["Chi phí phát sinh","Sự cố hàng hóa (hư hỏng/thiếu/mất)","Sai lệch chứng từ","Chậm trễ tiến độ","Thiếu nhân sự - phương tiện","Thay đổi yêu cầu từ NSD","Vượt phạm vi hỗ trợ","Khác"],
+  nhomNN: ["Chủ quan (do người thực hiện)","Khách quan","Do người yêu cầu"],
   duyet: ["Chờ duyệt","Đã duyệt","Duyệt một phần","Từ chối","Yêu cầu bổ sung hồ sơ"],
   dvt: ["Thùng","Kiện","Bao","Cái","Bộ","Hộp","Tập","Kg","Chuyến","Lần","Người","Khác"]
 };
@@ -359,6 +361,38 @@ function slaStatus(t){
   return {pct,used,total,stopped,deadline:resH,color,label};
 }
 
+/* ============================ ĐIỂM CHẤT LƯỢNG TỔNG HỢP (v3) ============================ */
+// Trọng số mặc định theo đặc tả — sẽ cho chỉnh trong "Danh mục & Cấu hình" (GĐ3)
+const QCONF={csat:40, sla:25, sl:15, ps:10, reopen:10};
+// SLA phản hồi đạt? = thời gian từ "Đã tiếp nhận" đến "Đang xử lý" đầu tiên ≤ SLA phản hồi
+function responseMet(t){
+  const [respMin]=slaOf(t.uutien);
+  const hist=Array.isArray(t.history)?t.history:null; if(!hist) return true; // không đủ dữ liệu → coi như đạt
+  let tiepAt=null,startAt=null;
+  for(const h of hist){const b=baseStatus(h.to); if(b==="Đã tiếp nhận"&&!tiepAt)tiepAt=h.at; if(b==="Đang xử lý"&&tiepAt&&!startAt){startAt=h.at;break;}}
+  if(!tiepAt||!startAt) return true;
+  return (workingHours(tiepAt,startAt)||0)*60 <= respMin;
+}
+// Điểm chất lượng thực hiện (thang 100) — chỉ tính khi ticket đã đóng
+function computeQuality(t){
+  const s=slaStatus(t);
+  const csat=+t.csat||0; const cCsat=(csat/5)*QCONF.csat;
+  const respOk=responseMet(t), resOk=s.pct<=1;
+  const metCnt=(respOk?1:0)+(resOk?1:0);
+  const cSla=metCnt>=2?QCONF.sla:metCnt===1?QCONF.sla/2:0;
+  let cSl=QCONF.sl;
+  if(t.soluong && t.slThucte!=null && t.slThucte!==""){
+    const plan=+t.soluong, act=+t.slThucte, diff=plan?Math.abs(act-plan)/plan:0;
+    cSl = diff===0?QCONF.sl : diff<=0.05?+(QCONF.sl*10/15).toFixed(1) : 0;
+  }
+  const hasChuQuan=DB.ps.some(p=>p.ticketId===t.id && String(p.nhomNN||"").startsWith("Chủ quan"));
+  const cPs=hasChuQuan?0:QCONF.ps;
+  const cReopen=(+t.moLai>0)?0:QCONF.reopen;
+  const total=Math.round(cCsat+cSla+cSl+cPs+cReopen);
+  return {total, parts:{csat:+cCsat.toFixed(1),sla:cSla,sl:cSl,ps:cPs,reopen:cReopen}, respOk, resOk, hasChuQuan};
+}
+function qColor(v){return v>=85?"green":v>=65?"amber":"red";}
+
 /* Dữ liệu mẫu do máy chủ tạo lần đầu — không xử lý ở trình duyệt nữa. */
 
 /* ============================ NAV ============================ */
@@ -397,14 +431,20 @@ function renderDash(){
   const T=DB.tickets;
   const done=T.filter(t=>isClosed(t.trangthai)).length;
   const open=T.length-done;
-  const waiting=T.filter(t=>t.trangthai==="4. Chờ phản hồi/Chờ duyệt").length;
+  const waiting=T.filter(t=>["Chờ phản hồi","Chờ duyệt"].includes(baseStatus(t.trangthai))).length;
   let dangQuaHan=0,daViPham=0,amber=0,slaOk=0,doneCnt=0,csatSum=0,csatN=0,reopen=0,sumH=0,sumHn=0;
+  let qSum=0,qN=0,cReject=0,cReturn=0,cReopen=0,conflicts=0;
   T.forEach(t=>{const s=slaStatus(t);const closed=isClosed(t.trangthai);
     if(!closed && s.color==="red") dangQuaHan++;          // đang quá hạn, CHƯA đóng — cần xử lý ngay
     if(closed && s.pct>1) daViPham++;                     // đã đóng nhưng từng vi phạm SLA (thống kê)
     if(!closed && s.color==="amber") amber++;
-    if(closed){doneCnt++;if(s.pct<=1)slaOk++;sumH+=s.used;sumHn++;}
-    if(t.csat){csatSum+=+t.csat;csatN++;} reopen+=(+t.moLai||0);});
+    if(closed){doneCnt++;if(s.pct<=1)slaOk++;sumH+=s.used;sumHn++;const q=computeQuality(t);qSum+=q.total;qN++;}
+    if(t.csat){csatSum+=+t.csat;csatN++;} reopen+=(+t.moLai||0);
+    if(baseStatus(t.trangthai)==="Từ chối")cReject++;
+    if(Array.isArray(t.history)&&t.history.some(h=>baseStatus(h.to)==="Trả lại bổ sung"))cReturn++;
+    if(+t.moLai>0)cReopen++;
+    if(Array.isArray(t.priHistory))conflicts+=t.priHistory.length;});
+  const avgQ=qN?Math.round(qSum/qN):"–";
   const psWait=DB.ps.filter(p=>p.duyet==="Chờ duyệt").length;
   const costDX=DB.ps.reduce((a,p)=>a+(+p.chiphiDX||0),0);
   const costOK=DB.ps.reduce((a,p)=>a+(+p.chiphiDuyet||0),0);
@@ -419,7 +459,7 @@ function renderDash(){
   // phân bố
   const byPr=CAT.uutien.map(p=>[p,T.filter(t=>t.uutien===p).length]);
   const byFlow=[["Hỗ trợ Khách hàng bên ngoài",0],["Hỗ trợ Nội bộ",0]];T.forEach(t=>{const i=t.luong===byFlow[0][0]?0:1;byFlow[i][1]++;});
-  const bySt=CAT.trangthai.map(s=>[s,T.filter(t=>t.trangthai===s).length]);
+  const bySt=CAT.trangthai.map(s=>[s,T.filter(t=>baseStatus(t.trangthai)===baseStatus(s)).length]);
   const max=arr=>Math.max(1,...arr.map(x=>x[1]));
   const barBlock=(arr,mx)=>`<div class="bars">${arr.map(([n,v])=>`<div class="bar-row"><span class="muted">${n}</span><div class="track"><div class="fill" style="width:${v/mx*100}%"></div></div><b>${v}</b></div>`).join("")}</div>`;
 
@@ -433,15 +473,18 @@ function renderDash(){
       ${kpi("Đạt SLA xử lý",slaPct+"%","","Trên "+doneCnt+" ticket đã xong",'<path d="M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3"/>')}
       ${kpi("Chờ phản hồi/duyệt",waiting,"","Đang tạm dừng SLA",'<path d="M12 6v6l4 2"/>')}
       ${kpi("CSAT bình quân",avgCsat+" ★","","Trên "+csatN+" đánh giá",'<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/>')}
+      ${kpi("Điểm chất lượng BQ",avgQ+(qN?"/100":""),"","Trên "+qN+" ticket đã đóng",'<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/>')}
       ${kpi("TG xử lý bình quân",avgH+"h","","Giờ làm việc",'<path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>')}
       ${kpi("Phát sinh chờ duyệt",psWait,psWait?"warn":"","Cần phê duyệt",'<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>')}
       ${kpi("Chi phí PS đề xuất",fmtVnd(costDX),"","Đã duyệt: "+fmtVnd(costOK),'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>')}
+      ${kpi("Xung đột ưu tiên",conflicts,conflicts?"warn":"","Số lần trong kỳ",'<path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>')}
+      ${kpi("Trả lại / Từ chối / Mở lại",cReturn+" / "+cReject+" / "+cReopen,"","Chỉ số điều hành",'<path d="M3 12a9 9 0 1018 0 9 9 0 00-18 0zM3 12h4m10 0h4"/>')}
     </div>
     <div class="grid" style="grid-template-columns:1fr 1fr">
       <div class="panel"><div class="panel-h"><h3>Theo mức độ ưu tiên</h3></div><div class="panel-b">${barBlock(byPr,max(byPr))}</div></div>
       <div class="panel"><div class="panel-h"><h3>Theo luồng công việc</h3></div><div class="panel-b">${barBlock(byFlow,max(byFlow))}</div></div>
     </div>
-    <div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Theo vòng đời ticket (7 trạng thái)</h3></div><div class="panel-b">${barBlock(bySt,max(bySt))}</div></div>`;
+    <div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Theo vòng đời ticket (10 trạng thái)</h3></div><div class="panel-b">${barBlock(bySt,max(bySt))}</div></div>`;
 }
 
 /* ---------- TICKETS ---------- */
@@ -645,7 +688,24 @@ function openDetail(id,tab){
     ${row("Địa điểm giao → nhận",esc(t.diadiemGiao)+" → "+esc(t.diadiemNhan))}
     ${row("TG mong muốn",fmtDT(t.tGiaoYC))}
   </dl>`;
-  const proc=`<dl class="dl">
+  const q = isClosed(t.trangthai) ? computeQuality(t) : null;
+  const qc = q ? (q.total>=85?'#25a56a':q.total>=65?'#e0a400':'#d64545') : '';
+  const qtc = q ? (q.total>=85?'#1a7a4f':q.total>=65?'#8a6500':'#c0392b') : '';
+  const qBlock = q ? `<div style="margin:2px 0 16px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:var(--card)">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="width:74px;height:74px;border-radius:50%;display:grid;place-items:center;flex:none;background:conic-gradient(${qc} ${q.total*3.6}deg, var(--line-2) 0)">
+          <div style="width:58px;height:58px;border-radius:50%;background:#fff;display:grid;place-items:center;font-weight:800;font-size:20px;color:${qtc}">${q.total}</div></div>
+        <div><div style="font-weight:700;font-size:15px;color:var(--green-800)">Điểm chất lượng tổng hợp: ${q.total}/100</div>
+          <div class="muted" style="font-size:12.5px;margin-top:2px">Tự tính khi đóng ticket · trọng số cấu hình được</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:14px;font-size:12.5px">
+        <div class="qpart">CSAT (40%): <b>${q.parts.csat}</b></div>
+        <div class="qpart">Đạt SLA (25%): <b>${q.parts.sla}</b> <span class="muted">(PH:${q.respOk?'đạt':'chưa'} · XL:${q.resOk?'đạt':'chưa'})</span></div>
+        <div class="qpart">Số lượng (15%): <b>${q.parts.sl}</b></div>
+        <div class="qpart">Không PS chủ quan (10%): <b>${q.parts.ps}</b>${q.hasChuQuan?' <span class="pill red" style="font-size:10px">có PS chủ quan</span>':''}</div>
+        <div class="qpart">Không mở lại (10%): <b>${q.parts.reopen}</b></div>
+      </div></div>` : '';
+  const proc=`${qBlock}<dl class="dl">
     ${row("Ưu tiên",`<span class="pr ${t.uutien.split(' ')[0]}">${esc(t.uutien)}</span>`)}
     ${row("SLA quy định",`Phản hồi ${rp} phút · Xử lý ${rh} giờ`)}
     ${row("Nhóm/Đội",esc(t.doi))}
@@ -676,6 +736,10 @@ function openDetail(id,tab){
     <tbody>${ps.map(psRow).join("")}</tbody></table></div>${addPsBtn}${can('approve')?'<div class="hint" style="margin-top:8px">Nhấp vào dòng phát sinh để phê duyệt / cập nhật.</div>':''}`
     :`<div class="empty" style="padding:34px"><div>Ticket chưa có phát sinh.</div>${addPsBtn}</div>`;
 
+  const priHist=Array.isArray(t.priHistory)?t.priHistory:[];
+  const priTab = priHist.length
+    ? `<div class="histbox">${priHist.slice().reverse().map(h=>`<div class="hrow"><div class="hdot" style="background:var(--amber)"></div><div><b>Phương án ${h.option}</b> <span class="muted" style="font-size:12.5px">· ${fmtDT(h.at)}${h.by?" · "+esc(h.by):""}</span>${h.ketQua?`<div style="font-size:12.5px">${esc(h.ketQua)}</div>`:''}${h.reason?`<div class="muted" style="font-size:12.5px">Lý do: ${esc(h.reason)}</div>`:''}</div></div>`).join("")}</div>`
+    : `<div class="empty" style="padding:34px"><div>Chưa ghi nhận xung đột ưu tiên nào cho ticket này.</div></div>`;
   const acts=nextActions(t).filter(actionAllowed); window.__acts=acts;
   const actionsBar = acts.length
     ? `<div class="actbar"><div class="lbl">Hành động tiếp theo</div><div class="row">${acts.map((a,i)=>`<button class="btn ${i===0?'primary':''} sm" onclick="doAction('${id}',${i})">${esc(a.label)}</button>`).join("")}</div></div>`
@@ -690,8 +754,9 @@ function openDetail(id,tab){
         <button class="${TAB==='info'?'active':''}" onclick="openDetail('${id}','info')">Thông tin chung</button>
         <button class="${TAB==='proc'?'active':''}" onclick="openDetail('${id}','proc')">Xử lý & SLA</button>
         <button class="${TAB==='ps'?'active':''}" onclick="openDetail('${id}','ps')">Phát sinh (${ps.length})</button>
+        <button class="${TAB==='pri'?'active':''}" onclick="openDetail('${id}','pri')">Lịch sử ưu tiên (${priHist.length})</button>
       </div>
-      ${TAB==='info'?info:TAB==='proc'?proc:psTab}
+      ${TAB==='info'?info:TAB==='proc'?proc:TAB==='pri'?priTab:psTab}
     </div></div>`;
   document.getElementById("overlay").classList.add("show");
 }
@@ -702,7 +767,7 @@ function nextActions(t){
   const add=(to,label,need,cap)=>A.push({to,label,need:!!need,cap:cap||'edit'});
   if(s==='Tạo mới'){ add('Đã tiếp nhận','Tiếp nhận (đủ điều kiện)',false,'edit'); add('Trả lại bổ sung','Trả lại bổ sung',true,'edit'); add('Từ chối','Từ chối',true,'edit'); }
   else if(s==='Trả lại bổ sung'){ add('Tạo mới','Gửi lại (đã bổ sung)',false,'create'); }
-  else if(s==='Đã tiếp nhận'){ add('Đang xử lý','Bắt đầu xử lý',false,'edit'); add('Từ chối','Từ chối',true,'edit'); }
+  else if(s==='Đã tiếp nhận'){ add('@assign','Phân công người thực hiện',false,'edit'); add('Đang xử lý','Bắt đầu xử lý',false,'edit'); add('Từ chối','Từ chối',true,'edit'); }
   else if(s==='Đang xử lý'){ add('Đã xử lý','Hoàn thành xử lý',false,'edit'); add('Chờ phản hồi','Chờ phản hồi NYC',false,'edit'); add('Chờ duyệt','Chờ duyệt phát sinh',false,'edit'); add('Tạm dừng','Tạm dừng',true,'edit'); }
   else if(s==='Chờ phản hồi'||s==='Chờ duyệt'){ add('Đang xử lý','Tiếp tục xử lý',false,'edit'); }
   else if(s==='Tạm dừng'){ add('Đang xử lý','Tiếp tục xử lý',false,'edit'); add('Đã tiếp nhận','Phân loại lại (Bước 2)',true,'edit'); }
@@ -715,6 +780,7 @@ function actionAllowed(a){ return a.cap==='create' ? can('create') : can(a.cap);
 function doAction(id, idx){
   const a=(window.__acts||[])[idx]; if(!a)return;
   const t=DB.tickets.find(x=>x.id===id); if(!t)return; const to=a.to;
+  if(to==='@assign'){ openAssign(id); return; }
   // Bước 2 — tiếp nhận: mở hộp chốt ưu tiên
   if(baseStatus(to)==='Đã tiếp nhận' && baseStatus(t.trangthai)==='Tạo mới'){ openReceive(id); return; }
   // Chốt kế hoạch: phải có Người thực hiện trước khi Đang xử lý
@@ -763,6 +829,106 @@ function openReceive(id){
   };
 }
 
+/* ============================ PHÂN CÔNG & XUNG ĐỘT ƯU TIÊN (v3 mục 3) ============================ */
+const OVERLOAD_N=3; // ngưỡng quá tải (P1/P2), cấu hình được (GĐ3)
+function openTicketsOf(name,excludeId){ return DB.tickets.filter(x=>String(x.assignee||"").trim()===String(name).trim() && !isClosed(x.trangthai) && x.id!==excludeId); }
+function slaRemainHtml(t){ const s=slaStatus(t); const left=+(s.deadline-s.used).toFixed(1); return `<span class="pill ${s.color}"><span class="dot"></span>${left>=0?('còn '+left+'h'):('trễ '+Math.abs(left)+'h')}</span>`; }
+function openAssign(id){
+  const t=DB.tickets.find(x=>x.id===id); if(!t)return;
+  document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:520px">
+    <div class="modal-h"><h3>Phân công người thực hiện</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
+    <div class="modal-b"><div class="f"><label>Người thực hiện <span class="req">*</span></label><input id="asgName" value="${esc(t.assignee||'')}" placeholder="Nhập tên người thực hiện"></div>
+      <div class="hint" style="margin-top:8px">Hệ thống sẽ kiểm tra xung đột mức độ ưu tiên & quá tải trước khi giao việc.</div></div>
+    <div class="modal-f"><button class="btn" onclick="closeModal()">Hủy</button><button class="btn primary" id="asgOk">Kiểm tra & phân công</button></div></div>`;
+  document.getElementById("overlay").classList.add("show");
+  document.getElementById("asgOk").onclick=()=>{ const name=document.getElementById("asgName").value.trim(); if(!name){toast('Nhập tên người thực hiện',true);return;} checkConflict(id,name); };
+}
+function checkConflict(id,name){
+  const t=DB.tickets.find(x=>x.id===id);
+  const open=openTicketsOf(name,id);
+  const condA = priNum(t.uutien)===1 && open.some(x=>priNum(x.uutien)===1);
+  const condB = open.filter(x=>priNum(x.uutien)<=2).length>=OVERLOAD_N;
+  if(condA||condB) showConflict(id,name,open,condA,condB);
+  else assignTo(id,name,{},null,'Phân công (không xung đột)');
+}
+async function assignTo(id,name,extra,priLog){
+  const src=DB.tickets.find(x=>x.id===id); if(!src)return;
+  const t=JSON.parse(JSON.stringify(src)); t.assignee=name;
+  if(!t.tAssign) t.tAssign=new Date().toISOString().slice(0,16);
+  if(extra)Object.assign(t,extra);
+  if(priLog){ t.priHistory=Array.isArray(t.priHistory)?t.priHistory.slice():[]; t.priHistory.push(priLog); }
+  try{ await api('PUT','/api/tickets/'+encodeURIComponent(id),t); await refresh(); buildNav(); render(); openDetail(id,'proc'); toast('Đã phân công cho '+name); }
+  catch(e){ toast(e.message||'Lỗi phân công',true); }
+}
+function showConflict(id,name,open,condA,condB){
+  const t=DB.tickets.find(x=>x.id===id);
+  const rows=open.map(x=>`<tr><td class="mono">${x.id}</td><td><div class="ell" style="max-width:200px">${esc(x.noidung)}</div></td><td><span class="pr ${x.uutien.split(' ')[0]}">${esc(x.uutien.split(' ')[0])}</span></td><td>${slaRemainHtml(x)}</td></tr>`).join("");
+  const OPTS=[
+    {n:1,label:"Ưu tiên việc mới, tạm dừng việc đang làm",desc:"Việc đang xử lý của người này → Tạm dừng (dừng SLA); việc mới được giao ngay."},
+    {n:2,label:"Giữ nguyên thứ tự, xử lý việc hiện tại trước",desc:"Việc mới vào hàng đợi — đánh dấu \"chờ đến lượt\"; SLA vẫn chạy."},
+    {n:3,label:"Chuyển cho nhân sự khác",desc:"Giao việc mới cho người khác; hệ thống kiểm tra xung đột lại cho người mới."},
+    {n:4,label:"Chuyển cấp quản lý xác nhận",desc:"Gửi Trưởng bộ phận/Quản trị xác nhận thứ tự ưu tiên — SLA riêng 30 phút, quá hạn tự áp phương án 2."},
+    {n:5,label:"Điều chỉnh thời hạn hoàn thành",desc:"Đặt thời hạn mới cho việc mới — ghi nhận là gia hạn có phê duyệt."},
+  ];
+  window.__confCtx={id,name};
+  document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:720px">
+    <div class="modal-h"><h3 style="color:var(--red)">⚠️ Cảnh báo xung đột mức độ ưu tiên</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
+    <div class="modal-b">
+      <div class="warn" style="background:var(--red-bg);border-color:var(--red)">${condA?'<b>Xung đột P1:</b> người thực hiện đang có yêu cầu <b>P1 khẩn cấp chưa hoàn thành</b>, và việc đang giao cũng là P1.<br>':''}${condB?'<b>Quá tải:</b> người thực hiện đang có ≥ '+OVERLOAD_N+' yêu cầu P1/P2 chưa hoàn thành.<br>':''}Vui lòng chọn phương án xử lý trước khi giao việc cho <b>${esc(name)}</b>.</div>
+      <div style="font-weight:600;font-size:13px;color:var(--green-800);margin:6px 0 6px">Các việc đang mở của ${esc(name)}:</div>
+      <div class="table-wrap"><table><thead><tr><th>Mã</th><th>Nội dung</th><th>Ưu tiên</th><th>SLA còn lại</th></tr></thead><tbody>${rows||'<tr><td colspan="4" class="muted">(không có)</td></tr>'}</tbody></table></div>
+      <div style="font-weight:600;font-size:13px;color:var(--green-800);margin:16px 0 8px">Chọn phương án:</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${OPTS.map(o=>`<button class="btn" style="text-align:left;justify-content:flex-start;height:auto;padding:11px 14px;flex-direction:column;align-items:flex-start;gap:3px" onclick="pickConflict(${o.n})"><b>Phương án ${o.n} — ${esc(o.label)}</b><span class="muted" style="font-weight:400;font-size:12px">${esc(o.desc)}</span></button>`).join("")}
+      </div>
+    </div></div>`;
+  document.getElementById("overlay").classList.add("show");
+}
+function pickConflict(n){
+  const {id,name}=window.__confCtx||{}; if(!id)return;
+  const t=DB.tickets.find(x=>x.id===id);
+  // Phương án 3 & 5 cần thêm dữ liệu
+  let extraFields="";
+  if(n===3) extraFields=`<div class="f"><label>Giao việc mới cho người khác <span class="req">*</span></label><input id="cfNew" placeholder="Tên người thực hiện mới"></div>`;
+  if(n===5) extraFields=`<div class="f"><label>Thời hạn hoàn thành mới cho việc mới <span class="req">*</span></label><input id="cfDeadline" type="datetime-local"></div>`;
+  document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:520px">
+    <div class="modal-h"><h3>Phương án ${n}</h3><div class="spacer"></div><button class="x" onclick="showConflictBack()">←</button></div>
+    <div class="modal-b"><div class="form-grid">
+      ${extraFields}
+      <div class="f full"><label>Lý do quyết định <span class="req">*</span></label><textarea id="cfReason" placeholder="Bắt buộc, tối thiểu 10 ký tự…" style="min-height:80px"></textarea><div class="hint">Ghi vào tab \"Lịch sử ưu tiên\" của ticket.</div></div>
+    </div></div>
+    <div class="modal-f"><button class="btn" onclick="showConflictBack()">← Quay lại</button><button class="btn primary" onclick="applyConflict(${n})">Xác nhận phương án ${n}</button></div></div>`;
+}
+function showConflictBack(){ const {id,name}=window.__confCtx||{}; if(id) checkConflict(id,name); }
+async function applyConflict(n){
+  const {id,name}=window.__confCtx||{}; if(!id)return;
+  const reason=(document.getElementById("cfReason").value||"").trim();
+  if(reason.length<10){ toast('Vui lòng ghi lý do (tối thiểu 10 ký tự)',true); return; }
+  const now=new Date().toISOString();
+  const log={at:now, by:ME.username, option:n, reason, name};
+  if(n===1){
+    // Tạm dừng các việc đang "Đang xử lý" của người này
+    const busy=openTicketsOf(name,id).filter(x=>baseStatus(x.trangthai)==='Đang xử lý');
+    for(const x of busy){ const xt=JSON.parse(JSON.stringify(x)); xt.trangthai='Tạm dừng'; xt._reason='Tạm dừng do ưu tiên việc mới '+id; try{await api('PUT','/api/tickets/'+encodeURIComponent(x.id),xt);}catch(e){} }
+    await assignTo(id,name,{choDenLuot:false}, {...log, ketQua:'Tạm dừng '+busy.length+' việc, giao việc mới'});
+  } else if(n===2){
+    await assignTo(id,name,{choDenLuot:true}, {...log, ketQua:'Việc mới chờ đến lượt'});
+  } else if(n===3){
+    const nn=(document.getElementById("cfNew").value||"").trim(); if(!nn){toast('Nhập tên người mới',true);return;}
+    // Giao việc mới cho người khác → kiểm tra xung đột lại cho người đó
+    window.__confCtx={id,name:nn};
+    checkConflict(id,nn); // sẽ tự assignTo nếu không xung đột, hoặc hiện cảnh báo cho người mới
+    return;
+  } else if(n===4){
+    const deadline=new Date(Date.now()+30*60000).toISOString();
+    await assignTo(id,name,{conflictEscalation:{at:now,deadline,by:ME.username}}, {...log, ketQua:'Chuyển cấp quản lý — SLA 30 phút'});
+    toast('Đã chuyển cấp quản lý. Quá 30 phút không phản hồi sẽ tự áp phương án 2.');
+  } else if(n===5){
+    const dl=document.getElementById("cfDeadline").value; if(!dl){toast('Chọn thời hạn mới',true);return;}
+    await assignTo(id,name,{tGiaoYC:dl, giaHan:true}, {...log, ketQua:'Gia hạn có phê duyệt đến '+dl});
+  }
+}
+
 /* ============================ FORM PHÁT SINH ============================ */
 let EDITPS=null, PS_EDITING=false;
 function openPS(ticketId,psId){
@@ -770,7 +936,7 @@ function openPS(ticketId,psId){
   const tid=ticketId||(DB.tickets[0]&&DB.tickets[0].id)||"";
   const t=DB.tickets.find(x=>x.id===tid);
   PS_EDITING=false;
-  EDITPS={id:"(tự sinh)",ticketId:tid,ngay:new Date().toISOString().slice(0,10),loai:CAT.loaiPS[0],mota:"",nguyennhan:"",anhhuong:"Trung bình",chiphiDX:"",chiphiDuyet:"",duyet:"Chờ duyệt",attach:"",nguoiXL:t?t.assignee:""};
+  EDITPS={id:"(tự sinh)",ticketId:tid,ngay:new Date().toISOString().slice(0,10),loai:CAT.loaiPS[0],nhomNN:CAT.nhomNN[0],mota:"",nguyennhan:"",anhhuong:"Trung bình",chiphiDX:"",chiphiDuyet:"",duyet:"Chờ duyệt",attach:"",nguoiXL:t?t.assignee:""};
   drawPS();document.getElementById("overlay").classList.add("show");
 }
 function drawPS(){
@@ -783,6 +949,8 @@ function drawPS(){
       <div class="f"><label>Mã Ticket liên quan <span class="req">*</span></label><select onchange="EDITPS.ticketId=this.value">${DB.tickets.map(t=>`<option value="${t.id}" ${t.id===p.ticketId?'selected':''}>${t.id} — ${esc(t.noidung.slice(0,30))}</option>`).join("")}</select></div>
       <div class="f"><label>Ngày phát sinh</label>${inp("ngay","date")}</div>
       <div class="f"><label>Loại phát sinh</label>${sel("loai",CAT.loaiPS)}</div>
+      <div class="f"><label>Nhóm nguyên nhân <span class="req">*</span></label>${sel("nhomNN",CAT.nhomNN)}</div>
+      <div class="f full"><div class="hint" style="background:var(--amber-bg);color:#8a6500;padding:8px 11px;border-radius:9px">⚠️ <b>Chủ quan</b> = do người thực hiện (làm sai/quên/chậm) → <b>trừ điểm chất lượng</b>. <b>Khách quan</b> / <b>Do người yêu cầu</b> → không trừ điểm. Ghi trung thực để đánh giá đúng.</div></div>
       <div class="f"><label>Mức độ ảnh hưởng</label>${sel("anhhuong",["Thấp","Trung bình","Cao","Nghiêm trọng"])}</div>
       <div class="f full"><label>Mô tả chi tiết <span class="req">*</span></label><textarea oninput="EDITPS.mota=this.value" placeholder="Mô tả phát sinh…">${esc(p.mota)}</textarea></div>
       <div class="f full"><label>Nguyên nhân</label><textarea oninput="EDITPS.nguyennhan=this.value">${esc(p.nguyennhan)}</textarea></div>
