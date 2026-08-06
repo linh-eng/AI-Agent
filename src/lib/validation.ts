@@ -233,6 +233,54 @@ export const stockCountScanSchema = z.object({
   serialNumbers: z.array(z.string().min(1)).min(1, "Chưa quét serial nào"),
 });
 
+// ----- Xuất kho (M6–M8) -----
+export const outboundTypeEnum = z.enum([
+  "X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8", "X9", "X10", "X11",
+]);
+
+export const outboundCreateSchema = z.object({
+  type: outboundTypeEnum,
+  customerId: z.string().optional().nullable(),
+  projectId: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+  lines: z
+    .array(
+      z.object({
+        productId: z.string().min(1),
+        quantity: z.coerce.number().int().positive(),
+        projectId: z.string().optional().nullable(),
+      })
+    )
+    .min(1, "Phiếu xuất cần ít nhất 1 dòng"),
+});
+
+export const outboundRejectSchema = z.object({
+  reason: z.string().min(1, "Cần lý do từ chối"),
+});
+
+export const outboundShipSchema = z.object({
+  lines: z
+    .array(
+      z.object({
+        lineId: z.string().min(1),
+        serialNumbers: z.array(z.string().min(1)).default([]),
+      })
+    )
+    .min(1),
+  delivery: z
+    .object({
+      method: z.string().optional().nullable(),
+      carrier: z.string().optional().nullable(),
+      trackingNumber: z.string().optional().nullable(),
+      signatureUrl: z.string().optional().nullable(),
+      packingVideoUrl: z.string().optional().nullable(),
+    })
+    .optional()
+    .nullable(),
+  /// Cho phép vượt khóa dự án K-DA (cần quyền duyệt xuất)
+  allowProjectOverride: z.boolean().default(false),
+});
+
 /** Parse an toàn, ném lỗi Zod để lớp handle() bắt. */
 export function parseJson<T>(schema: z.ZodType<T>, body: unknown): T {
   return schema.parse(body);

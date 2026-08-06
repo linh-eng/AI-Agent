@@ -17,6 +17,7 @@ import {
   Wrench,
   Gauge,
   ClipboardList,
+  PackageMinus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
@@ -28,6 +29,7 @@ const NAV = [
   { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
   { href: "/inventory", label: "Tồn kho", icon: Gauge },
   { href: "/inbound", label: "Nhập kho", icon: PackagePlus },
+  { href: "/outbound", label: "Xuất kho", icon: PackageMinus },
   { href: "/work-orders", label: "Lắp ráp", icon: Wrench },
   { href: "/stock-counts", label: "Kiểm kê", icon: ClipboardList },
   { href: "/serials", label: "Serial", icon: ScanBarcode },

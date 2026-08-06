@@ -294,11 +294,12 @@ model Project {
   acceptedAt DateTime? // mốc nghiệm thu (dùng cho SLA tồn K-DA 30 ngày)
   createdAt  DateTime  @default(now())
 
-  customer      Partner?       @relation("ProjectCustomer", fields: [customerId], references: [id])
-  serials       Serial[]
-  lots          Lot[]
-  inboundLines  InboundLine[]
-  outboundLines OutboundLine[]
+  customer       Partner?        @relation("ProjectCustomer", fields: [customerId], references: [id])
+  serials        Serial[]
+  lots           Lot[]
+  inboundLines   InboundLine[]
+  outboundLines  OutboundLine[]
+  outboundOrders OutboundOrder[]
 
   @@map("projects")
 }
@@ -558,16 +559,23 @@ model InboundLine {
 }
 
 model OutboundOrder {
-  id         String         @id @default(cuid())
-  number     String         @unique
-  type       OutboundType
-  customerId String?
-  status     DocumentStatus @default(DRAFT)
-  note       String?
-  createdAt  DateTime       @default(now())
+  id          String         @id @default(cuid())
+  number      String         @unique
+  type        OutboundType
+  customerId  String?
+  projectId   String?
+  status      DocumentStatus @default(DRAFT)
+  approvedBy  String?
+  approvedAt  DateTime?
+  rejectReason String?
+  deliveredAt DateTime?
+  note        String?
+  createdAt   DateTime       @default(now())
 
-  customer Partner?       @relation(fields: [customerId], references: [id])
-  lines    OutboundLine[]
+  customer        Partner?         @relation(fields: [customerId], references: [id])
+  project         Project?         @relation(fields: [projectId], references: [id])
+  lines           OutboundLine[]
+  deliveryReports DeliveryReport[]
 
   @@map("outbound_orders")
 }
@@ -834,7 +842,10 @@ model DeliveryReport {
   trackingNumber  String? // mã vận đơn
   signatureUrl    String? // ký điện tử
   packingVideoUrl String? // video đóng gói (hàng giá trị cao)
+  serialNumbers   String? // chốt danh sách serial đã giao (JSON/CSV)
   createdAt       DateTime  @default(now())
+
+  outboundOrder OutboundOrder? @relation(fields: [outboundOrderId], references: [id])
 
   @@map("delivery_reports")
 }

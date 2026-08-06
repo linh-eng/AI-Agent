@@ -10,7 +10,7 @@ truy vết xuất xứ (CO/CQ, tờ khai HQ, lô) và bảo hành hai tầng (h�
 
 Tham chiếu yêu cầu đầy đủ: bản mô tả 10 module (M1–M10) và lộ trình 7 phase.
 
-## Current status — **Phase 4 hoàn tất**
+## Current status — **Phase 5 hoàn tất**
 
 - **Phase 1:** Auth + RBAC, schema Prisma đầy đủ cho toàn bộ mục 6, màn hình danh mục nền tảng.
 - **Phase 2:** Nhập kho (M1–M3) — tạo phiếu nhập theo mã nghiệp vụ N1–N12 (bung checklist chứng từ +
@@ -25,8 +25,13 @@ Tham chiếu yêu cầu đầy đủ: bản mô tả 10 module (M1–M10) và l�
   với **quy tắc khả dụng = IN_STOCK + không nằm trong máy (parentSerialId null) + kho tính tồn**; cảnh báo
   (dưới tồn tối thiểu, hàng tồn lâu, linh kiện sắp hết BH NCC khi còn trong kho); báo cáo theo dự án; kiểm kê
   (chụp serial kỳ vọng → quét thực tế → tự so lệch thiếu/thừa → BGĐ duyệt → bút toán ADJUSTMENT).
+- **Phase 5:** Xuất kho (M6–M8) — tạo phiếu xuất theo mã X1–X11 → trình duyệt → kế toán duyệt (chặn bán
+  vượt tồn khả dụng + kiểm hạn mức công nợ) / từ chối kèm lý do → picking **quét 100% serial** (chặn sai
+  serial, sai sản phẩm, serial không khả dụng, **khóa dự án K-DA** — chỉ mở khi có quyền duyệt override) →
+  đóng gói & bàn giao (biên bản giao: hình thức, đơn vị VC, mã vận đơn, ký điện tử, video đóng gói). Serial
+  → SOLD/RENTED + stock_movement OUTBOUND + serial_event.
 
-Các phase 5–7 (xuất/bảo hành/báo cáo) chưa làm — schema đã có sẵn bảng cho chúng.
+Các phase 6–7 (bảo hành/rã máy/báo cáo) chưa làm — schema đã có sẵn bảng cho chúng.
 
 ## Tech stack
 
@@ -49,6 +54,7 @@ src/
       dashboard/     # Tổng quan + tồn theo kho
       inventory/     # Tồn kho realtime theo kho/sản phẩm + cảnh báo (M5)
       inbound/       # Nhập kho: list + tạo phiếu + màn nhận hàng (quét serial, scan-to-bin)
+      outbound/      # Xuất kho: list + tạo + duyệt + picking quét serial + bàn giao
       work-orders/   # Lắp ráp: list + tạo lệnh + workbench (cấp phát/QC/hoàn thành as-built)
       stock-counts/  # Kiểm kê: list + tạo + quét đối chiếu + duyệt BGĐ
       serials/       # Danh sách serial + truy vết hai chiều
@@ -64,7 +70,8 @@ src/
   lib/               # prisma, auth, session, rbac, warehouses, validation, api, client, utils,
                      # inbound (cấu hình N1–N12), inbound-service (receive), workorder-service
                      # (lắp ráp: allocate/qc/complete), inventory (tồn+cảnh báo),
-                     # stockcount-service (kiểm kê), labels
+                     # stockcount-service (kiểm kê), outbound + outbound-service
+                     # (xuất: submit/approve/ship), labels
   middleware.ts      # Bảo vệ route: chưa đăng nhập -> /login hoặc 401
 ```
 
