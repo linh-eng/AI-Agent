@@ -1,0 +1,903 @@
+// =============================================================================
+// THNG — Hệ thống quản lý kho (Nhập / Xuất / Lắp ráp / Tháo dỡ / Truy vết Serial)
+// Prisma schema — bao phủ toàn bộ mục 6 của bản mô tả yêu cầu.
+//
+// Nguyên tắc bất biến được mã hóa trong schema:
+//   * warehouse_id BẮT BUỘC trên mọi bản ghi tồn (Serial, Lot, StockMovement).
+//   * Serial không bao giờ bị xóa cứng — chỉ đổi `status`; serial bị thay
+//     trỏ tới `replacedBySerialId`; máy lắp ráp trỏ con qua `parentSerialId`.
+//   * bom_as_built có `version` (nhiều phiên bản cho một serial cha).
+//   * Warehouse.countsAsAvailable phân biệt kho tính/không tính tồn khả dụng.
+//   * Chứng từ đã duyệt không sửa/xóa — chỉ đối ứng bằng chứng từ khác.
+//   * AuditLog append-only (không có API sửa/xóa).
+//
+// Ràng buộc "supplier_id/project_id NOT NULL HOẶC is_commercial_stock":
+//   Prisma không hỗ trợ CHECK constraint trong schema. Trên InboundLine,
+//   `supplierId` là quan hệ BẮT BUỘC (NOT NULL ở DB). Điều kiện
+//   "projectId khác null HOẶC isCommercialStock = true" được kiểm ở tầng API
+//   (src/lib/validation) + có thể bổ sung CHECK constraint qua migration SQL.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// ENUMS
+// ----------------------------------------------------------------------------
+
+/// Chế độ quản lý hàng hóa (mục 3c)
+enum TrackingMode {
+  SERIAL // Laptop, màn hình, thiết bị mạng... quét 100%, unique toàn hệ thống
+  LOT // Mực in, linh kiện có mã lô — ghi lô + số lượng + hạn
+  QUANTITY // Cáp, ốc, keo, phụ kiện nhỏ — đếm số lượng
+  LICENSE // Windows, Office, phần mềm bản quyền — mã key + hạn
+}
+
+/// Vòng đời serial (mục 3d) — chỉ chuyển trạng thái, không xóa
+enum SerialStatus {
+  IN_STOCK
+  WIP
+  RESERVED
+  SOLD
+  RENTED
+  IN_WARRANTY_INTAKE
+  AT_VENDOR
+  IN_REPAIR
+  DAMAGED
+  REPLACED
+  DISASSEMBLED
+  SCRAPPED
+}
+
+/// Grade tình trạng cho hàng tháo máy / tân trang
+enum ConditionGrade {
+  A
+  B
+  C
+}
+
+/// Loại đối tác
+enum PartnerType {
+  SUPPLIER // Nhà cung cấp
+  CUSTOMER // Khách hàng
+  BOTH
+}
+
+/// Bên bảo hành
+enum WarrantyProvider {
+  VENDOR // NCC / hãng
+  THNG // Bảo hành THNG cấp cho khách
+}
+
+/// Trạng thái duyệt chứng từ
+enum DocumentStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// Loại nghiệp vụ NHẬP (mục 5, M1)
+enum InboundType {
+  N1 // Mua mới -> K-TM
+  N2 // Hàng dự án -> K-DA
+  N3 // Bảo hành từ khách -> K-BH-KH
+  N4 // Bảo hành NCC/hãng trả về -> K-BH-KH
+  N5 // Sửa chữa có phí -> K-SC
+  N6 // Thiết bị hư hỏng -> K-HH
+  N7 // Thành phẩm sau lắp ráp
+  N8 // Linh kiện sau tháo dỡ -> K-TMAY
+  N9 // Khách trả/đổi
+  N10 // Thu hồi demo/thuê
+  N11 // Chuyển kho
+  N12 // Khuyến mãi/hàng mượn NCC
+}
+
+/// Loại nghiệp vụ XUẤT (mục 5, M1)
+enum OutboundType {
+  X1 // Bán thương mại
+  X2 // Giao hàng dự án
+  X3 // Xuất linh kiện lắp ráp
+  X4 // Gửi bảo hành hãng (K-BH-KH -> K-BH-NCC)
+  X5 // Trả máy BH cho khách
+  X6 // Trả máy sửa chữa
+  X7 // Trả hàng lỗi NCC
+  X8 // Demo/mượn/thuê
+  X9 // Chuyển kho
+  X10 // Hủy/thanh lý
+  X11 // Điều chỉnh kiểm kê
+}
+
+/// Loại biến động tồn
+enum MovementType {
+  INBOUND
+  OUTBOUND
+  TRANSFER
+  ADJUSTMENT
+  ASSEMBLY_CONSUME // linh kiện -> WIP
+  ASSEMBLY_PRODUCE // thành phẩm nhập kho
+  DISASSEMBLY
+}
+
+/// Chế độ lệnh lắp ráp
+enum WorkOrderMode {
+  TO_ORDER // lắp theo đơn
+  TO_STOCK // lắp để tồn kho
+}
+
+enum WorkOrderStatus {
+  DRAFT
+  ALLOCATING // đang cấp phát linh kiện
+  ASSEMBLING
+  QC
+  DONE
+  CANCELLED
+}
+
+enum QcType {
+  INBOUND // QC đầu vào (M2)
+  OUTPUT // QC/burn-in đầu ra (M4)
+}
+
+enum QcResult {
+  PASS
+  FAIL
+}
+
+enum StockCountStatus {
+  DRAFT
+  COUNTING
+  PENDING_APPROVAL
+  APPROVED
+  CANCELLED
+}
+
+/// Hướng xử lý thiết bị hư hỏng (K-HH)
+enum DamageResolution {
+  PENDING
+  RETURN_VENDOR // trả NCC (X7)
+  CUSTOMER_COMPENSATION // thu bồi thường khách
+  SALVAGE_PARTS // tận dụng linh kiện (M10)
+  LIQUIDATE // thanh lý
+}
+
+// ----------------------------------------------------------------------------
+// AUTH & RBAC
+// ----------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  roles     UserRole[]
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  code        String   @unique // ADMIN, BOD, PURCHASING, WH_ACCOUNTANT, WAREHOUSE_KEEPER, TECH, QC, SALES, WARRANTY
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique // vd: "warehouse.read", "product.write", "outbound.approve"
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ----------------------------------------------------------------------------
+// DANH MỤC KHO / VỊ TRÍ (A1)
+// ----------------------------------------------------------------------------
+
+model Warehouse {
+  id                String   @id @default(cuid())
+  code              String   @unique // K-TM, K-DA, K-TAM, K-BH-KH, K-BH-NCC, K-SC, K-HH, K-LK, K-TMAY, K-DEMO, K-SW, K-TL
+  name              String
+  description       String?
+  /// K-HH, K-BH-KH, K-BH-NCC, K-SC, K-TL => false (không tính tồn khả dụng bán)
+  countsAsAvailable Boolean  @default(true)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  zones         Zone[]
+  serials       Serial[]
+  lots          Lot[]
+  movementsFrom StockMovement[] @relation("MovementFromWarehouse")
+  movementsTo   StockMovement[] @relation("MovementToWarehouse")
+
+  @@map("warehouses")
+}
+
+model Zone {
+  id          String    @id @default(cuid())
+  warehouseId String
+  code        String
+  name        String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  bins        Bin[]
+
+  @@unique([warehouseId, code])
+  @@map("zones")
+}
+
+model Bin {
+  id      String   @id @default(cuid())
+  zoneId  String
+  code    String
+  label   String?
+  zone    Zone     @relation(fields: [zoneId], references: [id])
+  serials Serial[]
+
+  @@unique([zoneId, code])
+  @@map("bins")
+}
+
+// ----------------------------------------------------------------------------
+// DỰ ÁN / ĐỐI TÁC / SẢN PHẨM
+// (dùng chung với Module Hỗ trợ — chia sẻ bảng projects, partners, serials)
+// ----------------------------------------------------------------------------
+
+model Project {
+  id         String    @id @default(cuid())
+  code       String    @unique
+  name       String
+  customerId String?
+  customerPo String? // PO của khách
+  contractNo String? // Hợp đồng mua bán
+  status     String    @default("ACTIVE") // ACTIVE, ACCEPTED, CLOSED...
+  acceptedAt DateTime? // mốc nghiệm thu (dùng cho SLA tồn K-DA 30 ngày)
+  createdAt  DateTime  @default(now())
+
+  customer       Partner?        @relation("ProjectCustomer", fields: [customerId], references: [id])
+  serials        Serial[]
+  lots           Lot[]
+  inboundLines   InboundLine[]
+  outboundLines  OutboundLine[]
+  outboundOrders OutboundOrder[]
+
+  @@map("projects")
+}
+
+model Partner {
+  id          String      @id @default(cuid())
+  code        String      @unique
+  name        String
+  type        PartnerType
+  taxCode     String?
+  phone       String?
+  email       String?
+  address     String?
+  /// Hạn mức công nợ (VND) — kế toán kiểm tra khi duyệt xuất
+  creditLimit Decimal?    @db.Decimal(18, 2)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+
+  projectsAsCustomer Project[]       @relation("ProjectCustomer")
+  serialsAsSupplier  Serial[]        @relation("SerialSupplier")
+  lotsAsSupplier     Lot[]           @relation("LotSupplier")
+  inboundOrders      InboundOrder[]
+  outboundOrders     OutboundOrder[]
+  origins            Origin[]
+
+  @@map("partners")
+}
+
+model Product {
+  id           String       @id @default(cuid())
+  sku          String       @unique
+  barcode      String?      @unique
+  name         String
+  model        String?
+  brand        String?
+  category     String?
+  trackingMode TrackingMode
+  uom          String       @default("Cái") // đơn vị tính
+  weight       Decimal?     @db.Decimal(12, 3)
+  dimensions   String? // DxRxC
+  /// Tồn tối thiểu để cảnh báo (đặc biệt cho linh kiện K-LK)
+  minStock     Int?
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+
+  serials       Serial[]
+  lots          Lot[]
+  licenses      License[]
+  bomPlanned    BomPlanned[]
+  inboundLines  InboundLine[]
+  outboundLines OutboundLine[]
+  workOrders    WorkOrder[]
+
+  @@map("products")
+}
+
+// ----------------------------------------------------------------------------
+// SERIAL — trung tâm truy vết. Bất biến, tự tham chiếu cha/con và replaced_by.
+// ----------------------------------------------------------------------------
+
+model Serial {
+  id           String          @id @default(cuid())
+  serialNumber String          @unique // serial/imei — unique toàn hệ thống
+  productId    String
+  /// BẮT BUỘC: mọi serial luôn thuộc đúng một kho
+  warehouseId  String
+  status       SerialStatus    @default(IN_STOCK)
+  condition    String? // mô tả tình trạng
+  grade        ConditionGrade?
+
+  // Xuất xứ nghiệp vụ (mục 3b) — supplier/project gắn khi nhập
+  supplierId        String?
+  projectId         String?
+  /// true nếu là hàng tồn thương mại chưa gán dự án
+  isCommercialStock Boolean  @default(false)
+  poNumber          String?
+  invoiceNumber     String?
+  yearOfManufacture Int?
+  originCountry     String?
+  weight            Decimal? @db.Decimal(12, 3)
+  dimensions        String?
+
+  binId String?
+
+  // Quan hệ cha–con & thay thế (mục 3d) — TỰ THAM CHIẾU
+  parentSerialId     String?
+  replacedBySerialId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product   Product   @relation(fields: [productId], references: [id])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  supplier  Partner?  @relation("SerialSupplier", fields: [supplierId], references: [id])
+  project   Project?  @relation(fields: [projectId], references: [id])
+  bin       Bin?      @relation(fields: [binId], references: [id])
+
+  // Cha–con: một serial cha có nhiều serial con; mỗi con trỏ về 1 cha
+  parentSerial Serial?  @relation("SerialParentChild", fields: [parentSerialId], references: [id])
+  childSerials Serial[] @relation("SerialParentChild")
+
+  // Thay thế: serial cũ -> serial mới (1-1)
+  replacedBy Serial? @relation("SerialReplacement", fields: [replacedBySerialId], references: [id])
+  replaces   Serial? @relation("SerialReplacement")
+
+  origins            Origin[]
+  warranties         Warranty[]
+  events             SerialEvent[]
+  bomAsBuiltAsParent BomAsBuilt[]    @relation("BomAsBuiltParent")
+  bomAsBuiltAsChild  BomAsBuilt[]    @relation("BomAsBuiltChild")
+  activatedLicenses  License[]
+  movements          StockMovement[]
+
+  @@index([productId])
+  @@index([warehouseId])
+  @@index([status])
+  @@index([projectId])
+  @@index([parentSerialId])
+  @@map("serials")
+}
+
+model Lot {
+  id                String    @id @default(cuid())
+  lotNumber         String
+  productId         String
+  warehouseId       String // BẮT BUỘC
+  manufactureDate   DateTime?
+  expiryDate        DateTime?
+  quantity          Int       @default(0)
+  supplierId        String?
+  projectId         String?
+  isCommercialStock Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+
+  product    Product    @relation(fields: [productId], references: [id])
+  warehouse  Warehouse  @relation(fields: [warehouseId], references: [id])
+  supplier   Partner?   @relation("LotSupplier", fields: [supplierId], references: [id])
+  project    Project?   @relation(fields: [projectId], references: [id])
+  origins    Origin[]
+  warranties Warranty[]
+
+  @@unique([productId, lotNumber, warehouseId])
+  @@index([productId])
+  @@index([warehouseId])
+  @@map("lots")
+}
+
+model Origin {
+  id                   String   @id @default(cuid())
+  // Gắn với serial HOẶC lot (một trong hai)
+  serialId             String?
+  lotId                String?
+  countryOfOrigin      String?
+  supplierId           String?
+  poNumber             String?
+  coNumber             String? // CO — Certificate of Origin
+  cqNumber             String? // CQ — Certificate of Quality
+  customsDeclarationNo String? // số tờ khai hải quan
+  createdAt            DateTime @default(now())
+
+  serial   Serial?  @relation(fields: [serialId], references: [id])
+  lot      Lot?     @relation(fields: [lotId], references: [id])
+  supplier Partner? @relation(fields: [supplierId], references: [id])
+
+  @@index([serialId])
+  @@index([lotId])
+  @@map("origins")
+}
+
+model Warranty {
+  id        String           @id @default(cuid())
+  serialId  String?
+  lotId     String?
+  provider  WarrantyProvider // NCC(VENDOR) hoặc THNG
+  startDate DateTime?
+  endDate   DateTime?
+  terms     String?
+  createdAt DateTime         @default(now())
+
+  serial Serial? @relation(fields: [serialId], references: [id])
+  lot    Lot?    @relation(fields: [lotId], references: [id])
+
+  @@index([serialId])
+  @@index([endDate])
+  @@map("warranties")
+}
+
+model License {
+  id                String    @id @default(cuid())
+  productId         String
+  licenseKey        String    @unique
+  expiryDate        DateTime?
+  activatedSerialId String? // thiết bị đã kích hoạt
+  createdAt         DateTime  @default(now())
+
+  product         Product @relation(fields: [productId], references: [id])
+  activatedSerial Serial? @relation(fields: [activatedSerialId], references: [id])
+
+  @@map("licenses")
+}
+
+// ----------------------------------------------------------------------------
+// CHỨNG TỪ & ĐƠN NHẬP/XUẤT
+// ----------------------------------------------------------------------------
+
+model Document {
+  id          String         @id @default(cuid())
+  type        String // loại chứng từ
+  number      String         @unique
+  status      DocumentStatus @default(DRAFT)
+  fileUrl     String?
+  note        String?
+  createdById String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("documents")
+}
+
+model InboundOrder {
+  id                     String         @id @default(cuid())
+  number                 String         @unique
+  type                   InboundType
+  supplierId             String?
+  poNumber               String?
+  invoiceNumber          String?
+  destinationWarehouseId String?
+  status                 DocumentStatus @default(DRAFT)
+  note                   String?
+  createdAt              DateTime       @default(now())
+
+  supplier Partner?      @relation(fields: [supplierId], references: [id])
+  lines    InboundLine[]
+
+  @@map("inbound_orders")
+}
+
+model InboundLine {
+  id                String  @id @default(cuid())
+  inboundOrderId    String
+  productId         String
+  /// BẮT BUỘC ở tầng nghiệp vụ (mục 3b)
+  supplierId        String
+  /// projectId khác null HOẶC isCommercialStock = true (kiểm ở API)
+  projectId         String?
+  isCommercialStock Boolean @default(false)
+  quantity          Int
+  yearOfManufacture Int?
+  originCountry     String?
+
+  inboundOrder InboundOrder @relation(fields: [inboundOrderId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id])
+  project      Project?     @relation(fields: [projectId], references: [id])
+
+  @@index([inboundOrderId])
+  @@map("inbound_lines")
+}
+
+model OutboundOrder {
+  id          String         @id @default(cuid())
+  number      String         @unique
+  type        OutboundType
+  customerId  String?
+  projectId   String?
+  status      DocumentStatus @default(DRAFT)
+  approvedBy  String?
+  approvedAt  DateTime?
+  rejectReason String?
+  deliveredAt DateTime?
+  note        String?
+  createdAt   DateTime       @default(now())
+
+  customer        Partner?         @relation(fields: [customerId], references: [id])
+  project         Project?         @relation(fields: [projectId], references: [id])
+  lines           OutboundLine[]
+  deliveryReports DeliveryReport[]
+
+  @@map("outbound_orders")
+}
+
+model OutboundLine {
+  id              String  @id @default(cuid())
+  outboundOrderId String
+  productId       String
+  projectId       String?
+  quantity        Int
+
+  outboundOrder OutboundOrder @relation(fields: [outboundOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+  project       Project?      @relation(fields: [projectId], references: [id])
+
+  @@index([outboundOrderId])
+  @@map("outbound_lines")
+}
+
+// ----------------------------------------------------------------------------
+// LẮP RÁP & BOM (M4)
+// ----------------------------------------------------------------------------
+
+model WorkOrder {
+  id          String          @id @default(cuid())
+  number      String          @unique
+  mode        WorkOrderMode
+  status      WorkOrderStatus @default(DRAFT)
+  productId   String? // sản phẩm thành phẩm dự kiến
+  assembledBy String? // người lắp
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  note        String?
+  createdAt   DateTime        @default(now())
+
+  product    Product?     @relation(fields: [productId], references: [id])
+  bomPlanned BomPlanned[]
+  bomAsBuilt BomAsBuilt[]
+  qcReports  QcReport[]
+
+  @@map("work_orders")
+}
+
+model BomPlanned {
+  id          String @id @default(cuid())
+  workOrderId String
+  productId   String // linh kiện dự kiến
+  quantity    Int
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@index([workOrderId])
+  @@map("bom_planned")
+}
+
+/// As-built BOM có VERSION — liên kết serial cha ↔ serial/lot/license con
+model BomAsBuilt {
+  id             String   @id @default(cuid())
+  workOrderId    String?
+  parentSerialId String
+  version        Int      @default(1)
+  childSerialId  String?
+  childLotId     String?
+  childLicenseId String?
+  quantity       Int      @default(1)
+  note           String?
+  createdAt      DateTime @default(now())
+
+  workOrder    WorkOrder? @relation(fields: [workOrderId], references: [id])
+  parentSerial Serial     @relation("BomAsBuiltParent", fields: [parentSerialId], references: [id])
+  childSerial  Serial?    @relation("BomAsBuiltChild", fields: [childSerialId], references: [id])
+
+  @@index([parentSerialId])
+  @@index([parentSerialId, version])
+  @@map("bom_as_built")
+}
+
+model QcReport {
+  id          String   @id @default(cuid())
+  workOrderId String?
+  serialId    String?
+  type        QcType
+  result      QcResult
+  burnInHours Int?
+  details     Json?
+  photos      String? // link ảnh
+  createdBy   String?
+  createdAt   DateTime @default(now())
+
+  workOrder WorkOrder? @relation(fields: [workOrderId], references: [id])
+
+  @@map("qc_reports")
+}
+
+// ----------------------------------------------------------------------------
+// BIẾN ĐỘNG TỒN & TIMELINE SERIAL
+// ----------------------------------------------------------------------------
+
+model StockMovement {
+  id              String       @id @default(cuid())
+  type            MovementType
+  serialId        String?
+  lotId           String?
+  quantity        Int          @default(1)
+  fromWarehouseId String?
+  toWarehouseId   String?
+  documentType    String? // tham chiếu loại chứng từ
+  documentNumber  String?
+  note            String?
+  createdBy       String?
+  createdAt       DateTime     @default(now())
+
+  serial        Serial?    @relation(fields: [serialId], references: [id])
+  fromWarehouse Warehouse? @relation("MovementFromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse? @relation("MovementToWarehouse", fields: [toWarehouseId], references: [id])
+
+  @@index([serialId])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+model SerialEvent {
+  id         String        @id @default(cuid())
+  serialId   String
+  eventType  String // vd: STATUS_CHANGE, MOVE, ASSEMBLE, DISASSEMBLE, WARRANTY_INTAKE...
+  fromStatus SerialStatus?
+  toStatus   SerialStatus?
+  detail     Json?
+  createdBy  String?
+  createdAt  DateTime      @default(now())
+
+  serial Serial @relation(fields: [serialId], references: [id])
+
+  @@index([serialId])
+  @@index([createdAt])
+  @@map("serial_events")
+}
+
+// ----------------------------------------------------------------------------
+// KIỂM KÊ
+// ----------------------------------------------------------------------------
+
+model StockCount {
+  id          String           @id @default(cuid())
+  number      String           @unique
+  warehouseId String?
+  status      StockCountStatus @default(DRAFT)
+  note        String?
+  approvedBy  String?
+  approvedAt  DateTime?
+  createdAt   DateTime         @default(now())
+
+  lines StockCountLine[]
+
+  @@map("stock_counts")
+}
+
+/// Dòng kiểm kê từng serial: hệ thống kỳ vọng có / thực tế quét được.
+model StockCountLine {
+  id           String   @id @default(cuid())
+  stockCountId String
+  serialId     String?
+  serialNumber String // lưu cả số serial để đối chiếu kể cả serial lạ
+  /// true: hệ thống kỳ vọng serial này ở kho khi bắt đầu kiểm kê
+  expected     Boolean  @default(false)
+  /// true: thực tế đã quét thấy
+  scanned      Boolean  @default(false)
+  note         String?
+  createdAt    DateTime @default(now())
+
+  stockCount StockCount @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
+
+  @@index([stockCountId])
+  @@map("stock_count_lines")
+}
+
+// ----------------------------------------------------------------------------
+// BẢO HÀNH / SỬA CHỮA / HƯ HỎNG (M9)
+// ----------------------------------------------------------------------------
+
+model WarrantyIntake {
+  id                String   @id @default(cuid())
+  number            String   @unique
+  serialId          String?
+  customerId        String?
+  originalInvoiceNo String?
+  sealIntact        Boolean?
+  conditionNote     String?
+  photos            String?
+  route             String? // TO_VENDOR(X4) / TO_REPAIR(K-SC) / TO_DAMAGED(K-HH)
+  status            String   @default("OPEN") // OPEN / ROUTED / CLOSED
+  createdAt         DateTime @default(now())
+
+  @@map("warranty_intakes")
+}
+
+model VendorRma {
+  id                  String    @id @default(cuid())
+  number              String    @unique
+  serialId            String?
+  vendorId            String?
+  sentDate            DateTime?
+  shippingMethod      String?
+  carrier             String?
+  trackingNumber      String?
+  slaDays             Int?
+  status              String    @default("SENT") // SENT / RETURNED
+  result              String? // REPAIRED / REPLACED
+  replacementSerialId String?
+  returnedAt          DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@map("vendor_rma")
+}
+
+model DamagedItem {
+  id         String           @id @default(cuid())
+  serialId   String?
+  cause      String?
+  resolution DamageResolution @default(PENDING)
+  /// Hạn chốt hướng xử lý — mặc định 15 ngày (SLA K-HH)
+  dueDate    DateTime?
+  resolvedAt DateTime?
+  createdAt  DateTime         @default(now())
+
+  @@map("damaged_items")
+}
+
+model RmaTicket {
+  id            String   @id @default(cuid())
+  number        String   @unique
+  serialId      String?
+  // claim bảo hành ngược NCC
+  isVendorClaim Boolean  @default(false)
+  vendorId      String?
+  claimValue    Decimal? @db.Decimal(18, 2)
+  status        String   @default("OPEN")
+  createdAt     DateTime @default(now())
+
+  @@map("rma_tickets")
+}
+
+// ----------------------------------------------------------------------------
+// CHUYỂN KHO / GIAO HÀNG / THUÊ / RÃ MÁY
+// ----------------------------------------------------------------------------
+
+model TransferOrder {
+  id              String         @id @default(cuid())
+  number          String         @unique
+  fromWarehouseId String
+  toWarehouseId   String
+  status          DocumentStatus @default(DRAFT)
+  reason          String?
+  createdAt       DateTime       @default(now())
+
+  @@map("transfer_orders")
+}
+
+model DeliveryReport {
+  id              String    @id @default(cuid())
+  number          String    @unique
+  outboundOrderId String?
+  deliveredAt     DateTime?
+  method          String? // hình thức giao
+  carrier         String? // phương tiện/đơn vị vận chuyển
+  trackingNumber  String? // mã vận đơn
+  signatureUrl    String? // ký điện tử
+  packingVideoUrl String? // video đóng gói (hàng giá trị cao)
+  serialNumbers   String? // chốt danh sách serial đã giao (JSON/CSV)
+  createdAt       DateTime  @default(now())
+
+  outboundOrder OutboundOrder? @relation(fields: [outboundOrderId], references: [id])
+
+  @@map("delivery_reports")
+}
+
+model RentalContract {
+  id         String    @id @default(cuid())
+  number     String    @unique
+  customerId String?
+  serialId   String?
+  startDate  DateTime?
+  dueDate    DateTime? // hạn thu hồi
+  returnedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@map("rental_contracts")
+}
+
+model DisassemblyOrder {
+  id             String         @id @default(cuid())
+  number         String         @unique
+  parentSerialId String
+  reason         String?
+  status         DocumentStatus @default(DRAFT)
+  /// Rã máy BẮT BUỘC duyệt cấp quản lý/BGĐ (M10)
+  approvedBy     String?
+  approvedAt     DateTime?
+  executedAt     DateTime?
+  createdAt      DateTime       @default(now())
+
+  @@map("disassembly_orders")
+}
+
+// ----------------------------------------------------------------------------
+// AUDIT LOG — append-only (immutable)
+// ----------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String // CREATE / UPDATE / APPROVE / STATUS_CHANGE / LOGIN...
+  entityType String
+  entityId   String?
+  changes    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
