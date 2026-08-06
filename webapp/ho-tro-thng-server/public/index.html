@@ -639,7 +639,7 @@ async function saveConfig(){
 
 /* ============================ FORM TẠO/SỬA TICKET ============================ */
 let EDIT=null, FSTEP=0;
-const FSTEPS=["Tiếp nhận","Phân công & SLA","Thực hiện & nghiệm thu","CSAT & đóng"];
+const FSTEPS=["Thông tin yêu cầu","Phân công & SLA","Thực hiện & nghiệm thu","CSAT & đóng"];
 function openForm(id){
   EDIT=id?JSON.parse(JSON.stringify(DB.tickets.find(t=>t.id===id))):blankTicket();
   FSTEP=0; drawForm();
@@ -741,19 +741,32 @@ function drawForm(){
   </div>`;
   const steps=[step0,step1,step2,step3];
   const o=document.getElementById("overlay");
-  o.innerHTML=`<div class="modal">
-    <div class="modal-h"><h3>${isNew?"Tạo ticket mới":"Cập nhật ticket "+esc(t.id)}</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
-    <div class="modal-b">
-      <div class="steps">${FSTEPS.map((s,i)=>`<div class="step ${i===FSTEP?'active':''}" onclick="FSTEP=${i};drawForm()"><span class="n">${i+1}</span>${s}</div>`).join("")}</div>
-      ${steps[FSTEP]}
-    </div>
-    <div class="modal-f">
-      ${FSTEP>0?`<button class="btn" onclick="FSTEP--;drawForm()">← Trước</button>`:''}
-      <div style="flex:1"></div>
-      ${!isNew?`<button class="btn danger" onclick="delTicket('${t.id}')">Xóa</button>`:''}
-      ${FSTEP<3?`<button class="btn" onclick="FSTEP++;drawForm()">Tiếp →</button>`:''}
-      <button class="btn primary" onclick="saveTicket()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Lưu ticket</button>
-    </div></div>`;
+  if(isNew){
+    // TẠO MỚI = Bước 1 (Yêu cầu hỗ trợ). Các bước sau (phân công, thực hiện, nghiệm thu, CSAT)
+    // do vai trò khác thực hiện qua nút thao tác trong chi tiết ticket — không nằm ở form tạo.
+    o.innerHTML=`<div class="modal">
+      <div class="modal-h"><h3>Tạo phiếu yêu cầu hỗ trợ <span class="muted" style="font-size:13px;font-weight:500">· Bước 1</span></h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
+      <div class="modal-b">
+        <div class="note" style="margin:0 0 14px">Bạn chỉ cần điền <b>thông tin yêu cầu</b>. Việc tiếp nhận, phân công, xử lý và nghiệm thu sẽ do các bước sau thực hiện.</div>
+        ${step0}
+      </div>
+      <div class="modal-f"><button class="btn" onclick="closeModal()">Hủy</button>
+        <button class="btn primary" onclick="saveTicket()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Gửi yêu cầu</button></div></div>`;
+  } else {
+    o.innerHTML=`<div class="modal">
+      <div class="modal-h"><h3>Cập nhật ticket ${esc(t.id)}</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
+      <div class="modal-b">
+        <div class="steps">${FSTEPS.map((s,i)=>`<div class="step ${i===FSTEP?'active':''}" onclick="FSTEP=${i};drawForm()"><span class="n">${i+1}</span>${s}</div>`).join("")}</div>
+        ${steps[FSTEP]}
+      </div>
+      <div class="modal-f">
+        ${FSTEP>0?`<button class="btn" onclick="FSTEP--;drawForm()">← Trước</button>`:''}
+        <div style="flex:1"></div>
+        <button class="btn danger" onclick="delTicket('${t.id}')">Xóa</button>
+        ${FSTEP<3?`<button class="btn" onclick="FSTEP++;drawForm()">Tiếp →</button>`:''}
+        <button class="btn primary" onclick="saveTicket()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Lưu ticket</button>
+      </div></div>`;
+  }
 }
 window.flowOf=flowOf; window.priOf=priOf; window.groupOf=groupOf;
 async function saveTicket(){
