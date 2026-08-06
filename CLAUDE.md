@@ -10,7 +10,7 @@ truy vết xuất xứ (CO/CQ, tờ khai HQ, lô) và bảo hành hai tầng (h�
 
 Tham chiếu yêu cầu đầy đủ: bản mô tả 10 module (M1–M10) và lộ trình 7 phase.
 
-## Current status — **Phase 5 hoàn tất**
+## Current status — **Phase 6 hoàn tất**
 
 - **Phase 1:** Auth + RBAC, schema Prisma đầy đủ cho toàn bộ mục 6, màn hình danh mục nền tảng.
 - **Phase 2:** Nhập kho (M1–M3) — tạo phiếu nhập theo mã nghiệp vụ N1–N12 (bung checklist chứng từ +
@@ -30,8 +30,15 @@ Tham chiếu yêu cầu đầy đủ: bản mô tả 10 module (M1–M10) và l�
   serial, sai sản phẩm, serial không khả dụng, **khóa dự án K-DA** — chỉ mở khi có quyền duyệt override) →
   đóng gói & bàn giao (biên bản giao: hình thức, đơn vị VC, mã vận đơn, ký điện tử, video đóng gói). Serial
   → SOLD/RENTED + stock_movement OUTBOUND + serial_event.
+- **Phase 6:** Bảo hành/RMA/hư hỏng & rã máy (M9–M10) — tiếp nhận máy khách (N3 → K-BH-KH,
+  IN_WARRANTY_INTAKE); phân luồng (gửi hãng X4 → K-BH-NCC + VendorRma / sửa phí → K-SC / hỏng → K-HH +
+  DamagedItem SLA 15 ngày); hãng trả về (N4: sửa xong trả khách, hoặc **REPLACED** → serial cũ REPLACED +
+  liên kết replaced_by + **as-built BOM version mới** + tự mở phiếu **đòi BH ngược NCC** nếu linh kiện cũ
+  còn hạn hãng); chốt xử lý K-HH (thanh lý → SCRAPPED K-TL...). Rã máy: đề nghị → **BGĐ duyệt bắt buộc** →
+  đối chiếu as-built → serial cha DISASSEMBLED, serial con thu hồi vào K-TMAY (grade) hoặc K-TL (hỏng).
+  Bảng SLA cấu hình ở `src/lib/sla.ts`.
 
-Các phase 6–7 (bảo hành/rã máy/báo cáo) chưa làm — schema đã có sẵn bảng cho chúng.
+Phase 7 (báo cáo + in ấn chứng từ/tem) chưa làm — schema đã có sẵn bảng cho chúng.
 
 ## Tech stack
 
@@ -56,6 +63,8 @@ src/
       inbound/       # Nhập kho: list + tạo phiếu + màn nhận hàng (quét serial, scan-to-bin)
       outbound/      # Xuất kho: list + tạo + duyệt + picking quét serial + bàn giao
       work-orders/   # Lắp ráp: list + tạo lệnh + workbench (cấp phát/QC/hoàn thành as-built)
+      warranty/      # Bảo hành/RMA: tiếp nhận + phân luồng + nhận về hãng + K-HH SLA
+      disassembly/   # Rã máy: list + đề nghị + duyệt BGĐ + thực hiện ([id])
       stock-counts/  # Kiểm kê: list + tạo + quét đối chiếu + duyệt BGĐ
       serials/       # Danh sách serial + truy vết hai chiều
       lots/          # Danh sách lô hàng
@@ -71,7 +80,8 @@ src/
                      # inbound (cấu hình N1–N12), inbound-service (receive), workorder-service
                      # (lắp ráp: allocate/qc/complete), inventory (tồn+cảnh báo),
                      # stockcount-service (kiểm kê), outbound + outbound-service
-                     # (xuất: submit/approve/ship), labels
+                     # (xuất: submit/approve/ship), warranty-service (M9),
+                     # disassembly-service (M10), sla (bảng SLA), labels
   middleware.ts      # Bảo vệ route: chưa đăng nhập -> /login hoặc 401
 ```
 

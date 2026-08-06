@@ -281,6 +281,73 @@ export const outboundShipSchema = z.object({
   allowProjectOverride: z.boolean().default(false),
 });
 
+// ----- Bảo hành / RMA / hư hỏng (M9) -----
+export const warrantyIntakeCreateSchema = z.object({
+  serialNumber: z.string().min(1, "Nhập serial máy"),
+  customerId: z.string().optional().nullable(),
+  originalInvoiceNo: z.string().optional().nullable(),
+  sealIntact: z.boolean().optional().nullable(),
+  conditionNote: z.string().optional().nullable(),
+  photos: z.string().optional().nullable(),
+});
+
+export const warrantyRouteSchema = z
+  .object({
+    route: z.enum(["TO_VENDOR", "TO_REPAIR", "TO_DAMAGED"]),
+    vendorId: z.string().optional().nullable(),
+    carrier: z.string().optional().nullable(),
+    trackingNumber: z.string().optional().nullable(),
+    slaDays: z.coerce.number().int().positive().optional().nullable(),
+    cause: z.string().optional().nullable(),
+  })
+  .refine((v) => v.route !== "TO_VENDOR" || !!v.vendorId, {
+    message: "Gửi hãng cần chọn NCC/hãng",
+    path: ["vendorId"],
+  });
+
+export const vendorRmaReturnSchema = z
+  .object({
+    result: z.enum(["REPAIRED", "REPLACED"]),
+    replacementSerialNumber: z.string().optional().nullable(),
+    warranty: z
+      .object({
+        startDate: z.string().optional().nullable(),
+        endDate: z.string().optional().nullable(),
+        terms: z.string().optional().nullable(),
+      })
+      .optional()
+      .nullable(),
+  })
+  .refine((v) => v.result !== "REPLACED" || !!v.replacementSerialNumber, {
+    message: "Hàng thay thế cần serial mới",
+    path: ["replacementSerialNumber"],
+  });
+
+export const damagedResolveSchema = z.object({
+  resolution: z.enum(["RETURN_VENDOR", "CUSTOMER_COMPENSATION", "SALVAGE_PARTS", "LIQUIDATE"]),
+  note: z.string().optional().nullable(),
+});
+
+// ----- Rã máy (M10) -----
+export const disassemblyCreateSchema = z.object({
+  parentSerialNumber: z.string().min(1, "Nhập serial máy cần rã"),
+  reason: z.string().optional().nullable(),
+});
+
+export const disassemblyExecuteSchema = z.object({
+  // grade cho từng serial con thu hồi (mặc định B); serial con không dùng được -> scrap
+  children: z
+    .array(
+      z.object({
+        serialNumber: z.string().min(1),
+        grade: z.enum(["A", "B", "C"]).optional().nullable(),
+        scrap: z.boolean().default(false),
+      })
+    )
+    .default([]),
+  note: z.string().optional().nullable(),
+});
+
 /** Parse an toàn, ném lỗi Zod để lớp handle() bắt. */
 export function parseJson<T>(schema: z.ZodType<T>, body: unknown): T {
   return schema.parse(body);

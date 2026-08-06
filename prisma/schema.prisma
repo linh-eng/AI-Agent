@@ -767,6 +767,7 @@ model WarrantyIntake {
   conditionNote     String?
   photos            String?
   route             String? // TO_VENDOR(X4) / TO_REPAIR(K-SC) / TO_DAMAGED(K-HH)
+  status            String   @default("OPEN") // OPEN / ROUTED / CLOSED
   createdAt         DateTime @default(now())
 
   @@map("warranty_intakes")
@@ -782,8 +783,10 @@ model VendorRma {
   carrier             String?
   trackingNumber      String?
   slaDays             Int?
-  result              String?
+  status              String    @default("SENT") // SENT / RETURNED
+  result              String? // REPAIRED / REPLACED
   replacementSerialId String?
+  returnedAt          DateTime?
   createdAt           DateTime  @default(now())
 
   @@map("vendor_rma")
@@ -872,6 +875,7 @@ model DisassemblyOrder {
   /// Rã máy BẮT BUỘC duyệt cấp quản lý/BGĐ (M10)
   approvedBy     String?
   approvedAt     DateTime?
+  executedAt     DateTime?
   createdAt      DateTime       @default(now())
 
   @@map("disassembly_orders")

@@ -18,6 +18,8 @@ import {
   Gauge,
   ClipboardList,
   PackageMinus,
+  ShieldCheck,
+  Hammer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
@@ -31,6 +33,8 @@ const NAV = [
   { href: "/inbound", label: "Nhập kho", icon: PackagePlus },
   { href: "/outbound", label: "Xuất kho", icon: PackageMinus },
   { href: "/work-orders", label: "Lắp ráp", icon: Wrench },
+  { href: "/warranty", label: "Bảo hành / RMA", icon: ShieldCheck },
+  { href: "/disassembly", label: "Rã máy", icon: Hammer },
   { href: "/stock-counts", label: "Kiểm kê", icon: ClipboardList },
   { href: "/serials", label: "Serial", icon: ScanBarcode },
   { href: "/lots", label: "Lô hàng", icon: Boxes },
