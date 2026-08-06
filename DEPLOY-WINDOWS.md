@@ -102,7 +102,8 @@ PORT="7000"
   ```powershell
   [Convert]::ToBase64String((1..48 | ForEach-Object {Get-Random -Maximum 256}))
   ```
-- `PORT="7000"` — cổng webapp (nhân viên truy cập).
+- `PORT="7000"` — chỉ để ghi nhớ; **cổng thực tế được đặt bằng `-p 7000`** khi chạy
+  (lệnh `next start` không đọc PORT từ `.env`).
 - `COOKIE_SECURE="false"` — **bắt buộc** vì chạy http:// nội bộ.
 
 ## BƯỚC 4 — Cài đặt & dựng bản chạy
@@ -115,12 +116,15 @@ npm run build        # dựng bản production
 npm run db:setup     # tạo bảng + nạp dữ liệu mẫu (CHỈ chạy 1 lần đầu)
 ```
 
-Chạy thử:
+Chạy thử (⚠️ phải truyền `-p 7000`; lệnh `next start` KHÔNG tự đọc PORT từ `.env`):
 ```powershell
-npm run start
+npx next start -H 0.0.0.0 -p 7000
 ```
 Mở trình duyệt trên máy chủ: **`http://localhost:7000`** → thấy trang đăng nhập là OK.
 Đăng nhập thử `admin@thng.com.vn` / `admin123`. Xong nhấn **Ctrl + C** để dừng, sang Bước 5.
+
+> Nếu báo lỗi `EADDRINUSE ... :7000` nghĩa là cổng 7000 cũng đang bị chiếm — đổi
+> sang cổng trống khác (vd `-p 7001`) rồi mở firewall theo cổng đó.
 
 ## BƯỚC 5 — Chạy nền & tự bật khi khởi động Windows (NSSM)
 
@@ -135,9 +139,9 @@ Mở trình duyệt trên máy chủ: **`http://localhost:7000`** → thấy tra
 3. Cửa sổ NSSM hiện ra, tab **Application** điền:
    - **Path:** `C:\Program Files\nodejs\node.exe`
    - **Startup directory:** `C:\apps\thng-warehouse`
-   - **Arguments:** `node_modules\next\dist\bin\next start -H 0.0.0.0`
+   - **Arguments:** `node_modules\next\dist\bin\next start -H 0.0.0.0 -p 7000`
    - Bấm **Install service**.
-   *(Không cần điền biến môi trường — app tự đọc file `.env`, gồm cả PORT=7000.)*
+   *(Cổng lấy từ `-p 7000` trong Arguments; DATABASE_URL/AUTH_SECRET app tự đọc từ `.env`.)*
 4. Khởi động dịch vụ:
    ```powershell
    C:\apps\nssm.exe start THNGKho
