@@ -820,6 +820,10 @@ function openDetail(id,tab){
   const priTab = priHist.length
     ? `<div class="histbox">${priHist.slice().reverse().map(h=>`<div class="hrow"><div class="hdot" style="background:var(--amber)"></div><div><b>Phương án ${h.option}</b> <span class="muted" style="font-size:12.5px">· ${fmtDT(h.at)}${h.by?" · "+esc(h.by):""}</span>${h.ketQua?`<div style="font-size:12.5px">${esc(h.ketQua)}</div>`:''}${h.reason?`<div class="muted" style="font-size:12.5px">Lý do: ${esc(h.reason)}</div>`:''}</div></div>`).join("")}</div>`
     : `<div class="empty" style="padding:34px"><div>Chưa ghi nhận xung đột ưu tiên nào cho ticket này.</div></div>`;
+  const audit=Array.isArray(t.auditLog)?t.auditLog:[];
+  const auditTab = audit.length
+    ? `<div class="histbox">${audit.slice().reverse().map(a=>`<div class="hrow"><div class="hdot" style="background:var(--blue)"></div><div><span class="muted" style="font-size:12.5px">${fmtDT(a.at)}${a.by?" · "+esc(a.by):""}</span>${a.changes.map(c=>`<div style="font-size:12.5px">${esc(c.field)}: <span class="muted">${esc(c.from||'(trống)')}</span> → <b>${esc(c.to||'(trống)')}</b></div>`).join("")}${a.note?`<div class="muted" style="font-size:12px">Lý do: ${esc(a.note)}</div>`:''}</div></div>`).join("")}</div>`
+    : `<div class="empty" style="padding:34px"><div>Chưa ghi nhận thay đổi trường nào.</div></div>`;
   const acts=nextActions(t).filter(actionAllowed); window.__acts=acts;
   const actionsBar = acts.length
     ? `<div class="actbar"><div class="lbl">Hành động tiếp theo</div><div class="row">${acts.map((a,i)=>`<button class="btn ${i===0?'primary':''} sm" onclick="doAction('${id}',${i})">${esc(a.label)}</button>`).join("")}</div></div>`
@@ -835,8 +839,9 @@ function openDetail(id,tab){
         <button class="${TAB==='proc'?'active':''}" onclick="openDetail('${id}','proc')">Xử lý & SLA</button>
         <button class="${TAB==='ps'?'active':''}" onclick="openDetail('${id}','ps')">Phát sinh (${ps.length})</button>
         <button class="${TAB==='pri'?'active':''}" onclick="openDetail('${id}','pri')">Lịch sử ưu tiên (${priHist.length})</button>
+        <button class="${TAB==='audit'?'active':''}" onclick="openDetail('${id}','audit')">Nhật ký thay đổi (${audit.length})</button>
       </div>
-      ${TAB==='info'?info:TAB==='proc'?proc:TAB==='pri'?priTab:psTab}
+      ${TAB==='info'?info:TAB==='proc'?proc:TAB==='pri'?priTab:TAB==='audit'?auditTab:psTab}
     </div></div>`;
   document.getElementById("overlay").classList.add("show");
 }

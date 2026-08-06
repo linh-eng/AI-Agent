@@ -46,6 +46,19 @@ function needReason(from, to) {
   if (bf === "Tạm dừng" && bt === "Đã tiếp nhận") return true; // phân loại lại
   return false;
 }
+// Các trường theo dõi trong nhật ký thay đổi (audit log)
+const AUDIT_FIELDS = [["uutien","Ưu tiên"],["assignee","Người thực hiện"],["doi","Đội hỗ trợ"],["donvi","Đơn vị yêu cầu"],
+  ["nguoiYC","Người yêu cầu"],["loai","Loại công việc"],["luong","Luồng"],["noidung","Nội dung"],["tGiaoYC","Thời hạn mong muốn"],
+  ["soluong","Số lượng"],["slThucte","SL thực tế"],["nghiemthu","Kết quả nghiệm thu"],["csat","CSAT"],["nhanxet","Nhận xét"]];
+function diffAudit(cur, next) {
+  const changes = [];
+  for (const [f, label] of AUDIT_FIELDS) {
+    const a = cur[f], b = next[f];
+    if (typeof b === "object") continue;
+    if (String(a==null?"":a) !== String(b==null?"":b)) changes.push({ field: label, from: a==null?"":String(a), to: b==null?"":String(b) });
+  }
+  return changes;
+}
 
 /* ============================ SQLITE ============================ */
 const db = new DatabaseSync(DB_FILE);
@@ -261,12 +274,17 @@ const server = http.createServer(async (req, res) => {
           if (!can(me, "edit") && !ownerResubmit) return sendJSON(res, 403, { error: "Không có quyền sửa ticket" });
           const t = await readBody(req); t.id = id; t.createdBy = cur.createdBy;
           const note = String(t._reason || "").trim();
+          const nowISO = new Date().toISOString();
           t.history = Array.isArray(cur.history) ? cur.history.slice() : [];
           if (baseStatus(t.trangthai) !== baseStatus(cur.trangthai)) {
             if (needReason(cur.trangthai, t.trangthai) && note.length < 5)
               return sendJSON(res, 400, { error: "Vui lòng ghi lý do (tối thiểu 5 ký tự) cho thao tác này" });
-            t.history.push({ at: new Date().toISOString(), from: cur.trangthai, to: t.trangthai, by: me.username, note });
+            t.history.push({ at: nowISO, from: cur.trangthai, to: t.trangthai, by: me.username, note });
           }
+          // Nhật ký thay đổi (audit log) — máy chủ giữ, không cho client xóa vết
+          t.auditLog = Array.isArray(cur.auditLog) ? cur.auditLog.slice() : [];
+          const changes = diffAudit(cur, t);
+          if (changes.length) t.auditLog.push({ at: nowISO, by: me.username, changes, note: note || "" });
           delete t._reason;
           saveTicketRow(t, false); return sendJSON(res, 200, t);
         }
