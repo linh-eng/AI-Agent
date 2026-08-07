@@ -160,6 +160,12 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
 .catcol{display:flex;flex-direction:column;gap:5px}
 .catcol .h{font-weight:700;color:var(--green-800);font-size:13px;margin-bottom:4px}
 .catcol .i{font-size:12.5px;color:var(--ink-2);padding:5px 10px;background:var(--green-50);border-radius:8px}
+.catrow{display:flex;gap:6px;align-items:center}
+.catrow input{flex:1;width:auto;min-width:0;font-size:12.5px;padding:5px 9px}
+.xbtn{flex:none;width:26px;height:28px;border:1px solid var(--line);background:#fff;color:var(--red);border-radius:7px;cursor:pointer;font-size:16px;line-height:1;font-weight:700;padding:0}
+.xbtn:hover{background:#fff0f0;border-color:var(--red)}
+.addbtn{align-self:flex-start;margin-top:3px;border:1px dashed var(--green-700,#2f855a);background:var(--green-50);color:var(--green-800);border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer}
+.addbtn:hover{background:#e6f2ec}
 @media(max-width:1000px){.app{grid-template-columns:1fr}.side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center}.nav{flex-direction:row;flex-wrap:wrap}.side-foot{display:none}.form-grid,.dl{grid-template-columns:1fr}}
 
 /* ---- user area in sidebar ---- */
@@ -252,8 +258,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
 
 <script>
 /* ============================ DỮ LIỆU DANH MỤC ============================ */
-// Danh mục 16 loại công việc (5G): [mã, tên, luồng, ưu tiên mặc định, nhóm-trường-động]
-const WORKTYPES = [
+// Danh mục loại công việc (5G): [mã, tên, luồng, ưu tiên mặc định, nhóm-trường-động] — nạp từ Cấu hình
+let WORKTYPES = [
   ["KT01","Xử lý sự cố / lỗi sản phẩm","Hỗ trợ kỹ thuật","P2 - Ưu tiên cao","kt"],
   ["KT02","Hỗ trợ cài đặt, cấu hình","Hỗ trợ kỹ thuật","P3 - Ưu tiên trung bình","kt"],
   ["KT03","Hỗ trợ tư vấn kỹ thuật cho khách hàng","Hỗ trợ khách hàng","P3 - Ưu tiên trung bình","kt"],
@@ -273,7 +279,8 @@ const WORKTYPES = [
   ["HC03","Hỗ trợ chuẩn bị họp, sự kiện","Hỗ trợ nội bộ","P4 - Thấp","hc"],
   ["KH99","Khác (ghi rõ)","","P3 - Ưu tiên trung bình","khac"],
 ];
-const WT = Object.fromEntries(WORKTYPES.map(w=>[w[1],{ma:w[0],luong:w[2],pri:w[3],group:w[4]}]));
+let WT = {};
+function rebuildWT(){ WT=Object.fromEntries(WORKTYPES.map(w=>[w[1],{ma:w[0],luong:w[2],pri:w[3],group:w[4]||""}])); if(typeof CAT==='object'&&CAT) CAT.loai=WORKTYPES.map(w=>w[1]); }
 const CAT = {
   loai: WORKTYPES.map(w=>w[1]),
   donvi: ["Phòng Hành chính","Phòng Kế toán","Phòng Kinh doanh","Phòng Mua hàng","Phòng Triển khai","Phòng Testing","Phòng Bảo hành","Phòng Tư vấn kỹ thuật","Ban Giám đốc","Trợ lý Giám đốc"],
@@ -293,6 +300,7 @@ const groupOf = l => (WT[l] ? WT[l].group : "");
 const isKhac = l => groupOf(l)==="khac";
 // Hiển thị loại công việc: "Khác — [nội dung người yêu cầu ghi]"
 const loaiText = t => isKhac(t.loai) ? ("Khác — "+(t.loaiKhac||"(chưa ghi rõ)")) : (t.loai||"");
+rebuildWT();
 // SLA theo ưu tiên: [phản hồi phút, xử lý giờ] — nạp từ Cấu hình máy chủ
 let SLA = {"P1 - Khẩn cấp":[15,2],"P2 - Ưu tiên cao":[30,4],"P3 - Ưu tiên trung bình":[60,8],"P4 - Thấp":[120,24]};
 const slaOf = p => SLA[p] || [60,8];
@@ -301,7 +309,10 @@ let WORK = {mStart:8,mEnd:12,aStart:13,aEnd:17,sat:false}; // giờ làm việc
 let QCONF={csat:40, sla:25, sl:15, ps:10, reopen:10}; // trọng số điểm chất lượng
 let OVERLOAD_N=3; // ngưỡng quá tải P1/P2
 let CFG=null;
-function applyConfig(c){ if(!c)return; CFG=c; if(c.sla)SLA=c.sla; if(c.work)WORK=Object.assign({sat:false},c.work); if(typeof c.warn==='number')WY_WARN=c.warn; if(typeof c.overload==='number')OVERLOAD_N=c.overload; if(c.quality)QCONF=c.quality; }
+function applyConfig(c){ if(!c)return; CFG=c; if(c.sla)SLA=c.sla; if(c.work)WORK=Object.assign({sat:false},c.work); if(typeof c.warn==='number')WY_WARN=c.warn; if(typeof c.overload==='number')OVERLOAD_N=c.overload; if(c.quality)QCONF=c.quality;
+  if(c.cat){ ["donvi","doi","dvt","loaiPS","nghiemthu"].forEach(k=>{ if(Array.isArray(c.cat[k])) CAT[k]=c.cat[k]; }); }
+  if(Array.isArray(c.worktypes)&&c.worktypes.length){ WORKTYPES=c.worktypes.map(w=>Array.isArray(w)?w:[w.ma||"",w.ten||"",w.luong||"",w.pri||"P3 - Ưu tiên trung bình",w.group||""]); rebuildWT(); }
+}
 
 /* ============================ STORE + AUTH (máy chủ) ============================ */
 let DB={tickets:[],ps:[],seq:{}};
@@ -584,14 +595,31 @@ function duyetPill(d){const m={"Chờ duyệt":"amber","Đã duyệt":"green","D
 
 /* ---------- DANH MỤC & CẤU HÌNH ---------- */
 let EDITCFG=null;
-function renderCat(){
+function renderCat(keep){
   const admin=can("users");
-  EDITCFG=JSON.parse(JSON.stringify(CFG||{sla:SLA,work:WORK,warn:WY_WARN,overload:OVERLOAD_N,quality:QCONF}));
+  if(!keep) EDITCFG=JSON.parse(JSON.stringify(CFG||{sla:SLA,work:WORK,warn:WY_WARN,overload:OVERLOAD_N,quality:QCONF}));
   const c=EDITCFG;
+  // đảm bảo có danh mục chỉnh sửa được (nạp từ danh mục đang dùng nếu chưa có trong cấu hình)
+  if(!c.cat||typeof c.cat!=='object') c.cat={};
+  ["donvi","doi","dvt","loaiPS","nghiemthu"].forEach(k=>{ if(!Array.isArray(c.cat[k])) c.cat[k]=CAT[k].slice(); });
+  if(!Array.isArray(c.worktypes)||!c.worktypes.length) c.worktypes=WORKTYPES.map(w=>w.slice());
   const num=(val,path,w)=>`<input type="number" value="${val}" style="width:${w||70}px" oninput="cfgSet('${path}',this.value)">`;
   const slaRows=Object.keys(c.sla).map(p=>`<tr><td><span class="pr ${p.split(' ')[0]}">${esc(p)}</span></td><td>${admin?num(c.sla[p][0],'sla.'+p+'.0'):c.sla[p][0]} phút</td><td>${admin?num(c.sla[p][1],'sla.'+p+'.1'):c.sla[p][1]} giờ</td></tr>`).join("");
   const qsum=c.quality.csat+c.quality.sla+c.quality.sl+c.quality.ps+c.quality.reopen;
   const col=(h,arr)=>`<div class="catcol"><div class="h">${h}</div>${arr.map(x=>`<div class="i">${esc(x)}</div>`).join("")}</div>`;
+  // Danh mục chỉnh được: mỗi mục = ô nhập + nút xóa, kèm nút "+ Thêm"
+  const catEdit=(h,key)=>`<div class="catcol"><div class="h">${h} (${c.cat[key].length})</div>${
+      c.cat[key].map((x,i)=>`<div class="catrow"><input value="${esc(x)}" ${admin?'':'disabled'} oninput="EDITCFG.cat['${key}'][${i}]=this.value"${admin?` placeholder="(để trống sẽ bị bỏ khi lưu)"`:''}>${admin?`<button class="xbtn" title="Xóa" onclick="catRemove('${key}',${i})">×</button>`:''}</div>`).join("")
+    }${admin?`<button class="addbtn" onclick="catAdd('${key}')">+ Thêm</button>`:''}</div>`;
+  const priOpts=CAT.uutien;
+  const wtRows=c.worktypes.map((w,i)=>`<tr>
+      <td><input value="${esc(w[0]||'')}" style="width:64px" ${admin?'':'disabled'} oninput="EDITCFG.worktypes[${i}][0]=this.value"></td>
+      <td><input value="${esc(w[1]||'')}" style="min-width:180px" ${admin?'':'disabled'} oninput="EDITCFG.worktypes[${i}][1]=this.value"></td>
+      <td><input value="${esc(w[2]||'')}" style="min-width:120px" ${admin?'':'disabled'} oninput="EDITCFG.worktypes[${i}][2]=this.value"></td>
+      <td><select ${admin?'':'disabled'} onchange="EDITCFG.worktypes[${i}][3]=this.value">${priOpts.map(p=>`<option ${p===w[3]?'selected':''}>${esc(p)}</option>`).join("")}</select></td>
+      <td><input value="${esc(w[4]||'')}" style="width:58px" ${admin?'':'disabled'} oninput="EDITCFG.worktypes[${i}][4]=this.value" title="Mã nhóm (vd: kt, tk, bh; ghi 'khac' cho mục Khác)"></td>
+      ${admin?`<td><button class="xbtn" title="Xóa" onclick="wtRemove(${i})">×</button></td>`:''}
+    </tr>`).join("");
   document.getElementById("view").innerHTML=`
     ${admin?'':'<div class="warn" style="margin-bottom:14px">Chỉ Quản trị mới chỉnh được cấu hình. Bạn đang xem ở chế độ chỉ đọc.</div>'}
     <div class="grid" style="grid-template-columns:1fr 1fr">
@@ -601,7 +629,7 @@ function renderCat(){
         <div class="panel-b" style="display:flex;flex-direction:column;gap:10px;font-size:13.5px">
           <div>Buổi sáng: ${admin?num(c.work.mStart,'work.mStart',55):c.work.mStart}h – ${admin?num(c.work.mEnd,'work.mEnd',55):c.work.mEnd}h</div>
           <div>Buổi chiều: ${admin?num(c.work.aStart,'work.aStart',55):c.work.aStart}h – ${admin?num(c.work.aEnd,'work.aEnd',55):c.work.aEnd}h</div>
-          <div><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" ${c.work.sat?'checked':''} ${admin?'':'disabled'} onchange="cfgSet('work.sat',this.checked)"> Làm việc Thứ 7 (tính SLA)</label></div>
+          <div><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" style="width:auto;flex:none" ${c.work.sat?'checked':''} ${admin?'':'disabled'} onchange="cfgSet('work.sat',this.checked)"> Làm việc Thứ 7</label></div>
           <div>Ngưỡng cảnh báo Vàng: ${admin?num(Math.round(c.warn*100),'warn%',60):Math.round(c.warn*100)}% SLA đã dùng</div>
           <div>Ngưỡng quá tải (cảnh báo xung đột): ${admin?num(c.overload,'overload',55):c.overload} việc P1/P2</div>
         </div></div>
@@ -616,13 +644,27 @@ function renderCat(){
         <div style="font-weight:700;color:${qsum===100?'var(--green)':'var(--red)'}">Tổng: <span id="qsum">${qsum}</span></div>
       </div></div>
     ${admin?`<div style="margin-top:16px"><button class="btn primary" onclick="saveConfig()">Lưu cấu hình</button> <span class="muted" style="font-size:12.5px">Áp dụng ngay cho toàn hệ thống.</span></div>`:''}
-    <div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Danh mục chuẩn hóa</h3></div>
-      <div class="panel-b" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:20px">
-        ${col("Loại công việc (18)",CAT.loai)}${col("Phòng ban yêu cầu (10)",CAT.donvi)}${col("Nhóm/Đội hỗ trợ",CAT.doi)}
-        ${col("Trạng thái ticket",CAT.trangthai)}${col("Kết quả nghiệm thu",CAT.nghiemthu)}${col("Loại phát sinh",CAT.loaiPS)}
-        ${col("Nhóm nguyên nhân PS",CAT.nhomNN)}${col("Đơn vị tính",CAT.dvt)}
-      </div></div>`;
+    <div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Danh mục Loại công việc (5G)</h3>${admin?`<button class="btn ghost sm" onclick="wtAdd()">+ Thêm loại</button>`:''}</div>
+      <div class="panel-b"><div class="table-wrap"><table>
+        <thead><tr><th>Mã</th><th>Tên loại công việc</th><th>Luồng / Đội xử lý</th><th>Ưu tiên gợi ý</th><th>Nhóm</th>${admin?'<th></th>':''}</tr></thead>
+        <tbody>${wtRows}</tbody></table></div>
+        <div class="muted" style="font-size:12px;margin-top:8px">Giữ lại một dòng có <b>Nhóm = khac</b> để làm ô "Khác (ghi rõ)". Thay đổi áp dụng ngay cho ô chọn Loại công việc khi tạo phiếu.</div>
+      </div></div>
+    <div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Danh mục chuẩn hóa khác</h3></div>
+      <div class="panel-b" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:22px">
+        ${catEdit("Phòng ban / Khách hàng yêu cầu","donvi")}${catEdit("Nhóm / Đội hỗ trợ","doi")}${catEdit("Đơn vị tính","dvt")}
+        ${catEdit("Loại phát sinh","loaiPS")}${catEdit("Kết quả nghiệm thu","nghiemthu")}
+      </div>
+      <div class="panel-b" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:20px;border-top:1px solid var(--line)">
+        <div style="grid-column:1/-1" class="muted" style="font-size:12px">Danh mục cố định theo quy trình (không chỉnh):</div>
+        ${col("Trạng thái ticket",CAT.trangthai)}${col("Mức ưu tiên",CAT.uutien)}${col("Nhóm nguyên nhân PS",CAT.nhomNN)}
+      </div>
+      ${admin?`<div class="panel-b"><button class="btn primary" onclick="saveConfig()">Lưu danh mục & cấu hình</button> <span class="muted" style="font-size:12.5px">Lưu toàn bộ cấu hình + danh mục ở trên.</span></div>`:''}</div>`;
 }
+function catAdd(key){ if(!EDITCFG.cat[key])EDITCFG.cat[key]=[]; EDITCFG.cat[key].push(""); renderCat(true); }
+function catRemove(key,i){ EDITCFG.cat[key].splice(i,1); renderCat(true); }
+function wtAdd(){ EDITCFG.worktypes.push(["","","","P3 - Ưu tiên trung bình",""]); renderCat(true); }
+function wtRemove(i){ EDITCFG.worktypes.splice(i,1); renderCat(true); }
 
 function cfgSet(path,val){
   if(path==='warn%'){ EDITCFG.warn=(+val||0)/100; return; }
@@ -633,7 +675,11 @@ function cfgSet(path,val){
   if(parts[0]==='quality'){ EDITCFG.quality[parts[1]]=+val||0; const q=EDITCFG.quality,s=q.csat+q.sla+q.sl+q.ps+q.reopen,el=document.getElementById('qsum'); if(el){el.textContent=s;el.parentElement.style.color=s===100?'var(--green)':'var(--red)';} return; }
 }
 async function saveConfig(){
-  try{ await api('PUT','/api/config',EDITCFG); applyConfig(EDITCFG); toast('Đã lưu cấu hình — áp dụng ngay'); render(); }
+  // dọn danh mục: bỏ mục trống, bỏ loại công việc thiếu mã hoặc tên
+  if(EDITCFG.cat){ Object.keys(EDITCFG.cat).forEach(k=>{ if(Array.isArray(EDITCFG.cat[k])) EDITCFG.cat[k]=EDITCFG.cat[k].map(x=>(x||'').trim()).filter(Boolean); }); }
+  if(Array.isArray(EDITCFG.worktypes)) EDITCFG.worktypes=EDITCFG.worktypes.map(w=>w.map(x=>(x||'').toString().trim())).filter(w=>w[0]&&w[1]);
+  const qs=EDITCFG.quality; if(qs){ const s=qs.csat+qs.sla+qs.sl+qs.ps+qs.reopen; if(s!==100 && !confirm('Tổng trọng số điểm chất lượng đang là '+s+' (khác 100). Vẫn lưu?')) return; }
+  try{ await api('PUT','/api/config',EDITCFG); applyConfig(EDITCFG); toast('Đã lưu cấu hình & danh mục — áp dụng ngay'); render(); }
   catch(e){ toast(e.message||'Lỗi lưu cấu hình',true); }
 }
 
@@ -1001,7 +1047,7 @@ function drawPlan(){
       <div class="f full"><label>Điều kiện tiên quyết</label><textarea oninput="EDITPLAN.dieuKien=this.value">${esc(k.dieuKien)}</textarea></div>
       <div class="f full"><label>Ghi chú gửi người yêu cầu</label><textarea oninput="EDITPLAN.ghiChuNYC=this.value">${esc(k.ghiChuNYC)}</textarea></div>
       <div class="f full" id="lyDoTreWrap" style="display:none"><label>Lý do hoàn tất trễ hơn thời hạn mong muốn <span class="req">*</span></label><textarea id="planLyDoTre" oninput="EDITPLAN.lyDoTre=this.value" placeholder="Bắt buộc ghi lý do…">${esc(k.lyDoTre)}</textarea></div>
-      <div class="f full"><label style="display:flex;gap:9px;align-items:center;cursor:pointer"><input type="checkbox" id="planCamKet" ${k.camKet?'checked':''} onchange="EDITPLAN.camKet=this.checked"> <b>Người thực hiện xác nhận nhận việc</b> — bắt buộc để bắt đầu xử lý</label></div>
+      <div class="f full"><label style="display:flex;gap:9px;align-items:center;cursor:pointer"><input type="checkbox" id="planCamKet" style="width:auto;flex:none" ${k.camKet?'checked':''} onchange="EDITPLAN.camKet=this.checked"> <span><b>Người thực hiện xác nhận nhận việc</b> — bắt buộc để bắt đầu xử lý</span></label></div>
     </div></div>
     <div class="modal-f"><button class="btn" onclick="closeModal()">Hủy</button><button class="btn primary" onclick="savePlan()">Lưu kế hoạch</button></div></div>`;
   document.getElementById("overlay").classList.add("show");
@@ -1288,7 +1334,7 @@ function openUser(username){
       <div class="f"><label>Trạng thái</label><select onchange="EDITU.trangthai=this.value"><option value="active" ${EDITU.trangthai==='active'?'selected':''}>Đang hoạt động</option><option value="inactive" ${EDITU.trangthai==='inactive'?'selected':''}>Ngưng hoạt động</option></select></div>
       <div class="f"><label>Số điện thoại</label><input value="${esc(EDITU.sdt)}" oninput="EDITU.sdt=this.value"></div>
       <div class="f"><label>Email</label><input value="${esc(EDITU.email)}" oninput="EDITU.email=this.value"></div>
-      <div class="f full"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" ${EDITU.canProxy?'checked':''} onchange="EDITU.canProxy=this.checked"> Cho phép <b>tạo phiếu thay phòng ban khác</b> (Trợ lý GĐ, Điều phối…)</label></div>
+      <div class="f full"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" style="width:auto;flex:none" ${EDITU.canProxy?'checked':''} onchange="EDITU.canProxy=this.checked"> <span>Cho phép <b>tạo phiếu thay phòng ban khác</b></span></label></div>
       <div class="f full"><label>${U_EDITING?"Đặt lại mật khẩu (để trống nếu giữ nguyên)":"Mật khẩu"} ${U_EDITING?'':'<span class="req">*</span>'}</label><input type="text" value="" placeholder="Tối thiểu 8 ký tự, có chữ và số" oninput="EDITU.password=this.value"><div class="hint">Người dùng sẽ được yêu cầu đổi mật khẩu ở lần đăng nhập đầu.</div></div>
       ${EDITU.role==='yeucau'?'<div class="hint" style="grid-column:1/-1">Người yêu cầu chỉ thấy ticket có <b>Đơn vị</b> trùng phòng ban ở trên (hoặc do chính họ tạo).</div>':''}
     </div></div>

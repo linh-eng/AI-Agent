@@ -79,13 +79,46 @@ for (const col of ["chucdanh TEXT DEFAULT ''","sdt TEXT DEFAULT ''","email TEXT 
 db.exec("CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)");
 const qSetGet = db.prepare("SELECT v FROM settings WHERE k = ?");
 const qSetSet = db.prepare("INSERT INTO settings(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v = excluded.v");
+const DEFAULT_WORKTYPES = [
+  ["KT01","Xử lý sự cố / lỗi sản phẩm","Hỗ trợ kỹ thuật","P2 - Ưu tiên cao","kt"],
+  ["KT02","Hỗ trợ cài đặt, cấu hình","Hỗ trợ kỹ thuật","P3 - Ưu tiên trung bình","kt"],
+  ["KT03","Hỗ trợ tư vấn kỹ thuật cho khách hàng","Hỗ trợ khách hàng","P3 - Ưu tiên trung bình","kt"],
+  ["KT04","Hỗ trợ kiểm thử (testing)","Hỗ trợ nội bộ","P3 - Ưu tiên trung bình","kt"],
+  ["TK01","Hỗ trợ triển khai tại khách hàng","Triển khai dự án","P2 - Ưu tiên cao","tk"],
+  ["TK02","Chuẩn bị thiết bị / vật tư cho dự án","Triển khai dự án","P3 - Ưu tiên trung bình","tk"],
+  ["TK03","Hỗ trợ nghiệm thu, bàn giao dự án","Triển khai dự án","P2 - Ưu tiên cao","tk"],
+  ["TK04","Khảo sát hiện trạng tại khách hàng","Triển khai dự án","P3 - Ưu tiên trung bình","tk"],
+  ["BH01","Tiếp nhận bảo hành, đổi trả thiết bị","Bảo hành","P2 - Ưu tiên cao","bh"],
+  ["BH02","Sửa chữa, thay thế linh kiện","Bảo hành","P2 - Ưu tiên cao","bh"],
+  ["BH03","Bảo trì định kỳ","Bảo hành","P4 - Thấp","bh"],
+  ["GN01","Giao nhận hàng hóa cho khách hàng","Hỗ trợ khách hàng bên ngoài","P2 - Ưu tiên cao","gn"],
+  ["GN02","Vận chuyển nội bộ giữa các kho/chi nhánh","Hỗ trợ nội bộ","P3 - Ưu tiên trung bình","gn"],
+  ["GN03","Nhận hàng từ nhà cung cấp","Hỗ trợ nội bộ","P3 - Ưu tiên trung bình","gn"],
+  ["HC01","Hỗ trợ chứng từ, hồ sơ thầu","Hỗ trợ nội bộ","P3 - Ưu tiên trung bình","hc"],
+  ["HC02","Hỗ trợ hồ sơ thanh toán, đối chiếu công nợ","Hỗ trợ nội bộ","P3 - Ưu tiên trung bình","hc"],
+  ["HC03","Hỗ trợ chuẩn bị họp, sự kiện","Hỗ trợ nội bộ","P4 - Thấp","hc"],
+  ["KH99","Khác (ghi rõ)","","P3 - Ưu tiên trung bình","khac"],
+];
 const DEFAULT_CONFIG = {
   sla: { "P1 - Khẩn cấp":[15,2], "P2 - Ưu tiên cao":[30,4], "P3 - Ưu tiên trung bình":[60,8], "P4 - Thấp":[120,24] },
   work: { mStart:8, mEnd:12, aStart:13, aEnd:17, sat:false }, // sat=true nếu làm Thứ 7
   warn: 0.8, overload: 3,
-  quality: { csat:40, sla:25, sl:15, ps:10, reopen:10 }
+  quality: { csat:40, sla:25, sl:15, ps:10, reopen:10 },
+  cat: {
+    donvi: ["Phòng Hành chính","Phòng Kế toán","Phòng Kinh doanh","Phòng Mua hàng","Phòng Triển khai","Phòng Testing","Phòng Bảo hành","Phòng Tư vấn kỹ thuật","Ban Giám đốc","Trợ lý Giám đốc"],
+    doi: ["Đội Kỹ thuật","Đội Triển khai","Đội Bảo hành","Đội Giao nhận","Đội Hành chính","Đội trực khẩn cấp"],
+    dvt: ["Thùng","Kiện","Bao","Cái","Bộ","Hộp","Tập","Kg","Chuyến","Lần","Người","Khác"],
+    loaiPS: ["Chi phí phát sinh","Sự cố hàng hóa (hư hỏng/thiếu/mất)","Sai lệch chứng từ","Chậm trễ tiến độ","Thiếu nhân sự - phương tiện","Thay đổi yêu cầu từ NSD","Vượt phạm vi hỗ trợ","Khác"],
+    nghiemthu: ["Đạt - nghiệm thu đủ","Đạt - có điều chỉnh","Không đạt - phải làm lại","Hoàn thành một phần","Hủy yêu cầu"]
+  },
+  worktypes: DEFAULT_WORKTYPES
 };
-function getConfig() { const r = qSetGet.get("config"); return r ? JSON.parse(r.v) : DEFAULT_CONFIG; }
+function getConfig() {
+  const r = qSetGet.get("config"); const c = r ? JSON.parse(r.v) : {};
+  return { ...DEFAULT_CONFIG, ...c,
+    cat: { ...DEFAULT_CONFIG.cat, ...(c.cat||{}) },
+    worktypes: (Array.isArray(c.worktypes) && c.worktypes.length) ? c.worktypes : DEFAULT_CONFIG.worktypes };
+}
 function seedConfig() { if (!qSetGet.get("config")) qSetSet.run("config", JSON.stringify(DEFAULT_CONFIG)); }
 
 /* ---- Tiện ích ID ---- */
