@@ -79,6 +79,18 @@ for (const col of ["chucdanh TEXT DEFAULT ''","sdt TEXT DEFAULT ''","email TEXT 
 db.exec("CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)");
 const qSetGet = db.prepare("SELECT v FROM settings WHERE k = ?");
 const qSetSet = db.prepare("INSERT INTO settings(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v = excluded.v");
+// Đính kèm file thật (3f): metadata trong DB, nội dung file lưu trên đĩa (uploads/)
+db.exec("CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY, ticketId TEXT, name TEXT, mime TEXT, size INTEGER, uploadedBy TEXT, at TEXT)");
+db.exec("CREATE INDEX IF NOT EXISTS ix_files_ticketId ON files(ticketId)");
+const UPLOAD_DIR = path.join(ROOT, "uploads");
+try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) {}
+const Q_FILES = {
+  byTicket: db.prepare("SELECT id,ticketId,name,mime,size,uploadedBy,at FROM files WHERE ticketId=? ORDER BY rowid"),
+  one:      db.prepare("SELECT * FROM files WHERE id=?"),
+  ins:      db.prepare("INSERT INTO files(id,ticketId,name,mime,size,uploadedBy,at) VALUES(?,?,?,?,?,?,?)"),
+  del:      db.prepare("DELETE FROM files WHERE id=?"),
+};
+const ALLOWED_UPLOAD = /\.(jpe?g|png|gif|webp|bmp|pdf|docx?|xlsx?|txt|csv|pptx?|zip|heic)$/i;
 const DEFAULT_WORKTYPES = [
   ["KT01","Xử lý sự cố / lỗi sản phẩm","Hỗ trợ kỹ thuật","P2 - Ưu tiên cao","kt"],
   ["KT02","Hỗ trợ cài đặt, cấu hình","Hỗ trợ kỹ thuật","P3 - Ưu tiên trung bình","kt"],
@@ -102,7 +114,7 @@ const DEFAULT_WORKTYPES = [
 const DEFAULT_CONFIG = {
   sla: { "P1 - Khẩn cấp":[15,2], "P2 - Ưu tiên cao":[30,4], "P3 - Ưu tiên trung bình":[60,8], "P4 - Thấp":[120,24] },
   work: { mStart:8, mEnd:12, aStart:13, aEnd:17, sat:false }, // sat=true nếu làm Thứ 7
-  warn: 0.8, overload: 3,
+  warn: 0.8, overload: 3, maxUpload: 10, // maxUpload: dung lượng tối đa mỗi file (MB)
   quality: { csat:40, sla:25, sl:15, ps:10, reopen:10 },
   cat: {
     donvi: ["Phòng Hành chính","Phòng Kế toán","Phòng Kinh doanh","Phòng Mua hàng","Phòng Triển khai","Phòng Testing","Phòng Bảo hành","Phòng Tư vấn kỹ thuật","Ban Giám đốc","Trợ lý Giám đốc"],
@@ -119,6 +131,9 @@ function getConfig() {
     cat: { ...DEFAULT_CONFIG.cat, ...(c.cat||{}) },
     worktypes: (Array.isArray(c.worktypes) && c.worktypes.length) ? c.worktypes : DEFAULT_CONFIG.worktypes };
 }
+// Danh mục Dự án (5H) — lưu trong settings, dùng chung mọi ticket
+function getProjects() { const r = qSetGet.get("projects"); return r ? JSON.parse(r.v) : []; }
+function setProjects(arr) { qSetSet.run("projects", JSON.stringify(Array.isArray(arr) ? arr : [])); }
 function seedConfig() { if (!qSetGet.get("config")) qSetSet.run("config", JSON.stringify(DEFAULT_CONFIG)); }
 
 /* ---- Tiện ích ID ---- */
@@ -246,7 +261,7 @@ function seedTickets() {
 const MIME = { ".html":"text/html; charset=utf-8", ".js":"text/javascript; charset=utf-8", ".css":"text/css; charset=utf-8",
   ".json":"application/json; charset=utf-8", ".svg":"image/svg+xml", ".ico":"image/x-icon", ".png":"image/png" };
 function sendJSON(res, code, obj, headers) { const s = JSON.stringify(obj); res.writeHead(code, Object.assign({ "Content-Type":"application/json; charset=utf-8", "Cache-Control":"no-store" }, headers||{})); res.end(s); }
-function readBody(req) { return new Promise(r => { let b=""; req.on("data", c => { b+=c; if (b.length>5e6) req.destroy(); }); req.on("end", () => { try { r(b?JSON.parse(b):{}); } catch { r({}); } }); }); }
+function readBody(req, max) { const cap = max || 5e6; return new Promise(r => { let b=""; req.on("data", c => { b+=c; if (b.length>cap) req.destroy(); }); req.on("end", () => { try { r(b?JSON.parse(b):{}); } catch { r({}); } }); }); }
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
@@ -271,6 +286,7 @@ const server = http.createServer(async (req, res) => {
       const me = currentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Chưa đăng nhập" });
 
+      let m;
       if (p === "/api/me" && req.method === "GET")
         return sendJSON(res, 200, { user: sanitizeUser(me), cap: capOf(me.role), roleLabel: ROLES[me.role].label, mustChange: !!me.mustChange });
 
@@ -303,6 +319,54 @@ const server = http.createServer(async (req, res) => {
         const b = await readBody(req); qSetSet.run("config", JSON.stringify(b)); return sendJSON(res, 200, { ok: true });
       }
 
+      /* ---- Danh mục Dự án (5H) ---- */
+      if (p === "/api/projects" && req.method === "GET")
+        return sendJSON(res, 200, getProjects());
+      if (p === "/api/projects" && req.method === "PUT") {
+        if (!can(me, "edit")) return sendJSON(res, 403, { error: "Không có quyền quản lý danh mục dự án" });
+        const b = await readBody(req);
+        setProjects((Array.isArray(b) ? b : (b.projects || [])).filter(x => x && (x.ma || x.ten)));
+        return sendJSON(res, 200, { ok: true, projects: getProjects() });
+      }
+
+      /* ---- Đính kèm file thật (3f) ---- */
+      if (p === "/api/files" && req.method === "GET") {
+        const tid = url.searchParams.get("ticketId") || "";
+        return sendJSON(res, 200, Q_FILES.byTicket.all(tid));
+      }
+      if (p === "/api/upload" && req.method === "POST") {
+        if (!can(me, "edit") && !can(me, "create")) return sendJSON(res, 403, { error: "Không có quyền đính kèm" });
+        const maxMB = +getConfig().maxUpload || 10;
+        const b = await readBody(req, Math.ceil(maxMB * 1024 * 1024 * 1.4) + 200000);
+        const name = String(b.name || "").trim();
+        if (!name || !b.dataB64) return sendJSON(res, 400, { error: "Thiếu tên file hoặc nội dung" });
+        if (!ALLOWED_UPLOAD.test(name)) return sendJSON(res, 400, { error: "Định dạng file không được phép" });
+        let buf; try { buf = Buffer.from(String(b.dataB64), "base64"); } catch { return sendJSON(res, 400, { error: "Nội dung file không hợp lệ" }); }
+        if (buf.length > maxMB * 1024 * 1024) return sendJSON(res, 400, { error: `File vượt giới hạn ${maxMB} MB` });
+        const id = crypto.randomBytes(12).toString("hex");
+        fs.writeFileSync(path.join(UPLOAD_DIR, id), buf);
+        const rec = { id, ticketId: String(b.ticketId || ""), name, mime: String(b.mime || "application/octet-stream"), size: buf.length, uploadedBy: me.username, at: new Date().toISOString() };
+        Q_FILES.ins.run(rec.id, rec.ticketId, rec.name, rec.mime, rec.size, rec.uploadedBy, rec.at);
+        return sendJSON(res, 201, rec);
+      }
+      if ((m = p.match(/^\/api\/file\/([a-f0-9]+)$/))) {
+        const rec = Q_FILES.one.get(m[1]);
+        if (!rec) return sendJSON(res, 404, { error: "not found" });
+        if (req.method === "DELETE") {
+          if (!can(me, "edit")) return sendJSON(res, 403, { error: "Không có quyền xóa file" });
+          try { fs.unlinkSync(path.join(UPLOAD_DIR, rec.id)); } catch (e) {}
+          Q_FILES.del.run(rec.id); return sendJSON(res, 200, { ok: true });
+        }
+        if (req.method === "GET") {
+          const fp = path.join(UPLOAD_DIR, rec.id);
+          if (!fs.existsSync(fp)) return sendJSON(res, 404, { error: "file missing" });
+          const dl = url.searchParams.get("dl");
+          const disp = (dl ? "attachment" : "inline") + `; filename*=UTF-8''` + encodeURIComponent(rec.name);
+          res.writeHead(200, { "Content-Type": rec.mime || "application/octet-stream", "Content-Disposition": disp, "Content-Length": rec.size, "Cache-Control": "private, max-age=3600" });
+          return fs.createReadStream(fp).pipe(res);
+        }
+      }
+
       if (p === "/api/data" && req.method === "GET")
         return sendJSON(res, 200, { tickets: ticketsForUser(me), ps: allPS(), seq: {} });
 
@@ -315,7 +379,6 @@ const server = http.createServer(async (req, res) => {
         delete t._reason;
         saveTicketRow(t, true); return sendJSON(res, 201, t);
       }
-      let m;
       if ((m = p.match(/^\/api\/tickets\/(.+)$/))) {
         const id = decodeURIComponent(m[1]); const cur = getTicket(id);
         if (!cur) return sendJSON(res, 404, { error: "not found" });

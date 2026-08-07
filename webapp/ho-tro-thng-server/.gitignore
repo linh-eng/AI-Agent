@@ -5,6 +5,8 @@ data.db-shm
 data.json
 data.json.tmp
 data.json.imported
+# File đính kèm do người dùng tải lên
+uploads/
 # Bản sao lưu
 backup-*.json
 backup-*.db

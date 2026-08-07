@@ -117,10 +117,11 @@ pm2 save
 ## D. Sao lưu & khôi phục dữ liệu
 
 - Toàn bộ dữ liệu nằm trong file **`data.db`** (cùng thư mục `server.js`).
-- **Sao lưu:** tốt nhất **tắt máy chủ** (`pm2 stop ho-tro-thng`) rồi copy `data.db` sang nơi an toàn,
-  sau đó bật lại (`pm2 start ho-tro-thng`). *(Nếu copy lúc đang chạy, nhớ copy kèm cả `data.db-wal`
-  và `data.db-shm` nếu có.)*
-- **Khôi phục:** tắt máy chủ → chép `data.db` bản sao lưu đè vào (xóa `data.db-wal`, `data.db-shm` nếu có) → bật lại.
+  **File đính kèm** người dùng tải lên nằm trong thư mục **`uploads/`** (cùng thư mục `server.js`).
+- **Sao lưu:** tốt nhất **tắt máy chủ** (`pm2 stop ho-tro-thng`) rồi copy **cả `data.db` và thư mục `uploads/`**
+  sang nơi an toàn, sau đó bật lại (`pm2 start ho-tro-thng`). *(Nếu copy lúc đang chạy, nhớ copy kèm cả
+  `data.db-wal` và `data.db-shm` nếu có.)*
+- **Khôi phục:** tắt máy chủ → chép `data.db` + `uploads/` bản sao lưu đè vào (xóa `data.db-wal`, `data.db-shm` nếu có) → bật lại.
 - Ngoài ra trong ứng dụng có nút **Xuất dữ liệu (JSON)** và **Xuất CSV** để lưu thêm bản đối chiếu.
 
 ---
@@ -149,5 +150,13 @@ Không. Dữ liệu đã lưu trong `data.db`, bật lại là còn nguyên.
 - Node.js thuần, **không phụ thuộc gói ngoài**; máy chủ HTTP + REST API đơn giản.
 - Frontend tĩnh trong `public/`, gọi API `/api/*`.
 - Lưu trữ: **SQLite** qua `node:sqlite` (file `data.db`, chế độ WAL). Tự di trú từ `data.json` cũ.
-- API: `GET /api/data`, `POST/PUT/DELETE /api/tickets[/:id]`, `POST/PUT/DELETE /api/ps[/:id]`.
-- SLA tính theo giờ làm việc 08–12 & 13–17, Thứ 2–Thứ 6 (sửa trong `public/index.html`).
+  File đính kèm lưu trên đĩa trong `uploads/`, metadata trong bảng `files`.
+- API chính: `GET /api/data`, `POST/PUT/DELETE /api/tickets[/:id]`, `POST/PUT/DELETE /api/ps[/:id]`,
+  `GET/PUT /api/config`, `GET/PUT /api/projects` (Danh mục Dự án 5H),
+  `POST /api/upload` · `GET /api/files?ticketId=` · `GET|DELETE /api/file/:id` (đính kèm).
+- SLA & danh mục (loại việc, phòng ban, đội, dự án, trọng số điểm CL, dung lượng file…) chỉnh trực tiếp
+  trong màn **Danh mục & Cấu hình** — lưu ở bảng `settings`, áp dụng ngay cho toàn hệ thống.
+- **Báo cáo theo chu kỳ** (menu Báo cáo): lọc theo ngày/tuần/tháng/năm + khoảng ngày, xuất Excel (.xls),
+  in 5 biểu mẫu PDF A4 (Phiếu yêu cầu / giao việc / biên bản phát sinh / nghiệm thu / báo cáo kỳ) — dùng
+  cửa sổ in của trình duyệt, chọn "Save as PDF".
+- SLA tính theo giờ làm việc 08–12 & 13–17, Thứ 2–Thứ 6 (chỉnh trong Cấu hình).

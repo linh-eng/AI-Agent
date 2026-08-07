@@ -49,11 +49,20 @@
       bắt buộc + luồng để Điều phối chọn; tự điền luồng & gợi ý ưu tiên theo loại
 - [x] **3b**: Hồ sơ người dùng (5C) tự điền vào phiếu; "Tạo thay người khác"; "Khách hàng bên ngoài"; Thông tin cá nhân; ngưng-hoạt-động chặn đăng nhập
 - [x] **3c**: Nhật ký thay đổi (audit log) — máy chủ ghi diff trường, tab riêng, không xóa vết
-- [ ] **3d**: Thông tin dự án & triển khai (5H mới) — trường động G/H/I/K/L; Danh mục Dự án; chặn thiếu trường bắt buộc *(CÒN LẠI — lớn)*
+- [x] **3d**: Thông tin dự án & triển khai (5H) — Danh mục Dự án (quản lý trong Cấu hình + thêm nhanh trong form);
+      trường động Nhóm G/H/I/K/L chỉ hiện với loại việc triển khai/giao nhận/bảo hành; cổng chặn chuyển
+      "Đang xử lý" khi thiếu trường bắt buộc H/I/L (báo rõ thiếu gì + gợi ý gửi yêu cầu bổ sung);
+      nút "Sao chép địa điểm & người nhận từ ticket trước của dự án".
 - [x] **3e**: Thông báo chuyển bước 5D (thủ công) — nút "Gửi thông báo" + cửa sổ soạn sẵn + đánh dấu đã/chưa
-- [ ] **3f**: Đính kèm file thật; trường động bắt buộc theo loại *(CÒN LẠI — lớn)*
-- [ ] **3g**: Trang Báo cáo theo chu kỳ (9B) + xuất Excel + 5 biểu mẫu PDF *(CÒN LẠI — lớn)*
-- [x] **3h**: Màn "Danh mục & Cấu hình" chỉnh được (ngưỡng SLA, giờ làm T7, trọng số điểm CL, ngưỡng quá tải)
+- [x] **3f**: Đính kèm file thật — tải lên (ảnh/PDF/Word/Excel…) lưu trên đĩa `uploads/` + bảng `files`;
+      tải về / xóa theo ticket; giới hạn dung lượng cấu hình được (`maxUpload`).
+- [x] **3g**: Trang Báo cáo theo chu kỳ (9B) — nút chọn nhanh (Hôm nay…Năm trước) + khoảng ngày + bộ lọc
+      (phòng ban/loại/ưu tiên/người thực hiện/trạng thái); 5 nhóm chỉ tiêu (Khối lượng/SLA/Chất lượng/
+      Phát sinh/Điều hành) + bảng xếp theo người; xuất Excel (.xls) + 5 biểu mẫu in PDF A4
+      (Phiếu yêu cầu, Phiếu giao việc, Biên bản phát sinh, Phiếu nghiệm thu, Báo cáo kỳ).
+- [x] **3h**: Màn "Danh mục & Cấu hình" chỉnh được (ngưỡng SLA, giờ làm T7, trọng số điểm CL, ngưỡng quá tải, dung lượng file)
+
+**→ GIAI ĐOẠN 3 HOÀN TẤT.**
 
 ### Ghi chú v3_2 (khác v3_1)
 - 5D: bỏ email tự động → nút "Gửi thông báo" thủ công (không cần máy chủ mail).
