@@ -631,6 +631,33 @@ function duyetPill(d){const m={"Chờ duyệt":"amber","Đã duyệt":"green","D
 
 /* ---------- BÁO CÁO THEO CHU KỲ (9B) ---------- */
 let RFILTER={preset:'thismonth',from:'',to:'',donvi:'',loai:'',luong:'',uutien:'',assignee:'',trangthai:''};
+let RMODE='tong';          // 'tong' | 'danhmuc' | 'canhan'
+let RDIM='donvi';          // danh mục đang xem ở chế độ "Theo danh mục"
+let RPERSON='';            // người cho báo cáo cá nhân (rỗng = chính mình)
+let RPROLE='assignee';     // 'assignee' (người thực hiện) | 'requester' (người yêu cầu)
+// Các danh mục có thể tách báo cáo
+const REPORT_DIMS=[
+  {id:'donvi',label:'Phòng ban / Khách hàng',key:t=>t.donvi||'(trống)'},
+  {id:'loai',label:'Loại công việc',key:t=>loaiText(t)||'(trống)'},
+  {id:'luong',label:'Luồng công việc',key:t=>t.luong||'(chưa xác định)'},
+  {id:'doi',label:'Đội hỗ trợ',key:t=>t.doi||'(chưa gán)'},
+  {id:'assignee',label:'Người thực hiện',key:t=>String(t.assignee||'').trim()||'(chưa gán)'},
+  {id:'uutien',label:'Mức ưu tiên',key:t=>t.uutien||'(trống)'},
+  {id:'trangthai',label:'Trạng thái',key:t=>baseStatus(t.trangthai)},
+  {id:'duan',label:'Dự án (5H)',key:t=>(t.site&&t.site.duAn)?t.site.duAn:'(không thuộc dự án)'},
+];
+const dimOf=id=>REPORT_DIMS.find(d=>d.id===id)||REPORT_DIMS[0];
+// Gộp danh sách theo một danh mục -> chỉ tiêu từng nhóm
+function groupMetrics(list,keyFn){
+  const g={}; list.forEach(t=>{const k=keyFn(t);(g[k]=g[k]||[]).push(t);});
+  return Object.entries(g).map(([k,items])=>{const M=reportMetrics(items);
+    return {key:k,n:M.tong,done:M.done,open:M.open,resRate:M.resRate,tbXL:M.tbXuLy,qAvg:M.qAvg,csatAvg:M.csatAvg,ps:M.psTong,cpDuyet:M.cpDuyet};
+  }).sort((a,b)=>b.n-a.n);
+}
+// Lọc theo người cho báo cáo cá nhân
+function personName(){ return (RPERSON&&RPERSON.trim())||(ME&&ME.name)||''; }
+function personScope(list){ const nm=personName();
+  return list.filter(t=> RPROLE==='requester' ? String(t.nguoiYC||'').trim()===nm : String(t.assignee||'').trim()===nm ); }
 const PRESET=[['today','Hôm nay'],['yesterday','Hôm qua'],['thisweek','Tuần này'],['lastweek','Tuần trước'],['thismonth','Tháng này'],['lastmonth','Tháng trước'],['thisquarter','Quý này'],['thisyear','Năm nay'],['lastyear','Năm trước']];
 function rangeOf(preset){
   const now=new Date(),y=now.getFullYear(),mo=now.getMonth(),d=now.getDate();
@@ -693,14 +720,32 @@ function reportMetrics(list){
     respRate:respTot?Math.round(respOk/respTot*100):null,resRate:resTot?Math.round(resOk/resTot*100):null,viol,tbXuLy:resTot?+(usedSum/resTot).toFixed(1):0,
     qAvg:Math.round(qAvg),csatAvg:+csatAvg.toFixed(2),byPerson,psTong:psList.length,psNN,cpDX,cpDuyet,conflict};
 }
+function rcard(lb,v,sub,col){return `<div class="rcard"><div class="rlb">${lb}</div><div class="rval" style="${col?'color:'+col:''}">${v}</div>${sub?`<div class="rsub">${sub}</div>`:''}</div>`;}
+function reportMetricCards(M){
+  return `<div class="sec-title" style="margin:18px 0 4px">Khối lượng</div>
+    <div class="rgrid">${rcard('Tổng tiếp nhận',M.tong)}${rcard('Đã hoàn tất',M.done,'',qColorVar(90))}${rcard('Đang mở',M.open)}${rcard('Bị trả lại',M.traLai)}${rcard('Bị từ chối',M.rejected)}${rcard('Bị mở lại',M.moLai)}</div>
+    <div class="sec-title" style="margin:18px 0 4px">SLA</div>
+    <div class="rgrid">${rcard('Đạt SLA phản hồi',M.respRate==null?'–':M.respRate+'%')}${rcard('Đạt SLA xử lý',M.resRate==null?'–':M.resRate+'%',(M.resRate!=null?'':'chưa có ticket đóng'))}${rcard('Số ca vi phạm',M.viol,'',M.viol?'var(--red)':'')}${rcard('TG xử lý BQ',M.tbXuLy+'h')}</div>
+    <div class="sec-title" style="margin:18px 0 4px">Chất lượng</div>
+    <div class="rgrid">${rcard('CSAT bình quân',M.csatAvg?M.csatAvg+' / 5':'–')}${rcard('Điểm chất lượng BQ',M.qAvg||'–','',qColorVar(M.qAvg))}</div>`;
+}
+function reportPsDh(M){
+  return `<div class="sec-title" style="margin:18px 0 4px">Phát sinh</div>
+    <div class="rgrid">${rcard('Tổng phát sinh',M.psTong)}${rcard('Chủ quan',M.psNN['Chủ quan'],'',M.psNN['Chủ quan']?'var(--red)':'')}${rcard('Khách quan',M.psNN['Khách quan'])}${rcard('Do người yêu cầu',M.psNN['Do người yêu cầu'])}${rcard('Chi phí đề xuất',fmtVnd(M.cpDX))}${rcard('Chi phí được duyệt',fmtVnd(M.cpDuyet))}</div>
+    <div class="sec-title" style="margin:18px 0 4px">Điều hành</div>
+    <div class="rgrid">${rcard('Số lần xung đột ưu tiên',M.conflict)}${rcard('Số lần mở lại',M.moLai)}</div>`;
+}
 function renderReport(){
-  const list=reportTickets();const M=reportMetrics(list);const rg=reportRange();
+  if(!RPERSON && ME) RPERSON=ME.name;
+  const list=reportTickets();const rg=reportRange();
   const distinctAssignee=[...new Set(DB.tickets.map(t=>String(t.assignee||'').trim()).filter(Boolean))].sort();
   const opt=(cur,arr,all)=>`<option value="">${all}</option>`+arr.map(x=>`<option ${x===cur?'selected':''}>${esc(x)}</option>`).join("");
   const presetBtns=PRESET.map(([k,l])=>`<button class="chip ${(!RFILTER.from&&!RFILTER.to&&RFILTER.preset===k)?'on':''}" onclick="rSetPreset('${k}')">${l}</button>`).join("");
-  const card=(lb,v,sub,col)=>`<div class="rcard"><div class="rlb">${lb}</div><div class="rval" style="${col?'color:'+col:''}">${v}</div>${sub?`<div class="rsub">${sub}</div>`:''}</div>`;
-  const perRows=Object.entries(M.byPerson).sort((a,b)=>b[1].q/b[1].n-a[1].q/a[1].n).map(([p,x])=>`<tr><td>${esc(p)}</td><td>${x.n}</td><td><b style="color:${qColorVar(Math.round(x.q/x.n))}">${Math.round(x.q/x.n)}</b></td><td>${x.csatN?(x.csat/x.csatN).toFixed(1)+' ★':'–'}</td></tr>`).join("")||`<tr><td colspan="4" class="muted" style="text-align:center;padding:12px">Chưa có ticket đã đóng trong kỳ.</td></tr>`;
-  document.getElementById("view").innerHTML=`
+  let actions;
+  if(RMODE==='danhmuc') actions=`<button class="btn sm" onclick="exportBreakdownExcel()">⬇ Xuất Excel (mọi danh mục)</button>`;
+  else if(RMODE==='canhan') actions=`<button class="btn sm" onclick="exportPersonExcel()">⬇ Xuất Excel</button><button class="btn sm" onclick="printPersonReport()">🖨️ In PDF</button>`;
+  else actions=`<button class="btn sm" onclick="exportReportExcel()">⬇ Xuất Excel</button><button class="btn sm" onclick="printReport()">🖨️ In báo cáo (PDF)</button>`;
+  const filterBar=`
     <div class="panel"><div class="panel-b" style="display:flex;flex-direction:column;gap:12px">
       <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center">${presetBtns}</div>
       <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:end">
@@ -709,31 +754,75 @@ function renderReport(){
         <div class="f" style="margin:0"><label style="font-size:12px">Phòng ban</label><select style="width:auto" onchange="RFILTER.donvi=this.value;renderReport()">${opt(RFILTER.donvi,CAT.donvi,'— Tất cả —')}</select></div>
         <div class="f" style="margin:0"><label style="font-size:12px">Loại việc</label><select style="width:auto" onchange="RFILTER.loai=this.value;renderReport()">${opt(RFILTER.loai,CAT.loai,'— Tất cả —')}</select></div>
         <div class="f" style="margin:0"><label style="font-size:12px">Ưu tiên</label><select style="width:auto" onchange="RFILTER.uutien=this.value;renderReport()">${opt(RFILTER.uutien,CAT.uutien,'— Tất cả —')}</select></div>
-        <div class="f" style="margin:0"><label style="font-size:12px">Người thực hiện</label><select style="width:auto" onchange="RFILTER.assignee=this.value;renderReport()">${opt(RFILTER.assignee,distinctAssignee,'— Tất cả —')}</select></div>
         <div class="f" style="margin:0"><label style="font-size:12px">Trạng thái</label><select style="width:auto" onchange="RFILTER.trangthai=this.value;renderReport()">${opt(RFILTER.trangthai,CAT.trangthai,'— Tất cả —')}</select></div>
         ${(RFILTER.from||RFILTER.to)?`<button class="btn sm" onclick="RFILTER.from='';RFILTER.to='';renderReport()">Xóa khoảng ngày</button>`:''}
-        <div style="flex:1"></div>
-        <button class="btn sm" onclick="exportReportExcel()">⬇ Xuất Excel</button>
-        <button class="btn sm" onclick="printReport()">🖨️ In báo cáo (PDF)</button>
+        <div style="flex:1"></div>${actions}
       </div>
       <div class="muted" style="font-size:12.5px">Kỳ báo cáo: <b>${esc(rg.label)}</b>${rg.a?` · ${rg.a.toLocaleDateString('vi-VN')} → ${rg.b?rg.b.toLocaleDateString('vi-VN'):'nay'}`:''} · Lọc theo ngày tiếp nhận.</div>
     </div></div>
-
-    <div class="sec-title" style="margin:18px 0 4px">Khối lượng</div>
-    <div class="rgrid">${card('Tổng tiếp nhận',M.tong)}${card('Đã hoàn tất',M.done,'',qColorVar(90))}${card('Đang mở',M.open)}${card('Bị trả lại',M.traLai)}${card('Bị từ chối',M.rejected)}${card('Bị mở lại',M.moLai)}</div>
-
-    <div class="sec-title" style="margin:18px 0 4px">SLA</div>
-    <div class="rgrid">${card('Đạt SLA phản hồi',M.respRate==null?'–':M.respRate+'%')}${card('Đạt SLA xử lý',M.resRate==null?'–':M.resRate+'%',(M.resRate!=null?'':'chưa có ticket đóng'))}${card('Số ca vi phạm',M.viol,'',M.viol?'var(--red)':'')}${card('TG xử lý BQ',M.tbXuLy+'h')}</div>
-
-    <div class="sec-title" style="margin:18px 0 4px">Chất lượng</div>
-    <div class="rgrid">${card('CSAT bình quân',M.csatAvg?M.csatAvg+' / 5':'–')}${card('Điểm chất lượng BQ',M.qAvg||'–','',qColorVar(M.qAvg))}</div>
-    <div class="panel" style="margin-top:10px"><div class="panel-h"><h3>Xếp theo người thực hiện</h3></div><div class="panel-b"><div class="table-wrap"><table><thead><tr><th>Người thực hiện</th><th>Số ticket đóng</th><th>Điểm CL BQ</th><th>CSAT BQ</th></tr></thead><tbody>${perRows}</tbody></table></div></div></div>
-
-    <div class="sec-title" style="margin:18px 0 4px">Phát sinh</div>
-    <div class="rgrid">${card('Tổng phát sinh',M.psTong)}${card('Chủ quan',M.psNN['Chủ quan'],'',M.psNN['Chủ quan']?'var(--red)':'')}${card('Khách quan',M.psNN['Khách quan'])}${card('Do người yêu cầu',M.psNN['Do người yêu cầu'])}${card('Chi phí đề xuất',fmtVnd(M.cpDX))}${card('Chi phí được duyệt',fmtVnd(M.cpDuyet))}</div>
-
-    <div class="sec-title" style="margin:18px 0 4px">Điều hành</div>
-    <div class="rgrid">${card('Số lần xung đột ưu tiên',M.conflict)}${card('Số lần mở lại',M.moLai)}</div>`;
+    <div class="tabs" style="margin:14px 0 4px">
+      <button class="${RMODE==='tong'?'active':''}" onclick="rMode('tong')">Tổng hợp</button>
+      <button class="${RMODE==='danhmuc'?'active':''}" onclick="rMode('danhmuc')">Theo danh mục</button>
+      <button class="${RMODE==='canhan'?'active':''}" onclick="rMode('canhan')">Cá nhân</button>
+    </div>`;
+  let body;
+  if(RMODE==='danhmuc') body=reportBodyDanhMuc(list);
+  else if(RMODE==='canhan') body=reportBodyCaNhan(list,distinctAssignee);
+  else body=reportBodyTong(list);
+  document.getElementById("view").innerHTML=filterBar+body;
+}
+function rMode(m){ RMODE=m; renderReport(); }
+function reportBodyTong(list){
+  const M=reportMetrics(list);
+  const perRows=Object.entries(M.byPerson).sort((a,b)=>b[1].q/b[1].n-a[1].q/a[1].n).map(([p,x])=>`<tr><td>${esc(p)}</td><td>${x.n}</td><td><b style="color:${qColorVar(Math.round(x.q/x.n))}">${Math.round(x.q/x.n)}</b></td><td>${x.csatN?(x.csat/x.csatN).toFixed(1)+' ★':'–'}</td></tr>`).join("")||`<tr><td colspan="4" class="muted" style="text-align:center;padding:12px">Chưa có ticket đã đóng trong kỳ.</td></tr>`;
+  return reportMetricCards(M)
+    +`<div class="panel" style="margin-top:10px"><div class="panel-h"><h3>Xếp theo người thực hiện</h3></div><div class="panel-b"><div class="table-wrap"><table><thead><tr><th>Người thực hiện</th><th>Số ticket đóng</th><th>Điểm CL BQ</th><th>CSAT BQ</th></tr></thead><tbody>${perRows}</tbody></table></div></div></div>`
+    +reportPsDh(M);
+}
+function reportBodyDanhMuc(list){
+  const dim=dimOf(RDIM);
+  const chips=REPORT_DIMS.map(d=>`<button class="chip ${d.id===RDIM?'on':''}" onclick="RDIM='${d.id}';renderReport()">${esc(d.label)}</button>`).join("");
+  const groups=groupMetrics(list,dim.key);
+  const rows=groups.map(g=>`<tr>
+      <td><b>${esc(g.key)}</b></td><td>${g.n}</td><td>${g.done}</td><td>${g.open}</td>
+      <td>${g.resRate==null?'–':g.resRate+'%'}</td><td>${g.tbXL}h</td>
+      <td><b style="color:${qColorVar(g.qAvg)}">${g.qAvg||'–'}</b></td><td>${g.csatAvg?g.csatAvg:'–'}</td>
+      <td>${g.ps}</td><td>${fmtVnd(g.cpDuyet)}</td></tr>`).join("")||`<tr><td colspan="10" class="muted" style="text-align:center;padding:14px">Không có dữ liệu trong kỳ.</td></tr>`;
+  return `<div class="panel"><div class="panel-b" style="display:flex;flex-wrap:wrap;gap:7px">${chips}</div></div>
+    <div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Báo cáo theo: ${esc(dim.label)} <span class="muted" style="font-weight:500;font-size:12.5px">· ${groups.length} nhóm</span></h3></div>
+    <div class="panel-b"><div class="table-wrap"><table>
+      <thead><tr><th>${esc(dim.label)}</th><th>Số ticket</th><th>Hoàn tất</th><th>Đang mở</th><th>Đạt SLA XL</th><th>TG xử lý BQ</th><th>Điểm CL BQ</th><th>CSAT BQ</th><th>Phát sinh</th><th>Chi phí duyệt</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+      <div class="muted" style="font-size:12px;margin-top:8px">Chọn danh mục ở trên để đổi cách tách. Nút "Xuất Excel (mọi danh mục)" xuất mỗi danh mục thành một sheet riêng.</div>
+    </div></div>`;
+}
+function reportBodyCaNhan(list,assignees){
+  const canPick=can('viewAll');
+  const requesters=[...new Set(DB.tickets.map(t=>String(t.nguoiYC||'').trim()).filter(Boolean))].sort();
+  let people=(RPROLE==='requester'?requesters:assignees).slice();
+  const nm=personName(); if(nm&&!people.includes(nm)) people.unshift(nm);
+  const scoped=personScope(list); const M=reportMetrics(scoped);
+  const picker= canPick
+    ? `<select style="width:auto" onchange="RPERSON=this.value;renderReport()">${people.map(p=>`<option ${p===nm?'selected':''}>${esc(p)}</option>`).join("")}</select>`
+    : `<b style="font-size:15px">${esc(nm)}</b> <span class="muted" style="font-size:12px">(báo cáo của chính bạn)</span>`;
+  const roleTabs=`<div class="tabs" style="margin:0">
+    <button class="${RPROLE==='assignee'?'active':''}" onclick="RPROLE='assignee';renderReport()">Vai trò: Người thực hiện</button>
+    <button class="${RPROLE==='requester'?'active':''}" onclick="RPROLE='requester';renderReport()">Vai trò: Người yêu cầu</button></div>`;
+  const trows=scoped.map(t=>`<tr onclick="openDetail('${t.id}','info')" style="cursor:pointer">
+      <td class="mono">${esc(t.id)}</td><td><div class="ell">${esc(loaiText(t))}</div></td><td>${esc(t.donvi)}</td>
+      <td><span class="pr ${t.uutien.split(' ')[0]}">${esc(t.uutien)}</span></td><td>${stPill(t.trangthai)}</td>
+      <td>${isClosed(t.trangthai)?('<b style="color:'+qColorVar(computeQuality(t).total)+'">'+computeQuality(t).total+'</b>'):'–'}</td>
+      <td>${t.csat?('★'+t.csat):'–'}</td></tr>`).join("")||`<tr><td colspan="7" class="muted" style="text-align:center;padding:14px">Không có ticket trong kỳ với vai trò này.</td></tr>`;
+  return `<div class="panel"><div class="panel-b" style="display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+      <div class="f" style="margin:0"><label style="font-size:12px">Người dùng</label><div>${picker}</div></div>
+      ${roleTabs}
+      <div style="flex:1"></div><div class="muted" style="font-size:12.5px">Tổng <b>${scoped.length}</b> ticket ${RPROLE==='requester'?'đã yêu cầu':'được giao xử lý'} trong kỳ.</div>
+    </div></div>
+    ${reportMetricCards(M)}${reportPsDh(M)}
+    <div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Danh sách ticket của ${esc(nm)}</h3></div>
+    <div class="panel-b"><div class="table-wrap"><table>
+      <thead><tr><th>Mã ticket</th><th>Loại việc</th><th>Đơn vị</th><th>Ưu tiên</th><th>Trạng thái</th><th>Điểm CL</th><th>CSAT</th></tr></thead>
+      <tbody>${trows}</tbody></table></div></div></div>`;
 }
 function qColorVar(v){return v>=85?'var(--green)':v>=65?'var(--amber)':v>0?'var(--red)':'';}
 function rSetPreset(k){ RFILTER.preset=k; RFILTER.from=''; RFILTER.to=''; renderReport(); }
@@ -1657,7 +1746,8 @@ function xlsxBlob(sheets){
   files.push({name:'[Content_Types].xml',data:enc.encode(ct)});
   files.push({name:'_rels/.rels',data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')});
   let wb='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>';
-  sheets.forEach((s,i)=>wb+=`<sheet name="${E(s.name).slice(0,31)}" sheetId="${i+1}" r:id="rId${i+1}"/>`);
+  const sname=n=>E(String(n==null?'':n).replace(/[\\\/?*\[\]:]/g,'-').trim()).slice(0,31)||'Sheet';
+  sheets.forEach((s,i)=>wb+=`<sheet name="${sname(s.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`);
   wb+='</sheets></workbook>'; files.push({name:'xl/workbook.xml',data:enc.encode(wb)});
   let wr='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
   sheets.forEach((s,i)=>wr+=`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`);
@@ -1745,6 +1835,45 @@ function exportReportExcel(){
   ];
   dl(xlsxBlob(sheets),"bao-cao-thng-"+ymd(new Date())+".xlsx");
   toast("Đã xuất Excel báo cáo");
+}
+// Xuất báo cáo tách theo MỌI danh mục — mỗi danh mục 1 sheet
+function exportBreakdownExcel(){
+  const list=reportTickets(); const rg=reportRange();
+  const head=['Số ticket','Hoàn tất','Đang mở','Đạt SLA XL (%)','TG xử lý BQ (giờ)','Điểm CL BQ','CSAT BQ','Phát sinh','Chi phí duyệt'];
+  const sheets=[{name:'Kỳ báo cáo',rows:[['Kỳ báo cáo',rg.label],['Tổng ticket',list.length],['Ngày xuất',ymd(new Date())]]}];
+  REPORT_DIMS.forEach(d=>{
+    const g=groupMetrics(list,d.key);
+    const rows=[[d.label].concat(head)].concat(g.map(x=>[x.key,x.n,x.done,x.open,x.resRate==null?'':x.resRate,x.tbXL,x.qAvg,x.csatAvg,x.ps,x.cpDuyet]));
+    sheets.push({name:d.label,rows});
+  });
+  dl(xlsxBlob(sheets),"bao-cao-danh-muc-"+ymd(new Date())+".xlsx");
+  toast("Đã xuất Excel theo mọi danh mục");
+}
+// Xuất báo cáo cá nhân
+function exportPersonExcel(){
+  const nm=personName(); const scoped=personScope(reportTickets()); const M=reportMetrics(scoped); const rg=reportRange();
+  const roleLb=RPROLE==='requester'?'Người yêu cầu':'Người thực hiện';
+  const sum=[
+    ['BÁO CÁO CÁ NHÂN',nm],['Vai trò',roleLb],['Kỳ báo cáo',rg.label],
+    ['— Khối lượng —',''],['Tổng ticket',M.tong],['Hoàn tất',M.done],['Đang mở',M.open],['Bị trả lại',M.traLai],['Bị từ chối',M.rejected],['Bị mở lại',M.moLai],
+    ['— SLA —',''],['Đạt SLA phản hồi (%)',M.respRate==null?'':M.respRate],['Đạt SLA xử lý (%)',M.resRate==null?'':M.resRate],['Số ca vi phạm',M.viol],['TG xử lý BQ (giờ)',M.tbXuLy],
+    ['— Chất lượng —',''],['CSAT bình quân',M.csatAvg],['Điểm chất lượng BQ',M.qAvg],
+    ['— Phát sinh —',''],['Tổng phát sinh',M.psTong],['Chi phí được duyệt',M.cpDuyet],
+  ];
+  dl(xlsxBlob([{name:'Cá nhân',rows:sum},{name:'Chi tiết',rows:rowsFrom(REPORT_DETAIL_COLS,scoped)}]),"bao-cao-ca-nhan-"+ymd(new Date())+".xlsx");
+  toast("Đã xuất Excel báo cáo cá nhân");
+}
+function printPersonReport(){
+  const nm=personName(); const scoped=personScope(reportTickets()); const M=reportMetrics(scoped); const rg=reportRange();
+  const roleLb=RPROLE==='requester'?'Người yêu cầu':'Người thực hiện';
+  const row=(k,v)=>`<tr><td style="width:55%">${xmlEsc(k)}</td><td><b>${xmlEsc(v)}</b></td></tr>`;
+  const b=docHeader("Báo cáo cá nhân","")+`<div style="text-align:center;margin-bottom:8px"><b>${xmlEsc(nm)}</b> · Vai trò: ${xmlEsc(roleLb)} · Kỳ: <b>${xmlEsc(rg.label)}</b></div>
+    <h3>Khối lượng</h3><table>${row('Tổng ticket',M.tong)}${row('Hoàn tất',M.done)}${row('Đang mở',M.open)}${row('Bị trả lại',M.traLai)}${row('Bị mở lại',M.moLai)}</table>
+    <h3>SLA</h3><table>${row('Đạt SLA phản hồi',M.respRate==null?'–':M.respRate+'%')}${row('Đạt SLA xử lý',M.resRate==null?'–':M.resRate+'%')}${row('Số ca vi phạm',M.viol)}${row('TG xử lý bình quân',M.tbXuLy+' giờ')}</table>
+    <h3>Chất lượng</h3><table>${row('CSAT bình quân',M.csatAvg||'–')}${row('Điểm chất lượng bình quân',M.qAvg||'–')}</table>
+    <h3>Phát sinh</h3><table>${row('Tổng phát sinh',M.psTong)}${row('Chi phí được duyệt',fmtVnd(M.cpDuyet))}</table>
+    <div style="margin-top:24px;text-align:right"><div class="s" style="font-style:italic;color:#666">Người lập</div><div style="height:52px"></div><div style="font-weight:700">${xmlEsc(ME?ME.name:'')}</div></div>`;
+  printDoc("Báo cáo cá nhân "+nm,b);
 }
 
 /* ============================ 10: BIỂU MẪU IN (PDF A4) ============================ */
