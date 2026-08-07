@@ -126,7 +126,7 @@ pm2 save
   sang nơi an toàn, sau đó bật lại (`pm2 start ho-tro-thng`). *(Nếu copy lúc đang chạy, nhớ copy kèm cả
   `data.db-wal` và `data.db-shm` nếu có.)*
 - **Khôi phục:** tắt máy chủ → chép `data.db` + `uploads/` bản sao lưu đè vào (xóa `data.db-wal`, `data.db-shm` nếu có) → bật lại.
-- Ngoài ra trong ứng dụng có nút **Xuất dữ liệu (JSON)** và **Xuất CSV** để lưu thêm bản đối chiếu.
+- Ngoài ra trong ứng dụng có các nút **Xuất Excel** (`.xlsx`) — xuất toàn bộ dữ liệu, danh sách ticket, và báo cáo theo kỳ — để lưu thêm bản đối chiếu.
 
 ---
 

@@ -592,7 +592,7 @@ function renderTickets(){
       <select class="field-sel" onchange="TFILTER.st=this.value;renderTickets()"><option value="">Tất cả trạng thái</option>${opt(CAT.trangthai,TFILTER.st)}</select>
       <select class="field-sel" onchange="TFILTER.pr=this.value;renderTickets()"><option value="">Tất cả ưu tiên</option>${opt(CAT.uutien,TFILTER.pr)}</select>
       <div class="spacer" style="flex:1"></div>
-      <button class="btn sm" onclick="exportCSV()">Xuất CSV</button>
+      <button class="btn sm" onclick="exportCSV()">Xuất Excel</button>
       ${can('create')?`<button class="btn primary sm" onclick="openForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 5v14M5 12h14"/></svg>Tạo ticket</button>`:''}
     </div>
     <div class="panel"><div class="table-wrap"><table>
@@ -1624,32 +1624,126 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({"&":"&amp;","
 function fmtVnd(n){n=+n||0;return n?n.toLocaleString("vi-VN")+" ₫":"–";}
 function fmtDT(s){if(!s)return"";const d=new Date(s);if(isNaN(d))return esc(s);return d.toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});}
 function toast(msg,bad){const el=document.getElementById("toast");el.innerHTML=(bad?'⚠️ ':'✓ ')+esc(msg);el.style.background=bad?'var(--red)':'var(--green-800)';el.classList.add("show");clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove("show"),2600);}
-function exportData(){const blob=new Blob([JSON.stringify(DB,null,2)],{type:"application/json"});dl(blob,"ho-tro-thng-"+ymd(new Date())+".json");toast("Đã xuất dữ liệu JSON");}
+/* ============================ BỘ TẠO FILE EXCEL (.xlsx) — không phụ thuộc thư viện ============================ */
+// CRC32 cho ZIP
+function crc32(bytes){ let t=crc32._t; if(!t){ t=crc32._t=[]; for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?(0xEDB88320^(c>>>1)):(c>>>1); t[n]=c>>>0; } }
+  let crc=0xFFFFFFFF; for(let i=0;i<bytes.length;i++) crc=(crc>>>8)^t[(crc^bytes[i])&0xFF]; return (crc^0xFFFFFFFF)>>>0; }
+// ZIP "store" (không nén) — đủ để tạo .xlsx hợp lệ
+function zipStore(files){
+  const u16=n=>[n&0xFF,(n>>8)&0xFF], u32=n=>[n&0xFF,(n>>8)&0xFF,(n>>16)&0xFF,(n>>24)&0xFF];
+  const enc=new TextEncoder(), parts=[], central=[]; let off=0; const D=21025, T=0; // 2021-01-01
+  for(const f of files){
+    const nb=enc.encode(f.name), data=f.data, crc=crc32(data);
+    const lh=[].concat(u32(0x04034b50),u16(20),u16(0),u16(0),u16(T),u16(D),u32(crc),u32(data.length),u32(data.length),u16(nb.length),u16(0));
+    parts.push(new Uint8Array(lh),nb,data);
+    central.push({nb,crc,size:data.length,off}); off+=lh.length+nb.length+data.length;
+  }
+  const cdStart=off, cd=[];
+  for(const c of central){
+    const ch=[].concat(u32(0x02014b50),u16(20),u16(20),u16(0),u16(0),u16(T),u16(D),u32(c.crc),u32(c.size),u32(c.size),u16(c.nb.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(c.off));
+    cd.push(new Uint8Array(ch),c.nb); off+=ch.length+c.nb.length;
+  }
+  const eocd=new Uint8Array([].concat(u32(0x06054b50),u16(0),u16(0),u16(central.length),u16(central.length),u32(off-cdStart),u32(cdStart),u16(0)));
+  return new Blob([...parts,...cd,eocd],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+// Tạo Blob .xlsx từ danh sách sheet: [{name, rows:[[cell,...],...], header?}]
+function xlsxBlob(sheets){
+  const enc=new TextEncoder(), E=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const col=i=>{ let s=''; i++; while(i>0){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=(i-1-m)/26; } return s; };
+  const files=[];
+  let ct='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
+  sheets.forEach((s,i)=>ct+=`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
+  ct+='</Types>';
+  files.push({name:'[Content_Types].xml',data:enc.encode(ct)});
+  files.push({name:'_rels/.rels',data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')});
+  let wb='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>';
+  sheets.forEach((s,i)=>wb+=`<sheet name="${E(s.name).slice(0,31)}" sheetId="${i+1}" r:id="rId${i+1}"/>`);
+  wb+='</sheets></workbook>'; files.push({name:'xl/workbook.xml',data:enc.encode(wb)});
+  let wr='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+  sheets.forEach((s,i)=>wr+=`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`);
+  wr+=`<Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
+  files.push({name:'xl/_rels/workbook.xml.rels',data:enc.encode(wr)});
+  files.push({name:'xl/styles.xml',data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>')});
+  sheets.forEach((s,si)=>{
+    let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
+    (s.rows||[]).forEach((row,ri)=>{
+      x+=`<row r="${ri+1}">`;
+      row.forEach((cell,ci)=>{
+        const ref=col(ci)+(ri+1), bold=(ri===0&&s.header!==false)?' s="1"':'';
+        if(typeof cell==='number'&&isFinite(cell)) x+=`<c r="${ref}"${bold}><v>${cell}</v></c>`;
+        else x+=`<c r="${ref}"${bold} t="inlineStr"><is><t xml:space="preserve">${E(cell)}</t></is></c>`;
+      });
+      x+='</row>';
+    });
+    x+='</sheetData></worksheet>'; files.push({name:`xl/worksheets/sheet${si+1}.xml`,data:enc.encode(x)});
+  });
+  return zipStore(files);
+}
+// Số nếu là số, ngược lại giữ chuỗi; rỗng -> ''
+const numOrBlank=v=>{ if(v===''||v==null)return ''; const n=+v; return isFinite(n)&&String(v).trim()!==''?n:String(v); };
+function rowsFrom(cols,items){ return [cols.map(c=>c[0])].concat(items.map(it=>cols.map(c=>c[1](it)))); }
+// Cột dữ liệu ticket & phát sinh (dùng chung cho các bản xuất)
+const TICKET_COLS=[
+  ['Mã ticket',t=>t.id],['Ngày tiếp nhận',t=>fmtDT(t.tCreate)],['Loại công việc',t=>loaiText(t)],['Luồng',t=>t.luong],
+  ['Đơn vị / KH',t=>t.donvi],['Người yêu cầu',t=>t.nguoiYC],['SĐT',t=>t.sdt],['Email',t=>t.email],['Nội dung',t=>t.noidung],
+  ['Số lượng',t=>numOrBlank(t.soluong)],['ĐVT',t=>t.dvt],['Ưu tiên',t=>t.uutien],['Đội',t=>t.doi],['Người thực hiện',t=>t.assignee],
+  ['Trạng thái',t=>baseStatus(t.trangthai)],['Trạng thái SLA',t=>slaStatus(t).label],['TG xử lý (giờ)',t=>numOrBlank(slaStatus(t).used)],
+  ['TG hoàn tất',t=>fmtDT(t.tDone)],['Kết quả nghiệm thu',t=>t.nghiemthu],['SL thực tế',t=>numOrBlank(t.slThucte)],
+  ['CSAT',t=>numOrBlank(t.csat)],['Điểm chất lượng',t=>isClosed(t.trangthai)?computeQuality(t).total:''],
+  ['Số lần mở lại',t=>numOrBlank(t.moLai)],['Ngày đóng',t=>fmtDT(t.tClose)],
+];
+const PS_COLS=[
+  ['Mã PS',p=>p.id],['Ticket',p=>p.ticketId],['Ngày',p=>fmtDT(p.ngay)],['Loại phát sinh',p=>p.loai],['Nhóm nguyên nhân',p=>p.nhomNN],
+  ['Mô tả',p=>p.mota],['Nguyên nhân',p=>p.nguyennhan],['Mức ảnh hưởng',p=>p.anhhuong],
+  ['CP đề xuất',p=>numOrBlank(p.chiphiDX)],['CP được duyệt',p=>numOrBlank(p.chiphiDuyet)],['Phê duyệt',p=>p.duyet],['Người xử lý',p=>p.nguoiXL],
+];
+function filteredTickets(){
+  return DB.tickets.filter(t=>{
+    if(TFILTER.st&&baseStatus(t.trangthai)!==baseStatus(TFILTER.st))return false;
+    if(TFILTER.pr&&t.uutien!==TFILTER.pr)return false;
+    if(TFILTER.q){const s=(t.id+" "+t.nguoiYC+" "+t.donvi+" "+t.noidung+" "+(t.assignee||"")).toLowerCase();if(!s.includes(TFILTER.q.toLowerCase()))return false;}
+    return true;
+  });
+}
+// Xuất toàn bộ dữ liệu (Ticket + Phát sinh) ra 1 file Excel nhiều sheet
+function exportData(){
+  const sheets=[{name:'Ticket',rows:rowsFrom(TICKET_COLS,DB.tickets)},{name:'Phát sinh',rows:rowsFrom(PS_COLS,DB.ps)}];
+  dl(xlsxBlob(sheets),"ho-tro-thng-"+ymd(new Date())+".xlsx"); toast("Đã xuất dữ liệu ra Excel");
+}
+// Xuất danh sách ticket đang lọc ra Excel
 function exportCSV(){
-  const cols=["id","tCreate","loai","luong","donvi","nguoiYC","sdt","email","noidung","soluong","dvt","uutien","doi","assignee","trangthai","tDone","nghiemthu","csat"];
-  const head=cols.join(",");
-  const rows=DB.tickets.map(t=>cols.map(c=>`"${String(t[c]==null?'':t[c]).replace(/"/g,'""')}"`).join(","));
-  const blob=new Blob(["﻿"+head+"\n"+rows.join("\n")],{type:"text/csv;charset=utf-8"});
-  dl(blob,"tickets-thng.csv");toast("Đã xuất CSV");
+  const list=filteredTickets();
+  dl(xlsxBlob([{name:'Ticket',rows:rowsFrom(TICKET_COLS,list)}]),"tickets-thng-"+ymd(new Date())+".xlsx");
+  toast("Đã xuất "+list.length+" ticket ra Excel");
 }
 function dl(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 
 /* ============================ 9B: XUẤT EXCEL BÁO CÁO ============================ */
 function xmlEsc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+const REPORT_DETAIL_COLS=[
+  ['Mã ticket',t=>t.id],['Ngày tiếp nhận',t=>fmtDT(t.tCreate)],['Loại việc',t=>loaiText(t)],['Luồng',t=>t.luong],
+  ['Phòng ban',t=>t.donvi],['Người yêu cầu',t=>t.nguoiYC],['Ưu tiên',t=>t.uutien],['Đội',t=>t.doi],['Người thực hiện',t=>t.assignee],
+  ['Trạng thái',t=>baseStatus(t.trangthai)],['SLA',t=>slaStatus(t).label],['TG xử lý (giờ)',t=>numOrBlank(slaStatus(t).used)],
+  ['Nghiệm thu',t=>t.nghiemthu],['CSAT',t=>numOrBlank(t.csat)],['Điểm CL',t=>isClosed(t.trangthai)?computeQuality(t).total:''],
+];
 function exportReportExcel(){
   const list=reportTickets();const M=reportMetrics(list);const rg=reportRange();
-  const th=a=>`<tr>${a.map(x=>`<th style="background:#dfeee7;border:1px solid #9bbfae">${xmlEsc(x)}</th>`).join("")}</tr>`;
-  const tr=a=>`<tr>${a.map(x=>`<td style="border:1px solid #cfe0d8">${xmlEsc(x)}</td>`).join("")}</tr>`;
-  const summary=`<table><tr><th colspan="2" style="background:#2f855a;color:#fff">BÁO CÁO TỔNG HỢP — ${xmlEsc(rg.label)}</th></tr>
-    ${tr(['Tổng tiếp nhận',M.tong])}${tr(['Đã hoàn tất',M.done])}${tr(['Đang mở',M.open])}${tr(['Bị trả lại',M.traLai])}${tr(['Bị từ chối',M.rejected])}${tr(['Bị mở lại',M.moLai])}
-    ${tr(['Đạt SLA phản hồi (%)',M.respRate==null?'':M.respRate])}${tr(['Đạt SLA xử lý (%)',M.resRate==null?'':M.resRate])}${tr(['Số ca vi phạm',M.viol])}${tr(['TG xử lý BQ (giờ)',M.tbXuLy])}
-    ${tr(['CSAT bình quân',M.csatAvg])}${tr(['Điểm chất lượng BQ',M.qAvg])}
-    ${tr(['Tổng phát sinh',M.psTong])}${tr(['PS chủ quan',M.psNN['Chủ quan']])}${tr(['PS khách quan',M.psNN['Khách quan']])}${tr(['PS do người yêu cầu',M.psNN['Do người yêu cầu']])}${tr(['Chi phí đề xuất',M.cpDX])}${tr(['Chi phí được duyệt',M.cpDuyet])}
-    ${tr(['Số lần xung đột ưu tiên',M.conflict])}</table>`;
-  const cols=[['Mã ticket','id'],['Ngày tiếp nhận','tCreate'],['Loại việc',t=>loaiText(t)],['Luồng','luong'],['Phòng ban','donvi'],['Người yêu cầu','nguoiYC'],['Ưu tiên','uutien'],['Đội','doi'],['Người thực hiện','assignee'],['Trạng thái',t=>baseStatus(t.trangthai)],['SLA',t=>slaStatus(t).label],['TG xử lý (h)',t=>slaStatus(t).used],['Nghiệm thu','nghiemthu'],['CSAT','csat'],['Điểm CL',t=>isClosed(t.trangthai)?computeQuality(t).total:'']];
-  const detail=`<table>${th(cols.map(c=>c[0]))}${list.map(t=>tr(cols.map(c=>typeof c[1]==='function'?c[1](t):(c[1]==='tCreate'?fmtDT(t[c[1]]):t[c[1]])))).join("")}</table>`;
-  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>${summary}<br/><table><tr><th colspan="15" style="background:#2f855a;color:#fff">CHI TIẾT TICKET TRONG KỲ (${list.length})</th></tr></table>${detail}</body></html>`;
-  dl(new Blob(["﻿"+html],{type:"application/vnd.ms-excel"}),"bao-cao-thng-"+ymd(new Date())+".xls");
+  const sum=[
+    ['BÁO CÁO TỔNG HỢP',rg.label],
+    ['— Khối lượng —',''],['Tổng tiếp nhận',M.tong],['Đã hoàn tất',M.done],['Đang mở',M.open],['Bị trả lại',M.traLai],['Bị từ chối',M.rejected],['Bị mở lại',M.moLai],
+    ['— SLA —',''],['Đạt SLA phản hồi (%)',M.respRate==null?'':M.respRate],['Đạt SLA xử lý (%)',M.resRate==null?'':M.resRate],['Số ca vi phạm',M.viol],['TG xử lý BQ (giờ)',M.tbXuLy],
+    ['— Chất lượng —',''],['CSAT bình quân',M.csatAvg],['Điểm chất lượng BQ',M.qAvg],
+    ['— Phát sinh —',''],['Tổng phát sinh',M.psTong],['PS chủ quan',M.psNN['Chủ quan']],['PS khách quan',M.psNN['Khách quan']],['PS do người yêu cầu',M.psNN['Do người yêu cầu']],['Chi phí đề xuất',M.cpDX],['Chi phí được duyệt',M.cpDuyet],
+    ['— Điều hành —',''],['Số lần xung đột ưu tiên',M.conflict],['Số lần mở lại',M.moLai],
+  ];
+  const per=[['Người thực hiện','Số ticket đóng','Điểm CL BQ','CSAT BQ']].concat(
+    Object.entries(M.byPerson).sort((a,b)=>b[1].q/b[1].n-a[1].q/a[1].n).map(([p,x])=>[p,x.n,Math.round(x.q/x.n),x.csatN?+(x.csat/x.csatN).toFixed(1):'']));
+  const sheets=[
+    {name:'Tổng hợp',rows:sum},
+    {name:'Theo người',rows:per},
+    {name:'Chi tiết',rows:rowsFrom(REPORT_DETAIL_COLS,list)},
+  ];
+  dl(xlsxBlob(sheets),"bao-cao-thng-"+ymd(new Date())+".xlsx");
   toast("Đã xuất Excel báo cáo");
 }
 
