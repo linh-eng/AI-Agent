@@ -580,7 +580,7 @@ function renderTickets(){
       <td><div class="ell" title="${esc(t.noidung)}">${esc(t.noidung)}</div><div class="muted" style="font-size:11.5px">${esc(loaiText(t))}</div></td>
       <td>${esc(t.donvi)}<div class="muted" style="font-size:11.5px">${esc(t.nguoiYC)}</div></td>
       <td><span class="pr ${rp}">${esc(t.uutien)}</span></td>
-      <td>${esc(t.assignee||'<span class="muted">Chưa gán</span>')}</td>
+      <td>${t.assignee?esc(t.assignee):'<span class="muted">Chưa gán</span>'}</td>
       <td>${stPill(t.trangthai)}${(()=>{const pp=planProgress(t);return pp?`<div class="muted" style="font-size:11px;margin-top:3px">Đầu việc ${pp.done}/${pp.total} (${pp.pct}%)</div>`:'';})()}</td>
       <td><span class="pill ${s.color}"><span class="dot"></span>${s.label}</span><div class="muted" style="font-size:11px;margin-top:3px">${s.used}h / ${s.deadline}h</div></td>
     </tr>`;
