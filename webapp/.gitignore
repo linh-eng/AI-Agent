@@ -1,0 +1,2 @@
+# Bản đóng gói phân phối (build/dist) — không đưa lên git
+*.zip
