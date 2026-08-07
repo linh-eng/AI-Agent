@@ -11,6 +11,10 @@ Có **đăng nhập & phân quyền theo vai trò**.
 
 > ⚙️ **Yêu cầu:** Node.js **22.5 trở lên** (khuyến nghị **24 LTS**) — vì dùng SQLite tích hợp sẵn của Node.
 
+> 📘 **Tài liệu kèm theo:**
+> - **`HUONG-DAN-CAI-DAT.html`** / **`.pdf`** — hướng dẫn **cài đặt mới** & **cập nhật khi có thay đổi** (dành cho IT / quản trị máy chủ).
+> - **`HUONG-DAN-SU-DUNG.html`** / **`.pdf`** — hướng dẫn **sử dụng** (dành cho người dùng cuối).
+
 ## Tài khoản dùng thử (tạo sẵn lần đầu)
 
 | Tên đăng nhập | Mật khẩu | Vai trò | Quyền |

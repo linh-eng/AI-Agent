@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hướng dẫn Cài đặt & Cập nhật — Hệ thống Hỗ trợ THNG</title>
+<style>
+:root{
+  --navy-900:#081f38;--navy-800:#0f3157;--navy-700:#1b4f86;--navy-600:#2563b8;--navy-500:#2f6fd6;--navy-50:#eaf1fc;
+  --ink:#12202e;--ink-2:#33475b;--ink-3:#6b7a8c;--line:#e2e8f0;--line-2:#eef2f7;--card:#fff;--bg:#f4f7fb;
+  --green:#1e9e6a;--green-bg:#e7f6ef;--amber:#e0940b;--amber-bg:#fdf3e0;--red:#d64545;--red-bg:#fcecec;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Segoe UI',system-ui,Roboto,Arial,sans-serif;font-size:15px;line-height:1.62}
+.wrap{max-width:940px;margin:0 auto;padding:0 18px 60px}
+a{color:var(--navy-600)}
+h3{font-size:16px;margin:22px 0 8px;color:var(--navy-700)}
+h4{font-size:14px;margin:16px 0 6px;color:var(--navy-800)}
+p{margin:8px 0}
+code{background:#eef3f9;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13.5px;font-family:'Consolas',monospace;color:#0b3d63}
+/* cover */
+.cover{background:linear-gradient(150deg,var(--navy-700),var(--navy-900));color:#fff;border-radius:0 0 26px 26px;padding:52px 40px 40px;text-align:center;margin-bottom:30px}
+.cover .ic{width:64px;height:64px;border-radius:16px;background:rgba(255,255,255,.14);display:inline-grid;place-items:center;margin-bottom:14px}
+.cover h1{margin:0;font-size:31px;letter-spacing:-.3px}
+.cover .st{margin-top:8px;font-size:16px;opacity:.92}
+.cover .tag{margin-top:14px;font-size:12.5px;opacity:.8;letter-spacing:.04em}
+/* toc */
+.toc{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 26px;margin-bottom:22px}
+.toc h2{font-size:13px;margin:0 0 12px;color:var(--navy-700);text-transform:uppercase;letter-spacing:.06em}
+.toc .grp{font-weight:700;color:var(--navy-800);margin:12px 0 6px;font-size:14.5px}
+.toc ol{margin:0;padding-left:22px}
+.toc a{text-decoration:none;color:var(--ink-2)}
+.toc a:hover{color:var(--navy-600)}
+/* sections */
+section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px 30px;margin-bottom:18px;box-shadow:0 1px 2px rgba(8,31,56,.04)}
+section>h2{font-size:20px;color:var(--navy-800);margin:0 0 12px;display:flex;align-items:center;gap:12px}
+section>h2 .num{background:linear-gradient(135deg,var(--navy-500),var(--navy-700));color:#fff;min-width:34px;height:34px;padding:0 8px;border-radius:10px;display:inline-grid;place-items:center;font-size:15px;flex:none}
+.part-label{display:flex;align-items:center;gap:14px;margin:8px 0 6px;padding:14px 22px;background:linear-gradient(135deg,var(--navy-700),var(--navy-800));color:#fff;border-radius:14px}
+.part-label .p{font-size:13px;letter-spacing:.12em;text-transform:uppercase;opacity:.8}
+.part-label h2{margin:0;font-size:22px;color:#fff}
+/* callouts */
+.note,.tip,.warn,.danger{border-radius:12px;padding:12px 16px;margin:13px 0;font-size:14px;border-left:4px solid}
+.note{background:var(--navy-50);border-color:var(--navy-500)}
+.tip{background:var(--green-bg);border-color:var(--green)}
+.warn{background:var(--amber-bg);border-color:var(--amber)}
+.danger{background:var(--red-bg);border-color:var(--red)}
+.note>b:first-child,.tip>b:first-child,.warn>b:first-child,.danger>b:first-child{display:block;margin-bottom:2px}
+/* command block */
+.cmd{background:#0d2033;color:#dbe9f5;border-radius:10px;padding:12px 15px;margin:10px 0;font-family:'Consolas',monospace;font-size:13px;line-height:1.7;overflow-x:auto;white-space:pre;-webkit-overflow-scrolling:touch}
+.cmd .c{color:#6fd08c}
+.cmd .g{color:#7fa6c9}
+/* steps */
+ol.steps{counter-reset:s;list-style:none;padding:0;margin:12px 0}
+ol.steps>li{position:relative;padding:2px 0 14px 42px;margin:0}
+ol.steps>li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:0;width:30px;height:30px;background:var(--navy-600);color:#fff;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px}
+ol.steps>li b{color:var(--navy-800)}
+/* tables */
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--navy-50);color:var(--navy-800);font-weight:600}
+td code{font-size:12.5px}
+.os{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:6px;margin-right:4px}
+.os-win{background:#e4effb;color:#1b62b0}.os-nix{background:#e8f5ea;color:#1c7a43}
+.chk{list-style:none;padding:0;margin:10px 0}
+.chk li{padding:5px 0 5px 28px;position:relative}
+.chk li::before{content:"☐";position:absolute;left:0;top:3px;color:var(--navy-600);font-size:16px}
+.lead{color:var(--ink-3);margin:-4px 0 14px;font-size:14px}
+hr.sp{border:none;border-top:1px solid var(--line-2);margin:22px 0}
+.foot{text-align:center;color:var(--ink-3);font-size:12.5px;margin-top:26px}
+@media print{
+  body{background:#fff}
+  .wrap{max-width:none;padding:0}
+  section,.toc{break-inside:avoid;box-shadow:none;border-color:#ccc}
+  .cover{border-radius:0}
+  .cmd{white-space:pre-wrap}
+  a{color:var(--ink)}
+}
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="ic"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg></div>
+  <h1>Hướng dẫn Cài đặt &amp; Cập nhật</h1>
+  <div class="st">Hệ thống Hỗ trợ THNG — Máy chủ nội bộ (LAN)</div>
+  <div class="tag">TÀI LIỆU KỸ THUẬT · DÀNH CHO IT / QUẢN TRỊ MÁY CHỦ</div>
+</div>
+
+<div class="wrap">
+
+<div class="toc">
+  <h2>Mục lục</h2>
+  <div class="grp">Phần A — Cài đặt mới</div>
+  <ol>
+    <li><a href="#yc">Yêu cầu hệ thống</a></li>
+    <li><a href="#node">Cài Node.js</a></li>
+    <li><a href="#chay">Chép thư mục &amp; khởi động lần đầu</a></li>
+    <li><a href="#mang">Thiết lập mạng (tường lửa · IP tĩnh · đổi cổng)</a></li>
+    <li><a href="#cauhinh">Cấu hình ban đầu (mật khẩu · tài khoản · danh mục)</a></li>
+    <li><a href="#pm2">Chạy nền tự động với PM2</a></li>
+    <li><a href="#saoluu">Sao lưu &amp; khôi phục dữ liệu</a></li>
+    <li><a href="#chk1">Kiểm tra sau khi cài (checklist)</a></li>
+  </ol>
+  <div class="grp">Phần B — Cập nhật khi hệ thống có thay đổi</div>
+  <ol start="9">
+    <li><a href="#nguyentac">Nguyên tắc an toàn khi cập nhật</a></li>
+    <li><a href="#quytrinh">Quy trình cập nhật chuẩn (từng bước)</a></li>
+    <li><a href="#loai">Loại thay đổi cần làm gì (bảng tra nhanh)</a></li>
+    <li><a href="#rollback">Khôi phục nhanh khi cập nhật lỗi (rollback)</a></li>
+    <li><a href="#chk2">Kiểm tra sau khi cập nhật (checklist)</a></li>
+  </ol>
+  <div class="grp">Phụ lục</div>
+  <ol start="14">
+    <li><a href="#plenh">Các lệnh PM2 thường dùng</a></li>
+    <li><a href="#pcau">Cấu trúc thư mục &amp; file dữ liệu</a></li>
+  </ol>
+</div>
+
+<div class="part-label"><div class="p">Phần A</div><h2>Cài đặt mới</h2></div>
+
+<section id="yc">
+  <h2><span class="num">1</span> Yêu cầu hệ thống</h2>
+  <table>
+    <tr><th>Hạng mục</th><th>Yêu cầu</th></tr>
+    <tr><td>Máy chủ</td><td>1 máy tính bất kỳ (Windows / Linux / macOS) luôn bật trong giờ làm việc. Không cần máy mạnh — 4 GB RAM là đủ cho một phòng ban.</td></tr>
+    <tr><td>Phần mềm</td><td><b>Node.js phiên bản 22.5 trở lên</b> (khuyến nghị <b>24 LTS</b>). Đây là <b>yêu cầu bắt buộc</b> vì hệ thống dùng SQLite tích hợp sẵn của Node.</td></tr>
+    <tr><td>Mạng</td><td>Máy chủ và các phòng ban <b>cùng một mạng nội bộ (LAN / Wi-Fi công ty)</b>. Không cần Internet để chạy.</td></tr>
+    <tr><td>Gói cài thêm</td><td><b>Không cần</b> — hệ thống là Node.js thuần, không phụ thuộc thư viện ngoài, không cần chạy <code>npm install</code>.</td></tr>
+  </table>
+  <div class="note"><b>Vì sao cần Node 22.5+?</b>Hệ thống lưu dữ liệu bằng SQLite thông qua mô-đun <code>node:sqlite</code> — chỉ có sẵn từ Node 22.5. Nếu Node cũ hơn, máy chủ sẽ báo lỗi và dừng ngay khi khởi động.</div>
+</section>
+
+<section id="node">
+  <h2><span class="num">2</span> Cài Node.js</h2>
+  <ol class="steps">
+    <li>Truy cập <a href="https://nodejs.org">https://nodejs.org</a>, tải bản <b>LTS</b> (24.x) cho hệ điều hành máy chủ.</li>
+    <li>Cài như phần mềm thường: <b>Next → Next → Finish</b> (Windows) hoặc trình cài của macOS.</li>
+    <li>Kiểm tra: mở <b><span class="os os-win">Windows</span>Command Prompt</b> / <b><span class="os os-nix">Linux·mac</span>Terminal</b> và gõ:</li>
+  </ol>
+  <div class="cmd">node -v</div>
+  <p>Nếu hiện ra số phiên bản (ví dụ <code>v24.5.0</code>) là đạt. Nếu số &lt; 22.5, hãy gỡ bản cũ và cài lại bản LTS mới.</p>
+  <div class="tip"><b>Ubuntu / Debian</b>Có thể cài nhanh bằng: <code>sudo apt install nodejs npm</code> — nhưng nhớ kiểm tra <code>node -v</code> ≥ 22.5; nếu kho hệ điều hành còn Node cũ, dùng NodeSource hoặc <code>nvm</code> để lấy bản 24 LTS.</div>
+</section>
+
+<section id="chay">
+  <h2><span class="num">3</span> Chép thư mục &amp; khởi động lần đầu</h2>
+  <ol class="steps">
+    <li>Chép <b>toàn bộ thư mục <code>ho-tro-thng-server</code></b> vào máy chủ — ví dụ <code>C:\ho-tro-thng-server</code> (Windows) hoặc <code>/opt/ho-tro-thng-server</code> (Linux).</li>
+    <li>Khởi động máy chủ:
+      <div class="cmd"><span class="g"># Windows:</span> nhấp đúp file  <span class="c">start-windows.bat</span>
+<span class="g"># Linux / macOS:</span>       bash start.sh
+<span class="g"># Hoặc mọi hệ:</span>            node server.js</div>
+    </li>
+    <li>Cửa sổ sẽ hiện các địa chỉ truy cập, ví dụ:
+      <div class="cmd">• Trên máy chủ này:            http://localhost:3000
+• Các phòng ban trong LAN mở:  http://172.16.10.5:3000</div>
+    </li>
+    <li>Mở trình duyệt trên máy chủ vào <code>http://localhost:3000</code> để kiểm tra màn đăng nhập hiện lên.</li>
+  </ol>
+  <div class="warn"><b>Để nguyên cửa sổ này chạy</b>Nếu khởi động bằng <code>.bat</code>/<code>start.sh</code>, <b>đóng cửa sổ = tắt máy chủ</b>. Để chạy nền bền vững, dùng PM2 ở mục 6.</div>
+  <div class="note"><b>Lần chạy đầu tạo sẵn</b>Ở lần chạy đầu, hệ thống tự tạo file dữ liệu <code>data.db</code>, các tài khoản mẫu và một ticket ví dụ. Nếu trước đây từng chạy bản cũ lưu bằng <code>data.json</code>, dữ liệu sẽ <b>tự chuyển sang <code>data.db</code></b> (bản cũ đổi tên thành <code>data.json.imported</code>).</div>
+</section>
+
+<section id="mang">
+  <h2><span class="num">4</span> Thiết lập mạng</h2>
+  <h3>4.1 Cho phép qua tường lửa <span class="os os-win">Windows</span></h3>
+  <p>Lần đầu chạy, Windows có thể hỏi <b>“Allow access”</b> → chọn <b>Allow / Cho phép</b> (cả <i>Private network</i>). Nếu không thấy hỏi mà máy khác không vào được: mở <b>Windows Defender Firewall → Allow an app</b> và cho phép <b>Node.js</b>, hoặc mở cổng <b>3000</b>.</p>
+  <h3>4.2 Đặt IP tĩnh cho máy chủ</h3>
+  <p>Nên đặt <b>IP tĩnh</b> để địa chỉ máy chủ không đổi (nhờ IT hoặc đặt trong router). Nếu IP đổi, các phòng ban phải gõ lại địa chỉ mới. Nên tạo <b>bookmark</b> địa chỉ trên máy nhân viên.</p>
+  <h3>4.3 Đổi cổng (nếu 3000 bị trùng)</h3>
+  <div class="cmd"><span class="g"># Windows:</span> set PORT=8080 &amp;&amp; node server.js
+<span class="g"># Linux/mac:</span> PORT=8080 node server.js</div>
+  <div class="tip"><b>Kiểm tra từ máy khác</b>Trên một máy <b>cùng mạng nội bộ</b>, mở trình duyệt gõ <code>http://&lt;IP-máy-chủ&gt;:3000</code>. Vào được màn đăng nhập là mạng đã thông.</div>
+</section>
+
+<section id="cauhinh">
+  <h2><span class="num">5</span> Cấu hình ban đầu</h2>
+  <ol class="steps">
+    <li>Đăng nhập tài khoản quản trị mặc định: <b>admin / admin123</b>. Hệ thống <b>bắt buộc đổi mật khẩu</b> ngay ở lần đăng nhập đầu (tối thiểu 8 ký tự, có cả chữ và số).</li>
+    <li>Vào menu <b>Người dùng</b> → tạo tài khoản cho từng nhân viên &amp; phòng ban, gán vai trò phù hợp (Điều phối / Nhân viên xử lý / Người yêu cầu / Ban giám đốc).</li>
+    <li>Vào menu <b>Danh mục &amp; SLA</b> → rà soát và chỉnh: ngưỡng SLA, giờ làm việc, danh mục Loại công việc, Phòng ban, Đội hỗ trợ, Danh mục Dự án, dung lượng tệp đính kèm…</li>
+  </ol>
+  <div class="danger"><b>Bảo mật bắt buộc</b>Đổi mật khẩu <code>admin</code> ngay sau lần đăng nhập đầu. Không để tài khoản mẫu ở mật khẩu mặc định trong môi trường thật.</div>
+</section>
+
+<section id="pm2">
+  <h2><span class="num">6</span> Chạy nền tự động với PM2 <span style="font-size:13px;color:var(--ink-3);font-weight:500">(khuyến nghị cho vận hành thật)</span></h2>
+  <p>Với PM2, máy chủ <b>chạy nền</b> (không cần giữ cửa sổ đen), <b>tự bật lại khi lỗi</b> và <b>tự khởi động cùng máy tính</b>.</p>
+  <h3>Cách dễ nhất <span class="os os-win">Windows</span></h3>
+  <ol class="steps">
+    <li>Đóng cửa sổ đang chạy <code>node server.js</code> (nếu có) để tránh trùng cổng.</li>
+    <li>Chuột phải <b><code>install-pm2-windows.bat</code></b> → <b>Run as administrator</b>, rồi làm theo hướng dẫn trên màn hình.</li>
+  </ol>
+  <h3>Hoặc gõ tay (PowerShell quyền Administrator, tại thư mục app)</h3>
+  <div class="cmd">npm install -g pm2 pm2-windows-startup
+pm2 start server.js --name ho-tro-thng
+pm2 save
+pm2-startup install
+pm2 save</div>
+  <p><span class="os os-nix">Linux·mac</span> tương tự, dùng <code>pm2 startup</code> thay cho <code>pm2-windows-startup</code>:</p>
+  <div class="cmd">npm install -g pm2
+pm2 start server.js --name ho-tro-thng
+pm2 save
+pm2 startup   <span class="g"># chạy dòng lệnh mà nó in ra, rồi:</span>
+pm2 save</div>
+  <div class="note"><b>Cần Internet lần cài đầu</b>Cài PM2 qua <code>npm install -g</code> cần Internet <b>một lần</b>. Sau khi cài xong, máy chủ chạy hoàn toàn nội bộ, không cần mạng ngoài.</div>
+</section>
+
+<section id="saoluu">
+  <h2><span class="num">7</span> Sao lưu &amp; khôi phục dữ liệu</h2>
+  <p>Toàn bộ dữ liệu nằm ở <b>2 nơi</b> (cùng thư mục <code>server.js</code>):</p>
+  <table>
+    <tr><th>Thành phần</th><th>Nội dung</th></tr>
+    <tr><td><code>data.db</code></td><td>Toàn bộ ticket, phát sinh, người dùng, cấu hình &amp; danh mục.</td></tr>
+    <tr><td>thư mục <code>uploads/</code></td><td>File đính kèm thật do người dùng tải lên.</td></tr>
+  </table>
+  <h4>Sao lưu</h4>
+  <ol class="steps">
+    <li>Tốt nhất <b>tắt máy chủ</b>: <code>pm2 stop ho-tro-thng</code>.</li>
+    <li>Copy <b>cả <code>data.db</code> và thư mục <code>uploads/</code></b> sang nơi an toàn (đặt tên theo ngày, ví dụ <code>backup-2026-08-07</code>).</li>
+    <li>Bật lại: <code>pm2 start ho-tro-thng</code>.</li>
+  </ol>
+  <div class="warn"><b>Nếu copy lúc đang chạy</b>Nhớ copy kèm cả <code>data.db-wal</code> và <code>data.db-shm</code> (nếu có) cùng lúc với <code>data.db</code>, nếu không bản sao có thể thiếu dữ liệu vừa ghi.</div>
+  <h4>Khôi phục</h4>
+  <p>Tắt máy chủ → chép <code>data.db</code> và <code>uploads/</code> bản sao lưu <b>đè</b> vào (xóa <code>data.db-wal</code>, <code>data.db-shm</code> nếu còn) → bật lại.</p>
+  <div class="tip"><b>Nên đặt lịch sao lưu định kỳ</b>Ví dụ cuối mỗi ngày làm việc. Có thể dùng Task Scheduler (Windows) / cron (Linux) để tự copy <code>data.db</code> + <code>uploads/</code>.</div>
+</section>
+
+<section id="chk1">
+  <h2><span class="num">8</span> Kiểm tra sau khi cài (checklist)</h2>
+  <ul class="chk">
+    <li><code>node -v</code> ≥ 22.5.</li>
+    <li>Máy chủ khởi động không báo lỗi, hiện địa chỉ truy cập.</li>
+    <li>Mở được màn đăng nhập trên chính máy chủ (<code>http://localhost:3000</code>).</li>
+    <li>Một máy khác <b>cùng LAN</b> vào được bằng IP máy chủ.</li>
+    <li>Đã đổi mật khẩu <code>admin</code>; đã tạo tài khoản cho nhân viên.</li>
+    <li>Đã đặt IP tĩnh &amp; mở tường lửa.</li>
+    <li>Đã cài PM2 (máy chủ tự chạy nền, tự bật khi khởi động máy).</li>
+    <li>Đã sao lưu thử <code>data.db</code> + <code>uploads/</code> và biết cách khôi phục.</li>
+  </ul>
+</section>
+
+<div class="part-label"><div class="p">Phần B</div><h2>Cập nhật khi hệ thống có thay đổi</h2></div>
+
+<section id="nguyentac">
+  <h2><span class="num">9</span> Nguyên tắc an toàn khi cập nhật</h2>
+  <p class="lead">Áp dụng cho mọi loại thay đổi: thêm module mới, chỉnh sửa giao diện, vá lỗi hệ thống…</p>
+  <p>Bản cập nhật chỉ gồm <b>các file mã nguồn</b> (thường là <code>server.js</code>, thư mục <code>public/</code>, các file <code>.bat</code>/<code>.sh</code>, tài liệu). Việc cập nhật thực chất là <b>chép đè file mã nguồn mới</b> lên bản cũ.</p>
+  <table>
+    <tr><th>Ghi nhớ 3 điều</th><th>Chi tiết</th></tr>
+    <tr><td>① Luôn sao lưu trước</td><td>Copy <code>data.db</code> + <code>uploads/</code> trước khi chép đè bất cứ thứ gì.</td></tr>
+    <tr><td>② Không đụng vào dữ liệu</td><td><b>Tuyệt đối không chép đè</b> lên <code>data.db</code> và thư mục <code>uploads/</code> — đó là dữ liệu thật của công ty. Chỉ thay file mã nguồn.</td></tr>
+    <tr><td>③ Cấu trúc dữ liệu tự nâng cấp</td><td>Bảng / cột / cấu hình mới do phiên bản mới cần sẽ <b>tự tạo an toàn</b> khi khởi động lại — không cần thao tác thủ công, dữ liệu cũ giữ nguyên.</td></tr>
+  </table>
+  <div class="tip"><b>Vì sao nâng cấp không mất dữ liệu?</b>Máy chủ được thiết kế để nâng cấp an toàn: tạo bảng theo kiểu “tạo nếu chưa có”, thêm cột mới bỏ qua nếu đã tồn tại, và tự bổ sung các tham số cấu hình mới mà <b>không xóa</b> cấu hình bạn đã lưu. Dữ liệu ticket/phát sinh/người dùng không bị chạm tới.</div>
+</section>
+
+<section id="quytrinh">
+  <h2><span class="num">10</span> Quy trình cập nhật chuẩn (từng bước)</h2>
+  <ol class="steps">
+    <li><b>Sao lưu trước (bắt buộc).</b> <code>pm2 stop ho-tro-thng</code> rồi copy <code>data.db</code> + <code>uploads/</code> ra nơi an toàn (đặt tên theo ngày). Giữ lại cả <b>bản zip mã nguồn hiện tại</b> để lỡ cần quay lui.</li>
+    <li><b>Nhận bộ file mới</b> (file zip do bên phát triển gửi) và giải nén ra một thư mục tạm.</li>
+    <li><b>Tắt máy chủ</b> nếu bản cập nhật có đụng <code>server.js</code>: <code>pm2 stop ho-tro-thng</code>. <i>(Nếu chỉ đổi giao diện <code>public/</code> thì có thể không cần tắt — xem mục 11.)</i></li>
+    <li><b>Chép đè file mã nguồn mới</b> vào thư mục đang chạy: <code>server.js</code>, thư mục <code>public/</code>, các file <code>.bat</code>/<code>.sh</code>, tài liệu…
+      <div class="danger" style="margin-top:8px"><b>Giữ nguyên</b> <code>data.db</code> (và <code>data.db-wal</code>, <code>data.db-shm</code>) cùng thư mục <code>uploads/</code>. Nếu bản zip mới không kèm hai thứ này thì càng yên tâm — cứ chép đè phần còn lại.</div>
+    </li>
+    <li><b>Bật lại máy chủ</b>: <code>pm2 restart ho-tro-thng</code> (hoặc <code>pm2 start ho-tro-thng</code> nếu đã stop). Lúc này bảng/cột/cấu hình mới (nếu có) tự được tạo.</li>
+    <li><b>Trên trình duyệt của người dùng</b>: nhấn <b>Ctrl + F5</b> để tải lại giao diện mới (bỏ qua cache).</li>
+    <li><b>Kiểm tra</b> theo checklist mục 13.</li>
+  </ol>
+  <div class="note"><b>Cập nhật giao diện thì rất nhanh</b>File giao diện (<code>public/index.html</code>) được máy chủ gửi ra với chế độ “không lưu cache”. Vì vậy nếu chỉ đổi giao diện, sau khi chép đè, người dùng chỉ cần <b>Ctrl + F5</b> là thấy bản mới — thường không cần khởi động lại máy chủ (nhưng <code>pm2 restart</code> cho chắc cũng không sao).</div>
+</section>
+
+<section id="loai">
+  <h2><span class="num">11</span> Loại thay đổi cần làm gì (bảng tra nhanh)</h2>
+  <table>
+    <tr><th>Loại thay đổi</th><th>File cần chép đè</th><th>Khởi động lại máy chủ?</th><th>Trên trình duyệt</th></tr>
+    <tr><td><b>Chỉnh sửa giao diện</b><br>(bố cục, màu, chữ, form…)</td><td>thư mục <code>public/</code> (chủ yếu <code>index.html</code>)</td><td>Không bắt buộc<br><span style="color:var(--ink-3)">(restart cho chắc)</span></td><td><b>Ctrl + F5</b></td></tr>
+    <tr><td><b>Vá lỗi / đổi logic máy chủ</b><br>(xử lý API, quy tắc nghiệp vụ)</td><td><code>server.js</code></td><td><b>Có</b> — <code>pm2 restart</code></td><td>Ctrl + F5</td></tr>
+    <tr><td><b>Thêm module / tính năng mới</b><br>(bảng, cột, cấu hình mới)</td><td><code>server.js</code> + <code>public/</code></td><td><b>Có</b> — <code>pm2 restart</code><br><span style="color:var(--ink-3)">(tự tạo bảng/cột/cấu hình mới)</span></td><td>Ctrl + F5</td></tr>
+    <tr><td><b>Cập nhật tài liệu</b><br>(hướng dẫn, README)</td><td>các file <code>.html</code>/<code>.pdf</code>/<code>.md</code></td><td>Không</td><td>—</td></tr>
+  </table>
+  <div class="warn"><b>Khi nào chắc chắn phải khởi động lại?</b>Bất cứ khi nào <code>server.js</code> thay đổi. Giao diện (<code>public/</code>) thì không cần, chỉ Ctrl + F5. Nếu không rõ, cứ <code>pm2 restart ho-tro-thng</code> — an toàn và chỉ mất 1–2 giây.</div>
+</section>
+
+<section id="rollback">
+  <h2><span class="num">12</span> Khôi phục nhanh khi cập nhật lỗi (rollback)</h2>
+  <p>Nếu sau khi cập nhật máy chủ không chạy hoặc phát sinh lỗi:</p>
+  <ol class="steps">
+    <li><b>Xem lỗi trước</b>: <code>pm2 logs ho-tro-thng</code> — thường chỉ rõ nguyên nhân (ví dụ Node quá cũ, thiếu file).</li>
+    <li><b>Quay lui mã nguồn</b>: chép đè lại bộ file <b>bản cũ</b> (từ zip đã giữ ở bước 1 mục 10) lên thư mục đang chạy.</li>
+    <li><b>Khôi phục dữ liệu nếu cần</b>: nếu nghi dữ liệu bị ảnh hưởng, tắt máy chủ, chép <code>data.db</code> + <code>uploads/</code> từ bản sao lưu đè vào (xóa <code>data.db-wal</code>, <code>data.db-shm</code> nếu còn).</li>
+    <li><b>Bật lại</b>: <code>pm2 restart ho-tro-thng</code> và kiểm tra lại.</li>
+  </ol>
+  <div class="tip"><b>Mẹo vận hành</b>Mỗi lần cập nhật, giữ lại bản zip mã nguồn cũ kèm ngày tháng (ví dụ <code>ho-tro-thng-server-2026-08-01.zip</code>). Khi cần quay lui chỉ việc giải nén bản đó — nhanh và chắc chắn.</div>
+</section>
+
+<section id="chk2">
+  <h2><span class="num">13</span> Kiểm tra sau khi cập nhật (checklist)</h2>
+  <ul class="chk">
+    <li>Đã sao lưu <code>data.db</code> + <code>uploads/</code> <b>trước</b> khi chép đè.</li>
+    <li><code>pm2 list</code> — máy chủ ở trạng thái <b>online</b>.</li>
+    <li>Mở được màn đăng nhập; đăng nhập tài khoản thật thành công.</li>
+    <li><b>Dữ liệu cũ còn nguyên</b>: danh sách ticket, người dùng, cấu hình đúng như trước.</li>
+    <li>Đã <b>Ctrl + F5</b>; giao diện hiển thị bản mới.</li>
+    <li>Tính năng mới / phần vừa vá hoạt động đúng như mong đợi.</li>
+    <li><code>pm2 logs</code> không có lỗi đỏ lặp lại.</li>
+  </ul>
+</section>
+
+<div class="part-label"><div class="p">Phụ lục</div><h2>Tham khảo nhanh</h2></div>
+
+<section id="plenh">
+  <h2><span class="num">14</span> Các lệnh PM2 thường dùng</h2>
+  <table>
+    <tr><th>Lệnh</th><th>Tác dụng</th></tr>
+    <tr><td><code>pm2 list</code></td><td>Xem máy chủ đang chạy không (online/stopped).</td></tr>
+    <tr><td><code>pm2 logs ho-tro-thng</code></td><td>Xem nhật ký / lỗi theo thời gian thực.</td></tr>
+    <tr><td><code>pm2 restart ho-tro-thng</code></td><td>Khởi động lại (dùng sau khi cập nhật <code>server.js</code>).</td></tr>
+    <tr><td><code>pm2 stop ho-tro-thng</code></td><td>Tạm dừng (dùng trước khi sao lưu / chép đè).</td></tr>
+    <tr><td><code>pm2 start ho-tro-thng</code></td><td>Bật lại sau khi stop.</td></tr>
+    <tr><td><code>pm2 delete ho-tro-thng</code></td><td>Gỡ khỏi PM2 (không xóa dữ liệu).</td></tr>
+    <tr><td><code>pm2 info ho-tro-thng</code></td><td>Xem chi tiết, gồm <b>đường dẫn file <code>server.js</code></b> đang chạy.</td></tr>
+  </table>
+  <div class="warn"><b>Cập nhật xong mà không thấy đổi?</b>Kiểm tra <code>pm2 info ho-tro-thng</code> để chắc chắn PM2 đang trỏ đúng thư mục bạn vừa chép đè. Nếu trỏ nhầm thư mục khác, chép đè vào đúng chỗ đó hoặc <code>pm2 delete</code> rồi <code>pm2 start</code> lại từ thư mục đúng.</div>
+</section>
+
+<section id="pcau">
+  <h2><span class="num">15</span> Cấu trúc thư mục &amp; file dữ liệu</h2>
+  <div class="cmd">ho-tro-thng-server/
+├─ server.js                <span class="g">← Mã nguồn máy chủ (chép đè khi vá lỗi/thêm module)</span>
+├─ public/
+│   └─ index.html           <span class="g">← Giao diện (chép đè khi chỉnh giao diện)</span>
+├─ start-windows.bat        <span class="g">← Khởi động trên Windows</span>
+├─ start.sh                 <span class="g">← Khởi động trên Linux/macOS</span>
+├─ install-pm2-windows.bat  <span class="g">← Cài PM2 tự động (Windows)</span>
+├─ README.md                <span class="g">← Ghi chú kỹ thuật</span>
+├─ HUONG-DAN-SU-DUNG.html   <span class="g">← Hướng dẫn cho người dùng cuối</span>
+│
+├─ data.db                  <span class="c">★ DỮ LIỆU — KHÔNG chép đè, luôn sao lưu</span>
+├─ data.db-wal / data.db-shm <span class="c">★ File phụ của data.db (sao lưu cùng lúc)</span>
+└─ uploads/                 <span class="c">★ FILE ĐÍNH KÈM — KHÔNG chép đè, luôn sao lưu</span></div>
+  <table>
+    <tr><th>Nhóm</th><th>File</th><th>Khi cập nhật</th></tr>
+    <tr><td><b>Mã nguồn</b></td><td><code>server.js</code>, <code>public/</code>, <code>*.bat</code>, <code>*.sh</code>, tài liệu</td><td>Chép đè bằng bản mới</td></tr>
+    <tr><td><b>Dữ liệu</b></td><td><code>data.db</code> (+ <code>-wal</code>/<code>-shm</code>), <code>uploads/</code></td><td><b>Giữ nguyên</b> · chỉ sao lưu / khôi phục</td></tr>
+  </table>
+  <div class="note"><b>Thông tin kỹ thuật</b>Node.js thuần, không phụ thuộc gói ngoài · HTTP + REST API · Lưu trữ SQLite (<code>node:sqlite</code>, chế độ WAL) · Frontend tĩnh trong <code>public/</code> gọi API <code>/api/*</code> · Cấu hình &amp; danh mục lưu trong bảng <code>settings</code> của <code>data.db</code>.</div>
+</section>
+
+<div class="foot">Hệ thống Hỗ trợ THNG — Hướng dẫn Cài đặt &amp; Cập nhật (dành cho IT / Quản trị máy chủ)</div>
+
+</div>
+</body>
+</html>
