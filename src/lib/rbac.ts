@@ -33,6 +33,16 @@ export const PERMISSIONS = {
   INVENTORY_READ: "inventory.read",
   INBOUND_WRITE: "inbound.write",
   OUTBOUND_WRITE: "outbound.write",
+  TRANSFER_WRITE: "transfer.write",
+
+  SERVICE_READ: "service.read",
+  SERVICE_WRITE: "service.write", // quản lý liệu trình + định mức
+  SERVICE_USE: "service.use", // ghi nhận thực hiện dịch vụ (trừ kho)
+
+  ASSET_READ: "asset.read",
+  ASSET_WRITE: "asset.write",
+
+  REPORT_READ: "report.read",
 
   USER_MANAGE: "user.manage",
 } as const;
@@ -53,6 +63,13 @@ export const PERMISSION_LABELS: Record<PermissionCode, string> = {
   "inventory.read": "Xem tồn kho",
   "inbound.write": "Nhập kho",
   "outbound.write": "Xuất kho",
+  "transfer.write": "Chuyển kho",
+  "service.read": "Xem liệu trình dịch vụ",
+  "service.write": "Quản lý liệu trình dịch vụ",
+  "service.use": "Ghi nhận thực hiện dịch vụ",
+  "asset.read": "Xem tài sản/thiết bị",
+  "asset.write": "Quản lý tài sản/thiết bị",
+  "report.read": "Xem báo cáo",
   "user.manage": "Quản trị người dùng",
 };
 
@@ -62,6 +79,9 @@ const READ_ALL: PermissionCode[] = [
   PERMISSIONS.PRODUCT_READ,
   PERMISSIONS.WAREHOUSE_READ,
   PERMISSIONS.INVENTORY_READ,
+  PERMISSIONS.SERVICE_READ,
+  PERMISSIONS.ASSET_READ,
+  PERMISSIONS.REPORT_READ,
 ];
 
 export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
@@ -75,6 +95,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.WAREHOUSE_WRITE,
     PERMISSIONS.INBOUND_WRITE,
     PERMISSIONS.OUTBOUND_WRITE,
+    PERMISSIONS.TRANSFER_WRITE,
+    PERMISSIONS.SERVICE_WRITE,
+    PERMISSIONS.SERVICE_USE,
+    PERMISSIONS.ASSET_WRITE,
   ],
 
   WAREHOUSE: [
@@ -83,9 +107,12 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.SUPPLIER_WRITE,
     PERMISSIONS.INBOUND_WRITE,
     PERMISSIONS.OUTBOUND_WRITE,
+    PERMISSIONS.TRANSFER_WRITE,
+    PERMISSIONS.SERVICE_USE,
+    PERMISSIONS.ASSET_WRITE,
   ],
 
-  STAFF: [...READ_ALL, PERMISSIONS.OUTBOUND_WRITE],
+  STAFF: [...READ_ALL, PERMISSIONS.OUTBOUND_WRITE, PERMISSIONS.SERVICE_USE],
 };
 
 export function can(

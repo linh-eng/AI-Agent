@@ -10,7 +10,7 @@ mỹ phẩm/skincare, thực phẩm chức năng (TPCN), vật tư tiêu hao spa
 Đặc thù nghiệp vụ: quản lý tồn **theo lô + hạn sử dụng (HSD)**; xuất kho ưu tiên **FEFO** (hết hạn
 trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới định mức tồn.
 
-## Trạng thái hiện tại — **MVP hoàn chỉnh**
+## Trạng thái hiện tại — **MVP + Phase 2**
 
 - **Auth + RBAC:** JWT cookie httpOnly + bcrypt; 4 vai trò (ADMIN, MANAGER, WAREHOUSE, STAFF).
 - **Danh mục:** sản phẩm (chế độ `LOT`/`QUANTITY`, cờ `requiresExpiry`, định mức tồn, ngưỡng cảnh báo HSD),
@@ -20,9 +20,17 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
   `requiresExpiry` thì bắt buộc HSD.
 - **Xuất kho:** phiếu xuất (SALE / INTERNAL_USE / DISPOSAL / ADJUSTMENT); tự phân bổ lô **FEFO**
   (HSD sớm nhất trước, cùng HSD thì lô cũ trước; lô không HSD xếp sau), chặn xuất vượt tồn.
+- **Chuyển kho (Phase 2):** phiếu chuyển giữa 2 kho; rút lô ở kho nguồn theo FEFO, tạo/cộng lô tương ứng
+  (giữ nguyên mã lô + HSD) ở kho đích; mỗi lần tách lô ghi 2 `StockMovement` (OUTBOUND + INBOUND, `refType=TRANSFER`).
+- **Dịch vụ/liệu trình (Phase 2):** khai báo định mức tiêu hao (`Service` + `ServiceItem`); ghi nhận thực hiện
+  N lượt (`ServiceUsage`) → tự lập phiếu xuất `INTERNAL_USE` (FEFO) trừ kho theo định mức × số lượt.
+- **Tài sản/thiết bị (Phase 2):** `Asset` theo serial, trạng thái (IN_STOCK/IN_USE/MAINTENANCE/RETIRED),
+  ngày mua & hạn bảo hành — quản lý riêng, không nằm trong tồn theo lô.
 - **Tồn kho realtime:** tồn theo sản phẩm (gộp lô), lọc theo kho, HSD gần nhất, giá trị tồn theo giá vốn.
-- **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng theo `expiryAlertDays` của sản phẩm, mặc định 60 ngày) và
-  sản phẩm dưới định mức (`onHand <= minStock`).
+- **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng theo `expiryAlertDays`, mặc định 60 ngày), sản phẩm dưới định mức
+  (`onHand <= minStock`), và **thiết bị sắp/đã hết bảo hành**.
+- **Báo cáo N-X-T (Phase 2):** tồn đầu – nhập – xuất – tồn cuối theo kỳ + kho, tính từ `StockMovement`;
+  xuất **CSV** (UTF-8 BOM) phía client.
 - **Dashboard:** số liệu tổng hợp + phiếu nhập/xuất gần đây.
 
 ## Tech stack
@@ -47,16 +55,23 @@ src/
       inventory/     # Tồn kho realtime theo sản phẩm/kho
       inbound/       # Nhập kho: list + new (tạo phiếu) + [id] (chi tiết)
       outbound/      # Xuất kho: list + new (FEFO) + [id] (chi tiết)
-      alerts/        # Trung tâm cảnh báo (HSD + dưới định mức)
+      transfers/     # Chuyển kho: list + new + [id]
+      service-usage/ # Ghi nhận thực hiện dịch vụ (tự trừ kho)
+      services/      # Liệu trình dịch vụ + định mức tiêu hao
+      assets/        # Tài sản/thiết bị theo serial + bảo hành
+      reports/       # Báo cáo Nhập-Xuất-Tồn + xuất CSV
+      alerts/        # Trung tâm cảnh báo (HSD + dưới định mức + bảo hành)
       products/      # Sản phẩm
       categories/    # Nhóm hàng
       suppliers/     # Nhà cung cấp
       warehouses/    # Kho
-    api/             # Route handlers REST (auth + catalog + inventory/alerts/dashboard/receipts/issues)
+    api/             # Route handlers REST (auth + catalog + inventory/alerts/dashboard/receipts/
+                     # issues/transfers/services/service-usages/assets/reports)
   components/        # app-shell, page-header, session-provider, ui/*
   lib/               # prisma, auth, session, rbac, api, client, utils, codes (sinh mã phiếu),
-                     # validation (Zod), inventory (tồn + cảnh báo), inbound-service (nhập),
-                     # outbound-service (xuất + FEFO)
+                     # validation (Zod), inventory (tồn + cảnh báo + bảo hành), reports (N-X-T),
+                     # csv, inbound-service, outbound-service (FEFO), transfer-service,
+                     # service-service (tiêu hao dịch vụ)
   middleware.ts      # Bảo vệ route: chưa đăng nhập -> /login hoặc 401
 ```
 
@@ -93,5 +108,8 @@ Tài khoản demo: `admin@sophia.vn` / `admin123` (mỗi vai trò 1 user, mật 
 - Thêm nghiệp vụ mới: cập nhật `schema.prisma` (nếu cần) → thêm Zod ở `validation.ts` → API route
   (`requirePermission`) → service ở `src/lib/*-service.ts` → trang UI → cập nhật seed + file này.
 - Giá trị tồn hiện tính theo `unitCost` của lô; có thể mở rộng giá bán/lợi nhuận sau.
-- Hướng phát triển tiếp: chuyển kho giữa nhiều kho, theo dõi tài sản/bảo hành cho thiết bị (serial),
-  kiểm kê định kỳ, báo cáo Nhập–Xuất–Tồn + xuất CSV/in phiếu.
+- Ghi nhận dịch vụ tạo phiếu xuất `INTERNAL_USE` rồi lưu `ServiceUsage.issueId` để truy vết (2 bước, không
+  cùng 1 transaction — nếu cần chặt hơn có thể gộp).
+- Báo cáo N-X-T lọc theo 1 kho là chính xác; xem gộp toàn kho thì số nhập/xuất có tính cả bút toán chuyển
+  kho nội bộ (tồn cuối vẫn đúng).
+- Hướng phát triển tiếp: kiểm kê định kỳ, in phiếu/tem, lịch sử bảo trì thiết bị, báo cáo doanh thu dịch vụ.

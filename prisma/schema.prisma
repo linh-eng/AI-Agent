@@ -25,10 +25,12 @@ model User {
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  roles     UserRole[]
-  receipts  GoodsReceipt[] @relation("ReceiptCreatedBy")
-  issues    GoodsIssue[]   @relation("IssueCreatedBy")
-  auditLogs AuditLog[]
+  roles         UserRole[]
+  receipts      GoodsReceipt[]  @relation("ReceiptCreatedBy")
+  issues        GoodsIssue[]    @relation("IssueCreatedBy")
+  transfers     StockTransfer[] @relation("TransferCreatedBy")
+  serviceUsages ServiceUsage[]  @relation("ServicePerformedBy")
+  auditLogs     AuditLog[]
 
   @@map("users")
 }
@@ -83,10 +85,14 @@ model Warehouse {
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
 
-  batches   StockBatch[]
-  receipts  GoodsReceipt[]
-  issues    GoodsIssue[]
-  movements StockMovement[]
+  batches       StockBatch[]
+  receipts      GoodsReceipt[]
+  issues        GoodsIssue[]
+  movements     StockMovement[]
+  transfersFrom StockTransfer[] @relation("TransferFrom")
+  transfersTo   StockTransfer[] @relation("TransferTo")
+  serviceUsages ServiceUsage[]
+  assets        Asset[]
 
   @@map("warehouses")
 }
@@ -105,6 +111,7 @@ model Supplier {
 
   receipts GoodsReceipt[]
   batches  StockBatch[]
+  assets   Asset[]
 
   @@map("suppliers")
 }
@@ -152,7 +159,10 @@ model Product {
   batches      StockBatch[]
   receiptItems GoodsReceiptItem[]
   issueItems   GoodsIssueItem[]
-  movements    StockMovement[]
+  movements     StockMovement[]
+  serviceItems  ServiceItem[]
+  transferItems StockTransferItem[]
+  assets        Asset[]
 
   @@map("products")
 }
@@ -298,6 +308,121 @@ model StockMovement {
   @@index([productId, warehouseId])
   @@index([createdAt])
   @@map("stock_movements")
+}
+
+// -----------------------------------------------------------------------------
+// Chuyển kho giữa các chi nhánh
+// -----------------------------------------------------------------------------
+model StockTransfer {
+  id              String    @id @default(cuid())
+  code            String    @unique // mã phiếu chuyển PC-xxxx
+  fromWarehouseId String    @map("from_warehouse_id")
+  fromWarehouse   Warehouse @relation("TransferFrom", fields: [fromWarehouseId], references: [id])
+  toWarehouseId   String    @map("to_warehouse_id")
+  toWarehouse     Warehouse @relation("TransferTo", fields: [toWarehouseId], references: [id])
+  status          DocStatus @default(DRAFT)
+  note            String?
+  createdById     String    @map("created_by_id")
+  createdBy       User      @relation("TransferCreatedBy", fields: [createdById], references: [id])
+  transferredAt   DateTime? @map("transferred_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  items StockTransferItem[]
+
+  @@map("stock_transfers")
+}
+
+model StockTransferItem {
+  id         String        @id @default(cuid())
+  transferId String        @map("transfer_id")
+  transfer   StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  productId  String        @map("product_id")
+  product    Product       @relation(fields: [productId], references: [id])
+  quantity   Float
+
+  @@map("stock_transfer_items")
+}
+
+// -----------------------------------------------------------------------------
+// Dịch vụ / liệu trình + định mức tiêu hao (BOM) và ghi nhận sử dụng
+// -----------------------------------------------------------------------------
+model Service {
+  id        String        @id @default(cuid())
+  code      String        @unique
+  name      String
+  note      String?
+  isActive  Boolean       @default(true) @map("is_active")
+  createdAt DateTime      @default(now()) @map("created_at")
+  items     ServiceItem[]
+  usages    ServiceUsage[]
+
+  @@map("services")
+}
+
+// Định mức tiêu hao 1 lượt dịch vụ: mỗi sản phẩm tiêu hao bao nhiêu.
+model ServiceItem {
+  id        String  @id @default(cuid())
+  serviceId String  @map("service_id")
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Float
+
+  @@unique([serviceId, productId])
+  @@map("service_items")
+}
+
+// Một lần thực hiện dịch vụ N lượt -> tự trừ kho (tạo phiếu xuất INTERNAL_USE).
+model ServiceUsage {
+  id            String    @id @default(cuid())
+  code          String    @unique // mã SV-xxxx
+  serviceId     String    @map("service_id")
+  service       Service   @relation(fields: [serviceId], references: [id])
+  warehouseId   String    @map("warehouse_id")
+  warehouse     Warehouse @relation(fields: [warehouseId], references: [id])
+  sessions      Int       @default(1) // số lượt
+  customerName  String?   @map("customer_name")
+  note          String?
+  issueId       String?   @map("issue_id") // phiếu xuất phát sinh
+  issueCode     String?   @map("issue_code")
+  performedById String    @map("performed_by_id")
+  performedBy   User      @relation("ServicePerformedBy", fields: [performedById], references: [id])
+  performedAt   DateTime  @default(now()) @map("performed_at")
+
+  @@map("service_usages")
+}
+
+// -----------------------------------------------------------------------------
+// Tài sản / thiết bị theo serial + bảo hành
+// -----------------------------------------------------------------------------
+enum AssetStatus {
+  IN_STOCK // trong kho
+  IN_USE // đang sử dụng
+  MAINTENANCE // bảo trì/sửa chữa
+  RETIRED // thanh lý
+}
+
+model Asset {
+  id            String      @id @default(cuid())
+  code          String      @unique // mã tài sản
+  productId     String      @map("product_id")
+  product       Product     @relation(fields: [productId], references: [id])
+  serialNumber  String?     @unique @map("serial_number")
+  warehouseId   String?     @map("warehouse_id")
+  warehouse     Warehouse?  @relation(fields: [warehouseId], references: [id])
+  status        AssetStatus @default(IN_STOCK)
+  location      String? // vị trí đặt (phòng/chi nhánh)
+  purchaseDate  DateTime?   @map("purchase_date")
+  warrantyUntil DateTime?   @map("warranty_until")
+  supplierId    String?     @map("supplier_id")
+  supplier      Supplier?   @relation(fields: [supplierId], references: [id])
+  note          String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([warrantyUntil])
+  @@map("assets")
 }
 
 // -----------------------------------------------------------------------------

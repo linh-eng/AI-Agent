@@ -24,3 +24,27 @@ export async function nextIssueCode(): Promise<string> {
   });
   return `${prefix}-${String(count + 1).padStart(4, "0")}`;
 }
+
+/** PC-20260810-0001 — phiếu chuyển kho. */
+export async function nextTransferCode(): Promise<string> {
+  const prefix = `PC-${ymd()}`;
+  const count = await prisma.stockTransfer.count({
+    where: { code: { startsWith: prefix } },
+  });
+  return `${prefix}-${String(count + 1).padStart(4, "0")}`;
+}
+
+/** SV-20260810-0001 — ghi nhận thực hiện dịch vụ. */
+export async function nextServiceUsageCode(): Promise<string> {
+  const prefix = `SV-${ymd()}`;
+  const count = await prisma.serviceUsage.count({
+    where: { code: { startsWith: prefix } },
+  });
+  return `${prefix}-${String(count + 1).padStart(4, "0")}`;
+}
+
+/** TS-0001 — mã tài sản (tuần tự toàn cục). */
+export async function nextAssetCode(): Promise<string> {
+  const count = await prisma.asset.count();
+  return `TS-${String(count + 1).padStart(4, "0")}`;
+}

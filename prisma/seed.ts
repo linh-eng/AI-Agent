@@ -235,6 +235,84 @@ async function main() {
     }
   }
 
+  // ---- Liệu trình dịch vụ + định mức tiêu hao ----
+  if ((await prisma.service.count()) === 0) {
+    const serviceData = [
+      {
+        code: "SPA-BASIC",
+        name: "Chăm sóc da cơ bản",
+        items: [
+          { sku: "SR-VITC-30", qty: 0.2 },
+          { sku: "BONG-TAYTRANG", qty: 0.1 },
+          { sku: "KHAN-SPA", qty: 0.5 },
+        ],
+      },
+      {
+        code: "SPA-MASK",
+        name: "Liệu trình đắp mặt nạ dưỡng ẩm",
+        items: [
+          { sku: "MN-DUONGAM", qty: 0.1 },
+          { sku: "TD-OAILUONG", qty: 0.05 },
+          { sku: "KHAN-SPA", qty: 0.5 },
+        ],
+      },
+      {
+        code: "SPA-SUN",
+        name: "Chống nắng & bảo vệ da",
+        items: [
+          { sku: "KEM-SPF50", qty: 0.15 },
+          { sku: "BONG-TAYTRANG", qty: 0.1 },
+        ],
+      },
+    ];
+    for (const s of serviceData) {
+      await prisma.service.create({
+        data: {
+          code: s.code,
+          name: s.name,
+          items: {
+            create: s.items.map((i) => ({ productId: productByS[i.sku], quantity: i.qty })),
+          },
+        },
+      });
+    }
+  }
+
+  // ---- Tài sản / thiết bị (serial + bảo hành) ----
+  if ((await prisma.asset.count()) === 0) {
+    interface A {
+      sku: string;
+      serial: string;
+      status: "IN_STOCK" | "IN_USE" | "MAINTENANCE" | "RETIRED";
+      warranty: number; // ngày kể từ hôm nay (âm = đã hết bảo hành)
+      location?: string;
+    }
+    const assetData: A[] = [
+      { sku: "MAY-XONGHOI", serial: "XH-2024-001", status: "IN_USE", warranty: 40, location: "Phòng trị liệu 1" },
+      { sku: "MAY-XONGHOI", serial: "XH-2024-002", status: "IN_USE", warranty: 400, location: "Phòng trị liệu 2" },
+      { sku: "MAY-XONGHOI", serial: "XH-2023-003", status: "MAINTENANCE", warranty: -20, location: "Kho kỹ thuật" },
+      { sku: "DEN-LED-TRILIEU", serial: "LED-2024-001", status: "IN_USE", warranty: 200, location: "Phòng trị liệu 1" },
+      { sku: "DEN-LED-TRILIEU", serial: "LED-2022-002", status: "IN_STOCK", warranty: -120 },
+    ];
+    let idx = 0;
+    for (const a of assetData) {
+      idx += 1;
+      await prisma.asset.create({
+        data: {
+          code: `TS-${String(idx).padStart(4, "0")}`,
+          productId: productByS[a.sku],
+          serialNumber: a.serial,
+          warehouseId: khoTong.id,
+          status: a.status,
+          location: a.location,
+          purchaseDate: daysFromNow(-500),
+          warrantyUntil: daysFromNow(a.warranty),
+          supplierId: sups["NCC-SPAPRO"],
+        },
+      });
+    }
+  }
+
   await prisma.auditLog.create({
     data: { userId: admin.id, action: "SEED", entityType: "System", detail: "Khởi tạo dữ liệu mẫu" },
   });

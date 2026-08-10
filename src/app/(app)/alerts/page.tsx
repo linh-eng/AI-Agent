@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CalendarClock, TrendingDown } from "lucide-react";
+import { CalendarClock, TrendingDown, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -28,17 +28,29 @@ interface LowStock {
   onHand: number;
   minStock: number;
 }
+interface WarrantyAlert {
+  assetId: string;
+  code: string;
+  productName: string;
+  serialNumber: string | null;
+  warrantyUntil: string;
+  daysLeft: number;
+  status: string;
+  isExpired: boolean;
+}
 
 export default function AlertsPage() {
   const [expiry, setExpiry] = useState<ExpiryAlert[]>([]);
   const [lowStock, setLowStock] = useState<LowStock[]>([]);
+  const [warranty, setWarranty] = useState<WarrantyAlert[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch<{ expiry: ExpiryAlert[]; lowStock: LowStock[] }>("/api/alerts")
+    apiFetch<{ expiry: ExpiryAlert[]; lowStock: LowStock[]; warranty: WarrantyAlert[] }>("/api/alerts")
       .then((d) => {
         setExpiry(d.expiry);
         setLowStock(d.lowStock);
+        setWarranty(d.warranty ?? []);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -110,7 +122,7 @@ export default function AlertsPage() {
       </Card>
 
       {/* Định mức */}
-      <Card>
+      <Card className="mb-6">
         <CardContent className="p-5">
           <div className="mb-3 flex items-center gap-2">
             <TrendingDown className="h-5 w-5 text-amber-600" />
@@ -153,6 +165,59 @@ export default function AlertsPage() {
                       <Badge tone="warning">
                         +{formatNumber(Math.max(0, a.minStock - a.onHand))} {a.uom}
                       </Badge>
+                    </TD>
+                  </TR>
+                ))
+              )}
+            </TBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Bảo hành thiết bị */}
+      <Card>
+        <CardContent className="p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-amber-600" />
+            <h3 className="font-semibold">Bảo hành thiết bị</h3>
+            <Badge tone={warranty.length ? "warning" : "success"}>{warranty.length} thiết bị</Badge>
+          </div>
+          <Table>
+            <THead>
+              <TR>
+                <TH>Mã TS</TH>
+                <TH>Thiết bị</TH>
+                <TH>Serial</TH>
+                <TH>Bảo hành đến</TH>
+                <TH className="text-right">Còn lại</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {loading ? (
+                <TR>
+                  <TD colSpan={5} className="py-6 text-center text-muted-foreground">
+                    Đang tải…
+                  </TD>
+                </TR>
+              ) : warranty.length === 0 ? (
+                <TR>
+                  <TD colSpan={5} className="py-6 text-center text-muted-foreground">
+                    Không có thiết bị sắp hết bảo hành 🎉
+                  </TD>
+                </TR>
+              ) : (
+                warranty.map((w) => (
+                  <TR key={w.assetId}>
+                    <TD className="font-mono text-xs">{w.code}</TD>
+                    <TD className="font-medium">{w.productName}</TD>
+                    <TD className="font-mono text-xs">{w.serialNumber ?? "—"}</TD>
+                    <TD>{formatDate(w.warrantyUntil)}</TD>
+                    <TD className="text-right">
+                      {w.isExpired ? (
+                        <Badge tone="danger">Hết BH {Math.abs(w.daysLeft)} ngày</Badge>
+                      ) : (
+                        <Badge tone="warning">Còn {w.daysLeft} ngày</Badge>
+                      )}
                     </TD>
                   </TR>
                 ))

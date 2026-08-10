@@ -153,6 +153,46 @@ export async function getLowStockAlerts(
     }));
 }
 
+export interface WarrantyAlert {
+  assetId: string;
+  code: string;
+  productName: string;
+  serialNumber: string | null;
+  warrantyUntil: string;
+  daysLeft: number;
+  status: string;
+  isExpired: boolean;
+}
+
+/** Thiết bị/tài sản sắp hoặc đã hết hạn bảo hành (ngưỡng ngày). */
+export async function getWarrantyAlerts(days = 60): Promise<WarrantyAlert[]> {
+  const assets = await prisma.asset.findMany({
+    where: {
+      warrantyUntil: { not: null },
+      status: { not: "RETIRED" },
+    },
+    include: { product: true },
+    orderBy: { warrantyUntil: "asc" },
+  });
+  const out: WarrantyAlert[] = [];
+  for (const a of assets) {
+    if (!a.warrantyUntil) continue;
+    const left = daysUntil(a.warrantyUntil);
+    if (left > days) continue;
+    out.push({
+      assetId: a.id,
+      code: a.code,
+      productName: a.product.name,
+      serialNumber: a.serialNumber,
+      warrantyUntil: a.warrantyUntil.toISOString(),
+      daysLeft: left,
+      status: a.status,
+      isExpired: left < 0,
+    });
+  }
+  return out;
+}
+
 export interface DashboardStats {
   productCount: number;
   totalOnHand: number;

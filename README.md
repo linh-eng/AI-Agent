@@ -4,8 +4,9 @@ Hệ thống quản lý kho cho **Sophia Wellness**: nhập – xuất kho, **t�
 cảnh báo hàng sắp/đã hết hạn và dưới định mức tồn. Phù hợp 4 nhóm hàng: mỹ phẩm/skincare, thực phẩm
 chức năng, vật tư tiêu hao spa, thiết bị & máy.
 
-> Trạng thái: **MVP hoàn chỉnh** — Auth/RBAC, danh mục (sản phẩm/nhóm hàng/NCC/kho), nhập kho theo lô +
-> HSD, xuất kho tự phân bổ lô **FEFO** (hết hạn trước xuất trước), tồn kho realtime, và trung tâm cảnh báo.
+> Trạng thái: **MVP + Phase 2** — Auth/RBAC, danh mục, nhập kho theo lô + HSD, xuất kho **FEFO**, tồn kho
+> realtime, cảnh báo; và Phase 2: **chuyển kho** giữa chi nhánh, **trừ kho tự động theo liệu trình dịch vụ**,
+> **theo dõi tài sản/bảo hành thiết bị theo serial**, **báo cáo Nhập–Xuất–Tồn + xuất CSV**.
 
 ## Công nghệ
 
@@ -40,8 +41,12 @@ npm run dev                   # http://localhost:3000
   Ghi sổ ngay: sinh/cộng lô tồn + bút toán biến động (`StockMovement`).
 - **Xuất kho:** lập phiếu xuất (bán / dùng nội bộ / hủy / điều chỉnh); hệ thống **tự chọn lô theo FEFO**
   (HSD sớm nhất xuất trước), chặn xuất vượt tồn khả dụng.
+- **Chuyển kho:** phiếu chuyển giữa 2 kho/chi nhánh; rút lô ở kho nguồn theo FEFO, giữ nguyên lô & HSD sang kho đích.
+- **Dịch vụ/liệu trình:** khai báo định mức tiêu hao; ghi nhận thực hiện N lượt → tự lập phiếu xuất tiêu hao (FEFO).
+- **Tài sản/thiết bị:** theo dõi thiết bị theo serial, trạng thái sử dụng, ngày mua & hạn bảo hành.
 - **Tồn kho realtime:** tồn theo sản phẩm (gộp mọi lô), lọc theo kho, HSD gần nhất, giá trị tồn.
-- **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng cấu hình theo sản phẩm, mặc định 60 ngày) và sản phẩm dưới định mức.
+- **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng cấu hình, mặc định 60 ngày), sản phẩm dưới định mức, và thiết bị sắp/đã hết bảo hành.
+- **Báo cáo N-X-T:** tồn đầu – nhập – xuất – tồn cuối theo kỳ + kho, xuất CSV.
 
 ## Điểm nhấn kiến trúc
 

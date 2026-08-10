@@ -89,3 +89,83 @@ export const issueCreateSchema = z.object({
 
 export type ReceiptCreateInput = z.infer<typeof receiptCreateSchema>;
 export type IssueCreateInput = z.infer<typeof issueCreateSchema>;
+
+// ----- Chuyển kho -----
+export const transferCreateSchema = z.object({
+  fromWarehouseId: z.string().min(1, "Chọn kho nguồn"),
+  toWarehouseId: z.string().min(1, "Chọn kho đích"),
+  note: optionalString,
+  items: z
+    .array(
+      z.object({
+        productId: z.string().min(1, "Chọn sản phẩm"),
+        quantity: z.number().positive("Số lượng > 0"),
+      })
+    )
+    .min(1, "Cần ít nhất 1 dòng hàng"),
+});
+
+// ----- Dịch vụ / liệu trình -----
+export const serviceCreateSchema = z.object({
+  code: z.string().trim().min(1, "Bắt buộc").max(30),
+  name: z.string().trim().min(1, "Bắt buộc").max(160),
+  note: optionalString,
+  items: z
+    .array(
+      z.object({
+        productId: z.string().min(1, "Chọn sản phẩm"),
+        quantity: z.number().positive("Định mức > 0"),
+      })
+    )
+    .default([]),
+});
+
+export const serviceUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(160).optional(),
+  note: optionalString,
+  isActive: z.boolean().optional(),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().min(1),
+        quantity: z.number().positive(),
+      })
+    )
+    .optional(),
+});
+
+export const serviceUsageSchema = z.object({
+  serviceId: z.string().min(1, "Chọn dịch vụ"),
+  warehouseId: z.string().min(1, "Chọn kho"),
+  sessions: z.number().int().positive("Số lượt >= 1").default(1),
+  customerName: optionalString,
+  note: optionalString,
+});
+
+// ----- Tài sản / thiết bị -----
+export const assetCreateSchema = z.object({
+  productId: z.string().min(1, "Chọn thiết bị"),
+  code: optionalString, // để trống -> sinh tự động
+  serialNumber: optionalString,
+  warehouseId: optionalString,
+  status: z.enum(["IN_STOCK", "IN_USE", "MAINTENANCE", "RETIRED"]).default("IN_STOCK"),
+  location: optionalString,
+  purchaseDate: optionalString,
+  warrantyUntil: optionalString,
+  supplierId: optionalString,
+  note: optionalString,
+});
+
+export const assetUpdateSchema = z.object({
+  serialNumber: optionalString,
+  warehouseId: optionalString,
+  status: z.enum(["IN_STOCK", "IN_USE", "MAINTENANCE", "RETIRED"]).optional(),
+  location: optionalString,
+  purchaseDate: optionalString,
+  warrantyUntil: optionalString,
+  supplierId: optionalString,
+  note: optionalString,
+});
+
+export type TransferCreateInput = z.infer<typeof transferCreateSchema>;
+export type ServiceUsageInput = z.infer<typeof serviceUsageSchema>;
