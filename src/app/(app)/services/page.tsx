@@ -19,6 +19,7 @@ interface Service {
   id: string;
   code: string;
   name: string;
+  price?: number | null;
   note?: string | null;
   isActive: boolean;
   items: { productId: string; quantity: number; product: Product }[];
@@ -33,7 +34,7 @@ export default function ServicesPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: "", name: "", note: "", isActive: true });
+  const [form, setForm] = useState({ code: "", name: "", price: "", note: "", isActive: true });
   const [items, setItems] = useState<FormItem[]>([{ productId: "", quantity: "" }]);
 
   async function load() {
@@ -51,14 +52,14 @@ export default function ServicesPage() {
 
   function openCreate() {
     setEditing(null);
-    setForm({ code: "", name: "", note: "", isActive: true });
+    setForm({ code: "", name: "", price: "", note: "", isActive: true });
     setItems([{ productId: "", quantity: "" }]);
     setError(null);
     setOpen(true);
   }
   function openEdit(s: Service) {
     setEditing(s);
-    setForm({ code: s.code, name: s.name, note: s.note ?? "", isActive: s.isActive });
+    setForm({ code: s.code, name: s.name, price: s.price != null ? String(s.price) : "", note: s.note ?? "", isActive: s.isActive });
     setItems(
       s.items.length
         ? s.items.map((i) => ({ productId: i.productId, quantity: String(i.quantity) }))
@@ -75,15 +76,16 @@ export default function ServicesPage() {
       .filter((i) => i.productId && Number(i.quantity) > 0)
       .map((i) => ({ productId: i.productId, quantity: Number(i.quantity) }));
     try {
+      const price = form.price ? Number(form.price) : null;
       if (editing) {
         await apiFetch(`/api/services/${editing.id}`, {
           method: "PATCH",
-          body: JSON.stringify({ name: form.name, note: form.note || null, isActive: form.isActive, items: cleanItems }),
+          body: JSON.stringify({ name: form.name, price, note: form.note || null, isActive: form.isActive, items: cleanItems }),
         });
       } else {
         await apiFetch("/api/services", {
           method: "POST",
-          body: JSON.stringify({ code: form.code, name: form.name, note: form.note || null, items: cleanItems }),
+          body: JSON.stringify({ code: form.code, name: form.name, price, note: form.note || null, items: cleanItems }),
         });
       }
       setOpen(false);
@@ -113,6 +115,7 @@ export default function ServicesPage() {
               <TR>
                 <TH>Mã</TH>
                 <TH>Tên liệu trình</TH>
+                <TH className="text-right">Đơn giá</TH>
                 <TH>Định mức tiêu hao / lượt</TH>
                 <TH className="text-center">Trạng thái</TH>
                 {canWrite && <TH className="text-right">Sửa</TH>}
@@ -121,13 +124,13 @@ export default function ServicesPage() {
             <TBody>
               {loading ? (
                 <TR>
-                  <TD colSpan={canWrite ? 5 : 4} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={canWrite ? 6 : 5} className="py-8 text-center text-muted-foreground">
                     Đang tải…
                   </TD>
                 </TR>
               ) : rows.length === 0 ? (
                 <TR>
-                  <TD colSpan={canWrite ? 5 : 4} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={canWrite ? 6 : 5} className="py-8 text-center text-muted-foreground">
                     Chưa có liệu trình
                   </TD>
                 </TR>
@@ -136,6 +139,7 @@ export default function ServicesPage() {
                   <TR key={s.id}>
                     <TD className="font-mono font-medium">{s.code}</TD>
                     <TD>{s.name}</TD>
+                    <TD className="text-right">{s.price != null ? `${formatNumber(s.price)} đ` : "—"}</TD>
                     <TD className="text-muted-foreground">
                       {s.items.length === 0 ? (
                         <span className="text-amber-600">Chưa khai báo</span>
@@ -184,9 +188,21 @@ export default function ServicesPage() {
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>Ghi chú</Label>
-            <Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Đơn giá / lượt (đ)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="any"
+                value={form.price}
+                onChange={(e) => setForm({ ...form, price: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Ghi chú</Label>
+              <Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+            </div>
           </div>
           {editing && (
             <label className="flex items-center gap-2 text-sm">

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Plus, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -184,7 +185,11 @@ export default function AssetsPage() {
                   const days = a.warrantyUntil ? daysUntil(a.warrantyUntil) : null;
                   return (
                     <TR key={a.id}>
-                      <TD className="font-mono text-xs font-medium">{a.code}</TD>
+                      <TD>
+                        <Link href={`/assets/${a.id}`} className="font-mono text-xs font-medium text-primary hover:underline">
+                          {a.code}
+                        </Link>
+                      </TD>
                       <TD>
                         <div className="font-medium">{a.product.name}</div>
                         <div className="text-xs text-muted-foreground">{a.product.sku}</div>

@@ -34,6 +34,7 @@ export const PERMISSIONS = {
   INBOUND_WRITE: "inbound.write",
   OUTBOUND_WRITE: "outbound.write",
   TRANSFER_WRITE: "transfer.write",
+  STOCKCOUNT_WRITE: "stockcount.write",
 
   SERVICE_READ: "service.read",
   SERVICE_WRITE: "service.write", // quản lý liệu trình + định mức
@@ -64,6 +65,7 @@ export const PERMISSION_LABELS: Record<PermissionCode, string> = {
   "inbound.write": "Nhập kho",
   "outbound.write": "Xuất kho",
   "transfer.write": "Chuyển kho",
+  "stockcount.write": "Kiểm kê kho",
   "service.read": "Xem liệu trình dịch vụ",
   "service.write": "Quản lý liệu trình dịch vụ",
   "service.use": "Ghi nhận thực hiện dịch vụ",
@@ -96,6 +98,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.INBOUND_WRITE,
     PERMISSIONS.OUTBOUND_WRITE,
     PERMISSIONS.TRANSFER_WRITE,
+    PERMISSIONS.STOCKCOUNT_WRITE,
     PERMISSIONS.SERVICE_WRITE,
     PERMISSIONS.SERVICE_USE,
     PERMISSIONS.ASSET_WRITE,
@@ -108,6 +111,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.INBOUND_WRITE,
     PERMISSIONS.OUTBOUND_WRITE,
     PERMISSIONS.TRANSFER_WRITE,
+    PERMISSIONS.STOCKCOUNT_WRITE,
     PERMISSIONS.SERVICE_USE,
     PERMISSIONS.ASSET_WRITE,
   ],

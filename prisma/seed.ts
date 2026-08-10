@@ -241,6 +241,7 @@ async function main() {
       {
         code: "SPA-BASIC",
         name: "Chăm sóc da cơ bản",
+        price: 350000,
         items: [
           { sku: "SR-VITC-30", qty: 0.2 },
           { sku: "BONG-TAYTRANG", qty: 0.1 },
@@ -250,6 +251,7 @@ async function main() {
       {
         code: "SPA-MASK",
         name: "Liệu trình đắp mặt nạ dưỡng ẩm",
+        price: 450000,
         items: [
           { sku: "MN-DUONGAM", qty: 0.1 },
           { sku: "TD-OAILUONG", qty: 0.05 },
@@ -259,6 +261,7 @@ async function main() {
       {
         code: "SPA-SUN",
         name: "Chống nắng & bảo vệ da",
+        price: 250000,
         items: [
           { sku: "KEM-SPF50", qty: 0.15 },
           { sku: "BONG-TAYTRANG", qty: 0.1 },
@@ -270,6 +273,7 @@ async function main() {
         data: {
           code: s.code,
           name: s.name,
+          price: s.price,
           items: {
             create: s.items.map((i) => ({ productId: productByS[i.sku], quantity: i.qty })),
           },

@@ -48,3 +48,12 @@ export async function nextAssetCode(): Promise<string> {
   const count = await prisma.asset.count();
   return `TS-${String(count + 1).padStart(4, "0")}`;
 }
+
+/** PK-20260810-0001 — phiếu kiểm kê. */
+export async function nextStockCountCode(): Promise<string> {
+  const prefix = `PK-${ymd()}`;
+  const count = await prisma.stockCount.count({
+    where: { code: { startsWith: prefix } },
+  });
+  return `${prefix}-${String(count + 1).padStart(4, "0")}`;
+}

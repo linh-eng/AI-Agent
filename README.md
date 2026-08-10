@@ -4,9 +4,10 @@ Hệ thống quản lý kho cho **Sophia Wellness**: nhập – xuất kho, **t�
 cảnh báo hàng sắp/đã hết hạn và dưới định mức tồn. Phù hợp 4 nhóm hàng: mỹ phẩm/skincare, thực phẩm
 chức năng, vật tư tiêu hao spa, thiết bị & máy.
 
-> Trạng thái: **MVP + Phase 2** — Auth/RBAC, danh mục, nhập kho theo lô + HSD, xuất kho **FEFO**, tồn kho
-> realtime, cảnh báo; và Phase 2: **chuyển kho** giữa chi nhánh, **trừ kho tự động theo liệu trình dịch vụ**,
-> **theo dõi tài sản/bảo hành thiết bị theo serial**, **báo cáo Nhập–Xuất–Tồn + xuất CSV**.
+> Trạng thái: **MVP + Phase 2 + Phase 3**. MVP: Auth/RBAC, danh mục, nhập kho theo lô + HSD, xuất kho **FEFO**,
+> tồn kho realtime, cảnh báo. Phase 2: **chuyển kho** giữa chi nhánh, **trừ kho tự động theo liệu trình dịch vụ**,
+> **tài sản/bảo hành thiết bị theo serial**, **báo cáo Nhập–Xuất–Tồn + CSV**. Phase 3: **kiểm kê định kỳ**,
+> **in phiếu & tem lô**, **lịch sử bảo trì thiết bị**, **báo cáo doanh thu dịch vụ**.
 
 ## Công nghệ
 
@@ -43,10 +44,12 @@ npm run dev                   # http://localhost:3000
   (HSD sớm nhất xuất trước), chặn xuất vượt tồn khả dụng.
 - **Chuyển kho:** phiếu chuyển giữa 2 kho/chi nhánh; rút lô ở kho nguồn theo FEFO, giữ nguyên lô & HSD sang kho đích.
 - **Dịch vụ/liệu trình:** khai báo định mức tiêu hao; ghi nhận thực hiện N lượt → tự lập phiếu xuất tiêu hao (FEFO).
-- **Tài sản/thiết bị:** theo dõi thiết bị theo serial, trạng thái sử dụng, ngày mua & hạn bảo hành.
+- **Tài sản/thiết bị:** theo dõi thiết bị theo serial, trạng thái sử dụng, ngày mua & hạn bảo hành, **lịch sử bảo trì/sửa chữa**.
+- **Kiểm kê định kỳ:** chốt tồn theo lô, nhập số thực đếm, tự điều chỉnh chênh lệch khi duyệt.
+- **In phiếu & tem:** in phiếu nhập/xuất/chuyển (khổ A4) và tem lô (mã lô + HSD) trực tiếp từ trình duyệt.
 - **Tồn kho realtime:** tồn theo sản phẩm (gộp mọi lô), lọc theo kho, HSD gần nhất, giá trị tồn.
 - **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng cấu hình, mặc định 60 ngày), sản phẩm dưới định mức, và thiết bị sắp/đã hết bảo hành.
-- **Báo cáo N-X-T:** tồn đầu – nhập – xuất – tồn cuối theo kỳ + kho, xuất CSV.
+- **Báo cáo:** Nhập–Xuất–Tồn theo kỳ + kho, và **doanh thu dịch vụ** (doanh thu – giá vốn – lợi nhuận); xuất CSV.
 
 ## Điểm nhấn kiến trúc
 

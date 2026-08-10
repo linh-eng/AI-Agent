@@ -12,6 +12,23 @@ function parseDate(v?: string | null): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+export const GET = handle(async (_req, ctx) => {
+  await requirePermission(PERMISSIONS.ASSET_READ);
+  const row = await prisma.asset.findUniqueOrThrow({
+    where: { id: ctx.params.id },
+    include: {
+      product: { select: { sku: true, name: true } },
+      warehouse: { select: { name: true } },
+      supplier: { select: { name: true } },
+      maintenance: {
+        include: { createdBy: { select: { name: true } } },
+        orderBy: { performedAt: "desc" },
+      },
+    },
+  });
+  return ok(row);
+});
+
 export const PATCH = handle(async (req, ctx) => {
   await requirePermission(PERMISSIONS.ASSET_WRITE);
   const input = assetUpdateSchema.parse(await req.json());

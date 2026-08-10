@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Printer, Tag } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -50,11 +50,23 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         title={`Phiếu nhập ${data.code}`}
         description={`NCC: ${data.supplier.name} · Kho: ${data.warehouse.name}`}
         action={
-          <Link href="/inbound">
-            <Button variant="outline">
-              <ArrowLeft className="h-4 w-4" /> Danh sách
-            </Button>
-          </Link>
+          <>
+            <a href={`/print/labels/${data.id}`} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline">
+                <Tag className="h-4 w-4" /> In tem lô
+              </Button>
+            </a>
+            <a href={`/print/receipt/${data.id}`} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline">
+                <Printer className="h-4 w-4" /> In phiếu
+              </Button>
+            </a>
+            <Link href="/inbound">
+              <Button variant="outline">
+                <ArrowLeft className="h-4 w-4" /> Danh sách
+              </Button>
+            </Link>
+          </>
         }
       />
       <Card className="mb-4">

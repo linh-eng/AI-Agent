@@ -109,6 +109,7 @@ export const transferCreateSchema = z.object({
 export const serviceCreateSchema = z.object({
   code: z.string().trim().min(1, "Bắt buộc").max(30),
   name: z.string().trim().min(1, "Bắt buộc").max(160),
+  price: z.number().nonnegative().nullable().optional(),
   note: optionalString,
   items: z
     .array(
@@ -122,6 +123,7 @@ export const serviceCreateSchema = z.object({
 
 export const serviceUpdateSchema = z.object({
   name: z.string().trim().min(1).max(160).optional(),
+  price: z.number().nonnegative().nullable().optional(),
   note: optionalString,
   isActive: z.boolean().optional(),
   items: z
@@ -132,6 +134,33 @@ export const serviceUpdateSchema = z.object({
       })
     )
     .optional(),
+});
+
+// ----- Kiểm kê -----
+export const stockCountCreateSchema = z.object({
+  warehouseId: z.string().min(1, "Chọn kho"),
+  note: optionalString,
+});
+
+export const stockCountPostSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        itemId: z.string().min(1),
+        countedQty: z.number().nonnegative("Số đếm >= 0"),
+      })
+    )
+    .min(1, "Không có dòng kiểm kê"),
+});
+
+// ----- Bảo trì thiết bị -----
+export const maintenanceCreateSchema = z.object({
+  type: z.enum(["MAINTENANCE", "REPAIR", "INSPECTION"]).default("MAINTENANCE"),
+  description: z.string().trim().min(1, "Nhập nội dung"),
+  cost: z.number().nonnegative().nullable().optional(),
+  vendor: optionalString,
+  performedAt: z.string().min(1, "Chọn ngày thực hiện"),
+  note: optionalString,
 });
 
 export const serviceUsageSchema = z.object({

@@ -9,6 +9,7 @@ import {
   PackagePlus,
   PackageMinus,
   ArrowLeftRight,
+  ClipboardCheck,
   Bell,
   Package,
   Tags,
@@ -39,8 +40,9 @@ const NAV = [
       { href: "/inbound", label: "Nhập kho", icon: PackagePlus },
       { href: "/outbound", label: "Xuất kho", icon: PackageMinus },
       { href: "/transfers", label: "Chuyển kho", icon: ArrowLeftRight },
+      { href: "/stock-counts", label: "Kiểm kê", icon: ClipboardCheck },
       { href: "/alerts", label: "Cảnh báo", icon: Bell },
-      { href: "/reports", label: "Báo cáo N-X-T", icon: BarChart3 },
+      { href: "/reports", label: "Báo cáo", icon: BarChart3 },
     ],
   },
   {

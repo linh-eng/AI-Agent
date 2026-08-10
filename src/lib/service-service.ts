@@ -45,6 +45,15 @@ export async function recordServiceUsage(input: ServiceUsageInput, userId: strin
     userId
   );
 
+  // Chốt doanh thu (đơn giá × số lượt) và giá vốn vật tư tiêu hao (theo lô đã xuất).
+  const revenue = service.price != null ? service.price * input.sessions : null;
+  const issueDetail = await prisma.goodsIssue.findUnique({
+    where: { id: issue.id },
+    include: { items: { include: { batch: true } } },
+  });
+  const cost =
+    issueDetail?.items.reduce((s, it) => s + it.quantity * (it.batch?.unitCost ?? 0), 0) ?? 0;
+
   const code = await nextServiceUsageCode();
   const usage = await prisma.serviceUsage.create({
     data: {
@@ -53,6 +62,8 @@ export async function recordServiceUsage(input: ServiceUsageInput, userId: strin
       warehouseId: input.warehouseId,
       sessions: input.sessions,
       customerName: input.customerName ?? null,
+      revenue,
+      cost,
       note: input.note ?? null,
       issueId: issue.id,
       issueCode: issue.code,

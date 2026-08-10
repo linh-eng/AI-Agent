@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -54,11 +54,18 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
         title={`Phiếu xuất ${data.code}`}
         description={`${ISSUE_LABEL[data.issueType] ?? data.issueType} · Kho: ${data.warehouse.name}`}
         action={
-          <Link href="/outbound">
-            <Button variant="outline">
-              <ArrowLeft className="h-4 w-4" /> Danh sách
-            </Button>
-          </Link>
+          <>
+            <a href={`/print/issue/${data.id}`} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline">
+                <Printer className="h-4 w-4" /> In phiếu
+              </Button>
+            </a>
+            <Link href="/outbound">
+              <Button variant="outline">
+                <ArrowLeft className="h-4 w-4" /> Danh sách
+              </Button>
+            </Link>
+          </>
         }
       />
       <Card className="mb-4">

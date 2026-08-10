@@ -10,7 +10,7 @@ mỹ phẩm/skincare, thực phẩm chức năng (TPCN), vật tư tiêu hao spa
 Đặc thù nghiệp vụ: quản lý tồn **theo lô + hạn sử dụng (HSD)**; xuất kho ưu tiên **FEFO** (hết hạn
 trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới định mức tồn.
 
-## Trạng thái hiện tại — **MVP + Phase 2**
+## Trạng thái hiện tại — **MVP + Phase 2 + Phase 3**
 
 - **Auth + RBAC:** JWT cookie httpOnly + bcrypt; 4 vai trò (ADMIN, MANAGER, WAREHOUSE, STAFF).
 - **Danh mục:** sản phẩm (chế độ `LOT`/`QUANTITY`, cờ `requiresExpiry`, định mức tồn, ngưỡng cảnh báo HSD),
@@ -26,6 +26,14 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
   N lượt (`ServiceUsage`) → tự lập phiếu xuất `INTERNAL_USE` (FEFO) trừ kho theo định mức × số lượt.
 - **Tài sản/thiết bị (Phase 2):** `Asset` theo serial, trạng thái (IN_STOCK/IN_USE/MAINTENANCE/RETIRED),
   ngày mua & hạn bảo hành — quản lý riêng, không nằm trong tồn theo lô.
+- **Kiểm kê định kỳ (Phase 3):** phiếu kiểm kê (`StockCount` + `StockCountItem`) chốt tồn hệ thống theo lô;
+  nhập số thực đếm; khi duyệt cập nhật tồn lô về số đếm và ghi `StockMovement` ADJUSTMENT cho chênh lệch.
+- **In phiếu/tem (Phase 3):** route độc lập `/print/{receipt,issue,transfer}/[id]` in phiếu A4 và
+  `/print/labels/[receiptId]` in tem lô (mã lô + HSD); dùng `PrintFrame` + `window.print()`.
+- **Lịch sử bảo trì (Phase 3):** `MaintenanceLog` (bảo trì/sửa chữa/kiểm tra, chi phí, đơn vị) gắn với `Asset`;
+  xem tại trang chi tiết tài sản `/assets/[id]`.
+- **Doanh thu dịch vụ (Phase 3):** `Service.price` (đơn giá/lượt); mỗi `ServiceUsage` chốt `revenue` (giá×lượt)
+  và `cost` (giá vốn vật tư tiêu hao theo lô đã xuất); báo cáo doanh thu–giá vốn–lợi nhuận theo kỳ.
 - **Tồn kho realtime:** tồn theo sản phẩm (gộp lô), lọc theo kho, HSD gần nhất, giá trị tồn theo giá vốn.
 - **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng theo `expiryAlertDays`, mặc định 60 ngày), sản phẩm dưới định mức
   (`onHand <= minStock`), và **thiết bị sắp/đã hết bảo hành**.
@@ -56,22 +64,21 @@ src/
       inbound/       # Nhập kho: list + new (tạo phiếu) + [id] (chi tiết)
       outbound/      # Xuất kho: list + new (FEFO) + [id] (chi tiết)
       transfers/     # Chuyển kho: list + new + [id]
+      stock-counts/  # Kiểm kê định kỳ: list + [id] (nhập thực đếm + duyệt)
       service-usage/ # Ghi nhận thực hiện dịch vụ (tự trừ kho)
-      services/      # Liệu trình dịch vụ + định mức tiêu hao
-      assets/        # Tài sản/thiết bị theo serial + bảo hành
-      reports/       # Báo cáo Nhập-Xuất-Tồn + xuất CSV
+      services/      # Liệu trình dịch vụ + định mức tiêu hao + đơn giá
+      assets/        # Tài sản/thiết bị: list + [id] (chi tiết + lịch sử bảo trì)
+      reports/       # Báo cáo N-X-T + Doanh thu dịch vụ (2 tab) + xuất CSV
       alerts/        # Trung tâm cảnh báo (HSD + dưới định mức + bảo hành)
-      products/      # Sản phẩm
-      categories/    # Nhóm hàng
-      suppliers/     # Nhà cung cấp
-      warehouses/    # Kho
+      products/ categories/ suppliers/ warehouses/   # Danh mục
+    print/           # Trang in độc lập: receipt/issue/transfer/[id] + labels/[receiptId]
     api/             # Route handlers REST (auth + catalog + inventory/alerts/dashboard/receipts/
-                     # issues/transfers/services/service-usages/assets/reports)
-  components/        # app-shell, page-header, session-provider, ui/*
+                     # issues/transfers/stock-counts/services/service-usages/assets(+maintenance)/reports)
+  components/        # app-shell, page-header, session-provider, print-frame, ui/*
   lib/               # prisma, auth, session, rbac, api, client, utils, codes (sinh mã phiếu),
-                     # validation (Zod), inventory (tồn + cảnh báo + bảo hành), reports (N-X-T),
+                     # validation (Zod), inventory (tồn + cảnh báo + bảo hành), reports (N-X-T + doanh thu),
                      # csv, inbound-service, outbound-service (FEFO), transfer-service,
-                     # service-service (tiêu hao dịch vụ)
+                     # service-service (tiêu hao dịch vụ), stockcount-service (kiểm kê)
   middleware.ts      # Bảo vệ route: chưa đăng nhập -> /login hoặc 401
 ```
 
@@ -112,4 +119,7 @@ Tài khoản demo: `admin@sophia.vn` / `admin123` (mỗi vai trò 1 user, mật 
   cùng 1 transaction — nếu cần chặt hơn có thể gộp).
 - Báo cáo N-X-T lọc theo 1 kho là chính xác; xem gộp toàn kho thì số nhập/xuất có tính cả bút toán chuyển
   kho nội bộ (tồn cuối vẫn đúng).
-- Hướng phát triển tiếp: kiểm kê định kỳ, in phiếu/tem, lịch sử bảo trì thiết bị, báo cáo doanh thu dịch vụ.
+- Kiểm kê chốt danh sách lô lúc tạo phiếu; khi duyệt tính chênh lệch theo tồn hiện tại của lô (an toàn nếu
+  có phát sinh xen giữa). Doanh thu/giá vốn dịch vụ được chốt vào `ServiceUsage` tại thời điểm ghi nhận.
+- Trang `/print/*` render phía client rồi tự gọi `window.print()`; vẫn qua `middleware` nên cần đăng nhập.
+- Hướng phát triển tiếp: in mã vạch/QR trên tem, xuất PDF phiếu, phân bổ chi phí, báo cáo tồn theo thời điểm.

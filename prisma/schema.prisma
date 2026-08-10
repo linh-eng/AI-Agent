@@ -27,9 +27,11 @@ model User {
 
   roles         UserRole[]
   receipts      GoodsReceipt[]  @relation("ReceiptCreatedBy")
-  issues        GoodsIssue[]    @relation("IssueCreatedBy")
-  transfers     StockTransfer[] @relation("TransferCreatedBy")
-  serviceUsages ServiceUsage[]  @relation("ServicePerformedBy")
+  issues        GoodsIssue[]     @relation("IssueCreatedBy")
+  transfers     StockTransfer[]  @relation("TransferCreatedBy")
+  serviceUsages ServiceUsage[]   @relation("ServicePerformedBy")
+  stockCounts   StockCount[]     @relation("CountCreatedBy")
+  maintenance   MaintenanceLog[] @relation("MaintenanceCreatedBy")
   auditLogs     AuditLog[]
 
   @@map("users")
@@ -92,6 +94,7 @@ model Warehouse {
   transfersFrom StockTransfer[] @relation("TransferFrom")
   transfersTo   StockTransfer[] @relation("TransferTo")
   serviceUsages ServiceUsage[]
+  stockCounts   StockCount[]
   assets        Asset[]
 
   @@map("warehouses")
@@ -159,10 +162,11 @@ model Product {
   batches      StockBatch[]
   receiptItems GoodsReceiptItem[]
   issueItems   GoodsIssueItem[]
-  movements     StockMovement[]
-  serviceItems  ServiceItem[]
-  transferItems StockTransferItem[]
-  assets        Asset[]
+  movements       StockMovement[]
+  serviceItems    ServiceItem[]
+  transferItems   StockTransferItem[]
+  stockCountItems StockCountItem[]
+  assets          Asset[]
 
   @@map("products")
 }
@@ -189,6 +193,7 @@ model StockBatch {
 
   movements  StockMovement[]
   issueItems GoodsIssueItem[]
+  countItems StockCountItem[]
 
   @@index([productId, warehouseId])
   @@index([expiryDate])
@@ -347,12 +352,13 @@ model StockTransferItem {
 // Dịch vụ / liệu trình + định mức tiêu hao (BOM) và ghi nhận sử dụng
 // -----------------------------------------------------------------------------
 model Service {
-  id        String        @id @default(cuid())
-  code      String        @unique
+  id        String         @id @default(cuid())
+  code      String         @unique
   name      String
+  price     Float?         @map("price") // đơn giá dịch vụ / 1 lượt
   note      String?
-  isActive  Boolean       @default(true) @map("is_active")
-  createdAt DateTime      @default(now()) @map("created_at")
+  isActive  Boolean        @default(true) @map("is_active")
+  createdAt DateTime       @default(now()) @map("created_at")
   items     ServiceItem[]
   usages    ServiceUsage[]
 
@@ -382,6 +388,8 @@ model ServiceUsage {
   warehouse     Warehouse @relation(fields: [warehouseId], references: [id])
   sessions      Int       @default(1) // số lượt
   customerName  String?   @map("customer_name")
+  revenue       Float?    @map("revenue") // doanh thu = đơn giá × số lượt (chốt tại thời điểm ghi nhận)
+  cost          Float?    @map("cost") // giá vốn vật tư tiêu hao
   note          String?
   issueId       String?   @map("issue_id") // phiếu xuất phát sinh
   issueCode     String?   @map("issue_code")
@@ -420,9 +428,73 @@ model Asset {
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
+  maintenance MaintenanceLog[]
+
   @@index([status])
   @@index([warrantyUntil])
   @@map("assets")
+}
+
+// -----------------------------------------------------------------------------
+// Kiểm kê định kỳ: chốt tồn hệ thống theo lô, nhập số thực đếm, ghi bút toán
+// điều chỉnh chênh lệch khi duyệt.
+// -----------------------------------------------------------------------------
+model StockCount {
+  id          String    @id @default(cuid())
+  code        String    @unique // mã phiếu kiểm kê PK-xxxx
+  warehouseId String    @map("warehouse_id")
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  status      DocStatus @default(DRAFT)
+  note        String?
+  createdById String    @map("created_by_id")
+  createdBy   User      @relation("CountCreatedBy", fields: [createdById], references: [id])
+  countedAt   DateTime? @map("counted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  items StockCountItem[]
+
+  @@map("stock_counts")
+}
+
+model StockCountItem {
+  id         String     @id @default(cuid())
+  countId    String     @map("count_id")
+  count      StockCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+  productId  String     @map("product_id")
+  product    Product    @relation(fields: [productId], references: [id])
+  batchId    String     @map("batch_id")
+  batch      StockBatch @relation(fields: [batchId], references: [id])
+  systemQty  Float      @map("system_qty") // tồn hệ thống lúc chốt phiếu
+  countedQty Float?     @map("counted_qty") // số thực đếm
+
+  @@map("stock_count_items")
+}
+
+// -----------------------------------------------------------------------------
+// Lịch sử bảo trì / sửa chữa thiết bị
+// -----------------------------------------------------------------------------
+enum MaintenanceType {
+  MAINTENANCE // bảo trì định kỳ
+  REPAIR // sửa chữa
+  INSPECTION // kiểm tra
+}
+
+model MaintenanceLog {
+  id          String          @id @default(cuid())
+  assetId     String          @map("asset_id")
+  asset       Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  type        MaintenanceType @default(MAINTENANCE)
+  description String
+  cost        Float?
+  vendor      String? // đơn vị/kỹ thuật thực hiện
+  performedAt DateTime        @map("performed_at")
+  note        String?
+  createdById String          @map("created_by_id")
+  createdBy   User            @relation("MaintenanceCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  @@index([assetId])
+  @@map("maintenance_logs")
 }
 
 // -----------------------------------------------------------------------------

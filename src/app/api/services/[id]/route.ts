@@ -17,13 +17,14 @@ export const GET = handle(async (_req, ctx) => {
 
 export const PATCH = handle(async (req, ctx) => {
   await requirePermission(PERMISSIONS.SERVICE_WRITE);
-  const { name, note, isActive, items } = serviceUpdateSchema.parse(await req.json());
+  const { name, price, note, isActive, items } = serviceUpdateSchema.parse(await req.json());
 
   const row = await prisma.$transaction(async (tx) => {
     await tx.service.update({
       where: { id: ctx.params.id },
       data: {
         ...(name !== undefined ? { name } : {}),
+        ...(price !== undefined ? { price } : {}),
         ...(note !== undefined ? { note } : {}),
         ...(isActive !== undefined ? { isActive } : {}),
       },

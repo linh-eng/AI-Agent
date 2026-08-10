@@ -17,11 +17,12 @@ export const GET = handle(async () => {
 
 export const POST = handle(async (req) => {
   await requirePermission(PERMISSIONS.SERVICE_WRITE);
-  const { code, name, note, items } = serviceCreateSchema.parse(await req.json());
+  const { code, name, price, note, items } = serviceCreateSchema.parse(await req.json());
   const row = await prisma.service.create({
     data: {
       code,
       name,
+      price: price ?? null,
       note,
       items: { create: items.map((i) => ({ productId: i.productId, quantity: i.quantity })) },
     },
