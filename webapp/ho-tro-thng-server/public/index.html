@@ -241,7 +241,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <aside class="side">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.4.2</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.5</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="userbox" id="userbox"></div>
@@ -269,7 +269,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <div class="login-card">
     <div class="login-top">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.4.2</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.5</span></div>
     </div>
     <div class="login-body">
       <h2>Đăng nhập hệ thống</h2>
@@ -1022,11 +1022,13 @@ function blankSite(){return {duAn:"",maDA:"",khachDA:"",soHopDong:"",giaiDoanDA:
   diaDiemTen:"",diaChi:"",toaBlock:"",tang:"",phongKV:"",diemMoc:"",mapLink:"",
   nguoiNhanTen:"",nguoiNhanCD:"",nguoiNhanSdt:"",nguoiNhanDP:"",khungGio:"",ngayHen:"",
   dangKyRaVao:"Không",dkHan:"",dkDauMoi:"",giayTo:[],thangMayHang:"Không rõ",gioiHanTM:"",gioiHanGio:"",doXe:"",atld:"",ghiChuHT:"",
-  yeuCauCauHinh:"",phamViCV:"",khongThuoc:"",tieuChuanNT:"",camKetKH:"",chungTuBG:[],yeuCauDacBiet:"",dmThietBi:[]};}
+  yeuCauCauHinh:"",phamViCV:"",khongThuoc:"",tieuChuanNT:"",camKetKH:"",chungTuBG:[],chungTuKhac:"",yeuCauDacBiet:"",dmThietBi:[]};}
 function blankTicket(){const l0=CAT.loai[0];return {id:"(tự sinh khi lưu)",tCreate:"",loai:l0,luong:flowOf(l0),loaiKhac:"",moTaThem:"",
   donvi:(ME&&ME.dept)||CAT.donvi[0],nguoiYC:(ME&&ME.name)||"",sdt:(ME&&ME.sdt)||"",email:(ME&&ME.email)||"",_taoThay:false,_khachNgoai:false,_proxyUser:"",
+  nguoiDuocYC:"",nguoiDuocYCName:"",nguoiDuocYCSdt:"",riengTu:false,
   watchers:"",noidung:"",soluong:"",dvt:CAT.dvt[0],quycach:"",diadiemGiao:"",diadiemNhan:"",tGiaoYC:"",uutien:priOf(l0),doi:"",assignee:"",phoihop:"",tAssign:"",tStart:"",tDone:"",trangthai:CAT.trangthai[0],slThucte:"",diadiemThucte:"",nguoiNhan:"",nghiemthu:"",dexuat:"",dathuchien:"",attach:"",csat:"",nhanxet:"",tClose:"",moLai:0,ghichu:"",site:blankSite()};}
 function pickProxyUser(un){const u=PEOPLE.find(x=>x.username===un);EDIT._proxyUser=un;if(u){EDIT.donvi=u.dept;EDIT.nguoiYC=u.name;EDIT.sdt=u.sdt;EDIT.email=u.email;}drawForm();}
+function pickNguoiDuocYC(un){const u=PEOPLE.find(x=>x.username===un);EDIT.nguoiDuocYC=un;EDIT.nguoiDuocYCName=u?u.name:"";EDIT.nguoiDuocYCSdt=u?u.sdt:"";}
 
 function drawForm(){
   const t=EDIT;const isNew=!DB.tickets.some(x=>x.id===t.id);
@@ -1084,7 +1086,11 @@ function drawForm(){
     ${window.groupOf(t.loai)==='khac'?`<div class="f full"><label>Ghi rõ loại công việc <span class="req">*</span></label>${inp("loaiKhac","text","Nêu rõ đầu việc, tối thiểu 5 ký tự…")}</div>
     <div class="f full"><label>Mô tả thêm về đầu việc</label>${ta("moTaThem","Diễn giải thêm nếu cần…")}</div>`:''}
     ${identityBlock}
-    <div class="f full"><label>Người theo dõi</label>${inp("watchers","text","Trưởng phòng; Kế toán…")}</div>
+    <div class="f"><label>Người được yêu cầu <span class="hint" style="font-weight:400">chọn từ danh bạ nhân sự</span></label>
+      <select onchange="pickNguoiDuocYC(this.value)"><option value="">— Không chỉ định —</option>${PEOPLE.map(u=>`<option value="${esc(u.username)}" ${t.nguoiDuocYC===u.username?'selected':''}>${esc(u.name)}${u.sdt?' — '+esc(u.sdt):''}${u.dept?' ('+esc(u.dept)+')':''}</option>`).join("")}</select>
+      ${t.nguoiDuocYCSdt?`<div class="hint">SĐT: ${esc(t.nguoiDuocYCSdt)}</div>`:''}</div>
+    <div class="f"><label>Người theo dõi</label>${inp("watchers","text","Trưởng phòng; Kế toán…")}</div>
+    <div class="f full" style="grid-column:1/-1"><label style="display:inline-flex;gap:9px;align-items:center;cursor:pointer;padding:9px 13px;background:var(--amber-bg,#fdf3e0);border-radius:10px;font-weight:600"><input type="checkbox" style="width:auto;flex:none" ${t.riengTu?'checked':''} onchange="EDIT.riengTu=this.checked"> 🔒 Công việc riêng tư <span class="hint" style="font-weight:400">— chỉ Người tạo, Người được yêu cầu, Người theo dõi & Quản trị xem được</span></label></div>
     <div class="f full"><label>Nội dung yêu cầu <span class="req">*</span></label>${ta("noidung","Mô tả công việc cần hỗ trợ…")}</div>
     <div class="f"><label>Số lượng</label>${inp("soluong","number")}</div>
     <div class="f"><label>Đơn vị tính</label>${sel("dvt",CAT.dvt)}</div>
@@ -1125,11 +1131,10 @@ function drawForm(){
   // ---------- Nhóm 5H: Thông tin dự án & triển khai (chỉ hiện với loại việc triển khai/giao nhận/bảo hành) ----------
   const multiChk=(k,opts)=>{const cur=Array.isArray(t.site[k])?t.site[k]:[];return `<div style="display:flex;flex-wrap:wrap;gap:14px;padding:2px 0">${opts.map(o=>`<label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-weight:500;font-size:13px"><input type="checkbox" style="width:auto;flex:none" ${cur.includes(o)?'checked':''} onchange="siteToggle('${k}',${JSON.stringify(o)})">${esc(o)}</label>`).join("")}</div>`;};
   const devRows=(t.site.dmThietBi||[]).map((r,i)=>`<tr>
-      <td><input value="${esc(r.ma||'')}" style="width:72px" oninput="EDIT.site.dmThietBi[${i}].ma=this.value"></td>
-      <td><input value="${esc(r.ten||'')}" style="min-width:160px" oninput="EDIT.site.dmThietBi[${i}].ten=this.value"></td>
-      <td><input type="number" value="${esc(r.sl??'')}" style="width:66px" oninput="EDIT.site.dmThietBi[${i}].sl=this.value"></td>
-      <td><input value="${esc(r.dvt||'')}" style="width:70px" oninput="EDIT.site.dmThietBi[${i}].dvt=this.value"></td>
-      <td><input value="${esc(r.serial||'')}" style="min-width:110px" oninput="EDIT.site.dmThietBi[${i}].serial=this.value"></td>
+      <td style="text-align:center;font-weight:600;color:var(--ink-2)">${i+1}</td>
+      <td><input value="${esc(r.ma||'')}" style="width:90px" oninput="EDIT.site.dmThietBi[${i}].ma=this.value"></td>
+      <td><input value="${esc(r.ten||'')}" style="min-width:200px" oninput="EDIT.site.dmThietBi[${i}].ten=this.value"></td>
+      <td><input type="number" value="${esc(r.sl??'')}" style="width:80px" oninput="EDIT.site.dmThietBi[${i}].sl=this.value"></td>
       <td><button class="xbtn" title="Xóa" onclick="siteDevRemove(${i})">×</button></td></tr>`).join("");
   const projOpts=`<option value="">— Không thuộc dự án —</option>`+PROJECTS.map(pr=>`<option value="${esc(pr.ma)}" ${t.site.duAn===pr.ma?'selected':''}>${esc(pr.ma)} — ${esc(pr.ten)}</option>`).join("");
   const tk=isTrienKhai(t);
@@ -1177,8 +1182,8 @@ function drawForm(){
 
     <div class="sec-sub" style="grid-column:1/-1">Nhóm L — Yêu cầu chi tiết từ Kinh doanh</div>
     <div class="f full" style="grid-column:1/-1"><label>Danh mục thiết bị / hạng mục ${tk?'<span class="req">*</span>':''}</label>
-      <div class="table-wrap"><table><thead><tr><th>Mã hàng</th><th>Tên</th><th>SL</th><th>ĐVT</th><th>Số serial</th><th></th></tr></thead>
-      <tbody>${devRows||'<tr><td colspan="6" class="muted" style="text-align:center;padding:10px">Chưa có dòng nào</td></tr>'}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th style="width:44px">STT</th><th>Mã Hàng</th><th>Tên Hàng Hóa</th><th style="width:90px">Số Lượng</th><th></th></tr></thead>
+      <tbody>${devRows||'<tr><td colspan="5" class="muted" style="text-align:center;padding:10px">Chưa có dòng nào</td></tr>'}</tbody></table></div>
       <button type="button" class="addbtn" onclick="siteDevAdd()">+ Thêm hạng mục</button></div>
     <div class="f full"><label>Yêu cầu cấu hình / thông số kỹ thuật ${tk?'<span class="req">*</span>':''}</label>${sta("yeuCauCauHinh")}</div>
     <div class="f full"><label>Phạm vi công việc ${tk?'<span class="req">*</span>':''}</label>${sta("phamViCV","Lắp đặt, cấu hình, đấu nối, hướng dẫn sử dụng…")}</div>
@@ -1186,6 +1191,7 @@ function drawForm(){
     <div class="f full"><label>Tiêu chuẩn nghiệm thu ${tk?'<span class="req">*</span>':''}</label>${sta("tieuChuanNT")}</div>
     <div class="f full"><label>Cam kết đã hứa với khách hàng</label>${sta("camKetKH","VD: xong trước ngày…, có nhân sự trực tại chỗ")}</div>
     <div class="f full"><label>Chứng từ phải bàn giao</label>${multiChk("chungTuBG",["Biên bản bàn giao","Phiếu bảo hành","Hóa đơn","Biên bản nghiệm thu","Tài liệu HDSD"])}</div>
+    <div class="f full"><label>Chứng từ khác <span class="hint" style="font-weight:400">(điền tay)</span></label>${sinp("chungTuKhac","text","VD: Giấy chứng nhận CO/CQ, tem kiểm định…")}</div>
     <div class="f full"><label>Yêu cầu đặc biệt của khách</label>${sta("yeuCauDacBiet")}</div>
   </div>` : '';
   // ---------- 3f: Đính kèm file thật (chỉ với ticket đã lưu) ----------
@@ -1224,7 +1230,7 @@ function drawForm(){
 window.flowOf=flowOf; window.priOf=priOf; window.groupOf=groupOf;
 /* ---------- 5H helpers ---------- */
 function siteToggle(k,val){ if(!EDIT.site)EDIT.site=blankSite(); if(!Array.isArray(EDIT.site[k]))EDIT.site[k]=[]; const a=EDIT.site[k]; const i=a.indexOf(val); if(i>=0)a.splice(i,1); else a.push(val); }
-function siteDevAdd(){ if(!Array.isArray(EDIT.site.dmThietBi))EDIT.site.dmThietBi=[]; EDIT.site.dmThietBi.push({ma:"",ten:"",sl:"",dvt:"",serial:""}); drawForm(); }
+function siteDevAdd(){ if(!Array.isArray(EDIT.site.dmThietBi))EDIT.site.dmThietBi=[]; EDIT.site.dmThietBi.push({ma:"",ten:"",sl:""}); drawForm(); }
 function siteDevRemove(i){ EDIT.site.dmThietBi.splice(i,1); drawForm(); }
 function pickProject(ma){ const pr=PROJECTS.find(x=>x.ma===ma); EDIT.site.duAn=ma;
   if(pr){ EDIT.site.maDA=pr.ma; EDIT.site.khachDA=pr.khachhang||''; if(!EDIT.site.pptrachDA)EDIT.site.pptrachDA=pr.pptrach||''; if(!EDIT.site.diaDiemTen&&pr.diadiem)EDIT.site.diaDiemTen=pr.diadiem; }
@@ -1301,7 +1307,7 @@ function site5HBlock(t){
   if(!needSite(t)||!t.site) return '';
   const s=t.site; const r=(k,v)=>v?`<dt>${k}</dt><dd>${v}</dd>`:'';
   const dev=Array.isArray(s.dmThietBi)?s.dmThietBi.filter(x=>x&&(x.ten||x.ma)):[];
-  const devTable=dev.length?`<div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>Mã</th><th>Tên</th><th>SL</th><th>ĐVT</th><th>Serial</th></tr></thead><tbody>${dev.map(x=>`<tr><td>${esc(x.ma||'')}</td><td>${esc(x.ten||'')}</td><td>${esc(x.sl??'')}</td><td>${esc(x.dvt||'')}</td><td>${esc(x.serial||'')}</td></tr>`).join("")}</tbody></table></div>`:'';
+  const devTable=dev.length?`<div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>STT</th><th>Mã Hàng</th><th>Tên Hàng Hóa</th><th>Số Lượng</th></tr></thead><tbody>${dev.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.ma||'')}</td><td>${esc(x.ten||'')}</td><td>${esc(x.sl??'')}</td></tr>`).join("")}</tbody></table></div>`:'';
   return `<div style="margin:14px 0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--card)">
     <div style="font-weight:700;color:var(--green-800);font-size:14px;margin-bottom:8px">🏗️ Thông tin dự án & triển khai (5H)</div>
     <dl class="dl" style="grid-template-columns:180px 1fr">
@@ -1316,7 +1322,7 @@ function site5HBlock(t){
       ${r("Giấy tờ mang",esc((s.giayTo||[]).join(', ')))}${r("Thang máy hàng",esc(s.thangMayHang))}${r("Giới hạn TM",esc(s.gioiHanTM))}
       ${r("Giới hạn giờ VC",esc(s.gioiHanGio))}${r("Đỗ xe / bốc dỡ",esc(s.doXe))}${r("ATLĐ",esc(s.atld))}${r("Ghi chú HT",esc(s.ghiChuHT))}
       ${r("Yêu cầu cấu hình",esc(s.yeuCauCauHinh))}${r("Phạm vi CV",esc(s.phamViCV))}${r("Ngoài phạm vi",esc(s.khongThuoc))}
-      ${r("Tiêu chuẩn NT",esc(s.tieuChuanNT))}${r("Cam kết với KH",esc(s.camKetKH))}${r("Chứng từ bàn giao",esc((s.chungTuBG||[]).join(', ')))}
+      ${r("Tiêu chuẩn NT",esc(s.tieuChuanNT))}${r("Cam kết với KH",esc(s.camKetKH))}${r("Chứng từ bàn giao",esc([...(s.chungTuBG||[]),...(s.chungTuKhac?[s.chungTuKhac]:[])].join(', ')))}
       ${r("Yêu cầu đặc biệt",esc(s.yeuCauDacBiet))}
     </dl>${devTable?('<div style="font-weight:600;font-size:12.5px;margin-top:10px;color:var(--green-800)">Danh mục thiết bị / hạng mục</div>'+devTable):''}
   </div>`;
@@ -1343,6 +1349,7 @@ async function openDetail(id,tab){
     ${row("Luồng",esc(t.luong))}
     ${row("Đơn vị / KH",esc(t.donvi))}
     ${row("Người yêu cầu",esc(t.nguoiYC)+` · ${esc(t.sdt)} · ${esc(t.email)}`)}
+    ${t.nguoiDuocYCName?row("Người được yêu cầu",esc(t.nguoiDuocYCName)+(t.nguoiDuocYCSdt?` · ${esc(t.nguoiDuocYCSdt)}`:'')):''}
     ${row("Người tạo phiếu",esc(t.createdBy||''))}
     ${row("Người theo dõi",esc(t.watchers))}
     ${row("Nội dung",esc(t.noidung))}
@@ -1425,7 +1432,7 @@ async function openDetail(id,tab){
     : (isClosed(t.trangthai)?`<div class="hint" style="margin:2px 0 14px">Ticket đã đóng — không còn thao tác chuyển trạng thái.</div>`:'');
   document.getElementById("overlay").innerHTML=`<div class="modal">
     <div class="modal-h"><h3 class="mono" style="color:var(--green-800)">${esc(t.id)}</h3>
-      <span class="pill ${s.color}"><span class="dot"></span>${s.label}</span>${stPill(t.trangthai)}
+      <span class="pill ${s.color}"><span class="dot"></span>${s.label}</span>${stPill(t.trangthai)}${t.riengTu?'<span class="pill amber" title="Chỉ Người tạo, Người được yêu cầu, Người theo dõi & Quản trị xem được">🔒 Riêng tư</span>':''}
       <div class="spacer"></div><button class="btn sm" onclick="printMenu('${id}')">🖨️ In phiếu</button>${can('edit')?`<button class="btn sm" onclick="openNotify('${id}')">📨 Gửi thông báo${notiPending(t)?' <span style="color:#ffd21e">●</span>':''}</button>`:''}${can('edit')?`<button class="btn sm" onclick="openForm('${t.id}')">Chỉnh sửa</button>`:''}${(!can('edit')&&can('create')&&t.createdBy===ME.username&&baseStatus(t.trangthai)==='Trả lại bổ sung')?`<button class="btn sm primary" onclick="openForm('${t.id}')">✏️ Bổ sung phiếu</button>`:''}<button class="x" onclick="closeModal()">✕</button></div>
     <div class="modal-b">
       ${actionsBar}
@@ -1991,8 +1998,8 @@ function siteDocBlock(t){
     ['Địa điểm',[s.diaDiemTen,s.diaChi].filter(Boolean).join(' — ')],['Tòa / Tầng / Phòng',[s.toaBlock,s.tang,s.phongKV].filter(Boolean).join(' · ')],['Điểm mốc',s.diemMoc],
     ['Người nhận',[s.nguoiNhanTen,s.nguoiNhanCD,s.nguoiNhanSdt].filter(Boolean).join(' · ')],['Dự phòng',s.nguoiNhanDP],['Khung giờ nhận',s.khungGio],['Ngày hẹn',fmtDT(s.ngayHen)],
     ['Đăng ký ra vào',s.dangKyRaVao],['Giấy tờ mang',(s.giayTo||[]).join(', ')],['Thang máy hàng',s.thangMayHang],['Giới hạn giờ VC',s.gioiHanGio],['Đỗ xe / bốc dỡ',s.doXe],['ATLĐ',s.atld],
-    ['Phạm vi công việc',s.phamViCV],['Ngoài phạm vi',s.khongThuoc],['Tiêu chuẩn nghiệm thu',s.tieuChuanNT],['Cam kết với KH',s.camKetKH],['Chứng từ bàn giao',(s.chungTuBG||[]).join(', ')]
-  ])}${dev.length?`<div style="font-weight:600;margin-top:8px">Danh mục thiết bị / hạng mục</div><table><tr><th>Mã</th><th>Tên</th><th>SL</th><th>ĐVT</th><th>Serial</th></tr>${dev.map(x=>`<tr><td>${xmlEsc(x.ma)}</td><td>${xmlEsc(x.ten)}</td><td>${xmlEsc(x.sl)}</td><td>${xmlEsc(x.dvt)}</td><td>${xmlEsc(x.serial)}</td></tr>`).join("")}</table>`:''}`;
+    ['Phạm vi công việc',s.phamViCV],['Ngoài phạm vi',s.khongThuoc],['Tiêu chuẩn nghiệm thu',s.tieuChuanNT],['Cam kết với KH',s.camKetKH],['Chứng từ bàn giao',[...(s.chungTuBG||[]),...(s.chungTuKhac?[s.chungTuKhac]:[])].join(', ')]
+  ])}${dev.length?`<div style="font-weight:600;margin-top:8px">Danh mục thiết bị / hạng mục</div><table><tr><th>STT</th><th>Mã Hàng</th><th>Tên Hàng Hóa</th><th>Số Lượng</th></tr>${dev.map((x,i)=>`<tr><td>${i+1}</td><td>${xmlEsc(x.ma)}</td><td>${xmlEsc(x.ten)}</td><td>${xmlEsc(x.sl)}</td></tr>`).join("")}</table>`:''}`;
 }
 function printMenu(id){
   const ps=DB.ps.filter(p=>p.ticketId===id);
@@ -2242,7 +2249,7 @@ async function startApp(){
   try{await refresh();}catch(e){setOnline(false);return;}
   try{applyConfig(await api("GET","/api/config"));}catch(e){}
   await refreshProjects();
-  if(ME&&ME.canProxy){ try{PEOPLE=await api("GET","/api/people");}catch(e){PEOPLE=[];} }
+  if(ME&&can('create')){ try{PEOPLE=await api("GET","/api/people");}catch(e){PEOPLE=[];} }
   refreshNotifs();
   PAGE="dash";go("dash");setOnline(true);resetIdle();
 }

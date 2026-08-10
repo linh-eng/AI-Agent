@@ -17,7 +17,7 @@ catch (e) {
   process.exit(1);
 }
 
-const APP_VERSION = "v3.4.2"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
+const APP_VERSION = "v3.5"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 const ROOT = __dirname;
@@ -240,7 +240,22 @@ const S = {
 };
 const parse = rows => rows.map(r => JSON.parse(r.data));
 function allTickets() { return parse(S.tickets.all()); }
-function ticketsForUser(u) { return can(u,"viewAll") ? allTickets() : parse(S.ticketsFor.all(u.dept||"", u.name||"", u.username||"")); }
+// Người theo dõi (watchers) là chuỗi tự do "Tên A; Tên B" — khớp theo tên
+function watchersHas(u, watchers) { const nm = String(u.name||"").trim().toLowerCase(); if (!nm) return false;
+  return String(watchers||"").toLowerCase().split(/[;,\n]/).some(x => x.trim() === nm); }
+// Quy tắc nhìn thấy 1 ticket (có xét công việc riêng tư)
+function ticketVisible(u, t) {
+  if (t.riengTu) { // riêng tư: chỉ Người tạo · Người được yêu cầu · Người theo dõi · Quản trị
+    return u.role === "admin"
+      || t.createdBy === u.username
+      || (t.nguoiDuocYC && t.nguoiDuocYC === u.username)
+      || (t.nguoiYC && String(t.nguoiYC).trim() === String(u.name||"").trim())
+      || watchersHas(u, t.watchers);
+  }
+  if (can(u, "viewAll")) return true;
+  return t.donvi === (u.dept||"") || t.nguoiYC === (u.name||"") || t.createdBy === (u.username||"");
+}
+function ticketsForUser(u) { return allTickets().filter(t => ticketVisible(u, t)); }
 function getTicket(id) { const r = S.ticket.get(id); return r ? JSON.parse(r.data) : null; }
 function saveTicketRow(t, isNew) {
   const args = [t.tCreate||"", t.createdBy||"", t.donvi||"", t.nguoiYC||"", t.uutien||"", t.trangthai||"", JSON.stringify(t)];
@@ -378,9 +393,9 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 200, { ok: true });
       }
 
-      // Danh sách người dùng để "tạo thay" — chỉ cho tài khoản có quyền tạo & tạo thay
+      // Danh bạ nhân sự — cho mọi tài khoản có quyền tạo phiếu (dùng cho "tạo thay" & chọn "người được yêu cầu")
       if (p === "/api/people" && req.method === "GET") {
-        if (!(can(me, "create") && me.canProxy)) return sendJSON(res, 403, { error: "Không có quyền tạo thay" });
+        if (!can(me, "create")) return sendJSON(res, 403, { error: "Cần quyền tạo phiếu" });
         return sendJSON(res, 200, S.users.all().filter(u => (u.trangthai||"active")==="active").map(sanitizeUser));
       }
 
