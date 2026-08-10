@@ -15,21 +15,26 @@ interface Row {
   id: string;
   code: string;
   name: string;
+  phone?: string | null;
+  email?: string | null;
   address?: string | null;
+  taxCode?: string | null;
 }
 
-export default function WarehousesPage() {
-  const canWrite = useCan(PERMISSIONS.WAREHOUSE_WRITE);
+const EMPTY = { code: "", name: "", phone: "", email: "", address: "", taxCode: "", note: "" };
+
+export default function SuppliersPage() {
+  const canWrite = useCan(PERMISSIONS.SUPPLIER_WRITE);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: "", name: "", address: "" });
+  const [form, setForm] = useState(EMPTY);
 
   async function load() {
     setLoading(true);
     try {
-      setRows(await apiFetch<Row[]>("/api/warehouses"));
+      setRows(await apiFetch<Row[]>("/api/suppliers"));
     } finally {
       setLoading(false);
     }
@@ -42,9 +47,9 @@ export default function WarehousesPage() {
     e.preventDefault();
     setError(null);
     try {
-      await apiFetch("/api/warehouses", { method: "POST", body: JSON.stringify(form) });
+      await apiFetch("/api/suppliers", { method: "POST", body: JSON.stringify(form) });
       setOpen(false);
-      setForm({ code: "", name: "", address: "" });
+      setForm(EMPTY);
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi");
@@ -54,12 +59,12 @@ export default function WarehousesPage() {
   return (
     <div>
       <PageHeader
-        title="Kho"
-        description="Danh mục kho — mỗi bản ghi tồn/nhập/xuất đều gắn với một kho."
+        title="Nhà cung cấp"
+        description="Danh sách nhà cung cấp — dùng khi lập phiếu nhập kho."
         action={
           canWrite && (
             <Button onClick={() => setOpen(true)}>
-              <Plus className="h-4 w-4" /> Thêm kho
+              <Plus className="h-4 w-4" /> Thêm NCC
             </Button>
           )
         }
@@ -69,22 +74,24 @@ export default function WarehousesPage() {
           <Table>
             <THead>
               <TR>
-                <TH>Mã kho</TH>
-                <TH>Tên kho</TH>
+                <TH>Mã</TH>
+                <TH>Tên</TH>
+                <TH>Điện thoại</TH>
+                <TH>Email</TH>
                 <TH>Địa chỉ</TH>
               </TR>
             </THead>
             <TBody>
               {loading ? (
                 <TR>
-                  <TD colSpan={3} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={5} className="py-8 text-center text-muted-foreground">
                     Đang tải…
                   </TD>
                 </TR>
               ) : rows.length === 0 ? (
                 <TR>
-                  <TD colSpan={3} className="py-8 text-center text-muted-foreground">
-                    Chưa có kho
+                  <TD colSpan={5} className="py-8 text-center text-muted-foreground">
+                    Chưa có nhà cung cấp
                   </TD>
                 </TR>
               ) : (
@@ -92,6 +99,8 @@ export default function WarehousesPage() {
                   <TR key={r.id}>
                     <TD className="font-mono font-medium">{r.code}</TD>
                     <TD>{r.name}</TD>
+                    <TD className="text-muted-foreground">{r.phone ?? "—"}</TD>
+                    <TD className="text-muted-foreground">{r.email ?? "—"}</TD>
                     <TD className="text-muted-foreground">{r.address ?? "—"}</TD>
                   </TR>
                 ))
@@ -101,15 +110,31 @@ export default function WarehousesPage() {
         </CardContent>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Thêm kho">
+      <Modal open={open} onClose={() => setOpen(false)} title="Thêm nhà cung cấp">
         <form onSubmit={create} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Mã kho *</Label>
-            <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Mã *</Label>
+              <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Mã số thuế</Label>
+              <Input value={form.taxCode} onChange={(e) => setForm({ ...form, taxCode: e.target.value })} />
+            </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Tên kho *</Label>
+            <Label>Tên NCC *</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Điện thoại</Label>
+              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label>Địa chỉ</Label>

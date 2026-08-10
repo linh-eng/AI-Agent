@@ -1,396 +1,251 @@
 // =============================================================================
-// Seed dữ liệu mẫu THNG (mục 8):
-//   * RBAC: roles + permissions + user cho từng vai trò
-//   * Danh mục kho A1, khu vực/kệ
-//   * NCC, khách hàng, dự án
-//   * Sản phẩm đủ 4 tracking_mode
-//   * MỘT máy lắp ráp hoàn chỉnh: serial cha + serial con + as-built BOM có
-//     version, xuất xứ, bảo hành 2 tầng (THNG + hãng), license, timeline.
+// Seed dữ liệu mẫu — Sophia Wellness (Quản lý kho).
+//   * RBAC: permissions + roles + 1 user cho mỗi vai trò
+//   * Kho, nhóm hàng, nhà cung cấp
+//   * Sản phẩm 4 nhóm (mỹ phẩm, TPCN, vật tư tiêu hao, thiết bị)
+//   * Tồn ban đầu theo lô + HSD (có lô sắp hết hạn / đã hết hạn để minh hoạ cảnh báo)
 // Chạy: npm run db:seed
 // =============================================================================
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, TrackingMode } from "@prisma/client";
 import { hashPassword } from "../src/lib/auth";
-import { WAREHOUSE_CATALOG } from "../src/lib/warehouses";
 import {
   ROLES,
   ROLE_LABELS,
   ROLE_PERMISSIONS,
   ALL_PERMISSIONS,
+  PERMISSION_LABELS,
   type RoleCode,
 } from "../src/lib/rbac";
 
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log("🌱 Bắt đầu seed...");
+function daysFromNow(n: number): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + n);
+  return d;
+}
 
-  // --- 1. Permissions ---
+async function main() {
+  console.log("→ Seed Sophia Wellness…");
+
+  // ---- Permissions ----
   for (const code of ALL_PERMISSIONS) {
     await prisma.permission.upsert({
       where: { code },
-      update: {},
-      create: { code, description: code },
+      update: { name: PERMISSION_LABELS[code] },
+      create: { code, name: PERMISSION_LABELS[code] },
     });
   }
   const permissions = await prisma.permission.findMany();
-  const permByCode = new Map(permissions.map((p) => [p.code, p.id]));
+  const permByCode = new Map(permissions.map((p) => [p.code, p]));
 
-  // --- 2. Roles + gán quyền ---
+  // ---- Roles + gán quyền ----
   for (const roleCode of Object.values(ROLES) as RoleCode[]) {
     const role = await prisma.role.upsert({
       where: { code: roleCode },
       update: { name: ROLE_LABELS[roleCode] },
       create: { code: roleCode, name: ROLE_LABELS[roleCode] },
     });
-    // reset & gán lại quyền
     await prisma.rolePermission.deleteMany({ where: { roleId: role.id } });
-    const perms = ROLE_PERMISSIONS[roleCode];
     await prisma.rolePermission.createMany({
-      data: perms.map((code) => ({ roleId: role.id, permissionId: permByCode.get(code)! })),
+      data: ROLE_PERMISSIONS[roleCode].map((code) => ({
+        roleId: role.id,
+        permissionId: permByCode.get(code)!.id,
+      })),
       skipDuplicates: true,
     });
   }
   const roles = await prisma.role.findMany();
-  const roleByCode = new Map(roles.map((r) => [r.code, r.id]));
+  const roleByCode = new Map(roles.map((r) => [r.code, r]));
 
-  // --- 3. Users (mật khẩu chung: <role>123) ---
-  const users: Array<{ email: string; name: string; role: RoleCode; password: string }> = [
-    { email: "admin@thng.com.vn", name: "Quản trị hệ thống", role: ROLES.ADMIN, password: "admin123" },
-    { email: "bod@thng.com.vn", name: "Ban Giám đốc", role: ROLES.BOD, password: "bod123" },
-    { email: "muahang@thng.com.vn", name: "Nguyễn Văn Mua", role: ROLES.PURCHASING, password: "muahang123" },
-    { email: "ketoan@thng.com.vn", name: "Trần Thị Kế Toán", role: ROLES.WH_ACCOUNTANT, password: "ketoan123" },
-    { email: "thukho@thng.com.vn", name: "Lê Văn Thủ Kho", role: ROLES.WAREHOUSE_KEEPER, password: "thukho123" },
-    { email: "kythuat@thng.com.vn", name: "Phạm Kỹ Thuật", role: ROLES.TECH, password: "kythuat123" },
-    { email: "qc@thng.com.vn", name: "Hoàng QC", role: ROLES.QC, password: "qc123" },
-    { email: "kinhdoanh@thng.com.vn", name: "Đỗ Kinh Doanh", role: ROLES.SALES, password: "kinhdoanh123" },
-    { email: "baohanh@thng.com.vn", name: "Vũ Bảo Hành", role: ROLES.WARRANTY, password: "baohanh123" },
+  // ---- Users: 1 cho mỗi vai trò ----
+  const passwordHash = await hashPassword("admin123");
+  const users: { email: string; name: string; role: RoleCode }[] = [
+    { email: "admin@sophia.vn", name: "Quản trị hệ thống", role: "ADMIN" },
+    { email: "quanly@sophia.vn", name: "Nguyễn Thị Quản Lý", role: "MANAGER" },
+    { email: "thukho@sophia.vn", name: "Trần Văn Thủ Kho", role: "WAREHOUSE" },
+    { email: "nhanvien@sophia.vn", name: "Lê Thị Nhân Viên", role: "STAFF" },
   ];
   for (const u of users) {
+    const pwd = await hashPassword(`${u.role.toLowerCase()}123`);
     const user = await prisma.user.upsert({
       where: { email: u.email },
       update: { name: u.name },
-      create: { email: u.email, name: u.name, passwordHash: await hashPassword(u.password) },
-    });
-    await prisma.userRole.upsert({
-      where: { userId_roleId: { userId: user.id, roleId: roleByCode.get(u.role)! } },
-      update: {},
-      create: { userId: user.id, roleId: roleByCode.get(u.role)! },
-    });
-  }
-
-  // --- 4. Danh mục kho A1 ---
-  for (const w of WAREHOUSE_CATALOG) {
-    await prisma.warehouse.upsert({
-      where: { code: w.code },
-      update: { name: w.name, description: w.description, countsAsAvailable: w.countsAsAvailable },
-      create: w,
-    });
-  }
-  const whByCode = new Map((await prisma.warehouse.findMany()).map((w) => [w.code, w.id]));
-
-  // --- 5. Zone + Bin cho kho linh kiện & kho thương mại ---
-  async function ensureZone(whCode: string, code: string, name: string) {
-    const warehouseId = whByCode.get(whCode)!;
-    return prisma.zone.upsert({
-      where: { warehouseId_code: { warehouseId, code } },
-      update: { name },
-      create: { warehouseId, code, name },
-    });
-  }
-  async function ensureBin(zoneId: string, code: string, label?: string) {
-    return prisma.bin.upsert({
-      where: { zoneId_code: { zoneId, code } },
-      update: {},
-      create: { zoneId, code, label },
-    });
-  }
-  const zoneLK = await ensureZone("K-LK", "A", "Khu A — Linh kiện");
-  const binLK1 = await ensureBin(zoneLK.id, "A-01", "Kệ A hàng 01");
-  await ensureBin(zoneLK.id, "A-02", "Kệ A hàng 02");
-  const zoneTM = await ensureZone("K-TM", "B", "Khu B — Thành phẩm");
-  const binTM1 = await ensureBin(zoneTM.id, "B-01", "Kệ B hàng 01");
-
-  // --- 6. Đối tác (NCC + khách hàng) ---
-  async function ensurePartner(data: {
-    code: string;
-    name: string;
-    type: "SUPPLIER" | "CUSTOMER" | "BOTH";
-    taxCode?: string;
-    creditLimit?: number;
-  }) {
-    return prisma.partner.upsert({
-      where: { code: data.code },
-      update: { name: data.name },
       create: {
-        code: data.code,
-        name: data.name,
-        type: data.type,
-        taxCode: data.taxCode,
-        creditLimit: data.creditLimit,
+        email: u.email,
+        name: u.name,
+        passwordHash: u.role === "ADMIN" ? passwordHash : pwd,
       },
     });
+    await prisma.userRole.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: roleByCode.get(u.role)!.id } },
+      update: {},
+      create: { userId: user.id, roleId: roleByCode.get(u.role)!.id },
+    });
   }
-  const ncc1 = await ensurePartner({ code: "NCC-INTEL", name: "Intel Việt Nam", type: "SUPPLIER", taxCode: "0300000001" });
-  const ncc2 = await ensurePartner({ code: "NCC-KINGSTON", name: "Kingston Distributor", type: "SUPPLIER", taxCode: "0300000002" });
-  const ncc3 = await ensurePartner({ code: "NCC-SAMSUNG", name: "Samsung SSD Supplier", type: "SUPPLIER", taxCode: "0300000003" });
-  const ncc4 = await ensurePartner({ code: "NCC-MSFT", name: "Microsoft License Reseller", type: "SUPPLIER", taxCode: "0300000004" });
-  const kh1 = await ensurePartner({ code: "KH-ACB", name: "Ngân hàng ACB", type: "CUSTOMER", creditLimit: 5_000_000_000 });
-  const kh2 = await ensurePartner({ code: "KH-FPT", name: "FPT Software", type: "CUSTOMER", creditLimit: 2_000_000_000 });
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@sophia.vn" } });
 
-  // --- 7. Dự án ---
-  const prjACB = await prisma.project.upsert({
-    where: { code: "DA-ACB-2026" },
+  // ---- Kho ----
+  const khoTong = await prisma.warehouse.upsert({
+    where: { code: "KHO-TONG" },
     update: {},
-    create: {
-      code: "DA-ACB-2026",
-      name: "Trang bị máy trạm ACB 2026",
-      customerId: kh1.id,
-      customerPo: "PO-ACB-0126",
-      contractNo: "HD-ACB-2026/001",
-      status: "ACTIVE",
-    },
+    create: { code: "KHO-TONG", name: "Kho tổng Sophia Wellness", address: "Trụ sở chính" },
   });
-  await prisma.project.upsert({
-    where: { code: "DA-FPT-DC" },
+  await prisma.warehouse.upsert({
+    where: { code: "KHO-SPA" },
     update: {},
-    create: {
-      code: "DA-FPT-DC",
-      name: "Data Center FPT giai đoạn 1",
-      customerId: kh2.id,
-      customerPo: "PO-FPT-9001",
-      status: "ACTIVE",
-    },
+    create: { code: "KHO-SPA", name: "Kho chi nhánh Spa", address: "Chi nhánh spa" },
   });
 
-  // --- 8. Sản phẩm đủ 4 tracking_mode ---
-  async function ensureProduct(data: {
+  // ---- Nhóm hàng ----
+  const catData = [
+    { code: "MP", name: "Mỹ phẩm & Skincare" },
+    { code: "TPCN", name: "Thực phẩm chức năng" },
+    { code: "VT", name: "Vật tư tiêu hao spa" },
+    { code: "TB", name: "Thiết bị & máy spa" },
+  ];
+  const cats: Record<string, string> = {};
+  for (const c of catData) {
+    const cat = await prisma.category.upsert({
+      where: { code: c.code },
+      update: { name: c.name },
+      create: c,
+    });
+    cats[c.code] = cat.id;
+  }
+
+  // ---- Nhà cung cấp ----
+  const supData = [
+    { code: "NCC-COSMEDIX", name: "Cosmedix Việt Nam", phone: "0901234567" },
+    { code: "NCC-WELLNUTRI", name: "WellNutri Supplements", phone: "0912345678" },
+    { code: "NCC-SPAPRO", name: "SpaPro Thiết bị", phone: "0923456789" },
+  ];
+  const sups: Record<string, string> = {};
+  for (const s of supData) {
+    const sup = await prisma.supplier.upsert({
+      where: { code: s.code },
+      update: { name: s.name },
+      create: s,
+    });
+    sups[s.code] = sup.id;
+  }
+
+  // ---- Sản phẩm ----
+  interface P {
     sku: string;
     name: string;
     brand?: string;
-    model?: string;
-    category?: string;
-    trackingMode: "SERIAL" | "LOT" | "QUANTITY" | "LICENSE";
-    uom?: string;
-    minStock?: number;
-  }) {
-    return prisma.product.upsert({
-      where: { sku: data.sku },
-      update: { name: data.name },
+    cat: string;
+    mode: TrackingMode;
+    expiry: boolean;
+    uom: string;
+    min?: number;
+  }
+  const productsData: P[] = [
+    { sku: "SR-VITC-30", name: "Serum Vitamin C 30ml", brand: "Cosmedix", cat: "MP", mode: "LOT", expiry: true, uom: "Chai", min: 10 },
+    { sku: "KEM-SPF50", name: "Kem chống nắng SPF50 50ml", brand: "Cosmedix", cat: "MP", mode: "LOT", expiry: true, uom: "Tuýp", min: 15 },
+    { sku: "MN-DUONGAM", name: "Mặt nạ dưỡng ẩm (hộp 10)", brand: "Cosmedix", cat: "MP", mode: "LOT", expiry: true, uom: "Hộp", min: 20 },
+    { sku: "COLLAGEN-90", name: "Viên uống Collagen (lọ 90 viên)", brand: "WellNutri", cat: "TPCN", mode: "LOT", expiry: true, uom: "Lọ", min: 8 },
+    { sku: "VITA-MULTI", name: "Vitamin tổng hợp (lọ 60 viên)", brand: "WellNutri", cat: "TPCN", mode: "LOT", expiry: true, uom: "Lọ", min: 8 },
+    { sku: "TD-OAILUONG", name: "Tinh dầu oải hương 100ml", brand: "SpaPro", cat: "VT", mode: "LOT", expiry: true, uom: "Chai", min: 5 },
+    { sku: "BONG-TAYTRANG", name: "Bông tẩy trang (gói 200)", cat: "VT", mode: "QUANTITY", expiry: false, uom: "Gói", min: 30 },
+    { sku: "KHAN-SPA", name: "Khăn giấy spa (cuộn)", cat: "VT", mode: "QUANTITY", expiry: false, uom: "Cuộn", min: 40 },
+    { sku: "GANGTAY-NITRILE", name: "Găng tay nitrile (hộp 100)", cat: "VT", mode: "QUANTITY", expiry: false, uom: "Hộp", min: 25 },
+    { sku: "MAY-XONGHOI", name: "Máy xông hơi mặt", brand: "SpaPro", cat: "TB", mode: "QUANTITY", expiry: false, uom: "Cái", min: 2 },
+    { sku: "DEN-LED-TRILIEU", name: "Đèn LED trị liệu ánh sáng", brand: "SpaPro", cat: "TB", mode: "QUANTITY", expiry: false, uom: "Cái", min: 1 },
+  ];
+
+  const productByS: Record<string, string> = {};
+  for (const p of productsData) {
+    const prod = await prisma.product.upsert({
+      where: { sku: p.sku },
+      update: { name: p.name },
       create: {
-        sku: data.sku,
-        name: data.name,
-        brand: data.brand,
-        model: data.model,
-        category: data.category,
-        trackingMode: data.trackingMode,
-        uom: data.uom ?? "Cái",
-        minStock: data.minStock,
+        sku: p.sku,
+        name: p.name,
+        brand: p.brand,
+        categoryId: cats[p.cat],
+        trackingMode: p.mode,
+        requiresExpiry: p.expiry,
+        uom: p.uom,
+        minStock: p.min ?? null,
       },
     });
-  }
-  // Thành phẩm (máy lắp ráp)
-  const pWorkstation = await ensureProduct({
-    sku: "TP-WS-PRO",
-    name: "Máy trạm THNG Workstation Pro",
-    brand: "THNG",
-    model: "WS-PRO-2026",
-    category: "Máy trạm",
-    trackingMode: "SERIAL",
-  });
-  // Linh kiện SERIAL
-  const pCpu = await ensureProduct({ sku: "LK-CPU-I9", name: "CPU Intel Core i9-14900K", brand: "Intel", model: "i9-14900K", category: "CPU", trackingMode: "SERIAL", minStock: 5 });
-  const pSsd = await ensureProduct({ sku: "LK-SSD-2TB", name: "SSD Samsung 990 Pro 2TB", brand: "Samsung", model: "990PRO-2TB", category: "SSD", trackingMode: "SERIAL", minStock: 10 });
-  // Linh kiện LOT
-  const pRam = await ensureProduct({ sku: "LK-RAM-32G", name: "RAM Kingston Fury 32GB DDR5", brand: "Kingston", model: "KF556-32", category: "RAM", trackingMode: "LOT", minStock: 20 });
-  // Phụ kiện QUANTITY
-  await ensureProduct({ sku: "PK-CABLE-C13", name: "Cáp nguồn C13 1.8m", category: "Phụ kiện", trackingMode: "QUANTITY", uom: "Sợi", minStock: 50 });
-  // LICENSE
-  const pWin = await ensureProduct({ sku: "SW-WIN11-PRO", name: "Windows 11 Pro OEM", brand: "Microsoft", trackingMode: "LICENSE", uom: "Key" });
-
-  // --- 9. MÁY LẮP RÁP HOÀN CHỈNH -------------------------------------------
-  // Xóa dữ liệu demo cũ (idempotent) trước khi dựng lại quan hệ cha-con.
-  const demoSerialNumbers = ["WS-PRO-2026-0001", "SN-CPU-DEMO-001", "SN-SSD-DEMO-001"];
-  const existingParent = await prisma.serial.findUnique({ where: { serialNumber: "WS-PRO-2026-0001" } });
-  if (existingParent) {
-    await prisma.bomAsBuilt.deleteMany({ where: { parentSerialId: existingParent.id } });
-    await prisma.serialEvent.deleteMany({ where: { serial: { serialNumber: { in: demoSerialNumbers } } } });
-    await prisma.origin.deleteMany({ where: { serial: { serialNumber: { in: demoSerialNumbers } } } });
-    await prisma.warranty.deleteMany({ where: { serial: { serialNumber: { in: demoSerialNumbers } } } });
-    await prisma.license.updateMany({ where: { licenseKey: "WIN11-DEMO-XXXX-YYYY-ZZZZ" }, data: { activatedSerialId: null } });
-    // gỡ liên kết cha để xóa con an toàn
-    await prisma.serial.updateMany({ where: { parentSerial: { serialNumber: "WS-PRO-2026-0001" } }, data: { parentSerialId: null } });
-    await prisma.serial.deleteMany({ where: { serialNumber: { in: demoSerialNumbers } } });
+    productByS[p.sku] = prod.id;
   }
 
-  const lkWh = whByCode.get("K-LK")!;
-  const tmWh = whByCode.get("K-TM")!;
+  // ---- Tồn ban đầu theo lô (kèm HSD minh hoạ cảnh báo) ----
+  // Chỉ seed khi chưa có lô nào (tránh nhân đôi khi chạy lại).
+  const existingBatches = await prisma.stockBatch.count();
+  if (existingBatches === 0) {
+    interface B {
+      sku: string;
+      code: string | null;
+      exp: number | null; // ngày kể từ hôm nay (âm = đã hết hạn)
+      qty: number;
+      cost: number;
+      sup: string;
+    }
+    const batches: B[] = [
+      // Serum Vitamin C: 1 lô còn hạn xa, 1 lô sắp hết hạn (45 ngày)
+      { sku: "SR-VITC-30", code: "LOT-VITC-A", exp: 300, qty: 40, cost: 180000, sup: "NCC-COSMEDIX" },
+      { sku: "SR-VITC-30", code: "LOT-VITC-B", exp: 45, qty: 12, cost: 180000, sup: "NCC-COSMEDIX" },
+      // Kem chống nắng: 1 lô đã hết hạn (-10 ngày) -> cảnh báo đỏ
+      { sku: "KEM-SPF50", code: "LOT-SPF-OLD", exp: -10, qty: 6, cost: 150000, sup: "NCC-COSMEDIX" },
+      { sku: "KEM-SPF50", code: "LOT-SPF-NEW", exp: 400, qty: 30, cost: 150000, sup: "NCC-COSMEDIX" },
+      // Mặt nạ: dưới định mức (min 20, tồn 12)
+      { sku: "MN-DUONGAM", code: "LOT-MN-01", exp: 200, qty: 12, cost: 90000, sup: "NCC-COSMEDIX" },
+      // Collagen: sắp hết hạn 20 ngày
+      { sku: "COLLAGEN-90", code: "LOT-COL-01", exp: 20, qty: 15, cost: 350000, sup: "NCC-WELLNUTRI" },
+      { sku: "VITA-MULTI", code: "LOT-VITA-01", exp: 500, qty: 25, cost: 220000, sup: "NCC-WELLNUTRI" },
+      { sku: "TD-OAILUONG", code: "LOT-TD-01", exp: 600, qty: 18, cost: 120000, sup: "NCC-SPAPRO" },
+      // Vật tư tiêu hao (QUANTITY, không HSD)
+      { sku: "BONG-TAYTRANG", code: null, exp: null, qty: 60, cost: 25000, sup: "NCC-SPAPRO" },
+      { sku: "KHAN-SPA", code: null, exp: null, qty: 35, cost: 18000, sup: "NCC-SPAPRO" }, // dưới định mức 40
+      { sku: "GANGTAY-NITRILE", code: null, exp: null, qty: 50, cost: 95000, sup: "NCC-SPAPRO" },
+      // Thiết bị
+      { sku: "MAY-XONGHOI", code: null, exp: null, qty: 3, cost: 2500000, sup: "NCC-SPAPRO" },
+      { sku: "DEN-LED-TRILIEU", code: null, exp: null, qty: 2, cost: 4200000, sup: "NCC-SPAPRO" },
+    ];
 
-  // Serial thành phẩm (cha) — trạng thái IN_STOCK, nằm K-TM
-  const parent = await prisma.serial.create({
-    data: {
-      serialNumber: "WS-PRO-2026-0001",
-      productId: pWorkstation.id,
-      warehouseId: tmWh,
-      status: "IN_STOCK",
-      condition: "Mới 100%",
-      isCommercialStock: false,
-      projectId: prjACB.id,
-      yearOfManufacture: 2026,
-      originCountry: "Việt Nam (lắp ráp)",
-      binId: binTM1.id,
-    },
+    for (const b of batches) {
+      const batch = await prisma.stockBatch.create({
+        data: {
+          productId: productByS[b.sku],
+          warehouseId: khoTong.id,
+          batchCode: b.code,
+          expiryDate: b.exp == null ? null : daysFromNow(b.exp),
+          quantity: b.qty,
+          unitCost: b.cost,
+          supplierId: sups[b.sup],
+        },
+      });
+      await prisma.stockMovement.create({
+        data: {
+          productId: productByS[b.sku],
+          warehouseId: khoTong.id,
+          batchId: batch.id,
+          type: "INBOUND",
+          quantity: b.qty,
+          refType: "SEED",
+          note: "Tồn đầu kỳ",
+        },
+      });
+    }
+  }
+
+  await prisma.auditLog.create({
+    data: { userId: admin.id, action: "SEED", entityType: "System", detail: "Khởi tạo dữ liệu mẫu" },
   });
 
-  // Serial con: CPU (SERIAL)
-  const cpuSerial = await prisma.serial.create({
-    data: {
-      serialNumber: "SN-CPU-DEMO-001",
-      productId: pCpu.id,
-      warehouseId: tmWh, // đã theo máy cha
-      status: "DISASSEMBLED", // con nằm trong máy — không tính tồn rời
-      condition: "Đã lắp vào máy",
-      supplierId: ncc1.id,
-      poNumber: "PO-INTEL-2026-01",
-      invoiceNumber: "HD-INTEL-0001",
-      yearOfManufacture: 2025,
-      originCountry: "Malaysia",
-      parentSerialId: parent.id,
-    },
-  });
-
-  // Serial con: SSD (SERIAL)
-  const ssdSerial = await prisma.serial.create({
-    data: {
-      serialNumber: "SN-SSD-DEMO-001",
-      productId: pSsd.id,
-      warehouseId: tmWh,
-      status: "DISASSEMBLED",
-      condition: "Đã lắp vào máy",
-      supplierId: ncc3.id,
-      poNumber: "PO-SAMSUNG-2026-01",
-      invoiceNumber: "HD-SAMSUNG-0007",
-      yearOfManufacture: 2025,
-      originCountry: "Korea",
-      parentSerialId: parent.id,
-    },
-  });
-
-  // Lô RAM (LOT) — con dạng lot
-  const ramLot = await prisma.lot.upsert({
-    where: { productId_lotNumber_warehouseId: { productId: pRam.id, lotNumber: "LOT-RAM-2026-A", warehouseId: lkWh } },
-    update: {},
-    create: {
-      productId: pRam.id,
-      lotNumber: "LOT-RAM-2026-A",
-      warehouseId: lkWh,
-      quantity: 40,
-      supplierId: ncc2.id,
-      manufactureDate: new Date("2025-11-01"),
-    },
-  });
-
-  // License Windows (con dạng license) — kích hoạt vào máy cha
-  const winLicense = await prisma.license.upsert({
-    where: { licenseKey: "WIN11-DEMO-XXXX-YYYY-ZZZZ" },
-    update: { activatedSerialId: parent.id },
-    create: {
-      productId: pWin.id,
-      licenseKey: "WIN11-DEMO-XXXX-YYYY-ZZZZ",
-      expiryDate: null,
-      activatedSerialId: parent.id,
-    },
-  });
-
-  // Work Order (đã hoàn thành)
-  const wo = await prisma.workOrder.upsert({
-    where: { number: "WO-2026-0001" },
-    update: {},
-    create: {
-      number: "WO-2026-0001",
-      mode: "TO_ORDER",
-      status: "DONE",
-      productId: pWorkstation.id,
-      assembledBy: "Phạm Kỹ Thuật",
-      startedAt: new Date("2026-01-10T08:00:00Z"),
-      finishedAt: new Date("2026-01-10T15:00:00Z"),
-      note: "Lắp theo đơn dự án ACB, có cài Windows 11 Pro",
-    },
-  });
-
-  // As-built BOM version 1 — liên kết cha ↔ từng con (serial/lot/license)
-  await prisma.bomAsBuilt.createMany({
-    data: [
-      { workOrderId: wo.id, parentSerialId: parent.id, version: 1, childSerialId: cpuSerial.id, quantity: 1, note: "CPU i9" },
-      { workOrderId: wo.id, parentSerialId: parent.id, version: 1, childSerialId: ssdSerial.id, quantity: 1, note: "SSD 2TB" },
-      { workOrderId: wo.id, parentSerialId: parent.id, version: 1, childLotId: ramLot.id, quantity: 2, note: "2 thanh RAM 32GB từ lô" },
-      { workOrderId: wo.id, parentSerialId: parent.id, version: 1, childLicenseId: winLicense.id, quantity: 1, note: "Windows 11 Pro" },
-    ],
-  });
-
-  // Xuất xứ (CO/CQ/tờ khai) cho từng linh kiện
-  await prisma.origin.createMany({
-    data: [
-      { serialId: cpuSerial.id, countryOfOrigin: "Malaysia", supplierId: ncc1.id, poNumber: "PO-INTEL-2026-01", coNumber: "CO-INTEL-001", cqNumber: "CQ-INTEL-001", customsDeclarationNo: "TK-105-2026" },
-      { serialId: ssdSerial.id, countryOfOrigin: "Korea", supplierId: ncc3.id, poNumber: "PO-SAMSUNG-2026-01", coNumber: "CO-SS-007", cqNumber: "CQ-SS-007", customsDeclarationNo: "TK-221-2026" },
-      { lotId: ramLot.id, countryOfOrigin: "Taiwan", supplierId: ncc2.id, poNumber: "PO-KINGSTON-2026-01", coNumber: "CO-KS-090", customsDeclarationNo: "TK-330-2026" },
-    ],
-  });
-
-  // Bảo hành 2 tầng: hãng cho từng linh kiện + THNG cho máy
-  await prisma.warranty.createMany({
-    data: [
-      // BH hãng cho linh kiện
-      { serialId: cpuSerial.id, provider: "VENDOR", startDate: new Date("2026-01-10"), endDate: new Date("2029-01-10"), terms: "BH hãng Intel 36 tháng" },
-      { serialId: ssdSerial.id, provider: "VENDOR", startDate: new Date("2026-01-10"), endDate: new Date("2031-01-10"), terms: "BH hãng Samsung 60 tháng" },
-      // BH THNG cấp khách cho toàn máy
-      { serialId: parent.id, provider: "THNG", startDate: new Date("2026-01-15"), endDate: new Date("2028-01-15"), terms: "BH THNG 24 tháng cho khách ACB" },
-    ],
-  });
-
-  // Timeline serial cha
-  await prisma.serialEvent.createMany({
-    data: [
-      { serialId: parent.id, eventType: "ASSEMBLE", toStatus: "IN_STOCK", detail: { workOrder: "WO-2026-0001" }, createdBy: "Phạm Kỹ Thuật" },
-      { serialId: parent.id, eventType: "QC_PASS", detail: { burnInHours: 12 }, createdBy: "Hoàng QC" },
-    ],
-  });
-
-  // QC/burn-in đầu ra
-  await prisma.qcReport.create({
-    data: {
-      workOrderId: wo.id,
-      serialId: parent.id,
-      type: "OUTPUT",
-      result: "PASS",
-      burnInHours: 12,
-      details: { cpuTemp: "72C", memtest: "PASS", disk: "PASS" },
-      createdBy: "Hoàng QC",
-    },
-  });
-
-  // Biến động tồn: nhập thành phẩm sau lắp ráp
-  await prisma.stockMovement.create({
-    data: {
-      type: "ASSEMBLY_PRODUCE",
-      serialId: parent.id,
-      toWarehouseId: tmWh,
-      documentType: "WORK_ORDER",
-      documentNumber: "WO-2026-0001",
-      note: "Nhập kho thành phẩm sau lắp ráp",
-      createdBy: "Lê Văn Thủ Kho",
-    },
-  });
-
-  console.log("✅ Seed hoàn tất.");
-  console.log("   Đăng nhập demo: admin@thng.com.vn / admin123");
-  console.log("   Máy lắp ráp mẫu: WS-PRO-2026-0001 (as-built BOM v1, BH 2 tầng)");
+  console.log("✓ Seed hoàn tất.");
+  console.log("  Đăng nhập: admin@sophia.vn / admin123");
 }
 
 main()
   .catch((e) => {
-    console.error("❌ Seed lỗi:", e);
+    console.error(e);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .finally(() => prisma.$disconnect());

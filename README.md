@@ -1,12 +1,11 @@
-# THNG — Webapp quản lý kho
+# Sophia Wellness — Webapp quản lý kho
 
-Hệ thống quản lý kho cho THNG: **Nhập – Xuất – Lắp ráp – Tháo dỡ – Truy vết Serial**.
-Quản lý tới Serial/IMEI, quan hệ serial cha–con của máy lắp ráp, xuất xứ (CO/CQ/tờ khai HQ),
-bảo hành hai tầng (hãng + THNG) và truy vết hai chiều.
+Hệ thống quản lý kho cho **Sophia Wellness**: nhập – xuất kho, **tồn realtime theo lô & hạn sử dụng (HSD)**,
+cảnh báo hàng sắp/đã hết hạn và dưới định mức tồn. Phù hợp 4 nhóm hàng: mỹ phẩm/skincare, thực phẩm
+chức năng, vật tư tiêu hao spa, thiết bị & máy.
 
-> Trạng thái: **Hoàn tất toàn bộ 7 phase** — Auth/RBAC + danh mục, Nhập kho (M1–M3), Lắp ráp & as-built
-> BOM (M4), Tồn kho realtime + kiểm kê (M5), Xuất kho (M6–M8), Bảo hành/RMA/rã máy (M9–M10), Báo cáo & in
-> ấn (mục 7). Xem chi tiết từng phase trong `CLAUDE.md`.
+> Trạng thái: **MVP hoàn chỉnh** — Auth/RBAC, danh mục (sản phẩm/nhóm hàng/NCC/kho), nhập kho theo lô +
+> HSD, xuất kho tự phân bổ lô **FEFO** (hết hạn trước xuất trước), tồn kho realtime, và trung tâm cảnh báo.
 
 ## Công nghệ
 
@@ -20,7 +19,7 @@ Yêu cầu: Node ≥ 18, PostgreSQL.
 npm install
 cp .env.example .env          # sửa DATABASE_URL và AUTH_SECRET
 npm run prisma:push           # tạo bảng theo schema
-npm run db:seed               # nạp dữ liệu mẫu (gồm 1 máy lắp ráp as-built BOM)
+npm run db:seed               # nạp dữ liệu mẫu (sản phẩm + tồn theo lô, có lô sắp/đã hết hạn)
 npm run dev                   # http://localhost:3000
 ```
 
@@ -28,22 +27,31 @@ npm run dev                   # http://localhost:3000
 
 | Vai trò | Email | Mật khẩu |
 |---|---|---|
-| Admin | admin@thng.com.vn | admin123 |
-| Ban Giám đốc | bod@thng.com.vn | bod123 |
-| Thủ kho | thukho@thng.com.vn | thukho123 |
-| Kế toán kho | ketoan@thng.com.vn | ketoan123 |
-| Kỹ thuật | kythuat@thng.com.vn | kythuat123 |
+| Quản trị | admin@sophia.vn | admin123 |
+| Quản lý | quanly@sophia.vn | manager123 |
+| Thủ kho | thukho@sophia.vn | warehouse123 |
+| Nhân viên | nhanvien@sophia.vn | staff123 |
 
-(Các vai trò còn lại: `muahang`, `qc`, `kinhdoanh`, `baohanh` — mật khẩu `<tên>123`.)
+## Nghiệp vụ chính
+
+- **Danh mục:** sản phẩm (chế độ quản lý *theo lô* — có/không HSD — hoặc *theo số lượng*), nhóm hàng,
+  nhà cung cấp, kho.
+- **Nhập kho:** lập phiếu nhập theo NCC + kho; mỗi dòng ghi mã lô, HSD, ngày SX, số lượng, giá vốn.
+  Ghi sổ ngay: sinh/cộng lô tồn + bút toán biến động (`StockMovement`).
+- **Xuất kho:** lập phiếu xuất (bán / dùng nội bộ / hủy / điều chỉnh); hệ thống **tự chọn lô theo FEFO**
+  (HSD sớm nhất xuất trước), chặn xuất vượt tồn khả dụng.
+- **Tồn kho realtime:** tồn theo sản phẩm (gộp mọi lô), lọc theo kho, HSD gần nhất, giá trị tồn.
+- **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng cấu hình theo sản phẩm, mặc định 60 ngày) và sản phẩm dưới định mức.
 
 ## Điểm nhấn kiến trúc
 
-- **Mô hình dữ liệu** (`prisma/schema.prisma`) phủ toàn bộ mục 6 của bản mô tả, mã hóa sẵn các quy tắc cứng:
-  `warehouse_id` bắt buộc, serial bất biến với `parent_serial_id`/`replaced_by_serial_id`,
-  `bom_as_built` có `version`, cờ `counts_as_available` cho kho, audit log append-only.
-- **RBAC** (`src/lib/rbac.ts`) là nguồn sự thật chung cho seed và kiểm quyền server; API route bảo vệ bằng
+- **Mô hình dữ liệu** (`prisma/schema.prisma`): lõi tồn kho là `StockBatch` (lô của 1 sản phẩm tại 1 kho,
+  kèm HSD), mọi biến động ghi vào `StockMovement`; phiếu nhập/xuất bất biến sau khi ghi sổ; audit log append-only.
+- **RBAC** (`src/lib/rbac.ts`) là nguồn sự thật chung cho seed và kiểm quyền server; API bảo vệ bằng
   `requirePermission(...)`, route trang bảo vệ bằng `middleware.ts`.
-- **Ràng buộc nghiệp vụ** ("có dự án HOẶC hàng thương mại", "NCC bắt buộc khi nhập") ở `src/lib/validation.ts`.
+- **Logic nghiệp vụ tách riêng:** nhập (`src/lib/inbound-service.ts`), xuất + FEFO
+  (`src/lib/outbound-service.ts`), tồn kho & cảnh báo (`src/lib/inventory.ts`), validation Zod
+  (`src/lib/validation.ts`).
 
 ## Lệnh hữu ích
 

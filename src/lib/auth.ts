@@ -6,7 +6,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 
-export const SESSION_COOKIE = "thng_session";
+export const SESSION_COOKIE = "sophia_session";
 
 const SECRET = new TextEncoder().encode(
   process.env.AUTH_SECRET ?? "dev-secret-change-me"

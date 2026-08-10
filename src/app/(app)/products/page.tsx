@@ -6,56 +6,53 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input, Label, Select } from "@/components/ui/input";
+import { Input, Label, Select, Checkbox } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { formatNumber } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 
-type Mode = "SERIAL" | "LOT" | "QUANTITY" | "LICENSE";
+type Mode = "LOT" | "QUANTITY";
+interface Category {
+  id: string;
+  name: string;
+}
 interface Row {
   id: string;
   sku: string;
   barcode?: string | null;
   name: string;
   brand?: string | null;
-  model?: string | null;
+  category?: Category | null;
   trackingMode: Mode;
+  requiresExpiry: boolean;
   uom: string;
   minStock?: number | null;
 }
 
-const MODE_LABEL: Record<Mode, string> = {
-  SERIAL: "Serial",
-  LOT: "Lô (Lot)",
-  QUANTITY: "Số lượng",
-  LICENSE: "License",
-};
-const MODE_TONE: Record<Mode, "default" | "success" | "warning" | "muted"> = {
-  SERIAL: "default",
-  LOT: "warning",
-  QUANTITY: "muted",
-  LICENSE: "success",
+const EMPTY = {
+  sku: "",
+  barcode: "",
+  name: "",
+  brand: "",
+  categoryId: "",
+  trackingMode: "LOT" as Mode,
+  requiresExpiry: true,
+  uom: "Cái",
+  minStock: "",
+  expiryAlertDays: "",
 };
 
 export default function ProductsPage() {
   const canWrite = useCan(PERMISSIONS.PRODUCT_WRITE);
   const [rows, setRows] = useState<Row[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    sku: "",
-    name: "",
-    brand: "",
-    model: "",
-    category: "",
-    trackingMode: "SERIAL" as Mode,
-    uom: "Cái",
-    barcode: "",
-    minStock: "",
-  });
+  const [q, setQ] = useState("");
+  const [form, setForm] = useState(EMPTY);
 
   async function load() {
     setLoading(true);
@@ -67,6 +64,7 @@ export default function ProductsPage() {
   }
   useEffect(() => {
     load();
+    apiFetch<Category[]>("/api/categories").then(setCategories).catch(() => {});
   }, []);
 
   async function create(e: React.FormEvent) {
@@ -76,24 +74,37 @@ export default function ProductsPage() {
       await apiFetch("/api/products", {
         method: "POST",
         body: JSON.stringify({
-          ...form,
-          minStock: form.minStock ? Number(form.minStock) : null,
+          sku: form.sku,
           barcode: form.barcode || null,
+          name: form.name,
+          brand: form.brand || null,
+          categoryId: form.categoryId || null,
+          trackingMode: form.trackingMode,
+          requiresExpiry: form.trackingMode === "LOT" ? form.requiresExpiry : false,
+          uom: form.uom,
+          minStock: form.minStock ? Number(form.minStock) : null,
+          expiryAlertDays: form.expiryAlertDays ? Number(form.expiryAlertDays) : null,
         }),
       });
       setOpen(false);
-      setForm({ sku: "", name: "", brand: "", model: "", category: "", trackingMode: "SERIAL", uom: "Cái", barcode: "", minStock: "" });
+      setForm(EMPTY);
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi");
     }
   }
 
+  const filtered = rows.filter(
+    (r) =>
+      r.name.toLowerCase().includes(q.toLowerCase()) ||
+      r.sku.toLowerCase().includes(q.toLowerCase())
+  );
+
   return (
     <div>
       <PageHeader
         title="Sản phẩm"
-        description="Mỗi sản phẩm có chế độ quản lý (tracking_mode): Serial / Lô / Số lượng / License."
+        description="Hàng hóa trong kho — chế độ quản lý theo lô (có HSD) hoặc theo số lượng."
         action={
           canWrite && (
             <Button onClick={() => setOpen(true)}>
@@ -102,6 +113,14 @@ export default function ProductsPage() {
           )
         }
       />
+      <div className="mb-4">
+        <Input
+          placeholder="Tìm theo tên / SKU…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="sm:max-w-xs"
+        />
+      </div>
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -109,35 +128,40 @@ export default function ProductsPage() {
               <TR>
                 <TH>SKU</TH>
                 <TH>Tên</TH>
-                <TH>Hãng / Model</TH>
+                <TH>Nhóm</TH>
                 <TH>Chế độ QL</TH>
                 <TH>ĐVT</TH>
-                <TH className="text-right">Tồn tối thiểu</TH>
+                <TH className="text-right">Định mức</TH>
               </TR>
             </THead>
             <TBody>
               {loading ? (
                 <TR>
                   <TD colSpan={6} className="py-8 text-center text-muted-foreground">
-                    Đang tải...
+                    Đang tải…
                   </TD>
                 </TR>
-              ) : rows.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <TR>
                   <TD colSpan={6} className="py-8 text-center text-muted-foreground">
                     Chưa có sản phẩm
                   </TD>
                 </TR>
               ) : (
-                rows.map((p) => (
+                filtered.map((p) => (
                   <TR key={p.id}>
-                    <TD className="font-mono font-medium">{p.sku}</TD>
-                    <TD>{p.name}</TD>
-                    <TD className="text-muted-foreground">
-                      {[p.brand, p.model].filter(Boolean).join(" / ") || "—"}
-                    </TD>
+                    <TD className="font-mono text-xs font-medium">{p.sku}</TD>
                     <TD>
-                      <Badge tone={MODE_TONE[p.trackingMode]}>{MODE_LABEL[p.trackingMode]}</Badge>
+                      <div className="font-medium">{p.name}</div>
+                      {p.brand && <div className="text-xs text-muted-foreground">{p.brand}</div>}
+                    </TD>
+                    <TD className="text-muted-foreground">{p.category?.name ?? "—"}</TD>
+                    <TD>
+                      {p.trackingMode === "LOT" ? (
+                        <Badge tone="default">Theo lô{p.requiresExpiry ? " · HSD" : ""}</Badge>
+                      ) : (
+                        <Badge tone="muted">Số lượng</Badge>
+                      )}
                     </TD>
                     <TD>{p.uom}</TD>
                     <TD className="text-right">{p.minStock != null ? formatNumber(p.minStock) : "—"}</TD>
@@ -167,12 +191,19 @@ export default function ProductsPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Hãng</Label>
+              <Label>Thương hiệu</Label>
               <Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>Model</Label>
-              <Input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
+              <Label>Nhóm hàng</Label>
+              <Select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
+                <option value="">— Chọn nhóm —</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -182,10 +213,8 @@ export default function ProductsPage() {
                 value={form.trackingMode}
                 onChange={(e) => setForm({ ...form, trackingMode: e.target.value as Mode })}
               >
-                <option value="SERIAL">Serial</option>
-                <option value="LOT">Lô (Lot)</option>
-                <option value="QUANTITY">Số lượng</option>
-                <option value="LICENSE">License</option>
+                <option value="LOT">Theo lô</option>
+                <option value="QUANTITY">Theo số lượng</option>
               </Select>
             </div>
             <div className="space-y-1.5">
@@ -193,7 +222,7 @@ export default function ProductsPage() {
               <Input value={form.uom} onChange={(e) => setForm({ ...form, uom: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>Tồn tối thiểu</Label>
+              <Label>Định mức tồn</Label>
               <Input
                 type="number"
                 value={form.minStock}
@@ -201,6 +230,26 @@ export default function ProductsPage() {
               />
             </div>
           </div>
+          {form.trackingMode === "LOT" && (
+            <div className="grid grid-cols-2 items-end gap-3">
+              <label className="flex items-center gap-2 pb-2 text-sm">
+                <Checkbox
+                  checked={form.requiresExpiry}
+                  onChange={(e) => setForm({ ...form, requiresExpiry: e.target.checked })}
+                />
+                Bắt buộc nhập HSD khi nhận hàng
+              </label>
+              <div className="space-y-1.5">
+                <Label>Số ngày cảnh báo trước HSD</Label>
+                <Input
+                  type="number"
+                  placeholder="Mặc định 60"
+                  value={form.expiryAlertDays}
+                  onChange={(e) => setForm({ ...form, expiryAlertDays: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

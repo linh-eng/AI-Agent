@@ -15,21 +15,22 @@ interface Row {
   id: string;
   code: string;
   name: string;
-  address?: string | null;
+  note?: string | null;
+  _count: { products: number };
 }
 
-export default function WarehousesPage() {
-  const canWrite = useCan(PERMISSIONS.WAREHOUSE_WRITE);
+export default function CategoriesPage() {
+  const canWrite = useCan(PERMISSIONS.CATEGORY_WRITE);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: "", name: "", address: "" });
+  const [form, setForm] = useState({ code: "", name: "", note: "" });
 
   async function load() {
     setLoading(true);
     try {
-      setRows(await apiFetch<Row[]>("/api/warehouses"));
+      setRows(await apiFetch<Row[]>("/api/categories"));
     } finally {
       setLoading(false);
     }
@@ -42,9 +43,9 @@ export default function WarehousesPage() {
     e.preventDefault();
     setError(null);
     try {
-      await apiFetch("/api/warehouses", { method: "POST", body: JSON.stringify(form) });
+      await apiFetch("/api/categories", { method: "POST", body: JSON.stringify(form) });
       setOpen(false);
-      setForm({ code: "", name: "", address: "" });
+      setForm({ code: "", name: "", note: "" });
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi");
@@ -54,12 +55,12 @@ export default function WarehousesPage() {
   return (
     <div>
       <PageHeader
-        title="Kho"
-        description="Danh mục kho — mỗi bản ghi tồn/nhập/xuất đều gắn với một kho."
+        title="Nhóm hàng"
+        description="Phân loại sản phẩm: mỹ phẩm, thực phẩm chức năng, vật tư tiêu hao, thiết bị…"
         action={
           canWrite && (
             <Button onClick={() => setOpen(true)}>
-              <Plus className="h-4 w-4" /> Thêm kho
+              <Plus className="h-4 w-4" /> Thêm nhóm
             </Button>
           )
         }
@@ -69,22 +70,23 @@ export default function WarehousesPage() {
           <Table>
             <THead>
               <TR>
-                <TH>Mã kho</TH>
-                <TH>Tên kho</TH>
-                <TH>Địa chỉ</TH>
+                <TH>Mã</TH>
+                <TH>Tên nhóm</TH>
+                <TH>Ghi chú</TH>
+                <TH className="text-right">Số SP</TH>
               </TR>
             </THead>
             <TBody>
               {loading ? (
                 <TR>
-                  <TD colSpan={3} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={4} className="py-8 text-center text-muted-foreground">
                     Đang tải…
                   </TD>
                 </TR>
               ) : rows.length === 0 ? (
                 <TR>
-                  <TD colSpan={3} className="py-8 text-center text-muted-foreground">
-                    Chưa có kho
+                  <TD colSpan={4} className="py-8 text-center text-muted-foreground">
+                    Chưa có nhóm hàng
                   </TD>
                 </TR>
               ) : (
@@ -92,7 +94,8 @@ export default function WarehousesPage() {
                   <TR key={r.id}>
                     <TD className="font-mono font-medium">{r.code}</TD>
                     <TD>{r.name}</TD>
-                    <TD className="text-muted-foreground">{r.address ?? "—"}</TD>
+                    <TD className="text-muted-foreground">{r.note ?? "—"}</TD>
+                    <TD className="text-right">{r._count.products}</TD>
                   </TR>
                 ))
               )}
@@ -101,19 +104,19 @@ export default function WarehousesPage() {
         </CardContent>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Thêm kho">
+      <Modal open={open} onClose={() => setOpen(false)} title="Thêm nhóm hàng">
         <form onSubmit={create} className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Mã kho *</Label>
+            <Label>Mã nhóm *</Label>
             <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
           </div>
           <div className="space-y-1.5">
-            <Label>Tên kho *</Label>
+            <Label>Tên nhóm *</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           </div>
           <div className="space-y-1.5">
-            <Label>Địa chỉ</Label>
-            <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            <Label>Ghi chú</Label>
+            <Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">

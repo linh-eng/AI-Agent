@@ -4,13 +4,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Warehouse } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { apiFetch } from "@/lib/client";
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const [email, setEmail] = useState("admin@thng.com.vn");
+  const [email, setEmail] = useState("admin@sophia.vn");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -34,13 +34,13 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
           <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Warehouse className="h-6 w-6" />
+            <Sparkles className="h-6 w-6" />
           </div>
-          <CardTitle>THNG — Quản lý kho</CardTitle>
+          <CardTitle>Sophia Wellness — Quản lý kho</CardTitle>
           <CardDescription>Đăng nhập để tiếp tục</CardDescription>
         </CardHeader>
         <CardContent>
@@ -72,7 +72,7 @@ function LoginForm() {
             </Button>
           </form>
           <p className="mt-4 text-center text-xs text-muted-foreground">
-            Tài khoản demo: <span className="font-medium">admin@thng.com.vn</span> / mật khẩu{" "}
+            Tài khoản demo: <span className="font-medium">admin@sophia.vn</span> / mật khẩu{" "}
             <span className="font-medium">admin123</span>
           </p>
         </CardContent>
