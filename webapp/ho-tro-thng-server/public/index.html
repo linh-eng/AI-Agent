@@ -241,7 +241,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <aside class="side">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.4.1</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.4.2</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="userbox" id="userbox"></div>
@@ -269,7 +269,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <div class="login-card">
     <div class="login-top">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.4.1</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.4.2</span></div>
     </div>
     <div class="login-body">
       <h2>Đăng nhập hệ thống</h2>
@@ -1215,9 +1215,9 @@ function drawForm(){
         ${step0}${siteSec}${step1}${step2}${attachSec}${step3}
       </div>
       <div class="modal-f">
-        <button class="btn danger" onclick="delTicket('${t.id}')">Xóa</button>
+        ${can('del')?`<button class="btn danger" onclick="delTicket('${t.id}')">Xóa</button>`:''}
         <div style="flex:1"></div>
-        <button class="btn primary" onclick="saveTicket()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Lưu ticket</button>
+        <button class="btn primary" onclick="saveTicket()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>${(!can('edit')&&can('create'))?'Lưu bổ sung':'Lưu ticket'}</button>
       </div></div>`;
   }
 }
@@ -1426,7 +1426,7 @@ async function openDetail(id,tab){
   document.getElementById("overlay").innerHTML=`<div class="modal">
     <div class="modal-h"><h3 class="mono" style="color:var(--green-800)">${esc(t.id)}</h3>
       <span class="pill ${s.color}"><span class="dot"></span>${s.label}</span>${stPill(t.trangthai)}
-      <div class="spacer"></div><button class="btn sm" onclick="printMenu('${id}')">🖨️ In phiếu</button>${can('edit')?`<button class="btn sm" onclick="openNotify('${id}')">📨 Gửi thông báo${notiPending(t)?' <span style="color:#ffd21e">●</span>':''}</button>`:''}${can('edit')?`<button class="btn sm" onclick="openForm('${t.id}')">Chỉnh sửa</button>`:''}<button class="x" onclick="closeModal()">✕</button></div>
+      <div class="spacer"></div><button class="btn sm" onclick="printMenu('${id}')">🖨️ In phiếu</button>${can('edit')?`<button class="btn sm" onclick="openNotify('${id}')">📨 Gửi thông báo${notiPending(t)?' <span style="color:#ffd21e">●</span>':''}</button>`:''}${can('edit')?`<button class="btn sm" onclick="openForm('${t.id}')">Chỉnh sửa</button>`:''}${(!can('edit')&&can('create')&&t.createdBy===ME.username&&baseStatus(t.trangthai)==='Trả lại bổ sung')?`<button class="btn sm primary" onclick="openForm('${t.id}')">✏️ Bổ sung phiếu</button>`:''}<button class="x" onclick="closeModal()">✕</button></div>
     <div class="modal-b">
       ${actionsBar}
       <div class="tabs">
