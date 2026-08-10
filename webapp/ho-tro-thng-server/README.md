@@ -126,6 +126,9 @@ pm2 save
   sang nơi an toàn, sau đó bật lại (`pm2 start ho-tro-thng`). *(Nếu copy lúc đang chạy, nhớ copy kèm cả
   `data.db-wal` và `data.db-shm` nếu có.)*
 - **Khôi phục:** tắt máy chủ → chép `data.db` + `uploads/` bản sao lưu đè vào (xóa `data.db-wal`, `data.db-shm` nếu có) → bật lại.
+- 🆕 **Sao lưu tự động:** máy chủ tự sao lưu `data.db` + `uploads/` theo lịch (mặc định mỗi 24 giờ, giữ 7 bản)
+  vào thư mục **`backups/`**. Quản trị viên chỉnh lịch/số bản, bấm **"Sao lưu ngay"** và **"Tải data.db về máy"**
+  ngay trong màn **Danh mục & SLA**. *(Thư mục `backups/` cũng cần được đưa vào lịch backup ngoài nếu muốn an toàn hơn.)*
 - Ngoài ra trong ứng dụng có các nút **Xuất Excel** (`.xlsx`) — xuất toàn bộ dữ liệu, danh sách ticket, và báo cáo theo kỳ — để lưu thêm bản đối chiếu.
 
 ---
@@ -158,6 +161,9 @@ Không. Dữ liệu đã lưu trong `data.db`, bật lại là còn nguyên.
 - API chính: `GET /api/data`, `POST/PUT/DELETE /api/tickets[/:id]`, `POST/PUT/DELETE /api/ps[/:id]`,
   `GET/PUT /api/config`, `GET/PUT /api/projects` (Danh mục Dự án 5H),
   `POST /api/upload` · `GET /api/files?ticketId=` · `GET|DELETE /api/file/:id` (đính kèm).
+- 🆕 Module vận hành: **Thông báo trong app** (`GET /api/notifs`, `POST /api/notifs/seen`; bảng `notifs`) ·
+  **Lịch sử truy cập** (`GET /api/loginlog`; bảng `loginlog` — ghi mọi lần đăng nhập kèm IP) ·
+  **Sao lưu tự động** (`GET /api/backups`, `POST /api/backup`, `GET /api/backup/download`; thư mục `backups/`).
 - SLA & danh mục (loại việc, phòng ban, đội, dự án, trọng số điểm CL, dung lượng file…) chỉnh trực tiếp
   trong màn **Danh mục & Cấu hình** — lưu ở bảng `settings`, áp dụng ngay cho toàn hệ thống.
 - **Báo cáo theo chu kỳ** (menu Báo cáo): lọc theo ngày/tuần/tháng/năm + khoảng ngày, xuất Excel (.xls),

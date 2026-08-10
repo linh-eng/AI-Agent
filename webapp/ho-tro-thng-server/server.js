@@ -91,6 +91,71 @@ const Q_FILES = {
   del:      db.prepare("DELETE FROM files WHERE id=?"),
 };
 const ALLOWED_UPLOAD = /\.(jpe?g|png|gif|webp|bmp|pdf|docx?|xlsx?|txt|csv|pptx?|zip|heic)$/i;
+
+// Lịch sử truy cập (đăng nhập) — module Lịch sử truy cập
+db.exec("CREATE TABLE IF NOT EXISTS loginlog (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, name TEXT, at TEXT, ip TEXT, ua TEXT, ok INTEGER)");
+db.exec("CREATE INDEX IF NOT EXISTS ix_loginlog_user ON loginlog(username)");
+const Q_LOGIN = {
+  ins:    db.prepare("INSERT INTO loginlog(username,name,at,ip,ua,ok) VALUES(?,?,?,?,?,?)"),
+  recent: db.prepare("SELECT username,name,at,ip,ua,ok FROM loginlog ORDER BY id DESC LIMIT ?"),
+  byUser: db.prepare("SELECT username,name,at,ip,ua,ok FROM loginlog WHERE username=? ORDER BY id DESC LIMIT ?"),
+  lastOk: db.prepare("SELECT at FROM loginlog WHERE username=? AND ok=1 ORDER BY id DESC LIMIT 1"),
+  prune:  db.prepare("DELETE FROM loginlog WHERE id NOT IN (SELECT id FROM loginlog ORDER BY id DESC LIMIT 5000)"),
+};
+function clientIP(req){ return String(req.headers["x-forwarded-for"]||"").split(",")[0].trim() || (req.socket&&req.socket.remoteAddress) || ""; }
+function logLogin(username, name, req, ok){ try{ Q_LOGIN.ins.run(username||"", name||"", new Date().toISOString(), clientIP(req), String(req.headers["user-agent"]||"").slice(0,180), ok?1:0); if(Math.random()<0.02) Q_LOGIN.prune.run(); }catch(e){} }
+
+// Thông báo trong ứng dụng — module Thông báo
+db.exec("CREATE TABLE IF NOT EXISTS notifs (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, at TEXT, type TEXT, text TEXT, ticketId TEXT, seen INTEGER DEFAULT 0)");
+db.exec("CREATE INDEX IF NOT EXISTS ix_notifs_user ON notifs(username,seen)");
+const Q_NOTIF = {
+  ins:     db.prepare("INSERT INTO notifs(username,at,type,text,ticketId,seen) VALUES(?,?,?,?,?,0)"),
+  recent:  db.prepare("SELECT id,at,type,text,ticketId,seen FROM notifs WHERE username=? ORDER BY id DESC LIMIT 40"),
+  unseen:  db.prepare("SELECT COUNT(*) c FROM notifs WHERE username=? AND seen=0"),
+  seenAll: db.prepare("UPDATE notifs SET seen=1 WHERE username=? AND seen=0"),
+  seenOne: db.prepare("UPDATE notifs SET seen=1 WHERE username=? AND id=?"),
+  prune:   db.prepare("DELETE FROM notifs WHERE id NOT IN (SELECT id FROM notifs ORDER BY id DESC LIMIT 4000)"),
+};
+function pushNotif(username, type, text, ticketId){ if(!username) return; try{ Q_NOTIF.ins.run(username, new Date().toISOString(), type||"", String(text||""), String(ticketId||"")); }catch(e){} }
+// Ánh xạ tên người thực hiện -> username (tài khoản đang hoạt động)
+function userByName(name){ name=String(name||"").trim(); if(!name) return null; return S.users.all().find(u=>String(u.name||"").trim()===name && (u.trangthai||"active")==="active") || null; }
+// Danh sách username có quyền tiếp nhận / duyệt (điều phối + quản trị)
+function dispatcherUsernames(){ return S.users.all().filter(u=>ROLES[u.role]&&(ROLES[u.role].approve) && (u.trangthai||"active")==="active").map(u=>u.username); }
+
+// Sao lưu tự động — module Sao lưu
+const BACKUP_DIR = path.join(ROOT, "backups");
+try { fs.mkdirSync(BACKUP_DIR, { recursive: true }); } catch (e) {}
+let lastBackupAt = 0;
+function pad2(n){ return String(n).padStart(2,"0"); }
+function stampNow(){ const d=new Date(); return `${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`; }
+function listBackups(){ try{ return fs.readdirSync(BACKUP_DIR).filter(n=>n.startsWith("backup-")).map(n=>{ const p=path.join(BACKUP_DIR,n); let size=0; try{ const st=fs.statSync(path.join(p,"data.db")); size=st.size; }catch(e){} return { name:n, at:n.replace("backup-",""), size }; }).sort((a,b)=>b.name.localeCompare(a.name)); }catch(e){ return []; } }
+function runBackup(reason){
+  try{
+    try{ db.exec("PRAGMA wal_checkpoint(TRUNCATE)"); }catch(e){}          // gộp WAL vào data.db để bản sao đầy đủ
+    const dir = path.join(BACKUP_DIR, "backup-" + stampNow());
+    fs.mkdirSync(dir, { recursive: true });
+    fs.copyFileSync(DB_FILE, path.join(dir, "data.db"));
+    if (fs.existsSync(UPLOAD_DIR)) { try{ fs.cpSync(UPLOAD_DIR, path.join(dir, "uploads"), { recursive: true }); }catch(e){} }
+    fs.writeFileSync(path.join(dir, "info.txt"), "Sao lưu lúc " + new Date().toLocaleString("vi-VN") + " (" + (reason||"tự động") + ")\n");
+    lastBackupAt = Date.now();
+    // dọn bản cũ, giữ N bản gần nhất
+    const keep = Math.max(1, +getConfig().backup.keep || 7);
+    const all = listBackups();
+    all.slice(keep).forEach(b => { try{ fs.rmSync(path.join(BACKUP_DIR, b.name), { recursive:true, force:true }); }catch(e){} });
+    return { ok:true, name: path.basename(dir) };
+  }catch(e){ return { ok:false, error:e.message }; }
+}
+
+/* ---- SLA theo giờ làm việc (bản máy chủ — để cảnh báo trễ hạn) ---- */
+function segOverlapMs(dayStart, end, h1, h2){ const a=new Date(dayStart); a.setHours(h1,0,0,0); const b=new Date(dayStart); b.setHours(h2,0,0,0); const lo=Math.max(dayStart.getTime(),a.getTime()), hi=Math.min(end.getTime(),b.getTime()); return hi>lo?(hi-lo)/60000:0; }
+function workHoursSrv(start, end){ if(!start||!end) return 0; const w=getConfig().work||{mStart:8,mEnd:12,aStart:13,aEnd:17,sat:false}; let s=new Date(start), e=new Date(end); if(e<=s) return 0; let mins=0, cur=new Date(s), guard=0;
+  while(cur<e && guard++<200000){ const day=cur.getDay(); if((day>=1&&day<=5)||(day===6&&w.sat)){ mins+=segOverlapMs(cur,e,w.mStart,w.mEnd); mins+=segOverlapMs(cur,e,w.aStart,w.aEnd); } cur.setDate(cur.getDate()+1); cur.setHours(0,0,0,0); }
+  return mins/60; }
+function isRunningSrv(s){ return ["Đã tiếp nhận","Đang xử lý","Mở lại"].includes(baseStatus(s)); }
+function slaUsedSrv(t){ const hist=Array.isArray(t.history)?t.history:null; const endTime=new Date().toISOString();
+  if(hist&&hist.length){ let used=0; for(let i=0;i<hist.length;i++){ const from=hist[i].at, to=(i+1<hist.length?hist[i+1].at:endTime); if(isRunningSrv(hist[i].to)) used+=workHoursSrv(from,to); } return used; }
+  return workHoursSrv(t.tStart||t.tAssign||t.tCreate, endTime); }
+function slaProcHours(uutien){ const sla=getConfig().sla||{}; const arr=sla[uutien]; return arr?arr[1]:8; }
 const DEFAULT_WORKTYPES = [
   ["KT01","Xử lý sự cố / lỗi sản phẩm","Hỗ trợ kỹ thuật","P2 - Ưu tiên cao","kt"],
   ["KT02","Hỗ trợ cài đặt, cấu hình","Hỗ trợ kỹ thuật","P3 - Ưu tiên trung bình","kt"],
@@ -115,6 +180,7 @@ const DEFAULT_CONFIG = {
   sla: { "P1 - Khẩn cấp":[15,2], "P2 - Ưu tiên cao":[30,4], "P3 - Ưu tiên trung bình":[60,8], "P4 - Thấp":[120,24] },
   work: { mStart:8, mEnd:12, aStart:13, aEnd:17, sat:false }, // sat=true nếu làm Thứ 7
   warn: 0.8, overload: 3, maxUpload: 10, // maxUpload: dung lượng tối đa mỗi file (MB)
+  backup: { enabled:true, everyHours:24, keep:7 }, // sao lưu tự động
   quality: { csat:40, sla:25, sl:15, ps:10, reopen:10 },
   cat: {
     donvi: ["Phòng Hành chính","Phòng Kế toán","Phòng Kinh doanh","Phòng Mua hàng","Phòng Triển khai","Phòng Testing","Phòng Bảo hành","Phòng Tư vấn kỹ thuật","Ban Giám đốc","Trợ lý Giám đốc"],
@@ -129,6 +195,7 @@ function getConfig() {
   const r = qSetGet.get("config"); const c = r ? JSON.parse(r.v) : {};
   return { ...DEFAULT_CONFIG, ...c,
     cat: { ...DEFAULT_CONFIG.cat, ...(c.cat||{}) },
+    backup: { ...DEFAULT_CONFIG.backup, ...(c.backup||{}) },
     worktypes: (Array.isArray(c.worktypes) && c.worktypes.length) ? c.worktypes : DEFAULT_CONFIG.worktypes };
 }
 // Danh mục Dự án (5H) — lưu trong settings, dùng chung mọi ticket
@@ -271,9 +338,11 @@ const server = http.createServer(async (req, res) => {
     try {
       if (p === "/api/login" && req.method === "POST") {
         const { username, password } = await readBody(req);
-        const u = S.user.get(String(username||"").trim());
-        if (!u || !verifyPw(password, u.salt, u.hash)) return sendJSON(res, 401, { error: "Sai tên đăng nhập hoặc mật khẩu" });
-        if ((u.trangthai||"active") !== "active") return sendJSON(res, 403, { error: "Tài khoản đã ngưng hoạt động. Liên hệ Quản trị." });
+        const un = String(username||"").trim();
+        const u = S.user.get(un);
+        if (!u || !verifyPw(password, u.salt, u.hash)) { logLogin(un, u?u.name:"", req, false); return sendJSON(res, 401, { error: "Sai tên đăng nhập hoặc mật khẩu" }); }
+        if ((u.trangthai||"active") !== "active") { logLogin(un, u.name, req, false); return sendJSON(res, 403, { error: "Tài khoản đã ngưng hoạt động. Liên hệ Quản trị." }); }
+        logLogin(u.username, u.name, req, true);
         const token = newSession(u.username);
         return sendJSON(res, 200, { user: sanitizeUser(u), cap: capOf(u.role), roleLabel: ROLES[u.role].label, mustChange: !!u.mustChange },
           { "Set-Cookie": `sid=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_MS/1000}` });
@@ -367,6 +436,41 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      /* ---- Thông báo trong ứng dụng ---- */
+      if (p === "/api/notifs" && req.method === "GET")
+        return sendJSON(res, 200, { list: Q_NOTIF.recent.all(me.username), unseen: Q_NOTIF.unseen.get(me.username).c });
+      if (p === "/api/notifs/seen" && req.method === "POST") {
+        const b = await readBody(req);
+        if (b && b.id) Q_NOTIF.seenOne.run(me.username, +b.id); else Q_NOTIF.seenAll.run(me.username);
+        if (Math.random() < 0.05) Q_NOTIF.prune.run();
+        return sendJSON(res, 200, { ok: true, unseen: Q_NOTIF.unseen.get(me.username).c });
+      }
+
+      /* ---- Lịch sử truy cập (admin) ---- */
+      if (p === "/api/loginlog" && req.method === "GET") {
+        if (!can(me, "users")) return sendJSON(res, 403, { error: "Chỉ quản trị viên" });
+        const un = url.searchParams.get("username");
+        const lim = Math.min(500, +url.searchParams.get("limit") || 200);
+        return sendJSON(res, 200, un ? Q_LOGIN.byUser.all(un, lim) : Q_LOGIN.recent.all(lim));
+      }
+
+      /* ---- Sao lưu (admin) ---- */
+      if (p === "/api/backups" && req.method === "GET") {
+        if (!can(me, "users")) return sendJSON(res, 403, { error: "Chỉ quản trị viên" });
+        return sendJSON(res, 200, { list: listBackups(), lastBackupAt });
+      }
+      if (p === "/api/backup" && req.method === "POST") {
+        if (!can(me, "users")) return sendJSON(res, 403, { error: "Chỉ quản trị viên" });
+        const r = runBackup("thủ công"); return sendJSON(res, r.ok ? 200 : 500, r.ok ? { ok: true, name: r.name, list: listBackups() } : { error: r.error });
+      }
+      if (p === "/api/backup/download" && req.method === "GET") {
+        if (!can(me, "users")) return sendJSON(res, 403, { error: "Chỉ quản trị viên" });
+        try { db.exec("PRAGMA wal_checkpoint(TRUNCATE)"); } catch (e) {}
+        const fn = "data-" + stampNow() + ".db";
+        res.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Disposition": `attachment; filename="${fn}"`, "Cache-Control": "no-store" });
+        return fs.createReadStream(DB_FILE).pipe(res);
+      }
+
       if (p === "/api/data" && req.method === "GET")
         return sendJSON(res, 200, { tickets: ticketsForUser(me), ps: allPS(), seq: {} });
 
@@ -377,7 +481,10 @@ const server = http.createServer(async (req, res) => {
         t.trangthai = "Tạo mới"; t.uutienDeXuat = t.uutien || ""; t.moLai = +t.moLai || 0;
         t.history = [{ at: t.tCreate, from: "", to: "Tạo mới", by: me.username, note: "Tạo phiếu yêu cầu" }];
         delete t._reason;
-        saveTicketRow(t, true); return sendJSON(res, 201, t);
+        saveTicketRow(t, true);
+        // Thông báo: ticket mới cần tiếp nhận -> điều phối/quản trị
+        dispatcherUsernames().forEach(un => { if (un !== me.username) pushNotif(un, "new", `Ticket mới cần tiếp nhận: ${t.id} · ${t.donvi||""}`, t.id); });
+        return sendJSON(res, 201, t);
       }
       if ((m = p.match(/^\/api\/tickets\/(.+)$/))) {
         const id = decodeURIComponent(m[1]); const cur = getTicket(id);
@@ -400,7 +507,15 @@ const server = http.createServer(async (req, res) => {
           const changes = diffAudit(cur, t);
           if (changes.length) t.auditLog.push({ at: nowISO, by: me.username, changes, note: note || "" });
           delete t._reason;
-          saveTicketRow(t, false); return sendJSON(res, 200, t);
+          saveTicketRow(t, false);
+          // Thông báo: được giao việc (khi đổi người thực hiện)
+          if (String(t.assignee||"").trim() && String(t.assignee||"").trim() !== String(cur.assignee||"").trim()) {
+            const au = userByName(t.assignee); if (au && au.username !== me.username) pushNotif(au.username, "assign", `Bạn được giao ticket ${t.id}: ${t.noidung? String(t.noidung).slice(0,60): t.donvi||""}`, t.id);
+          }
+          // Thông báo: ticket đổi trạng thái -> người tạo phiếu
+          if (baseStatus(t.trangthai) !== baseStatus(cur.trangthai) && cur.createdBy && cur.createdBy !== me.username)
+            pushNotif(cur.createdBy, "status", `Ticket ${t.id} chuyển sang "${baseStatus(t.trangthai)}"`, t.id);
+          return sendJSON(res, 200, t);
         }
         if (req.method === "DELETE") {
           if (!can(me, "del")) return sendJSON(res, 403, { error: "Không có quyền xóa ticket" });
@@ -411,7 +526,11 @@ const server = http.createServer(async (req, res) => {
       /* ---- Phát sinh ---- */
       if (p === "/api/ps" && req.method === "POST") {
         if (!can(me, "ps")) return sendJSON(res, 403, { error: "Không có quyền ghi phát sinh" });
-        const x = await readBody(req); x.id = genId("PS"); savePSRow(x, true); return sendJSON(res, 201, x);
+        const x = await readBody(req); x.id = genId("PS"); savePSRow(x, true);
+        // Thông báo: phát sinh chờ duyệt -> người có quyền duyệt
+        if (baseStatus(x.duyet||"Chờ duyệt") === "Chờ duyệt")
+          dispatcherUsernames().forEach(un => { if (un !== me.username) pushNotif(un, "ps", `Phát sinh ${x.id} chờ duyệt (ticket ${x.ticketId||""})`, x.ticketId||""); });
+        return sendJSON(res, 201, x);
       }
       if ((m = p.match(/^\/api\/ps\/(.+)$/))) {
         const id = decodeURIComponent(m[1]); const cur = getPS(id);
@@ -429,7 +548,7 @@ const server = http.createServer(async (req, res) => {
       /* ---- Người dùng (admin) ---- */
       if (p === "/api/users") {
         if (!can(me, "users")) return sendJSON(res, 403, { error: "Chỉ quản trị viên" });
-        if (req.method === "GET") return sendJSON(res, 200, S.users.all().map(sanitizeUser));
+        if (req.method === "GET") return sendJSON(res, 200, S.users.all().map(u => { const su = sanitizeUser(u); const r = Q_LOGIN.lastOk.get(u.username); su.lastLogin = r ? r.at : ""; return su; }));
         if (req.method === "POST") {
           const b = await readBody(req); const un = String(b.username||"").trim();
           if (!un || !b.password) return sendJSON(res, 400, { error: "Thiếu tên đăng nhập hoặc mật khẩu" });
@@ -501,9 +620,30 @@ setInterval(() => {
         saveTicketRow(t, false);
         console.log("  ⓘ Ticket " + t.id + ": tự áp phương án 2 sau 30' không phản hồi.");
       }
+      // Thông báo trễ SLA xử lý: chỉ báo 1 lần cho người thực hiện khi vượt hạn
+      if (!isClosedStatus(t.trangthai) && !t._slaBreachNoti && t.assignee) {
+        const used = slaUsedSrv(t), lim = slaProcHours(t.uutien);
+        if (lim > 0 && used > lim) {
+          const au = userByName(t.assignee);
+          if (au) pushNotif(au.username, "sla", `Ticket ${t.id} đã TRỄ SLA xử lý (đã dùng ${used.toFixed(1)}h / ${lim}h)`, t.id);
+          t._slaBreachNoti = true; saveTicketRow(t, false);
+        }
+      }
     }
   } catch (e) {}
 }, 60000);
+
+/* ---- Sao lưu tự động theo lịch (kiểm tra mỗi 10 phút) ---- */
+setInterval(() => {
+  try {
+    const b = getConfig().backup || {};
+    if (!b.enabled) return;
+    const everyMs = Math.max(1, +b.everyHours || 24) * 3600 * 1000;
+    if (Date.now() - lastBackupAt >= everyMs) { const r = runBackup("tự động"); if (r.ok) console.log("  ✓ Đã sao lưu tự động: " + r.name); }
+  } catch (e) {}
+}, 10 * 60 * 1000);
+// Sao lưu 1 lần ~30 giây sau khi khởi động (nếu đến hạn / chưa có bản nào)
+setTimeout(() => { try { const b = getConfig().backup||{}; if (b.enabled && !listBackups().length) { const r=runBackup("khởi động"); if(r.ok) console.log("  ✓ Đã tạo bản sao lưu đầu tiên: "+r.name); } } catch(e){} }, 30000);
 
 /* ============================ KHỞI ĐỘNG ============================ */
 migrateFromJson(); seedConfig(); seedUsers(); seedTickets();
