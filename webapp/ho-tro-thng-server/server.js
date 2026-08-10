@@ -17,6 +17,7 @@ catch (e) {
   process.exit(1);
 }
 
+const APP_VERSION = "v3.4"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 const ROOT = __dirname;
@@ -336,6 +337,8 @@ const server = http.createServer(async (req, res) => {
 
   if (p.startsWith("/api/")) {
     try {
+      if (p === "/api/version" && req.method === "GET")
+        return sendJSON(res, 200, { version: APP_VERSION, modules: ["notifs", "loginlog", "backup"] });
       if (p === "/api/login" && req.method === "POST") {
         const { username, password } = await readBody(req);
         const un = String(username||"").trim();
@@ -651,7 +654,7 @@ server.listen(PORT, HOST, () => {
   const nets = os.networkInterfaces(); const ips = [];
   for (const name of Object.keys(nets)) for (const ni of nets[name]) if (ni.family === "IPv4" && !ni.internal) ips.push(ni.address);
   console.log("\n===============================================================");
-  console.log("  HỆ THỐNG HỖ TRỢ THNG — máy chủ nội bộ (SQLite) đã chạy");
+  console.log("  HỆ THỐNG HỖ TRỢ THNG — máy chủ nội bộ (SQLite) " + APP_VERSION + " đã chạy");
   console.log("===============================================================");
   console.log("  • Trên máy chủ này, mở:   http://localhost:" + PORT);
   if (ips.length) { console.log("  • Các phòng ban trong mạng nội bộ mở:"); ips.forEach(ip => console.log("        http://" + ip + ":" + PORT)); }
