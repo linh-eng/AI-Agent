@@ -241,7 +241,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <aside class="side">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.5</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.6</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="userbox" id="userbox"></div>
@@ -269,7 +269,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <div class="login-card">
     <div class="login-top">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.5</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.6</span></div>
     </div>
     <div class="login-body">
       <h2>Đăng nhập hệ thống</h2>
@@ -1452,7 +1452,7 @@ async function openDetail(id,tab){
 function nextActions(t){
   const s=baseStatus(t.trangthai); const A=[];
   const add=(to,label,need,cap)=>A.push({to,label,need:!!need,cap:cap||'edit'});
-  if(s==='Tạo mới'){ add('Đã tiếp nhận','Tiếp nhận (đủ điều kiện)',false,'edit'); add('Trả lại bổ sung','Trả lại bổ sung',true,'edit'); add('Từ chối','Từ chối',true,'edit'); }
+  if(s==='Tạo mới'){ add('@noidung','📝 Nội dung xử lý',false,'edit'); }
   else if(s==='Trả lại bổ sung'){ add('Tạo mới','Gửi lại (đã bổ sung)',false,'create'); }
   else if(s==='Đã tiếp nhận'){ add('@assign','Phân công người thực hiện',false,'edit'); add('@plan','Lập kế hoạch thực hiện',false,'edit'); add('Đang xử lý','Bắt đầu xử lý',false,'edit'); add('Từ chối','Từ chối',true,'edit'); }
   else if(s==='Đang xử lý'){ add('Đã xử lý','Hoàn thành xử lý',false,'edit'); add('Chờ phản hồi','Chờ phản hồi NYC',false,'edit'); add('Chờ duyệt','Chờ duyệt phát sinh',false,'edit'); add('Tạm dừng','Tạm dừng',true,'edit'); }
@@ -1460,6 +1460,7 @@ function nextActions(t){
   else if(s==='Tạm dừng'){ add('Đang xử lý','Tiếp tục xử lý',false,'edit'); add('Đã tiếp nhận','Phân loại lại (Bước 2)',true,'edit'); }
   else if(s==='Đã xử lý'){ add('Hoàn tất','Nghiệm thu đạt → Hoàn tất',false,'edit'); add('Mở lại','Mở lại (chưa đạt)',true,'edit'); }
   else if(s==='Mở lại'){ add('Đang xử lý','Tiếp tục xử lý',false,'edit'); }
+  else if(s==='Từ chối'){ add('Mở lại','Mở lại',true,'edit'); }
   else if(s==='Hoàn tất'){ add('Mở lại','Mở lại',true,'edit'); }
   return A;
 }
@@ -1469,6 +1470,7 @@ function doAction(id, idx){
   const t=DB.tickets.find(x=>x.id===id); if(!t)return; const to=a.to;
   if(to==='@assign'){ openAssign(id); return; }
   if(to==='@plan'){ openPlan(id); return; }
+  if(to==='@noidung'){ openNoiDung(id); return; }
   // Bước 2 — tiếp nhận: mở hộp chốt ưu tiên
   if(baseStatus(to)==='Đã tiếp nhận' && baseStatus(t.trangthai)==='Tạo mới'){ openReceive(id); return; }
   // Cổng Bước 3: phải có Người thực hiện + kế hoạch đã xác nhận + trường 5H bắt buộc trước khi Đang xử lý
@@ -1510,6 +1512,49 @@ function askReason(title,cb){
   document.getElementById("rsOk").onclick=()=>{const v=document.getElementById("rsReason").value.trim(); if(v.length<5){toast('Vui lòng ghi lý do (tối thiểu 5 ký tự)',true);return;} cb(v);};
 }
 function priNum(x){const m=String(x).match(/P(\d)/);return m?+m[1]:3;}
+function noiDungPick(v){
+  const map={bosung:'ndBoxBoSung',tuchoi:'ndBoxTuChoi',thoigian:'ndBoxThoiGian'};
+  Object.values(map).forEach(x=>{const el=document.getElementById(x); if(el) el.style.display='none';});
+  const on=map[v]; if(on){const el=document.getElementById(on); if(el) el.style.display='block';}
+}
+function openNoiDung(id){
+  const t=DB.tickets.find(x=>x.id===id); if(!t)return;
+  const tGiao=t.tGiaoYC||'';
+  document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:560px">
+    <div class="modal-h"><h3>Nội dung xử lý phiếu</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
+    <div class="modal-b">
+      <div class="hint" style="margin-bottom:12px">Chọn hướng xử lý cho phiếu <b>${esc(t.ma||id)}</b>:</div>
+      <div class="f"><label style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:8px"><input type="radio" name="ndChoice" value="dongy" style="width:auto;flex:none" checked onchange="noiDungPick(this.value)"> <span><b>Đồng ý</b> — tiếp nhận phiếu</span></label>
+        <label style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:8px"><input type="radio" name="ndChoice" value="thoigian" style="width:auto;flex:none" onchange="noiDungPick(this.value)"> <span><b>Điều chỉnh thời gian</b> — tiếp nhận & chốt lại thời hạn</span></label>
+        <label style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:8px"><input type="radio" name="ndChoice" value="bosung" style="width:auto;flex:none" onchange="noiDungPick(this.value)"> <span><b>Cần bổ sung thông tin</b> — trả lại để người yêu cầu bổ sung</span></label>
+        <label style="display:flex;gap:9px;align-items:center;cursor:pointer"><input type="radio" name="ndChoice" value="tuchoi" style="width:auto;flex:none" onchange="noiDungPick(this.value)"> <span><b>Từ chối</b> — không tiếp nhận phiếu</span></label>
+      </div>
+      <div id="ndBoxThoiGian" style="display:none;margin-top:6px"><div class="f"><label>Thời hạn mong muốn (mới) <span class="req">*</span></label><input type="datetime-local" id="ndThoiGian" value="${esc(tGiao)}"><div class="hint">Chốt lại thời hạn hoàn tất mong muốn rồi tiếp nhận phiếu.</div></div></div>
+      <div id="ndBoxBoSung" style="display:none;margin-top:6px"><div class="f"><label>Thông tin cần bổ sung <span class="req">*</span></label><textarea id="ndBoSung" placeholder="Ghi rõ nội dung cần người yêu cầu bổ sung (tối thiểu 5 ký tự)…" style="min-height:80px"></textarea></div></div>
+      <div id="ndBoxTuChoi" style="display:none;margin-top:6px"><div class="f"><label>Lý do từ chối <span class="req">*</span></label><textarea id="ndTuChoi" placeholder="Ghi rõ lý do từ chối phiếu (tối thiểu 5 ký tự)…" style="min-height:80px"></textarea></div></div>
+    </div>
+    <div class="modal-f"><button class="btn" onclick="closeModal()">Hủy</button><button class="btn primary" id="ndOk">Xác nhận</button></div></div>`;
+  document.getElementById("overlay").classList.add("show");
+  document.getElementById("ndOk").onclick=()=>{
+    const v=(document.querySelector('input[name="ndChoice"]:checked')||{}).value;
+    if(v==='dongy'){ applyStatus(id,'Đã tiếp nhận','Đồng ý tiếp nhận',{}); return; }
+    if(v==='thoigian'){
+      const tg=document.getElementById("ndThoiGian").value;
+      if(!tg){ toast('Vui lòng chọn thời hạn mong muốn mới',true); return; }
+      applyStatus(id,'Đã tiếp nhận','Điều chỉnh thời gian, tiếp nhận',{tGiaoYC:tg}); return;
+    }
+    if(v==='bosung'){
+      const r=document.getElementById("ndBoSung").value.trim();
+      if(r.length<5){ toast('Vui lòng ghi nội dung cần bổ sung (tối thiểu 5 ký tự)',true); return; }
+      applyStatus(id,'Trả lại bổ sung',r,{}); return;
+    }
+    if(v==='tuchoi'){
+      const r=document.getElementById("ndTuChoi").value.trim();
+      if(r.length<5){ toast('Vui lòng ghi lý do từ chối (tối thiểu 5 ký tự)',true); return; }
+      applyStatus(id,'Từ chối',r,{}); return;
+    }
+  };
+}
 function openReceive(id){
   const t=DB.tickets.find(x=>x.id===id); if(!t)return;
   const deXuat=t.uutienDeXuat||t.uutien;
