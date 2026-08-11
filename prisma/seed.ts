@@ -733,6 +733,100 @@ async function main() {
     }
   }
 
+  // --- 12. MODULE 5–10: proposal · care · pricing · marketing --------------
+  const demo = await prisma.customer.findUnique({ where: { code: "KH-000001" } });
+
+  // Care template (mục 6)
+  await prisma.careInstruction.upsert({
+    where: { code: "CARE-POST-LASER" },
+    update: {},
+    create: {
+      code: "CARE-POST-LASER",
+      title: "Dặn dò sau Laser",
+      kind: "POST_CARE",
+      category: "Laser",
+      status: "ACTIVE",
+      content: "Tránh nắng 7 ngày, dùng SPF50, không dùng AHA/BHA 3 ngày, cấp ẩm đầy đủ.",
+      technologyId: techPico.id,
+      createdBy: "Phạm Chuyên Viên",
+    },
+  });
+
+  // Price rule (mục 9) — giá niêm yết cho dịch vụ Laser, có version
+  const existedPrice = await prisma.priceRule.findFirst({ where: { targetId: svcLaser.id, priceType: "STANDARD" } });
+  if (!existedPrice) {
+    await prisma.priceRule.create({
+      data: {
+        targetType: "SERVICE",
+        targetId: svcLaser.id,
+        targetName: svcLaser.name,
+        priceType: "STANDARD",
+        price: 2_500_000,
+        effectiveFrom: new Date("2026-01-01"),
+        createdBy: "Trần Quản Lý",
+      },
+    });
+  }
+
+  // Marketing campaign + lead (mục 10)
+  const camp = await prisma.marketingCampaign.upsert({
+    where: { code: "CAMP-SUMMER-2026" },
+    update: {},
+    create: {
+      code: "CAMP-SUMMER-2026",
+      name: "Hè rực rỡ 2026",
+      channel: "Facebook Ads",
+      startDate: new Date("2026-06-01"),
+      endDate: new Date("2026-08-31"),
+      budget: 50_000_000,
+      cost: 30_000_000,
+      owner: "Vũ Marketing",
+    },
+  });
+  await prisma.lead.upsert({
+    where: { code: "LEAD-000001" },
+    update: {},
+    create: { code: "LEAD-000001", name: "Trần Thị Lead", phone: "0912345678", source: "Facebook", campaignId: camp.id, status: "NEW" },
+  });
+  // Gán attribution cho khách demo
+  if (demo && !demo.campaignId) {
+    await prisma.customer.update({ where: { id: demo.id }, data: { campaignId: camp.id } });
+  }
+
+  // Proposal 2 phương án cho khách demo (mục 5)
+  if (demo) {
+    const existedProp = await prisma.treatmentProposal.findUnique({ where: { code: "PROP-000001" } });
+    if (!existedProp) {
+      await prisma.treatmentProposal.create({
+        data: {
+          code: "PROP-000001",
+          customerId: demo.id,
+          title: "Phương án trị nám 2026",
+          status: "SENT",
+          createdBy: "Phạm Chuyên Viên",
+          options: {
+            create: [
+              {
+                kind: "ESSENTIAL", name: "Thiết yếu", orderIndex: 0, sessions: 4, totalPrice: 9_000_000,
+                items: { create: [
+                  { itemType: "SERVICE", name: "Laser trị nám Pico", quantity: 4, unitPrice: 2_500_000, unitCost: 700_000, orderIndex: 0 },
+                ] },
+              },
+              {
+                kind: "PREMIUM", name: "Cao cấp", orderIndex: 1, sessions: 6, totalPrice: 16_200_000, discount: 800_000,
+                items: { create: [
+                  { itemType: "SERVICE", name: "Laser trị nám Pico", quantity: 6, unitPrice: 2_500_000, unitCost: 700_000, orderIndex: 0 },
+                  { itemType: "PRODUCT", name: "Serum HA phục hồi", quantity: 1, unitPrice: 1_200_000, unitCost: 400_000, isHomeCare: true, orderIndex: 1 },
+                  { itemType: "PRODUCT", name: "Kem chống nắng SPF50", quantity: 1, unitPrice: 650_000, unitCost: 200_000, isHomeCare: true, orderIndex: 2 },
+                ] },
+              },
+            ],
+          },
+        },
+      });
+    }
+  }
+
   console.log("✅ Seed hoàn tất.");
   console.log("   Đăng nhập kho: admin@thng.com.vn / admin123");
   console.log("   Đăng nhập spa: quanly@thng.com.vn / quanly123 (Quản lý)");
@@ -740,6 +834,8 @@ async function main() {
   console.log("   Khách spa mẫu: KH-000001 Nguyễn Thị An (phác đồ TP-000001)");
   console.log("   Thư viện: brand DMK, công nghệ Laser Pico, protocol DMK Enzyme Brightening,");
   console.log("             biểu mẫu FORM-SKIN-ASSESS (có conditional logic).");
+  console.log("   Module 5-10: báo giá PROP-000001, hướng dẫn CARE-POST-LASER, bảng giá Laser,");
+  console.log("                chiến dịch CAMP-SUMMER-2026 + LEAD-000001.");
 }
 
 main()

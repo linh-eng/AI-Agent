@@ -127,9 +127,10 @@ Dự án đã chuyển sang **Prisma Migrate** làm chiến lược triển khai
 - **`0_init`**: migration nền (baseline) sinh từ toàn bộ schema hiện tại (kho THNG + Spa + Thư viện Spa),
   hoàn toàn **additive** (chỉ `CREATE` — không có `DROP`). Sinh bằng
   `prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script`.
-- Mỗi module bổ sung sau baseline có **một migration riêng** (`1_..._proposals`, `2_..._care`, …), cũng
-  sinh bằng `migrate diff` giữa 2 phiên bản schema (không cần DB) và được kiểm tra **không chứa lệnh phá
-  hủy** trước khi commit.
+- Mỗi module bổ sung sau baseline có **một migration riêng**, sinh bằng `migrate diff` giữa 2 phiên bản
+  schema (không cần DB) và đã kiểm tra **0 lệnh phá hủy** trước khi commit:
+  `0_init` → `1_proposals_care_forms` (M5–M7) → `2_session_materials` (M8) → `3_price_management` (M9) →
+  `4_marketing` (M10).
 
 **Quy trình triển khai (deployment):**
 - **DB mới (fresh):** `npm run prisma:migrate:deploy` → chạy toàn bộ migration theo thứ tự. Rồi `npm run db:seed`.
@@ -147,16 +148,55 @@ Dự án đã chuyển sang **Prisma Migrate** làm chiến lược triển khai
 - Bản ghi lịch sử nghiệp vụ (proposal đã chốt, session đã hoàn thành, booking, thanh toán) được bảo toàn bằng
   **snapshot/version** ở tầng ứng dụng (xem phần "Data integrity"), độc lập với thay đổi catalog/giá về sau.
 
-### Còn lại / nợ kỹ thuật (theo yêu cầu MVP)
+### Module 5–10 (đã xong) — Proposal · Care · Session Forms · Materials · Pricing · Marketing
 
-- **Chưa làm (ưu tiên tiếp theo):** (5) Treatment Proposal + phương án ngân sách (Essential/Recommended/
-  Premium) có ẩn giá vốn; (6) thư viện Pre/Post-care riêng có version; (7) đã có bản ghi session độc lập,
-  cần đính kèm form-instance vào từng buổi (đã có `sessionId` trên FormInstance, chưa gắn UI ở buổi);
-  (8) nối vật tư session ↔ kho (đặt giữ → xuất → tiêu hao) — mới có `inventoryProductId` link mềm;
-  (9) Price Management có hiệu lực theo ngày + lịch sử; (10) Marketing campaign/lead/ROI.
-- **Nợ kỹ thuật/giới hạn:** field `TABLE`/`REPEATING_GROUP`/`SIGNATURE` render đơn giản (text/URL), chưa
-  upload file thật (nhập URL); `computeCalc` chỉ hỗ trợ sum/avg/product (chưa formula tùy ý); reorder buổi
-  không đổi `sessionNumber` (chỉ `orderIndex`); chưa có ràng buộc CHECK ở DB cho một số quan hệ.
+- **M5 Treatment Proposal (`treatment_proposals`/`_options`/`proposal_items`):** nhiều phương án
+  (ESSENTIAL/RECOMMENDED/PREMIUM/CUSTOM), tự tính tổng, so sánh cạnh nhau; chốt → `acceptedSnapshot` bất
+  biến + `agreedPrice`; mask `unitCost`/ghi chú nội bộ theo `finance.read`; khóa sửa khi ACCEPTED.
+  API `/proposals`(+`[id]`,`[id]/accept`). UI `/proposals`(+`[id]`). RBAC `proposal.read/write/accept`.
+- **M6 Care library (`care_instructions`/`care_instruction_instances`):** mẫu Pre/Post/General/Follow-up có
+  version + trạng thái; áp cho khách → snapshot nội dung, cá nhân hóa không đổi mẫu; `DeliveryChannel` chuẩn
+  bị Portal/Email/Zalo/WhatsApp/SMS. API `/care-instructions`,`/care-instances`. UI `/care-instructions` +
+  hồ sơ khách tab **Hướng dẫn**. RBAC `care.write`.
+- **M7 Session forms:** `FormInstance` thêm `status`/`completedBy`/`completedAt`; gắn biểu mẫu vào từng buổi
+  (snapshot schema+version), điền + **Hoàn thành** (khóa bất biến). Nâng cấp field: **TABLE** = lưới thêm–xóa
+  dòng theo cột; **SIGNATURE** = canvas ký lưu `{dataUrl,signedBy,signedAt}`; **CALCULATED** an toàn (không
+  eval): sum/avg/add/subtract/multiply/divide/percentage.
+- **M8 Materials↔Inventory↔Session (`session_materials`/`material_movements`):** bucket planned/reserved/
+  issued/consumed/returned/waste; `applyMaterialMovement` (REQUEST/RESERVE/ISSUE/CONSUME/RETURN/WASTE/DAMAGE)
+  + snapshot giá vốn; `recomputeSessionMaterialCost` → `session.materialCost` (tiêu hao đóng góp chi phí thật,
+  tự gán `actualCost` nếu trống). Phân biệt SP chuyên nghiệp (`isProfessional`) vs home-care. UI: nút **Vật tư**
+  mỗi buổi. RBAC `material.write`.
+- **M9 Pricing (`price_rules`):** giá theo Service/Product/Technology/Package × STANDARD/BRANCH/MEMBER/VIP/
+  CAMPAIGN/CUSTOM, hiệu lực theo ngày; đổi giá = tạo bản mới + archive bản cũ (append-only, `version`+
+  `supersedesId`). `resolvePrice` chọn giá tốt nhất; **Booking lưu snapshot** giá lúc tạo. API `/price-rules`
+  (+`[id]` archive, `/resolve`). UI `/pricing`. RBAC `price.read/write`.
+- **M10 Marketing (`marketing_campaigns`/`leads`):** chiến dịch (channel/budget/cost), lead
+  (NEW→CONTACTED→BOOKED→WON→LOST) → convert thành khách; attribution first-touch qua `Customer.campaignId`/
+  `Booking.campaignId`; `campaignMetrics` (leads/khách/booking/doanh thu/conversion/ROI/cost-per-lead/customer).
+  API `/marketing-campaigns`(+`[id]` metrics), `/leads`(+`[id]`,`[id]/convert`). UI `/marketing`(+`[id]`).
+  RBAC `marketing.read/write`.
+
+**Timeline khách (mục 23):** đã gộp thêm sự kiện proposal / care / recommendation ngoài crm/booking/
+assessment/plan/session/payment — hồ sơ khách là nơi xem toàn bộ hành trình.
+
+**Data integrity (snapshot vs mutable):** template/catalog/price là mutable; bản ghi lịch sử được đông cứng
+bằng snapshot/version: proposal `acceptedSnapshot`, FormInstance `schemaSnapshot`+`templateVersion`, care
+instance snapshot content, booking/session giá snapshot, ProposalItem `unitPrice` snapshot. Sửa mẫu/giá về
+sau KHÔNG đổi bản ghi đã chốt.
+
+### Nợ kỹ thuật / phần tạm thời (cập nhật)
+
+- Field media (`IMAGE`/`VIDEO`/`FILE`) vẫn nhập URL, chưa upload file thật; SIGNATURE lưu dataURL base64
+  trong JSON (chưa tách blob storage).
+- **M8**: tham chiếu kho (`inventoryProductId`/`warehouseId`) là **soft String** — CHƯA trừ tồn thật trong
+  `StockMovement` của phần kho THNG; kiểm tra tồn khả dụng chưa hard-block (mới snapshot cost + bucket).
+- **M9**: `resolvePrice` chưa áp tự động cho proposal/session (mới áp cho booking); chưa có UI gói (PACKAGE)
+  ngoài nhập tay tên.
+- **M10**: attribution mới first-touch (1 campaign/khách); multi-touch để mở rộng sau.
+- `TABLE`/`REPEATING_GROUP` dùng chung renderer lưới (REPEATING_GROUP chưa render subFields lồng nhau).
+- Chưa có test tự động; kiểm chứng bằng `tsc --noEmit` + `next build` (đều pass) — chưa chạy migration/seed
+  trên Postgres thật trong môi trường này.
 
 ## Tech stack
 
