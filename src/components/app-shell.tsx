@@ -25,6 +25,11 @@ import {
   CalendarDays,
   HeartPulse,
   ListTodo,
+  Building2,
+  Cpu,
+  ScrollText,
+  ShoppingBag,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
@@ -42,6 +47,16 @@ const NAV_GROUPS = [
       { href: "/services", label: "Dịch vụ", icon: Sparkles },
       { href: "/treatment-plans", label: "Phác đồ", icon: HeartPulse },
       { href: "/tasks", label: "Công việc / Follow-up", icon: ListTodo },
+    ],
+  },
+  {
+    title: "Thư viện Spa",
+    items: [
+      { href: "/brands", label: "Brand", icon: Building2 },
+      { href: "/technologies", label: "Công nghệ", icon: Cpu },
+      { href: "/protocols", label: "Protocol", icon: ScrollText },
+      { href: "/catalog", label: "Sản phẩm", icon: ShoppingBag },
+      { href: "/form-templates", label: "Biểu mẫu", icon: FileText },
     ],
   },
   {
