@@ -39,7 +39,11 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
   (`onHand <= minStock`), và **thiết bị sắp/đã hết bảo hành**.
 - **Báo cáo N-X-T (Phase 2):** tồn đầu – nhập – xuất – tồn cuối theo kỳ + kho, tính từ `StockMovement`;
   xuất **CSV** (UTF-8 BOM) phía client.
-- **Dashboard:** số liệu tổng hợp + phiếu nhập/xuất gần đây.
+- **Quản trị người dùng:** trang `/users` (quyền `user.manage`) — tạo tài khoản, phân vai trò, khoá/mở,
+  đặt lại mật khẩu (không cho tự khoá chính mình).
+- **Cài đặt công ty/thương hiệu:** `CompanySetting` (1 bản ghi id="company") — tên, logo (data URI),
+  địa chỉ, ĐT, MST; hiển thị ở sidebar, trang đăng nhập (GET `/api/settings` công khai) và **đầu phiếu in**.
+- **Dashboard:** số liệu tổng hợp + biểu đồ (giá trị tồn theo nhóm, cơ cấu cảnh báo) + phiếu gần đây.
 
 ## Tech stack
 
@@ -71,6 +75,8 @@ src/
       reports/       # Báo cáo N-X-T + Doanh thu dịch vụ (2 tab) + xuất CSV
       alerts/        # Trung tâm cảnh báo (HSD + dưới định mức + bảo hành)
       products/ categories/ suppliers/ warehouses/   # Danh mục
+      users/         # Quản trị người dùng (tạo/sửa/khoá/đổi vai trò/đặt mật khẩu)
+      settings/      # Cài đặt công ty & logo
     api/             # Route handlers REST (auth + catalog + inventory/alerts/dashboard/receipts/
                      # issues/transfers/stock-counts/services/service-usages/assets(+maintenance)/reports)
   components/        # app-shell, page-header, session-provider, ui/*

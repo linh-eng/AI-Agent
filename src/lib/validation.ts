@@ -196,5 +196,38 @@ export const assetUpdateSchema = z.object({
   note: optionalString,
 });
 
+// ----- Người dùng -----
+const roleCodes = ["ADMIN", "MANAGER", "WAREHOUSE", "STAFF"] as const;
+
+export const userCreateSchema = z.object({
+  email: z.string().trim().email("Email không hợp lệ"),
+  name: z.string().trim().min(1, "Nhập họ tên").max(120),
+  password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
+  roles: z.array(z.enum(roleCodes)).min(1, "Chọn ít nhất 1 vai trò"),
+});
+
+export const userUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  roles: z.array(z.enum(roleCodes)).min(1, "Chọn ít nhất 1 vai trò").optional(),
+  isActive: z.boolean().optional(),
+  password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự").optional(),
+});
+
+// ----- Cài đặt công ty -----
+export const settingUpdateSchema = z.object({
+  name: z.string().trim().min(1, "Nhập tên công ty").max(160),
+  logo: z.string().nullable().optional(), // data URI hoặc null
+  address: optionalString,
+  phone: optionalString,
+  email: z
+    .string()
+    .trim()
+    .email("Email không hợp lệ")
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => (v ? v : null)),
+  taxCode: optionalString,
+});
+
 export type TransferCreateInput = z.infer<typeof transferCreateSchema>;
 export type ServiceUsageInput = z.infer<typeof serviceUsageSchema>;

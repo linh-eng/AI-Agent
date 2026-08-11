@@ -317,6 +317,17 @@ async function main() {
     }
   }
 
+  // ---- Cấu hình công ty mặc định ----
+  await prisma.companySetting.upsert({
+    where: { id: "company" },
+    update: {},
+    create: {
+      id: "company",
+      name: "Sophia Wellness",
+      address: "Spa & Wellness",
+    },
+  });
+
   await prisma.auditLog.create({
     data: { userId: admin.id, action: "SEED", entityType: "System", detail: "Khởi tạo dữ liệu mẫu" },
   });

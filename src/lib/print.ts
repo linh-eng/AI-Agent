@@ -8,14 +8,34 @@ function openPrint(title: string, bodyHtml: string, styles = "") {
   const w = window.open("", "_blank", "width=840,height=640");
   if (!w) return;
   const BRAND = "#1e6fd6";
+
+  // Thông tin công ty (đã cache khi đăng nhập) để in lên đầu phiếu.
+  let company: any = { name: "Sophia Wellness", logo: null };
+  try {
+    const c = JSON.parse(localStorage.getItem("sophia_company") || "{}");
+    if (c && c.name) company = { ...company, ...c };
+  } catch {}
+  const esc = (s: string) => String(s).replace(/</g, "&lt;");
+  const mark = company.logo
+    ? `<img class="mark" src="${company.logo}" alt="logo" />`
+    : `<div class="mark">✦</div>`;
+  const contact = [company.address, company.phone && "ĐT: " + company.phone, company.taxCode && "MST: " + company.taxCode]
+    .filter(Boolean)
+    .map(esc)
+    .join(" · ");
+  const brandHtml = `<div class="brand">${mark}<div>
+      <div class="brand-name">${esc(company.name)}</div>
+      <div class="brand-sub">${contact || "Hệ thống quản lý kho"}</div>
+    </div></div>`;
   w.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${title}</title>
     <style>
       *{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif}
       body{margin:0;padding:24px 28px;color:#16203a}
       .brand{display:flex;align-items:center;gap:12px;border-bottom:2px solid ${BRAND};padding-bottom:12px;margin-bottom:18px}
-      .brand .mark{width:38px;height:38px;border-radius:10px;background:${BRAND};color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px}
-      .brand-name{font-family:Georgia,serif;font-size:19px;font-weight:700;letter-spacing:.02em;line-height:1}
-      .brand-sub{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.14em;margin-top:3px}
+      .brand .mark{width:40px;height:40px;border-radius:10px;background:${BRAND};color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none}
+      img.mark{object-fit:contain;background:#fff;border:1px solid #d8e3f0}
+      .brand-name{font-family:Georgia,serif;font-size:19px;font-weight:700;letter-spacing:.02em;line-height:1.1}
+      .brand-sub{font-size:11px;color:#64748b;margin-top:3px}
       h1{font-family:Georgia,serif;font-size:20px;text-align:center;margin:0 0 4px;color:${BRAND}}
       h2{font-size:14px;margin:14px 0 6px}
       .code{text-align:center;color:#64748b;margin-bottom:16px}
@@ -35,13 +55,7 @@ function openPrint(title: string, bodyHtml: string, styles = "") {
       .label .row{display:flex;justify-content:space-between;margin-top:4px;font-size:12px}
       ${styles}
     </style></head><body>
-    <div class="brand">
-      <div class="mark">✦</div>
-      <div>
-        <div class="brand-name">Sophia Wellness</div>
-        <div class="brand-sub">Hệ thống quản lý kho</div>
-      </div>
-    </div>
+    ${brandHtml}
     ${bodyHtml}</body></html>`);
   w.document.close();
   w.focus();

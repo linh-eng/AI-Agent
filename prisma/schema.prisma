@@ -498,6 +498,22 @@ model MaintenanceLog {
 }
 
 // -----------------------------------------------------------------------------
+// Cấu hình công ty / thương hiệu (1 bản ghi duy nhất, id = "company")
+// -----------------------------------------------------------------------------
+model CompanySetting {
+  id        String   @id @default("company")
+  name      String   @default("Sophia Wellness")
+  logo      String? // ảnh logo dạng data URI (base64)
+  address   String?
+  phone     String?
+  email     String?
+  taxCode   String?  @map("tax_code")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("company_settings")
+}
+
+// -----------------------------------------------------------------------------
 // Nhật ký hệ thống (append-only)
 // -----------------------------------------------------------------------------
 model AuditLog {

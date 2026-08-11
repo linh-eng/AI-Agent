@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 
 // Các đường dẫn công khai (không cần đăng nhập).
-const PUBLIC_PATHS = ["/login", "/api/auth/login"];
+// /api/settings: GET công khai để trang đăng nhập lấy logo/tên; PATCH vẫn được
+// bảo vệ bằng requirePermission trong route handler.
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/settings"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

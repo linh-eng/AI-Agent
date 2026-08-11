@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -14,6 +14,16 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [company, setCompany] = useState<{ name: string; logo: string | null }>({
+    name: "Sophia Wellness",
+    logo: null,
+  });
+
+  useEffect(() => {
+    apiFetch<any>("/api/settings")
+      .then((s) => setCompany({ name: s.name || "Sophia Wellness", logo: s.logo ?? null }))
+      .catch(() => {});
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,10 +47,17 @@ function LoginForm() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-[#eef4fc] to-blue-100 p-4">
       <Card className="w-full max-w-sm shadow-lg">
         <CardHeader className="items-center text-center">
-          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[hsl(204_90%_58%)] text-primary-foreground shadow-sm">
-            <Sparkles className="h-7 w-7" />
-          </div>
-          <CardTitle className="font-display text-xl">Sophia Wellness</CardTitle>
+          {company.logo ? (
+            <div className="mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border bg-card shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={company.logo} alt="logo" className="h-full w-full object-contain" />
+            </div>
+          ) : (
+            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[hsl(204_90%_58%)] text-primary-foreground shadow-sm">
+              <Sparkles className="h-7 w-7" />
+            </div>
+          )}
+          <CardTitle className="font-display text-xl">{company.name}</CardTitle>
           <CardDescription>Hệ thống quản lý kho · Đăng nhập để tiếp tục</CardDescription>
         </CardHeader>
         <CardContent>

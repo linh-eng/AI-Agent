@@ -45,6 +45,7 @@ export const PERMISSIONS = {
 
   REPORT_READ: "report.read",
 
+  SETTING_MANAGE: "setting.manage",
   USER_MANAGE: "user.manage",
 } as const;
 
@@ -72,6 +73,7 @@ export const PERMISSION_LABELS: Record<PermissionCode, string> = {
   "asset.read": "Xem tài sản/thiết bị",
   "asset.write": "Quản lý tài sản/thiết bị",
   "report.read": "Xem báo cáo",
+  "setting.manage": "Cài đặt công ty",
   "user.manage": "Quản trị người dùng",
 };
 
@@ -102,6 +104,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.SERVICE_WRITE,
     PERMISSIONS.SERVICE_USE,
     PERMISSIONS.ASSET_WRITE,
+    PERMISSIONS.SETTING_MANAGE,
   ],
 
   WAREHOUSE: [

@@ -50,6 +50,8 @@ npm run dev                   # http://localhost:9000
 - **Tồn kho realtime:** tồn theo sản phẩm (gộp mọi lô), lọc theo kho, HSD gần nhất, giá trị tồn.
 - **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng cấu hình, mặc định 60 ngày), sản phẩm dưới định mức, và thiết bị sắp/đã hết bảo hành.
 - **Báo cáo:** Nhập–Xuất–Tồn theo kỳ + kho, và **doanh thu dịch vụ** (doanh thu – giá vốn – lợi nhuận); xuất CSV.
+- **Quản trị người dùng:** tạo tài khoản, phân vai trò, khoá/mở, đặt lại mật khẩu.
+- **Cài đặt công ty:** tên, logo, địa chỉ, MST — hiển thị ở giao diện, trang đăng nhập và phiếu in.
 
 ## Điểm nhấn kiến trúc
 

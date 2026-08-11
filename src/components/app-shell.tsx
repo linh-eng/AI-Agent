@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Sparkles,
   LayoutDashboard,
@@ -19,13 +19,15 @@ import {
   ClipboardList,
   Cpu,
   BarChart3,
+  Users,
+  Settings,
   LogOut,
   Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
 import type { SessionPayload } from "@/lib/auth";
-import { ROLE_LABELS, type RoleCode } from "@/lib/rbac";
+import { ROLE_LABELS, PERMISSIONS, type RoleCode } from "@/lib/rbac";
 import { SessionProvider } from "@/components/session-provider";
 
 const NAV = [
@@ -62,6 +64,13 @@ const NAV = [
       { href: "/warehouses", label: "Kho", icon: Warehouse },
     ],
   },
+  {
+    section: "Hệ thống",
+    items: [
+      { href: "/users", label: "Người dùng", icon: Users, perm: PERMISSIONS.USER_MANAGE },
+      { href: "/settings", label: "Cài đặt công ty", icon: Settings, perm: PERMISSIONS.SETTING_MANAGE },
+    ],
+  },
 ];
 
 export function AppShell({
@@ -74,6 +83,22 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [company, setCompany] = useState<{ name: string; logo: string | null }>({
+    name: "Sophia Wellness",
+    logo: null,
+  });
+
+  useEffect(() => {
+    apiFetch<any>("/api/settings")
+      .then((s) => {
+        setCompany({ name: s.name || "Sophia Wellness", logo: s.logo ?? null });
+        // Lưu để phiếu in dùng lại (đọc đồng bộ khi mở cửa sổ in).
+        try {
+          localStorage.setItem("sophia_company", JSON.stringify(s));
+        } catch {}
+      })
+      .catch(() => {});
+  }, []);
 
   async function logout() {
     await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => {});
@@ -85,6 +110,8 @@ export function AppShell({
     .map((r) => ROLE_LABELS[r as RoleCode] ?? r)
     .join(", ");
 
+  const canSee = (perm?: string) => !perm || session.permissions.includes(perm);
+
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
@@ -95,22 +122,32 @@ export function AppShell({
         )}
       >
         <div className="flex h-14 items-center gap-2 border-b px-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-[hsl(204_90%_58%)] text-primary-foreground shadow-sm">
-            <Sparkles className="h-5 w-5" />
-          </div>
+          {company.logo ? (
+            <div className="flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-xl border bg-card">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={company.logo} alt="logo" className="h-full w-full object-contain" />
+            </div>
+          ) : (
+            <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-primary to-[hsl(204_90%_58%)] text-primary-foreground shadow-sm">
+              <Sparkles className="h-5 w-5" />
+            </div>
+          )}
           <div className="leading-tight">
-            <div className="font-display text-[15px] font-semibold">Sophia Wellness</div>
+            <div className="font-display text-[15px] font-semibold">{company.name}</div>
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Quản lý kho</div>
           </div>
         </div>
         <nav className="space-y-4 p-3">
-          {NAV.map((group) => (
+          {NAV.map((group) => {
+            const items = group.items.filter((it: any) => canSee(it.perm));
+            if (items.length === 0) return null;
+            return (
             <div key={group.section}>
               <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {group.section}
               </div>
               <div className="space-y-1">
-                {group.items.map((item) => {
+                {items.map((item) => {
                   const active =
                     pathname === item.href || pathname.startsWith(item.href + "/");
                   const Icon = item.icon;
@@ -133,7 +170,8 @@ export function AppShell({
                 })}
               </div>
             </div>
-          ))}
+            );
+          })}
         </nav>
       </aside>
 
