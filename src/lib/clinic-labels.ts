@@ -124,3 +124,38 @@ export const TIMELINE_KIND_TONE: Record<string, Tone> = {
   session: "default",
   payment: "success",
 };
+
+// ----- Thư viện: Protocol/Form status, kind, product type, priority -----
+export const LIBRARY_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Nháp",
+  REVIEW: "Chờ duyệt",
+  APPROVED: "Đã duyệt",
+  ACTIVE: "Đang dùng",
+  ARCHIVED: "Lưu trữ",
+};
+export const LIBRARY_STATUS_TONE: Record<string, Tone> = {
+  DRAFT: "muted",
+  REVIEW: "warning",
+  APPROVED: "default",
+  ACTIVE: "success",
+  ARCHIVED: "muted",
+};
+export const PROTOCOL_KIND_LABEL: Record<string, string> = {
+  BRAND: "Hãng",
+  INTERNAL: "Nội bộ",
+};
+export const PRODUCT_TYPE_LABEL: Record<string, string> = {
+  PROFESSIONAL: "Chuyên nghiệp",
+  HOME_CARE: "Chăm sóc tại nhà",
+  BOTH: "Cả hai",
+};
+export const RECOMMENDATION_PRIORITY_LABEL: Record<string, string> = {
+  ESSENTIAL: "Thiết yếu",
+  RECOMMENDED: "Khuyến nghị",
+  OPTIONAL: "Tùy chọn",
+};
+export const RECOMMENDATION_PRIORITY_TONE: Record<string, Tone> = {
+  ESSENTIAL: "danger",
+  RECOMMENDED: "default",
+  OPTIONAL: "muted",
+};

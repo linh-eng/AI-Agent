@@ -1019,13 +1019,15 @@ model Customer {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  activities  CrmActivity[]
-  bookings    Booking[]
-  assessments Assessment[]
-  plans       TreatmentPlan[]
-  sessions    TreatmentSession[]
-  payments    Payment[]
-  tasks       Task[]
+  activities      CrmActivity[]
+  bookings        Booking[]
+  assessments     Assessment[]
+  plans           TreatmentPlan[]
+  sessions        TreatmentSession[]
+  payments        Payment[]
+  tasks           Task[]
+  recommendations ProductRecommendation[]
+  formInstances   FormInstance[]
 
   @@index([phone])
   @@map("customers")
@@ -1163,10 +1165,12 @@ model TreatmentPlan {
   updatedAt   DateTime   @updatedAt
 
   customer Customer           @relation(fields: [customerId], references: [id])
-  stages   TreatmentStage[]
-  sessions TreatmentSession[]
-  payments Payment[]
-  tasks    Task[]
+  stages          TreatmentStage[]
+  sessions        TreatmentSession[]
+  payments        Payment[]
+  tasks           Task[]
+  recommendations ProductRecommendation[]
+  formInstances   FormInstance[]
 
   @@index([customerId])
   @@map("treatment_plans")
@@ -1217,15 +1221,24 @@ model TreatmentSession {
   price           Decimal?      @db.Decimal(18, 2)
   note            String?
   checkedBy       String? // Người kiểm tra/phê duyệt
+  // --- Treatment Plan Designer: buổi có thể phối công nghệ + brand protocol ---
+  technologyId    String?
+  brandProtocolId String?
+  orderIndex      Int           @default(0) // thứ tự buổi (kéo–thả sắp xếp)
+  steps           Json? // Các bước thực hiện của buổi (từ protocol hoặc tùy chỉnh)
+  professionalProducts Json? // Sản phẩm chuyên nghiệp dùng trong buổi (khác vật tư)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  plan     TreatmentPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
-  stage    TreatmentStage? @relation(fields: [stageId], references: [id])
-  customer Customer        @relation(fields: [customerId], references: [id])
-  booking  Booking?        @relation(fields: [bookingId], references: [id])
-  service  Service?        @relation(fields: [serviceId], references: [id])
-  tasks    Task[]
+  plan          TreatmentPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  stage         TreatmentStage? @relation(fields: [stageId], references: [id])
+  customer      Customer        @relation(fields: [customerId], references: [id])
+  booking       Booking?        @relation(fields: [bookingId], references: [id])
+  service       Service?        @relation(fields: [serviceId], references: [id])
+  technology    Technology?     @relation(fields: [technologyId], references: [id])
+  brandProtocol BrandProtocol?  @relation(fields: [brandProtocolId], references: [id])
+  tasks         Task[]
+  formInstances FormInstance[]
 
   @@index([planId, sessionNumber])
   @@index([customerId])
@@ -1282,4 +1295,265 @@ model Task {
   @@index([status, dueDate])
   @@index([customerId])
   @@map("tasks")
+}
+
+// ============================================================================
+// MODULE SPA — THƯ VIỆN: Brand · Technology · Brand/Internal Protocol · Product
+//   + Protocol/Form Builder (biểu mẫu động) + Product Recommendation
+// (theo bản "Bổ sung yêu cầu — Phác đồ / Công nghệ / Brand Protocol / Sản phẩm")
+//
+// Nguyên tắc: Admin cấu hình được (không hard-code brand); protocol/form có
+// version + trạng thái phê duyệt; áp template cho khách tạo INSTANCE riêng
+// không đổi bản gốc; soft delete; giữ lịch sử.
+// ============================================================================
+
+/// Trạng thái phê duyệt cho Protocol Library & Form Template (mục 19)
+enum LibraryStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  ACTIVE
+  ARCHIVED
+}
+
+/// Protocol thuộc hãng hay nội bộ doanh nghiệp
+enum ProtocolKind {
+  BRAND // Protocol chuẩn của hãng (DMK, Dermalogica, Klapp...)
+  INTERNAL // Protocol nội bộ do doanh nghiệp tự xây (có thể compose từ nhiều nguồn)
+}
+
+/// Loại sản phẩm theo logic chi phí/doanh thu (mục 15 phần bổ sung)
+enum ProductType {
+  PROFESSIONAL // Dùng trong quá trình thực hiện dịch vụ (ảnh hưởng chi phí session)
+  HOME_CARE // Bán/đề xuất khách dùng tại nhà (doanh thu bán lẻ)
+  BOTH
+}
+
+/// Mức ưu tiên đề xuất sản phẩm (mục 12 phần bổ sung)
+enum RecommendationPriority {
+  ESSENTIAL // Nên có
+  RECOMMENDED // Khuyến nghị
+  OPTIONAL // Tùy chọn
+}
+
+// ----------------------------------------------------------------------------
+// BRAND (mục 2 phần bổ sung) — không hard-code, Admin tự thêm
+// ----------------------------------------------------------------------------
+model Brand {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  logoUrl     String?
+  description String?
+  documents   String[] @default([]) // tài liệu đào tạo / PDF / hướng dẫn kỹ thuật (URL)
+  note        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  technologies Technology[]
+  protocols    BrandProtocol[]
+  products     SpaProduct[]
+
+  @@map("brands")
+}
+
+// ----------------------------------------------------------------------------
+// TECHNOLOGY (mục 1 phần bổ sung)
+// ----------------------------------------------------------------------------
+model Technology {
+  id                String   @id @default(cuid())
+  code              String   @unique
+  name              String
+  group             String? // Nhóm công nghệ
+  brandId           String?
+  deviceModel       String? // Model thiết bị
+  description       String?
+  indications       String? // Chỉ định sử dụng
+  applicableCond    String? // Điều kiện áp dụng
+  contraindications String? // Chống chỉ định
+  area              String? // Vùng thực hiện
+  durationMinutes   Int?
+  parameters        Json? // Thông số có thể thiết lập
+  preCare           String? // Hướng dẫn trước
+  postCare          String? // Hướng dẫn sau
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  brand        Brand?                     @relation(fields: [brandId], references: [id])
+  protocols    BrandProtocolTechnology[]
+  sessions     TreatmentSession[]
+
+  @@map("technologies")
+}
+
+// ----------------------------------------------------------------------------
+// BRAND / INTERNAL PROTOCOL LIBRARY (mục 3, 18, 19 phần bổ sung)
+// Khác với TreatmentPlan (phác đồ riêng của khách).
+// ----------------------------------------------------------------------------
+model BrandProtocol {
+  id                 String        @id @default(cuid())
+  code               String        @unique
+  name               String
+  kind               ProtocolKind  @default(BRAND)
+  brandId            String?
+  version            Int           @default(1)
+  status             LibraryStatus @default(DRAFT)
+  purpose            String? // Mục tiêu
+  suitableFor        String? // Đối tượng/tình trạng phù hợp
+  contraindications  String? // Chống chỉ định
+  steps              Json? // Các bước + thời gian từng bước
+  durationMinutes    Int?
+  parameters         Json? // Thông số
+  preCare            String? // Hướng dẫn trước
+  postCare           String? // Hướng dẫn sau
+  recommendedFreq    String? // Tần suất khuyến nghị
+  recommendedCount   Int? // Số lần khuyến nghị
+  attachments        String[]      @default([]) // hình ảnh/video/tài liệu (URL)
+  note               String? // Ghi chú chuyên môn
+  sourceRef          String? // Nguồn tham khảo (khi INTERNAL compose từ nhiều hãng)
+  changeLog          Json? // Lịch sử version
+  createdBy          String?
+  isActive           Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  brand        Brand?                     @relation(fields: [brandId], references: [id])
+  technologies BrandProtocolTechnology[]
+  products     BrandProtocolProduct[]
+  sessions     TreatmentSession[]
+
+  @@index([brandId])
+  @@index([status])
+  @@map("brand_protocols")
+}
+
+/// Join: protocol ↔ công nghệ sử dụng
+model BrandProtocolTechnology {
+  brandProtocolId String
+  technologyId    String
+  brandProtocol   BrandProtocol @relation(fields: [brandProtocolId], references: [id], onDelete: Cascade)
+  technology      Technology    @relation(fields: [technologyId], references: [id], onDelete: Cascade)
+
+  @@id([brandProtocolId, technologyId])
+  @@map("brand_protocol_technologies")
+}
+
+/// Join: protocol ↔ sản phẩm sử dụng
+model BrandProtocolProduct {
+  brandProtocolId String
+  spaProductId    String
+  usage           String? // cách dùng trong protocol
+  brandProtocol   BrandProtocol @relation(fields: [brandProtocolId], references: [id], onDelete: Cascade)
+  product         SpaProduct    @relation(fields: [spaProductId], references: [id], onDelete: Cascade)
+
+  @@id([brandProtocolId, spaProductId])
+  @@map("brand_protocol_products")
+}
+
+// ----------------------------------------------------------------------------
+// PRODUCT CATALOG (mục 11 phần bổ sung) — tách riêng với Product (kho THNG)
+// ----------------------------------------------------------------------------
+model SpaProduct {
+  id                String      @id @default(cuid())
+  sku               String      @unique
+  name              String
+  brandId           String?
+  category          String?
+  imageUrl          String?
+  description       String?
+  benefits          String? // Công dụng
+  suitableFor       String? // Tình trạng phù hợp
+  usage             String? // Hướng dẫn sử dụng
+  sellingPrice      Decimal?    @db.Decimal(18, 2)
+  cost              Decimal?    @db.Decimal(18, 2) // Giá vốn (nhạy cảm)
+  productType       ProductType @default(HOME_CARE)
+  inventoryProductId String? // Liên kết mềm tới Product kho (module 8 — sẽ nối sau)
+  isActive          Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  brand           Brand?                  @relation(fields: [brandId], references: [id])
+  protocols       BrandProtocolProduct[]
+  recommendations ProductRecommendation[]
+
+  @@map("spa_products")
+}
+
+// ----------------------------------------------------------------------------
+// PRODUCT RECOMMENDATION (mục 12 phần bổ sung)
+// ----------------------------------------------------------------------------
+model ProductRecommendation {
+  id           String                 @id @default(cuid())
+  customerId   String
+  planId       String?
+  spaProductId String
+  reason       String? // Lý do đề xuất
+  goal         String? // Mục tiêu sử dụng
+  usage        String? // Hướng dẫn sử dụng
+  duration     String? // Thời gian sử dụng
+  quantity     Int                    @default(1)
+  price        Decimal?               @db.Decimal(18, 2)
+  priority     RecommendationPriority @default(RECOMMENDED)
+  note         String?
+  createdBy    String?
+  createdAt    DateTime               @default(now())
+
+  customer Customer       @relation(fields: [customerId], references: [id])
+  plan     TreatmentPlan? @relation(fields: [planId], references: [id])
+  product  SpaProduct     @relation(fields: [spaProductId], references: [id])
+
+  @@index([customerId])
+  @@map("product_recommendations")
+}
+
+// ----------------------------------------------------------------------------
+// PROTOCOL / FORM BUILDER (mục 11–15 gốc) — biểu mẫu động kéo–thả
+// `schema` (Json) lưu định nghĩa: tabs/sections/groups/fields + conditional logic.
+// ----------------------------------------------------------------------------
+model FormTemplate {
+  id          String        @id @default(cuid())
+  code        String        @unique
+  name        String
+  description String?
+  category    String? // vd: "Phác đồ", "Đánh giá", "Tư vấn"
+  version     Int           @default(1)
+  status      LibraryStatus @default(DRAFT)
+  schema      Json // FormSchema: { tabs, sections, groups, fields, logic }
+  changeLog   Json?
+  createdBy   String?
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  instances FormInstance[]
+
+  @@index([status])
+  @@map("form_templates")
+}
+
+/// Instance riêng khi áp template cho khách/phác đồ/buổi — KHÔNG đổi template gốc.
+model FormInstance {
+  id              String   @id @default(cuid())
+  templateId      String
+  templateVersion Int // version template tại thời điểm áp
+  schemaSnapshot  Json // bản sao schema tại thời điểm áp (bất biến)
+  data            Json? // giá trị các field khách/buổi
+  customerId      String?
+  planId          String?
+  sessionId       String?
+  name            String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  template FormTemplate      @relation(fields: [templateId], references: [id])
+  customer Customer?         @relation(fields: [customerId], references: [id])
+  plan     TreatmentPlan?    @relation(fields: [planId], references: [id])
+  session  TreatmentSession? @relation(fields: [sessionId], references: [id])
+
+  @@index([customerId])
+  @@index([templateId])
+  @@map("form_instances")
 }

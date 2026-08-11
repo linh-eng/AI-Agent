@@ -16,8 +16,13 @@ export const GET = handle(async (_req, { params }) => {
       customer: { select: { code: true, fullName: true, phone: true } },
       stages: { orderBy: { orderIndex: "asc" } },
       sessions: {
-        include: { service: { select: { name: true } }, stage: { select: { name: true } } },
-        orderBy: { sessionNumber: "asc" },
+        include: {
+          service: { select: { name: true } },
+          stage: { select: { name: true } },
+          technology: { select: { name: true } },
+          brandProtocol: { select: { name: true, code: true } },
+        },
+        orderBy: [{ orderIndex: "asc" }, { sessionNumber: "asc" }],
       },
       payments: { orderBy: { paidAt: "desc" } },
     },

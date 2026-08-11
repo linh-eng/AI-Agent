@@ -88,6 +88,16 @@ export const PERMISSIONS = {
   CAMPAIGN_WRITE: "campaign.write",
   /// Dữ liệu tài chính nhạy cảm: giá vốn, chi phí, lợi nhuận (mục 24)
   FINANCE_READ: "finance.read",
+
+  // --- Thư viện & Protocol/Form Builder & Product catalog ---
+  LIBRARY_READ: "library.read", // đọc brand/technology/protocol/product/form
+  BRAND_WRITE: "brand.write",
+  TECHNOLOGY_WRITE: "technology.write",
+  PROTOCOL_WRITE: "protocol.write", // brand/internal protocol library
+  PROTOCOL_APPROVE: "protocol.approve", // duyệt protocol/form (Draft→…→Active)
+  FORM_WRITE: "form.write", // thiết kế biểu mẫu (protocol/form builder)
+  CATALOG_WRITE: "catalog.write", // product catalog (SpaProduct)
+  RECOMMEND_WRITE: "recommend.write", // đề xuất sản phẩm cho khách
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -109,6 +119,7 @@ const CLINIC_READ: PermissionCode[] = [
   PERMISSIONS.SERVICE_READ,
   PERMISSIONS.BOOKING_READ,
   PERMISSIONS.TREATMENT_READ,
+  PERMISSIONS.LIBRARY_READ,
 ];
 
 /**
@@ -128,6 +139,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.STOCKCOUNT_APPROVE,
     PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.FINANCE_READ,
+    PERMISSIONS.PROTOCOL_APPROVE,
   ],
 
   // Mua hàng: tạo PO/đề nghị nhập
@@ -179,6 +191,13 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.TASK_WRITE,
     PERMISSIONS.CAMPAIGN_WRITE,
     PERMISSIONS.FINANCE_READ,
+    PERMISSIONS.BRAND_WRITE,
+    PERMISSIONS.TECHNOLOGY_WRITE,
+    PERMISSIONS.PROTOCOL_WRITE,
+    PERMISSIONS.PROTOCOL_APPROVE,
+    PERMISSIONS.FORM_WRITE,
+    PERMISSIONS.CATALOG_WRITE,
+    PERMISSIONS.RECOMMEND_WRITE,
   ],
 
   // Lễ tân: tạo khách, đặt lịch, nhận thanh toán
@@ -200,12 +219,16 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.TASK_WRITE,
   ],
 
-  // Chuyên viên: đánh giá tình trạng, thiết kế phác đồ, ghi buổi thực hiện
+  // Chuyên viên: đánh giá, thiết kế phác đồ/protocol/biểu mẫu, đề xuất sản phẩm
   SPECIALIST: [
     ...CLINIC_READ,
     PERMISSIONS.TREATMENT_WRITE,
     PERMISSIONS.CRM_WRITE,
     PERMISSIONS.TASK_WRITE,
+    PERMISSIONS.PROTOCOL_WRITE,
+    PERMISSIONS.TECHNOLOGY_WRITE,
+    PERMISSIONS.FORM_WRITE,
+    PERMISSIONS.RECOMMEND_WRITE,
   ],
 
   // Thu ngân / Kế toán: thanh toán, công nợ, xem dữ liệu tài chính
@@ -216,12 +239,13 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.FINANCE_READ,
   ],
 
-  // Marketing: chiến dịch, nguồn khách, xem báo cáo tài chính tổng hợp
+  // Marketing: chiến dịch, nguồn khách, catalog sản phẩm bán lẻ, báo cáo
   MARKETING: [
     ...CLINIC_READ,
     PERMISSIONS.CAMPAIGN_WRITE,
     PERMISSIONS.CUSTOMER_WRITE,
     PERMISSIONS.FINANCE_READ,
+    PERMISSIONS.CATALOG_WRITE,
   ],
 };
 

@@ -30,6 +30,9 @@ export const POST = handle(async (req) => {
   });
   if (!plan) return fail(404, "Không tìm thấy phác đồ");
 
+  // orderIndex mặc định = sessionNumber nếu không truyền
+  const orderIndex = parsed.orderIndex ?? parsed.sessionNumber;
+
   const session = await prisma.treatmentSession.create({
     data: {
       planId: parsed.planId,
@@ -37,16 +40,22 @@ export const POST = handle(async (req) => {
       stageId: parsed.stageId ?? null,
       bookingId: parsed.bookingId ?? null,
       serviceId: parsed.serviceId ?? null,
+      technologyId: parsed.technologyId ?? null,
+      brandProtocolId: parsed.brandProtocolId ?? null,
+      orderIndex,
       sessionNumber: parsed.sessionNumber,
       name: parsed.name ?? null,
       status: parsed.status,
       scheduledAt: parsed.scheduledAt,
       objective: parsed.objective ?? null,
+      steps: (parsed.steps as any) ?? undefined,
+      professionalProducts: (parsed.professionalProducts as any) ?? undefined,
       plannedParams: (parsed.plannedParams as any) ?? undefined,
       plannedMaterials: (parsed.plannedMaterials as any) ?? undefined,
       plannedCost: parsed.plannedCost ?? null,
       price: parsed.price ?? null,
       preCare: parsed.preCare ?? null,
+      postCare: parsed.postCare ?? null,
       note: parsed.note ?? null,
     },
   });

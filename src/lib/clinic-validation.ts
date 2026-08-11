@@ -185,17 +185,28 @@ export const sessionCreateSchema = z.object({
   status: sessionStatusEnum.default("PLANNED"),
   scheduledAt: dateOpt,
   objective: z.string().optional().nullable(),
+  technologyId: z.string().optional().nullable(),
+  brandProtocolId: z.string().optional().nullable(),
+  orderIndex: z.coerce.number().int().optional(),
+  steps: jsonOpt,
+  professionalProducts: jsonOpt,
   plannedParams: jsonOpt,
   plannedMaterials: jsonOpt,
   plannedCost: money,
   price: money,
   preCare: z.string().optional().nullable(),
+  postCare: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
 });
 export const sessionUpdateSchema = z.object({
   stageId: z.string().optional().nullable(),
   bookingId: z.string().optional().nullable(),
   serviceId: z.string().optional().nullable(),
+  technologyId: z.string().optional().nullable(),
+  brandProtocolId: z.string().optional().nullable(),
+  orderIndex: z.coerce.number().int().optional(),
+  steps: jsonOpt,
+  professionalProducts: jsonOpt,
   name: z.string().optional().nullable(),
   status: sessionStatusEnum.optional(),
   scheduledAt: dateOpt,
@@ -247,3 +258,8 @@ export const taskCreateSchema = z.object({
   createdBy: z.string().optional().nullable(),
 });
 export const taskUpdateSchema = taskCreateSchema.partial();
+
+// Sắp xếp lại thứ tự buổi (kéo–thả)
+export const sessionReorderSchema = z.object({
+  order: z.array(z.object({ id: z.string().min(1), orderIndex: z.coerce.number().int() })).min(1),
+});
