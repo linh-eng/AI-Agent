@@ -58,7 +58,10 @@ Dành cho việc chạy Sophia Wellness — Quản lý kho ngay trên máy Windo
    DATABASE_URL="postgresql://postgres:SophiaKho2025@localhost:5432/sophia_wellness?schema=public"
    AUTH_SECRET="dan-mot-chuoi-ngau-nhien-that-dai-vao-day"
    SESSION_MAX_AGE="28800"
+   COOKIE_SECURE="false"
    ```
+   > `COOKIE_SECURE="false"` giúp đăng nhập được khi chạy HTTP nội bộ (LAN). Chỉ đổi thành
+   > `"true"` khi đã chạy sau HTTPS (tên miền + SSL).
    - Thay `SophiaKho2025` bằng đúng mật khẩu PostgreSQL ở Bước 2.
    - `AUTH_SECRET`: gõ một chuỗi ngẫu nhiên thật dài (chữ + số).
 
@@ -156,7 +159,7 @@ Mở **cmd**, chạy (nhập mật khẩu khi được hỏi):
 | `P1000: Authentication failed ... for 'postgres'` | Sai mật khẩu trong `DATABASE_URL`. Kiểm tra đúng mật khẩu; nếu có ký tự đặc biệt (`@ : / # ?`) phải mã hóa (xem ghi chú Bước 4). Thử đăng nhập **SQL Shell (psql)** bằng mật khẩu đó để xác nhận |
 | Cửa sổ `.bat` hiện rồi tắt ngay | Bấm đúp để xem lỗi; thường do `.env` sai — sửa rồi chạy lại `setup-windows.bat` |
 | Máy khác không vào được | Chưa mở cổng 9000 (làm phần LAN ở trên), hoặc khác mạng WiFi |
-| Đăng nhập xong bị đá ra | `AUTH_SECRET` trống — điền vào `.env`, chạy lại `start-windows.bat` |
+| Đăng nhập đúng mật khẩu nhưng không vào được giao diện | Đặt `COOKIE_SECURE="false"` trong `.env` (cookie yêu cầu HTTPS sẽ bị chặn khi chạy HTTP). Và chắc chắn đã chạy `npm run db:seed` để có tài khoản. Sau đó build lại + `start-windows.bat` |
 
 ---
 
