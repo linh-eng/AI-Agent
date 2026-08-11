@@ -118,10 +118,34 @@ Bổ sung theo bản "Bổ sung yêu cầu — Phác đồ / Công nghệ / Bran
 - **Form Builder dynamic:** schema lưu JSON, không hard-code; drag–drop dùng HTML5 DnD native (không thêm
   thư viện), conditional logic đánh giá client-side qua `evaluateLogic`.
 
-### Migration DB
+### Migration DB — dùng migration history (KHÔNG dùng `db push` cho production)
 
-Chưa tạo file migration SQL — dùng `npm run prisma:push` để đồng bộ schema mới (đã thêm ~10 bảng + cột mới
-trên `treatment_sessions`). Khi chuyển sang môi trường có lịch sử migration, chạy `prisma migrate dev`.
+Dự án đã chuyển sang **Prisma Migrate** làm chiến lược triển khai schema chính thức. Không dùng
+`prisma db push` cho staging/production nữa (chỉ dùng cho prototype nhanh trong máy dev khi thật cần).
+
+- **Thư mục `prisma/migrations/`** chứa lịch sử migration; `migration_lock.toml` khóa provider = postgresql.
+- **`0_init`**: migration nền (baseline) sinh từ toàn bộ schema hiện tại (kho THNG + Spa + Thư viện Spa),
+  hoàn toàn **additive** (chỉ `CREATE` — không có `DROP`). Sinh bằng
+  `prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script`.
+- Mỗi module bổ sung sau baseline có **một migration riêng** (`1_..._proposals`, `2_..._care`, …), cũng
+  sinh bằng `migrate diff` giữa 2 phiên bản schema (không cần DB) và được kiểm tra **không chứa lệnh phá
+  hủy** trước khi commit.
+
+**Quy trình triển khai (deployment):**
+- **DB mới (fresh):** `npm run prisma:migrate:deploy` → chạy toàn bộ migration theo thứ tự. Rồi `npm run db:seed`.
+- **DB đang chạy bằng `db push` từ trước (baselining — KHÔNG mất dữ liệu):** vì schema đã khớp, đánh dấu
+  baseline đã áp dụng bằng `npm run prisma:baseline` (`prisma migrate resolve --applied 0_init`), sau đó các
+  migration tiếp theo áp bằng `npm run prisma:migrate:deploy`.
+- **Phát triển (dev, có DB):** `npm run prisma:migrate` (`migrate dev`) để tạo + áp migration mới; `npm run
+  prisma:migrate:status` để kiểm tra trạng thái.
+
+**An toàn dữ liệu:**
+- Tất cả migration hiện tại là additive (thêm bảng/cột), **không destructive**. Nếu về sau cần thao tác phá
+  hủy (drop/rename cột có dữ liệu), phải **gắn cờ rõ ràng** trong tên migration + comment và tách riêng, kèm
+  bước sao lưu; không gộp lẫn với thay đổi additive.
+- **Không bao giờ** chạy `prisma migrate reset` trên môi trường có dữ liệu thật (lệnh này DROP toàn bộ schema).
+- Bản ghi lịch sử nghiệp vụ (proposal đã chốt, session đã hoàn thành, booking, thanh toán) được bảo toàn bằng
+  **snapshot/version** ở tầng ứng dụng (xem phần "Data integrity"), độc lập với thay đổi catalog/giá về sau.
 
 ### Còn lại / nợ kỹ thuật (theo yêu cầu MVP)
 
