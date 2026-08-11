@@ -44,7 +44,9 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
 - **Báo cáo N-X-T (Phase 2):** tồn đầu – nhập – xuất – tồn cuối theo kỳ + kho, tính từ `StockMovement`;
   xuất **CSV** (UTF-8 BOM) phía client.
 - **Quản trị người dùng:** trang `/users` (quyền `user.manage`) — tạo tài khoản, phân vai trò, khoá/mở,
-  đặt lại mật khẩu (không cho tự khoá chính mình).
+  đặt lại mật khẩu, **xoá người dùng** (không cho tự khoá/tự xoá; chặn xoá khi đã phát sinh chứng từ hoặc
+  là admin duy nhất — nên khoá thay vì xoá). **Tự đổi mật khẩu:** mọi người dùng đổi mật khẩu của mình qua
+  nút ở góc trên (POST `/api/account/password`, xác thực mật khẩu hiện tại).
 - **Cài đặt công ty/thương hiệu:** `CompanySetting` (1 bản ghi id="company") — tên, logo (data URI),
   địa chỉ, ĐT, MST; hiển thị ở sidebar, trang đăng nhập (GET `/api/settings` công khai) và **đầu phiếu in**.
 - **Dashboard:** số liệu tổng hợp + biểu đồ (giá trị tồn theo nhóm, cơ cấu cảnh báo) + phiếu gần đây.

@@ -31,6 +31,7 @@ import { apiFetch } from "@/lib/client";
 import type { SessionPayload } from "@/lib/auth";
 import { ROLE_LABELS, PERMISSIONS, type RoleCode } from "@/lib/rbac";
 import { SessionProvider } from "@/components/session-provider";
+import { ChangePassword } from "@/components/change-password";
 
 const NAV = [
   {
@@ -201,12 +202,13 @@ export function AppShell({
               <div className="text-sm font-medium leading-tight">{session.name}</div>
               <div className="text-xs text-muted-foreground">{roleLabels}</div>
             </div>
+            <ChangePassword />
             <button
               onClick={logout}
               className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
             >
               <LogOut className="h-4 w-4" />
-              Đăng xuất
+              <span className="hidden sm:inline">Đăng xuất</span>
             </button>
           </div>
         </header>

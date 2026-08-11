@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, KeyRound } from "lucide-react";
+import { Plus, Pencil, KeyRound, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -70,6 +70,16 @@ export default function UsersPage() {
     }));
   }
 
+  async function remove(u: User) {
+    if (!confirm(`Xoá tài khoản "${u.name}" (${u.email})?\nThao tác này không thể hoàn tác.`)) return;
+    try {
+      await apiFetch(`/api/users/${u.id}`, { method: "DELETE" });
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Không xoá được người dùng");
+    }
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -95,7 +105,7 @@ export default function UsersPage() {
     <div>
       <PageHeader
         title="Quản trị người dùng"
-        description="Tạo tài khoản, phân vai trò, khoá/mở và đặt lại mật khẩu."
+        description="Tạo tài khoản, phân vai trò, khoá/mở, đặt lại mật khẩu và xoá người dùng."
         action={
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" /> Thêm người dùng
@@ -112,7 +122,7 @@ export default function UsersPage() {
                 <TH>Vai trò</TH>
                 <TH className="text-center">Trạng thái</TH>
                 <TH>Ngày tạo</TH>
-                <TH className="text-right">Sửa</TH>
+                <TH className="text-right">Thao tác</TH>
               </TR>
             </THead>
             <TBody>
@@ -140,9 +150,22 @@ export default function UsersPage() {
                     </TD>
                     <TD className="text-muted-foreground">{formatDate(u.createdAt)}</TD>
                     <TD className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(u)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(u)} title="Sửa">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        {u.id !== me.userId && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => remove(u)}
+                            title="Xoá người dùng"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </TD>
                   </TR>
                 ))

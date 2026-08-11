@@ -243,6 +243,12 @@ export const userCreateSchema = z.object({
   roles: z.array(z.enum(roleCodes)).min(1, "Chọn ít nhất 1 vai trò"),
 });
 
+// Đổi mật khẩu của chính mình (mọi người dùng đã đăng nhập).
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Nhập mật khẩu hiện tại"),
+  newPassword: z.string().min(6, "Mật khẩu mới tối thiểu 6 ký tự"),
+});
+
 export const userUpdateSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   roles: z.array(z.enum(roleCodes)).min(1, "Chọn ít nhất 1 vai trò").optional(),
