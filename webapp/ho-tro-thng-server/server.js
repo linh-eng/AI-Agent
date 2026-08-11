@@ -17,7 +17,7 @@ catch (e) {
   process.exit(1);
 }
 
-const APP_VERSION = "v3.8"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
+const APP_VERSION = "v3.9"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 const ROOT = __dirname;
@@ -157,6 +157,10 @@ function slaUsedSrv(t){ const hist=Array.isArray(t.history)?t.history:null; cons
   if(hist&&hist.length){ let used=0; for(let i=0;i<hist.length;i++){ const from=hist[i].at, to=(i+1<hist.length?hist[i+1].at:endTime); if(isRunningSrv(hist[i].to)) used+=workHoursSrv(from,to); } return used; }
   return workHoursSrv(t.tStart||t.tAssign||t.tCreate, endTime); }
 function slaProcHours(uutien){ const sla=getConfig().sla||{}; const arr=sla[uutien]; return arr?arr[1]:8; }
+// Giai đoạn B — SLA nghiệm thu (giờ làm việc) theo nhóm loại việc
+function wtGroupSrv(loai){ const wts=getConfig().worktypes||[]; const w=wts.find(x=>x[1]===loai); return w?(w[4]||""):""; }
+function acceptSlaHours(t){ const cfg=getConfig().acceptSla||{}; const g=wtGroupSrv(t.loai)||"default"; const h=(cfg[g]!=null?cfg[g]:cfg.default); return +h||1; }
+function acceptUsedSrv(t){ return t.tSubmit ? workHoursSrv(t.tSubmit, new Date().toISOString()) : 0; }
 const DEFAULT_WORKTYPES = [
   ["KT01","Xử lý sự cố / lỗi sản phẩm","Hỗ trợ kỹ thuật","P2 - Ưu tiên cao","kt"],
   ["KT02","Hỗ trợ cài đặt, cấu hình","Hỗ trợ kỹ thuật","P3 - Ưu tiên trung bình","kt"],
@@ -197,6 +201,12 @@ const DEFAULT_CONFIG = {
       { key:"chungtu",  ten:"Chứng từ",              trongSo:20 }
     ]
   },
+  acceptSla: { default: 1 }, // Giai đoạn B — SLA nghiệm thu (giờ làm việc) theo nhóm loại việc
+  score: { // Giai đoạn D — công thức điểm theo hạng mục (thay điểm cũ)
+    lanFactor: [100, 80, 60, 40], // % điểm còn lại theo lần đạt (1,2,3,4+)
+    mucDoLoi: { nhe:20, tb:40, nang:60, lamlai:100 }, // % điểm hạng mục bị trừ khi phải tạo ticket khắc phục
+    slaPhat: 10 // điểm trừ trên tổng nếu trễ SLA xử lý
+  },
   quality: { csat:40, sla:25, sl:15, ps:10, reopen:10 },
   cat: {
     donvi: ["Phòng Hành chính","Phòng Kế toán","Phòng Kinh doanh","Phòng Mua hàng","Phòng Triển khai","Phòng Testing","Phòng Bảo hành","Phòng Tư vấn kỹ thuật","Ban Giám đốc","Trợ lý Giám đốc"],
@@ -214,6 +224,10 @@ function getConfig() {
     backup: { ...DEFAULT_CONFIG.backup, ...(c.backup||{}) },
     company: { ...DEFAULT_CONFIG.company, ...(c.company||{}) },
     accept: (c.accept && typeof c.accept === "object") ? { ...DEFAULT_CONFIG.accept, ...c.accept } : DEFAULT_CONFIG.accept,
+    acceptSla: (c.acceptSla && typeof c.acceptSla === "object") ? { ...DEFAULT_CONFIG.acceptSla, ...c.acceptSla } : DEFAULT_CONFIG.acceptSla,
+    score: c.score ? { ...DEFAULT_CONFIG.score, ...c.score,
+      mucDoLoi: { ...DEFAULT_CONFIG.score.mucDoLoi, ...(c.score.mucDoLoi||{}) },
+      lanFactor: (Array.isArray(c.score.lanFactor) && c.score.lanFactor.length) ? c.score.lanFactor : DEFAULT_CONFIG.score.lanFactor } : DEFAULT_CONFIG.score,
     worktypes: (Array.isArray(c.worktypes) && c.worktypes.length) ? c.worktypes : DEFAULT_CONFIG.worktypes };
 }
 // Danh mục Dự án (5H) — lưu trong settings, dùng chung mọi ticket
@@ -512,13 +526,19 @@ const server = http.createServer(async (req, res) => {
       /* ---- Ticket ---- */
       if (p === "/api/tickets" && req.method === "POST") {
         if (!can(me, "create")) return sendJSON(res, 403, { error: "Không có quyền tạo ticket" });
-        const t = await readBody(req); t.id = genId("TK"); t.tCreate = new Date().toISOString(); t.createdBy = me.username;
+        const t = await readBody(req); t.tCreate = new Date().toISOString(); t.createdBy = me.username;
+        // Giai đoạn C — Ticket khắc phục con: mã = <mã gốc>-01, -02… truy về ticket gốc
+        if (t.parentId) {
+          const parent = getTicket(t.parentId);
+          if (parent) { const kids = allTickets().filter(x => x.parentId === t.parentId); t.id = t.parentId + "-" + String(kids.length + 1).padStart(2,"0"); t.laKhacPhuc = true; }
+          else { t.parentId = ""; t.id = genId("TK"); }
+        } else { t.id = genId("TK"); }
         t.trangthai = "Tạo mới"; t.uutienDeXuat = t.uutien || ""; t.moLai = +t.moLai || 0;
-        t.history = [{ at: t.tCreate, from: "", to: "Tạo mới", by: me.username, note: "Tạo phiếu yêu cầu" }];
+        t.history = [{ at: t.tCreate, from: "", to: "Tạo mới", by: me.username, note: t.parentId ? ("Tạo ticket khắc phục từ " + t.parentId) : "Tạo phiếu yêu cầu" }];
         delete t._reason;
         saveTicketRow(t, true);
         // Thông báo: ticket mới cần tiếp nhận -> điều phối/quản trị
-        dispatcherUsernames().forEach(un => { if (un !== me.username) pushNotif(un, "new", `Ticket mới cần tiếp nhận: ${t.id} · ${t.donvi||""}`, t.id); });
+        dispatcherUsernames().forEach(un => { if (un !== me.username) pushNotif(un, "new", `${t.parentId?"Ticket khắc phục":"Ticket"} mới cần tiếp nhận: ${t.id} · ${t.donvi||""}`, t.id); });
         return sendJSON(res, 201, t);
       }
       if ((m = p.match(/^\/api\/tickets\/(.+)$/))) {
@@ -550,6 +570,19 @@ const server = http.createServer(async (req, res) => {
           // Thông báo: ticket đổi trạng thái -> người tạo phiếu
           if (baseStatus(t.trangthai) !== baseStatus(cur.trangthai) && cur.createdBy && cur.createdBy !== me.username)
             pushNotif(cur.createdBy, "status", `Ticket ${t.id} chuyển sang "${baseStatus(t.trangthai)}"`, t.id);
+          // Giai đoạn C — Ticket khắc phục con Hoàn tất -> cập nhật & báo về ticket gốc
+          if (t.parentId && baseStatus(t.trangthai) === "Hoàn tất" && baseStatus(cur.trangthai) !== "Hoàn tất") {
+            const parent = getTicket(t.parentId);
+            if (parent) {
+              if (Array.isArray(parent.hangMuc) && t.hangMucKey) {
+                const h = parent.hangMuc.find(x => x.key === t.hangMucKey);
+                if (h) { h.khacPhucXong = true; h.lyDo = (h.lyDo ? h.lyDo + " · " : "") + "Đã khắc phục (" + t.id + ") — chờ nghiệm thu lại"; }
+                saveTicketRow(parent, false);
+              }
+              if (parent.createdBy) pushNotif(parent.createdBy, "status", `Ticket khắc phục ${t.id} đã Hoàn tất — nghiệm thu lại ticket gốc ${parent.id}`, parent.id);
+              const pa = userByName(parent.assignee); if (pa && pa.username !== me.username) pushNotif(pa.username, "status", `Khắc phục ${t.id} xong cho ticket ${parent.id}`, parent.id);
+            }
+          }
           return sendJSON(res, 200, t);
         }
         if (req.method === "DELETE") {
@@ -662,6 +695,17 @@ setInterval(() => {
           const au = userByName(t.assignee);
           if (au) pushNotif(au.username, "sla", `Ticket ${t.id} đã TRỄ SLA xử lý (đã dùng ${used.toFixed(1)}h / ${lim}h)`, t.id);
           t._slaBreachNoti = true; saveTicketRow(t, false);
+        }
+      }
+      // Giai đoạn B — Thông báo trễ SLA nghiệm thu: ticket "Đã xử lý" (chờ nghiệm thu) quá hạn
+      // (bỏ qua nếu đã nghiệm thu sau lần gửi gần nhất — vd đang chờ khắc phục)
+      const ntSauGui = t.tNghiemThu && t.tSubmit && new Date(t.tNghiemThu) >= new Date(t.tSubmit);
+      if (baseStatus(t.trangthai) === "Đã xử lý" && t.tSubmit && !ntSauGui && !t._acceptBreachNoti) {
+        const usedA = acceptUsedSrv(t), limA = acceptSlaHours(t);
+        if (limA > 0 && usedA > limA) {
+          if (t.createdBy) pushNotif(t.createdBy, "sla", `Ticket ${t.id} CHỜ NGHIỆM THU quá hạn (${usedA.toFixed(1)}h / ${limA}h) — vui lòng nghiệm thu`, t.id);
+          dispatcherUsernames().forEach(un => { if (un !== t.createdBy) pushNotif(un, "sla", `Ticket ${t.id} chờ nghiệm thu quá SLA (${usedA.toFixed(1)}h / ${limA}h)`, t.id); });
+          t._acceptBreachNoti = true; saveTicketRow(t, false);
         }
       }
     }

@@ -173,6 +173,14 @@ Không. Dữ liệu đã lưu trong `data.db`, bật lại là còn nguyên.
   (cấu hình trong **Danh mục & Cấu hình**). Khi người thực hiện bấm *"Đã hoàn tất — Gửi nghiệm thu"*, ticket sang
   *Đã xử lý (chờ nghiệm thu)*. Người yêu cầu nghiệm thu **từng hạng mục** Đạt/Không đạt; hạng mục Không đạt được
   trả lại để sửa (giữ **lịch sử từng lần** không ghi đè). Chỉ khi **tất cả hạng mục Đạt** ticket mới **Hoàn tất**.
+- 🆕 **SLA nghiệm thu (Giai đoạn B)**: đo riêng thời gian **người yêu cầu** nghiệm thu (từ lúc nhận báo cáo → nghiệm thu),
+  cấu hình theo nhóm; cảnh báo khi trễ — tách khỏi SLA của người thực hiện.
+- 🆕 **Ticket khắc phục con (Giai đoạn C)**: khi một hạng mục Không đạt và phải làm lại công việc thực tế, tạo
+  **ticket con mã `<gốc>-01, -02…`** truy về ticket gốc; ticket con Hoàn tất sẽ báo về gốc để nghiệm thu lại.
+- 🆕 **Điểm chất lượng theo hạng mục (Giai đoạn D)**: `Điểm = Σ (trọng số × hệ số mức lỗi × hệ số số lần) − trừ trễ SLA`;
+  hệ số số lần, mức trừ theo lỗi, điểm trừ SLA đều **cấu hình được** (không hard-code).
+- 🆕 **Dashboard chất lượng (Giai đoạn E)**: thêm **First Pass Rate** (đạt ngay lần đầu), tỉ lệ đạt SLA nghiệm thu,
+  số ticket khắc phục; báo cáo cá nhân thêm cột **FPR / đúng hạn / mở lại** theo từng người.
 - **Báo cáo theo chu kỳ** (menu Báo cáo): lọc theo ngày/tuần/tháng/năm + khoảng ngày, xuất Excel (.xls),
   in 5 biểu mẫu PDF A4 (Phiếu yêu cầu / giao việc / biên bản phát sinh / nghiệm thu / báo cáo kỳ) — dùng
   cửa sổ in của trình duyệt, chọn "Save as PDF".

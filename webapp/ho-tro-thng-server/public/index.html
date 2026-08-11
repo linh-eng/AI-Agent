@@ -241,7 +241,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <aside class="side">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.8</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="userbox" id="userbox"></div>
@@ -269,7 +269,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <div class="login-card">
     <div class="login-top">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.8</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9</span></div>
     </div>
     <div class="login-body">
       <h2>Đăng nhập hệ thống</h2>
@@ -365,9 +365,13 @@ let OVERLOAD_N=3; // ngưỡng quá tải P1/P2
 let CFG=null;
 let COMPANY={name:"CÔNG TY THÁI NGUYỄN (THNG)",dept:"BỘ PHẬN HỖ TRỢ & TRIỂN KHAI",address:"",phone:"",email:"",taxCode:"",website:"",logo:"",footer:""}; // thông tin công ty cho biểu mẫu in
 let ACCEPT_TPL={ default:[{key:"thuchien",ten:"Chất lượng thực hiện",trongSo:40},{key:"baocao",ten:"Báo cáo kết quả",trongSo:20},{key:"hinhanh",ten:"Hình ảnh",trongSo:20},{key:"chungtu",ten:"Chứng từ",trongSo:20}] }; // bộ hạng mục nghiệm thu theo nhóm loại việc
+let ACCEPT_SLA={ default:1 }; // Giai đoạn B — SLA nghiệm thu (giờ làm việc) theo nhóm
+let SCORE={ lanFactor:[100,80,60,40], mucDoLoi:{nhe:20,tb:40,nang:60,lamlai:100}, slaPhat:10 }; // Giai đoạn D — công thức điểm
 function applyConfig(c){ if(!c)return; CFG=c; if(c.sla)SLA=c.sla; if(c.work)WORK=Object.assign({sat:false},c.work); if(typeof c.warn==='number')WY_WARN=c.warn; if(typeof c.overload==='number')OVERLOAD_N=c.overload; if(c.quality)QCONF=c.quality;
   if(c.company&&typeof c.company==='object') COMPANY=Object.assign({name:"",dept:"",address:"",phone:"",email:"",taxCode:"",website:"",logo:"",footer:""},c.company);
   if(c.accept&&typeof c.accept==='object'&&Object.keys(c.accept).length) ACCEPT_TPL=c.accept;
+  if(c.acceptSla&&typeof c.acceptSla==='object') ACCEPT_SLA=Object.assign({default:1},c.acceptSla);
+  if(c.score&&typeof c.score==='object') SCORE=Object.assign({lanFactor:[100,80,60,40],mucDoLoi:{nhe:20,tb:40,nang:60,lamlai:100},slaPhat:10},c.score);
   if(c.cat){ ["donvi","doi","dvt","loaiPS","nghiemthu"].forEach(k=>{ if(Array.isArray(c.cat[k])) CAT[k]=c.cat[k]; }); }
   if(Array.isArray(c.worktypes)&&c.worktypes.length){ WORKTYPES=c.worktypes.map(w=>Array.isArray(w)?w:[w.ma||"",w.ten||"",w.luong||"",w.pri||"P3 - Ưu tiên trung bình",w.group||""]); rebuildWT(); }
 }
@@ -496,23 +500,29 @@ function responseMet(t){
   if(!tiepAt||!startAt) return true;
   return (workingHours(tiepAt,startAt)||0)*60 <= respMin;
 }
+// Giai đoạn D — Điểm chất lượng theo hạng mục nghiệm thu (thay công thức cũ)
+function lanFactorOf(datLan){ const arr=(SCORE&&Array.isArray(SCORE.lanFactor)&&SCORE.lanFactor.length)?SCORE.lanFactor:[100,80,60,40]; const idx=Math.max(1,+datLan||1)-1; return (idx<arr.length?arr[idx]:arr[arr.length-1])/100; }
+function mucDoFactorOf(m){ if(!m) return 1; const p=(SCORE&&SCORE.mucDoLoi&&SCORE.mucDoLoi[m]!=null)?SCORE.mucDoLoi[m]:0; return Math.max(0,1-(+p||0)/100); }
+function mucDoLabel(m){ return {nhe:'Lỗi nhẹ',tb:'Lỗi trung bình',nang:'Lỗi nặng',lamlai:'Làm lại toàn bộ'}[m]||''; }
+// Giai đoạn B — SLA nghiệm thu (giờ làm việc) của người yêu cầu
+function acceptSlaOf(t){ const g=groupOfT(t)||'default'; const h=(ACCEPT_SLA&&ACCEPT_SLA[g]!=null?ACCEPT_SLA[g]:(ACCEPT_SLA&&ACCEPT_SLA.default)); return +h||1; }
+function acceptSlaStatus(t){ if(!t.tSubmit) return null; const end=t.tNghiemThu||new Date().toISOString(); const used=workingHours(t.tSubmit,end); const lim=acceptSlaOf(t); const pending=baseStatus(t.trangthai)==='Đã xử lý'&&!t.tNghiemThu; return {used:used==null?0:used,lim,breach:(used||0)>lim,pending}; }
+function canAccept(t){ return can('edit')||can('users')||(t&&ME&&(t.createdBy===ME.username||String(t.nguoiYC||'').trim()===String(ME.name||'').trim())); }
 // Điểm chất lượng thực hiện (thang 100) — chỉ tính khi ticket đã đóng
 function computeQuality(t){
-  const s=slaStatus(t);
-  const csat=+t.csat||0; const cCsat=(csat/5)*QCONF.csat;
-  const respOk=responseMet(t), resOk=s.pct<=1;
-  const metCnt=(respOk?1:0)+(resOk?1:0);
-  const cSla=metCnt>=2?QCONF.sla:metCnt===1?QCONF.sla/2:0;
-  let cSl=QCONF.sl;
-  if(t.soluong && t.slThucte!=null && t.slThucte!==""){
-    const plan=+t.soluong, act=+t.slThucte, diff=plan?Math.abs(act-plan)/plan:0;
-    cSl = diff===0?QCONF.sl : diff<=0.05?+(QCONF.sl*10/15).toFixed(1) : 0;
-  }
-  const hasChuQuan=DB.ps.some(p=>p.ticketId===t.id && String(p.nhomNN||"").startsWith("Chủ quan"));
-  const cPs=hasChuQuan?0:QCONF.ps;
-  const cReopen=(+t.moLai>0)?0:QCONF.reopen;
-  const total=Math.round(cCsat+cSla+cSl+cPs+cReopen);
-  return {total, parts:{csat:+cCsat.toFixed(1),sla:cSla,sl:cSl,ps:cPs,reopen:cReopen}, respOk, resOk, hasChuQuan};
+  const hm=Array.isArray(t.hangMuc)?t.hangMuc:[];
+  const s=slaStatus(t); const slaBreach=s.pct>1; const slaPhat=slaBreach?(+((SCORE&&SCORE.slaPhat)||0)):0;
+  let items;
+  if(hm.length){ items=hm.map(h=>({ten:h.ten,w:+h.trongSo||0,passed:h.ketQua==='Đạt',datLan:(h.datLan||h.soLan||1),mucDoLoi:h.mucDoLoi||''})); }
+  else { items=[{ten:'Chất lượng thực hiện',w:100,passed:true,datLan:(+t.moLai||0)+1,mucDoLoi:''}]; } // ticket cũ chưa nghiệm thu theo hạng mục: suy từ số lần mở lại
+  let sum=0; const parts=items.map(it=>{
+    const lanF=it.passed?lanFactorOf(it.datLan):0; const mF=mucDoFactorOf(it.mucDoLoi);
+    const diem=Math.round(it.w*mF*lanF*10)/10; sum+=diem;
+    return {ten:it.ten,trongSo:it.w,diem,datLan:it.datLan,lanPct:Math.round(lanF*100),mucDoLoi:it.mucDoLoi,mucDoPct:Math.round((1-mF)*100),passed:it.passed};
+  });
+  const total=Math.max(0,Math.round(sum-slaPhat));
+  const firstPass = hm.length ? hm.every(h=>h.ketQua==='Đạt' && (+h.datLan===1) && !h.mucDoLoi) : ((+t.moLai||0)===0);
+  return {total, parts, slaPhat, slaBreach, firstPass, legacy:!hm.length, respOk:responseMet(t), resOk:s.pct<=1};
 }
 function qColor(v){return v>=85?"green":v>=65?"amber":"red";}
 
@@ -557,18 +567,19 @@ function renderDash(){
   const open=T.length-done;
   const waiting=T.filter(t=>["Chờ phản hồi","Chờ duyệt"].includes(baseStatus(t.trangthai))).length;
   let dangQuaHan=0,daViPham=0,amber=0,slaOk=0,doneCnt=0,csatSum=0,csatN=0,reopen=0,sumH=0,sumHn=0;
-  let qSum=0,qN=0,cReject=0,cReturn=0,cReopen=0,conflicts=0;
+  let qSum=0,qN=0,cReject=0,cReturn=0,cReopen=0,conflicts=0,fpN=0;
   T.forEach(t=>{const s=slaStatus(t);const closed=isClosed(t.trangthai);
     if(!closed && s.color==="red") dangQuaHan++;          // đang quá hạn, CHƯA đóng — cần xử lý ngay
     if(closed && s.pct>1) daViPham++;                     // đã đóng nhưng từng vi phạm SLA (thống kê)
     if(!closed && s.color==="amber") amber++;
-    if(closed){doneCnt++;if(s.pct<=1)slaOk++;sumH+=s.used;sumHn++;const q=computeQuality(t);qSum+=q.total;qN++;}
+    if(closed){doneCnt++;if(s.pct<=1)slaOk++;sumH+=s.used;sumHn++;const q=computeQuality(t);qSum+=q.total;qN++;if(q.firstPass)fpN++;}
     if(t.csat){csatSum+=+t.csat;csatN++;} reopen+=(+t.moLai||0);
     if(baseStatus(t.trangthai)==="Từ chối")cReject++;
     if(Array.isArray(t.history)&&t.history.some(h=>baseStatus(h.to)==="Trả lại bổ sung"))cReturn++;
     if(+t.moLai>0)cReopen++;
     if(Array.isArray(t.priHistory))conflicts+=t.priHistory.length;});
   const avgQ=qN?Math.round(qSum/qN):"–";
+  const fpr=qN?Math.round(fpN/qN*100):"–";
   const psWait=DB.ps.filter(p=>p.duyet==="Chờ duyệt").length;
   const costDX=DB.ps.reduce((a,p)=>a+(+p.chiphiDX||0),0);
   const costOK=DB.ps.reduce((a,p)=>a+(+p.chiphiDuyet||0),0);
@@ -598,6 +609,7 @@ function renderDash(){
       ${kpi("Chờ phản hồi/duyệt",waiting,"","Đang tạm dừng SLA",'<path d="M12 6v6l4 2"/>')}
       ${kpi("CSAT bình quân",avgCsat+" ★","","Trên "+csatN+" đánh giá",'<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/>')}
       ${kpi("Điểm chất lượng BQ",avgQ+(qN?"/100":""),"","Trên "+qN+" ticket đã đóng",'<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/>')}
+      ${kpi("Đạt ngay lần đầu (FPR)",fpr+(qN?"%":""),(qN&&fpr>=80?"":(qN&&fpr<50?"warn":"")),"First pass rate · "+qN+" ticket",'<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>',qN&&fpr>=80?'var(--green)':(qN&&fpr<50?'var(--amber)':null))}
       ${kpi("TG xử lý bình quân",avgH+"h","","Giờ làm việc",'<path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>')}
       ${kpi("Phát sinh chờ duyệt",psWait,psWait?"warn":"","Cần phê duyệt",'<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>')}
       ${kpi("Chi phí PS đề xuất",fmtVnd(costDX),"","Đã duyệt: "+fmtVnd(costOK),'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>')}
@@ -758,13 +770,19 @@ function reportMetrics(list){
   const csatVals=list.map(t=>+t.csat||0).filter(x=>x>0);
   const csatAvg=csatVals.length?csatVals.reduce((a,x)=>a+x,0)/csatVals.length:0;
   const byPerson={};
-  closedList.forEach(t=>{const p=String(t.assignee||'—').trim()||'—';(byPerson[p]=byPerson[p]||{n:0,q:0,csat:0,csatN:0});byPerson[p].n++;byPerson[p].q+=computeQuality(t).total;const c=+t.csat||0;if(c>0){byPerson[p].csat+=c;byPerson[p].csatN++;}});
+  closedList.forEach(t=>{const p=String(t.assignee||'—').trim()||'—';(byPerson[p]=byPerson[p]||{n:0,q:0,csat:0,csatN:0,fp:0,onTime:0,reopen:0});const cq=computeQuality(t);byPerson[p].n++;byPerson[p].q+=cq.total;if(cq.firstPass)byPerson[p].fp++;if(slaStatus(t).pct<=1)byPerson[p].onTime++;if(+t.moLai>0)byPerson[p].reopen++;const c=+t.csat||0;if(c>0){byPerson[p].csat+=c;byPerson[p].csatN++;}});
+  const fprN=closedList.filter(t=>computeQuality(t).firstPass).length;
+  const fpr=closedList.length?Math.round(fprN/closedList.length*100):null;
+  let accTot=0,accOk=0;
+  list.forEach(t=>{ const a=acceptSlaStatus(t); if(a && t.tNghiemThu){ accTot++; if(!a.breach) accOk++; } });
+  const accRate=accTot?Math.round(accOk/accTot*100):null;
+  const khacPhuc=list.filter(t=>t.parentId).length;
   const tids=new Set(list.map(t=>t.id));
   const psList=DB.ps.filter(p=>tids.has(p.ticketId));
   const psNN={'Chủ quan':0,'Khách quan':0,'Do người yêu cầu':0};let cpDX=0,cpDuyet=0;
   psList.forEach(p=>{const nn=String(p.nhomNN||'');if(nn.startsWith('Chủ quan'))psNN['Chủ quan']++;else if(nn.startsWith('Khách quan'))psNN['Khách quan']++;else if(nn.startsWith('Do người'))psNN['Do người yêu cầu']++;cpDX+=+p.chiphiDX||0;cpDuyet+=+p.chiphiDuyet||0;});
   const conflict=list.filter(t=>Array.isArray(t.priHistory)&&t.priHistory.length).length;
-  return {tong:list.length,done,rejected,open,traLai,moLai,
+  return {tong:list.length,done,rejected,open,traLai,moLai,fpr,accRate,khacPhuc,
     respRate:respTot?Math.round(respOk/respTot*100):null,resRate:resTot?Math.round(resOk/resTot*100):null,viol,tbXuLy:resTot?+(usedSum/resTot).toFixed(1):0,
     qAvg:Math.round(qAvg),csatAvg:+csatAvg.toFixed(2),byPerson,psTong:psList.length,psNN,cpDX,cpDuyet,conflict};
 }
@@ -772,8 +790,8 @@ function rcard(lb,v,sub,col){return `<div class="rcard"><div class="rlb">${lb}</
 function reportMetricCards(M){
   return `<div class="sec-title" style="margin:18px 0 4px">Khối lượng</div>
     <div class="rgrid">${rcard('Tổng tiếp nhận',M.tong)}${rcard('Đã hoàn tất',M.done,'',qColorVar(90))}${rcard('Đang mở',M.open)}${rcard('Bị trả lại',M.traLai)}${rcard('Bị từ chối',M.rejected)}${rcard('Bị mở lại',M.moLai)}</div>
-    <div class="sec-title" style="margin:18px 0 4px">SLA</div>
-    <div class="rgrid">${rcard('Đạt SLA phản hồi',M.respRate==null?'–':M.respRate+'%')}${rcard('Đạt SLA xử lý',M.resRate==null?'–':M.resRate+'%',(M.resRate!=null?'':'chưa có ticket đóng'))}${rcard('Số ca vi phạm',M.viol,'',M.viol?'var(--red)':'')}${rcard('TG xử lý BQ',M.tbXuLy+'h')}</div>
+    <div class="sec-title" style="margin:18px 0 4px">SLA & chất lượng</div>
+    <div class="rgrid">${rcard('Đạt SLA phản hồi',M.respRate==null?'–':M.respRate+'%')}${rcard('Đạt SLA xử lý',M.resRate==null?'–':M.resRate+'%',(M.resRate!=null?'':'chưa có ticket đóng'))}${rcard('Đạt SLA nghiệm thu',M.accRate==null?'–':M.accRate+'%','người yêu cầu')}${rcard('Đạt ngay lần đầu (FPR)',M.fpr==null?'–':M.fpr+'%','first pass rate',M.fpr!=null&&M.fpr>=80?'var(--green)':'')}${rcard('Số ca vi phạm',M.viol,'',M.viol?'var(--red)':'')}${rcard('Ticket khắc phục',M.khacPhuc,'',M.khacPhuc?'var(--red)':'')}${rcard('TG xử lý BQ',M.tbXuLy+'h')}</div>
     <div class="sec-title" style="margin:18px 0 4px">Chất lượng</div>
     <div class="rgrid">${rcard('CSAT bình quân',M.csatAvg?M.csatAvg+' / 5':'–')}${rcard('Điểm chất lượng BQ',M.qAvg||'–','',qColorVar(M.qAvg))}</div>`;
 }
@@ -822,9 +840,9 @@ function renderReport(){
 function rMode(m){ RMODE=m; renderReport(); }
 function reportBodyTong(list){
   const M=reportMetrics(list);
-  const perRows=Object.entries(M.byPerson).sort((a,b)=>b[1].q/b[1].n-a[1].q/a[1].n).map(([p,x])=>`<tr><td>${esc(p)}</td><td>${x.n}</td><td><b style="color:${qColorVar(Math.round(x.q/x.n))}">${Math.round(x.q/x.n)}</b></td><td>${x.csatN?(x.csat/x.csatN).toFixed(1)+' ★':'–'}</td></tr>`).join("")||`<tr><td colspan="4" class="muted" style="text-align:center;padding:12px">Chưa có ticket đã đóng trong kỳ.</td></tr>`;
+  const perRows=Object.entries(M.byPerson).sort((a,b)=>b[1].q/b[1].n-a[1].q/a[1].n).map(([p,x])=>`<tr><td>${esc(p)}</td><td>${x.n}</td><td><b style="color:${qColorVar(Math.round(x.q/x.n))}">${Math.round(x.q/x.n)}</b></td><td><b style="color:${x.n&&Math.round(x.fp/x.n*100)>=80?'var(--green)':''}">${x.n?Math.round(x.fp/x.n*100)+'%':'–'}</b></td><td>${x.n?Math.round(x.onTime/x.n*100)+'%':'–'}</td><td>${x.reopen||0}</td><td>${x.csatN?(x.csat/x.csatN).toFixed(1)+' ★':'–'}</td></tr>`).join("")||`<tr><td colspan="7" class="muted" style="text-align:center;padding:12px">Chưa có ticket đã đóng trong kỳ.</td></tr>`;
   return reportMetricCards(M)
-    +`<div class="panel" style="margin-top:10px"><div class="panel-h"><h3>Xếp theo người thực hiện</h3></div><div class="panel-b"><div class="table-wrap"><table><thead><tr><th>Người thực hiện</th><th>Số ticket đóng</th><th>Điểm CL BQ</th><th>CSAT BQ</th></tr></thead><tbody>${perRows}</tbody></table></div></div></div>`
+    +`<div class="panel" style="margin-top:10px"><div class="panel-h"><h3>Xếp theo người thực hiện</h3></div><div class="panel-b"><div class="table-wrap"><table><thead><tr><th>Người thực hiện</th><th>Số ticket đóng</th><th>Điểm CL BQ</th><th>Đạt lần đầu (FPR)</th><th>Đúng hạn</th><th>Mở lại</th><th>CSAT BQ</th></tr></thead><tbody>${perRows}</tbody></table></div></div></div>`
     +reportPsDh(M);
 }
 function reportBodyDanhMuc(list){
@@ -897,6 +915,10 @@ function renderCat(keep){
   if(!c.company||typeof c.company!=='object') c.company={name:"",dept:"",address:"",phone:"",email:"",taxCode:"",website:"",logo:"",footer:""};
   if(!c.accept||typeof c.accept!=='object') c.accept={default:[{key:"thuchien",ten:"Chất lượng thực hiện",trongSo:40},{key:"baocao",ten:"Báo cáo kết quả",trongSo:20},{key:"hinhanh",ten:"Hình ảnh",trongSo:20},{key:"chungtu",ten:"Chứng từ",trongSo:20}]};
   if(!Array.isArray(c.accept.default)) c.accept.default=[];
+  if(!c.acceptSla||typeof c.acceptSla!=='object') c.acceptSla={default:1};
+  if(!c.score||typeof c.score!=='object') c.score={lanFactor:[100,80,60,40],mucDoLoi:{nhe:20,tb:40,nang:60,lamlai:100},slaPhat:10};
+  if(!Array.isArray(c.score.lanFactor)||!c.score.lanFactor.length) c.score.lanFactor=[100,80,60,40];
+  if(!c.score.mucDoLoi||typeof c.score.mucDoLoi!=='object') c.score.mucDoLoi={nhe:20,tb:40,nang:60,lamlai:100};
   const num=(val,path,w)=>`<input type="number" value="${val}" style="width:${w||70}px" oninput="cfgSet('${path}',this.value)">`;
   const slaRows=Object.keys(c.sla).map(p=>`<tr><td><span class="pr ${p.split(' ')[0]}">${esc(p)}</span></td><td>${admin?num(c.sla[p][0],'sla.'+p+'.0'):c.sla[p][0]} phút</td><td>${admin?num(c.sla[p][1],'sla.'+p+'.1'):c.sla[p][1]} giờ</td></tr>`).join("");
   const qsum=c.quality.csat+c.quality.sla+c.quality.sl+c.quality.ps+c.quality.reopen;
@@ -929,6 +951,13 @@ function renderCat(keep){
       <button class="xbtn" title="Xóa" onclick="acceptDel('${g}',${i})">×</button></div>`).join("");
     return head+rows+`<div style="margin:2px 0 8px"><button class="addbtn" onclick="acceptAdd('${g}')">+ Thêm hạng mục</button>${g==='default'?'':` <button class="btn sm ghost" onclick="acceptReset('${g}')">Bỏ tùy chỉnh (dùng Mặc định)</button>`}</div>`;
   }).join("");
+  // Giai đoạn B/D — SLA nghiệm thu + hệ số điểm chất lượng
+  const acceptSlaRows=acceptGrps.map(g=>{
+    const v=(c.acceptSla&&c.acceptSla[g]!=null)?c.acceptSla[g]:(g==='default'?(c.acceptSla.default!=null?c.acceptSla.default:1):'');
+    return `<div class="catrow" style="gap:8px;align-items:center;margin-bottom:6px"><span style="min-width:170px">${esc(GRP_LB[g]||g)}</span><input type="number" min="0" step="0.5" value="${v===''?'':v}" placeholder="${g==='default'?'':'(mặc định)'}" style="width:90px" ${admin?'':'disabled'} oninput="acceptSlaSet('${g}',this.value)"><span class="muted" style="font-size:12px">giờ làm việc</span></div>`;
+  }).join("");
+  const sc=c.score;
+  const mucRows=[['nhe','Lỗi nhẹ'],['tb','Lỗi trung bình'],['nang','Lỗi nặng'],['lamlai','Làm lại toàn bộ']].map(([k,lb])=>`<label style="display:flex;gap:6px;align-items:center;font-size:12.5px">${lb}: <input type="number" min="0" max="100" value="${(sc.mucDoLoi&&sc.mucDoLoi[k]!=null)?sc.mucDoLoi[k]:0}" ${admin?'':'disabled'} oninput="scoreMucSet('${k}',this.value)" style="width:66px">%</label>`).join('');
   document.getElementById("view").innerHTML=`
     ${admin?'':'<div class="warn" style="margin-bottom:14px">Chỉ Quản trị mới chỉnh được cấu hình. Bạn đang xem ở chế độ chỉ đọc.</div>'}
     <div class="grid" style="grid-template-columns:1fr 1fr">
@@ -986,6 +1015,20 @@ function renderCat(keep){
         ${acceptPanel}
         ${admin?`<div style="margin-top:10px"><button class="btn primary" onclick="saveConfig()">Lưu cấu hình</button> <span class="muted" style="font-size:12.5px">Áp dụng ngay cho màn nghiệm thu.</span></div>`:''}
       </div></div>
+    ${admin?`<div class="panel" style="margin-top:16px"><div class="panel-h"><h3>SLA nghiệm thu &amp; công thức điểm chất lượng</h3></div>
+      <div class="panel-b">
+        <div class="sec-title">SLA nghiệm thu của người yêu cầu (giờ làm việc)</div>
+        <div class="hint" style="margin-bottom:6px">Thời gian tối đa để người yêu cầu nghiệm thu sau khi nhận báo cáo. Trễ sẽ được cảnh báo & tách riêng khỏi SLA người thực hiện.</div>
+        ${acceptSlaRows}
+        <div class="sec-title" style="margin-top:14px">Hệ số điểm theo số lần đạt (%)</div>
+        <input value="${(sc.lanFactor||[]).join(', ')}" oninput="scoreLanSet(this.value)" style="max-width:300px" placeholder="VD: 100, 80, 60, 40">
+        <div class="hint" style="font-size:11px;margin-top:4px">Đạt lần 1 = số đầu; lần 2 = số thứ hai; … từ lần cuối trở đi giữ nguyên số cuối. VD 100,80,60,40 → đạt lần 3 còn 60%.</div>
+        <div class="sec-title" style="margin-top:14px">Mức trừ khi phải tạo Ticket khắc phục (%/điểm hạng mục)</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">${mucRows}</div>
+        <div class="sec-title" style="margin-top:14px">Điểm trừ khi trễ SLA xử lý</div>
+        <div style="display:flex;gap:6px;align-items:center"><input type="number" min="0" value="${+sc.slaPhat||0}" oninput="scoreSlaPhatSet(this.value)" style="width:90px"> <span class="muted" style="font-size:12.5px">điểm trừ trên tổng 100</span></div>
+        <div style="margin-top:12px"><button class="btn primary" onclick="saveConfig()">Lưu cấu hình</button> <span class="muted" style="font-size:12.5px">Điểm = Σ (trọng số × hệ số lỗi × hệ số số lần) − trừ trễ SLA.</span></div>
+      </div></div>`:''}
     ${admin?`<div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Sao lưu &amp; khôi phục dữ liệu</h3><button class="btn primary sm" onclick="backupNow()">Sao lưu ngay</button></div>
       <div class="panel-b">
         <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:center;font-size:13.5px">
@@ -1055,6 +1098,10 @@ function acceptAdd(g){ if(!EDITCFG.accept)EDITCFG.accept={}; if(!Array.isArray(E
 function acceptDel(g,i){ if(EDITCFG.accept&&Array.isArray(EDITCFG.accept[g])){ EDITCFG.accept[g].splice(i,1); renderCat(true);} }
 function acceptCustomize(g){ if(!EDITCFG.accept)EDITCFG.accept={}; const base=Array.isArray(EDITCFG.accept.default)?EDITCFG.accept.default:[]; EDITCFG.accept[g]=JSON.parse(JSON.stringify(base)); renderCat(true); }
 function acceptReset(g){ if(EDITCFG.accept){ delete EDITCFG.accept[g]; renderCat(true);} }
+function acceptSlaSet(g,v){ if(!EDITCFG.acceptSla)EDITCFG.acceptSla={}; EDITCFG.acceptSla[g]=Math.max(0,+v||0); }
+function scoreLanSet(v){ if(!EDITCFG.score)EDITCFG.score={}; const arr=String(v).split(',').map(x=>Math.max(0,+String(x).trim()||0)); EDITCFG.score.lanFactor=arr.length?arr:[100]; }
+function scoreMucSet(k,v){ if(!EDITCFG.score)EDITCFG.score={}; if(!EDITCFG.score.mucDoLoi)EDITCFG.score.mucDoLoi={}; EDITCFG.score.mucDoLoi[k]=Math.max(0,Math.min(100,+v||0)); }
+function scoreSlaPhatSet(v){ if(!EDITCFG.score)EDITCFG.score={}; EDITCFG.score.slaPhat=Math.max(0,+v||0); }
 function catAdd(key){ if(!EDITCFG.cat[key])EDITCFG.cat[key]=[]; EDITCFG.cat[key].push(""); renderCat(true); }
 function catRemove(key,i){ EDITCFG.cat[key].splice(i,1); renderCat(true); }
 function wtAdd(){ EDITCFG.worktypes.push(["","","","P3 - Ưu tiên trung bình",""]); renderCat(true); }
@@ -1086,6 +1133,8 @@ async function saveConfig(){
   if(EDITCFG.cat){ Object.keys(EDITCFG.cat).forEach(k=>{ if(Array.isArray(EDITCFG.cat[k])) EDITCFG.cat[k]=EDITCFG.cat[k].map(x=>(x||'').trim()).filter(Boolean); }); }
   if(Array.isArray(EDITCFG.worktypes)) EDITCFG.worktypes=EDITCFG.worktypes.map(w=>w.map(x=>(x||'').toString().trim())).filter(w=>w[0]&&w[1]);
   if(EDITCFG.accept&&typeof EDITCFG.accept==='object'){ Object.keys(EDITCFG.accept).forEach(g=>{ if(Array.isArray(EDITCFG.accept[g])){ EDITCFG.accept[g]=EDITCFG.accept[g].map(it=>({key:it.key||(it.ten||'').trim(),ten:(it.ten||'').trim(),trongSo:+it.trongSo||0})).filter(it=>it.ten); if(g!=='default'&&!EDITCFG.accept[g].length) delete EDITCFG.accept[g]; } }); if(!Array.isArray(EDITCFG.accept.default)||!EDITCFG.accept.default.length) EDITCFG.accept.default=[{key:"thuchien",ten:"Chất lượng thực hiện",trongSo:40},{key:"baocao",ten:"Báo cáo kết quả",trongSo:20},{key:"hinhanh",ten:"Hình ảnh",trongSo:20},{key:"chungtu",ten:"Chứng từ",trongSo:20}]; }
+  if(EDITCFG.score){ if(!Array.isArray(EDITCFG.score.lanFactor)||!EDITCFG.score.lanFactor.length) EDITCFG.score.lanFactor=[100,80,60,40]; else EDITCFG.score.lanFactor=EDITCFG.score.lanFactor.map(x=>Math.max(0,+x||0)); if(!EDITCFG.score.mucDoLoi) EDITCFG.score.mucDoLoi={nhe:20,tb:40,nang:60,lamlai:100}; EDITCFG.score.slaPhat=Math.max(0,+EDITCFG.score.slaPhat||0); }
+  if(EDITCFG.acceptSla&&typeof EDITCFG.acceptSla==='object'){ Object.keys(EDITCFG.acceptSla).forEach(g=>{ EDITCFG.acceptSla[g]=Math.max(0,+EDITCFG.acceptSla[g]||0); }); if(EDITCFG.acceptSla.default==null) EDITCFG.acceptSla.default=1; }
   const qs=EDITCFG.quality; if(qs){ const s=qs.csat+qs.sla+qs.sl+qs.ps+qs.reopen; if(s!==100 && !confirm('Tổng trọng số điểm chất lượng đang là '+s+' (khác 100). Vẫn lưu?')) return; }
   try{ await api('PUT','/api/config',EDITCFG); applyConfig(EDITCFG); toast('Đã lưu cấu hình & danh mục — áp dụng ngay'); render(); }
   catch(e){ toast(e.message||'Lỗi lưu cấu hình',true); }
@@ -1417,8 +1466,15 @@ function attachBlock(id){
     ${list.length?`<div style="display:flex;flex-direction:column;gap:6px">${list.map(f=>`<div class="catrow" style="justify-content:space-between;background:var(--green-50);border-radius:8px;padding:6px 10px"><a href="/api/file/${f.id}?dl=1" target="_blank" style="flex:1;color:var(--green-800);font-size:13px;text-decoration:none">📎 ${esc(f.name)} <span class="muted">(${fmtSize(f.size)})</span></a></div>`).join("")}</div>`:'<div class="muted" style="font-size:12.5px">Chưa có tệp. Vào "Chỉnh sửa" để tải lên.</div>'}
   </div>`;
 }
+async function markAcceptOpen(t){ try{
+  const isAssignee=ME&&t.assignee&&String(t.assignee).trim()===String(ME.name||'').trim();
+  if(baseStatus(t.trangthai)==='Đã xử lý' && !t.tOpenNT && canAccept(t) && !isAssignee){
+    const nt=JSON.parse(JSON.stringify(t)); nt.tOpenNT=new Date().toISOString();
+    await api('PUT','/api/tickets/'+encodeURIComponent(t.id),nt); t.tOpenNT=nt.tOpenNT;
+  } }catch(e){} }
 async function openDetail(id,tab){
   const t=DB.tickets.find(x=>x.id===id);if(!t)return;
+  markAcceptOpen(t);
   const s=slaStatus(t);const [rp,rh]=slaOf(t.uutien);
   const ps=DB.ps.filter(p=>p.ticketId===id);
   const row=(k,v)=>`<dt>${k}</dt><dd>${v||'<span class="muted">–</span>'}</dd>`;
@@ -1448,15 +1504,12 @@ async function openDetail(id,tab){
       <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
         <div style="width:74px;height:74px;border-radius:50%;display:grid;place-items:center;flex:none;background:conic-gradient(${qc} ${q.total*3.6}deg, var(--line-2) 0)">
           <div style="width:58px;height:58px;border-radius:50%;background:#fff;display:grid;place-items:center;font-weight:800;font-size:20px;color:${qtc}">${q.total}</div></div>
-        <div><div style="font-weight:700;font-size:15px;color:var(--green-800)">Điểm chất lượng tổng hợp: ${q.total}/100</div>
-          <div class="muted" style="font-size:12.5px;margin-top:2px">Tự tính khi đóng ticket · trọng số cấu hình được</div></div>
+        <div><div style="font-weight:700;font-size:15px;color:var(--green-800)">Điểm chất lượng: ${q.total}/100 ${q.firstPass?'<span class="pill green" style="font-size:11px">Đạt ngay lần đầu</span>':''}</div>
+          <div class="muted" style="font-size:12.5px;margin-top:2px">${q.legacy?'Ticket cũ — suy theo số lần mở lại':'Điểm = Σ (trọng số × hệ số lỗi × hệ số số lần)'} · cấu hình được</div></div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:14px;font-size:12.5px">
-        <div class="qpart">CSAT (40%): <b>${q.parts.csat}</b></div>
-        <div class="qpart">Đạt SLA (25%): <b>${q.parts.sla}</b> <span class="muted">(PH:${q.respOk?'đạt':'chưa'} · XL:${q.resOk?'đạt':'chưa'})</span></div>
-        <div class="qpart">Số lượng (15%): <b>${q.parts.sl}</b></div>
-        <div class="qpart">Không PS chủ quan (10%): <b>${q.parts.ps}</b>${q.hasChuQuan?' <span class="pill red" style="font-size:10px">có PS chủ quan</span>':''}</div>
-        <div class="qpart">Không mở lại (10%): <b>${q.parts.reopen}</b></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:14px;font-size:12.5px">
+        ${q.parts.map(pt=>`<div class="qpart">${esc(pt.ten)} (${pt.trongSo}%): <b>${pt.diem}</b>${!pt.passed?' <span class="pill red" style="font-size:10px">chưa đạt</span>':(pt.datLan>1?` <span class="muted">đạt lần ${pt.datLan} · ${pt.lanPct}%</span>`:'')}${pt.mucDoLoi?` <span class="pill amber" style="font-size:10px">-${pt.mucDoPct}% ${esc(mucDoLabel(pt.mucDoLoi))}</span>`:''}</div>`).join("")}
+        ${q.slaPhat?`<div class="qpart" style="color:var(--red)">Trừ trễ SLA xử lý: <b>-${q.slaPhat}</b></div>`:''}
       </div></div>` : '';
   const kh=t.keHoach; const pp=planProgress(t);
   const planBlock = kh ? `<div style="margin:2px 0 16px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--card)">
@@ -1470,7 +1523,7 @@ async function openDetail(id,tab){
       </dl>
       ${pp?`<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:12.5px"><span class="muted">Tiến độ đầu việc con</span><b>${pp.done}/${pp.total} (${pp.pct}%)</b></div><div class="track" style="margin-top:5px;height:12px"><div class="fill" style="width:${pp.pct}%"></div></div></div>`:''}
     </div>` : '';
-  const proc=`${qBlock}${planBlock}${nghiemThuBlock(t)}<dl class="dl">
+  const proc=`${qBlock}${planBlock}${khacPhucBlock(t)}${nghiemThuBlock(t)}<dl class="dl">
     ${row("Ưu tiên",`<span class="pr ${t.uutien.split(' ')[0]}">${esc(t.uutien)}</span>`)}
     ${row("SLA quy định",`Phản hồi ${rp} phút · Xử lý ${rh} giờ`)}
     ${row("Nhóm/Đội",esc(t.doi))}
@@ -1483,6 +1536,9 @@ async function openDetail(id,tab){
     ${row("Tổng thời gian trôi (giờ LV)",`${s.total!=null?s.total:s.used}h`)}
     ${row("Thời gian đã dừng (giờ LV)",`${s.stopped!=null?s.stopped:0}h`)}
     ${row("Trạng thái SLA",`<span class="pill ${s.color}"><span class="dot"></span>${s.label}</span>`)}
+    ${(()=>{const a=acceptSlaStatus(t); if(!a)return ''; return row("SLA nghiệm thu",`<b>${a.used}h</b> / ${a.lim}h <span class="pill ${a.breach?'red':(a.pending?'amber':'green')}" style="font-size:11px">${a.breach?'Trễ nghiệm thu':(a.pending?'đang chờ nghiệm thu':'trong hạn')}</span>`);})()}
+    ${t.tSubmit?row("TG gửi nghiệm thu",fmtDT(t.tSubmit)):''}
+    ${t.tNghiemThu?row("TG nghiệm thu",fmtDT(t.tNghiemThu)+(t.nghiemThuBy?` · ${esc(t.nghiemThuBy)}`:'')):''}
     ${row("Trạng thái ticket",stPill(t.trangthai))}
     ${row("SL thực tế",(t.slThucte||'–')+(t.slThucte&&t.soluong?` (lệch ${t.slThucte-t.soluong})`:''))}
     ${row("Kết quả nghiệm thu",esc(t.nghiemthu))}
@@ -1549,23 +1605,44 @@ function nghiemThuBlock(t){
     ${rows}
   </div>`;
 }
+function khacPhucBlock(t){
+  const kids=DB.tickets.filter(x=>x.parentId===t.id);
+  let html='';
+  if(t.parentId){ html+=`<div style="margin:2px 0 12px;padding:10px 14px;border:1px solid var(--amber);border-radius:10px;background:#fff8e6;font-size:13px">🔧 Đây là <b>ticket khắc phục</b> của ticket gốc <a href="#" onclick="openDetail('${esc(t.parentId)}');return false" class="mono">${esc(t.parentId)}</a>${t.hangMucTen?` · hạng mục: <b>${esc(t.hangMucTen)}</b>`:''}${t.mucDoLoi?` · <span class="pill amber" style="font-size:10px">${esc(mucDoLabel(t.mucDoLoi))}</span>`:''}</div>`; }
+  if(kids.length){ html+=`<div style="margin:2px 0 16px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--card)"><div style="font-weight:700;color:var(--green-800);font-size:14px;margin-bottom:8px">Ticket khắc phục phát sinh (${kids.length})</div>${kids.map(k=>`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-bottom:1px dashed var(--line)"><a href="#" onclick="openDetail('${esc(k.id)}');return false" class="mono">${esc(k.id)}</a> ${stPill(k.trangthai)} <span class="muted" style="font-size:12px">${esc(k.hangMucTen||'')}</span>${k.mucDoLoi?`<span class="pill amber" style="font-size:10px">${esc(mucDoLabel(k.mucDoLoi))}</span>`:''}</div>`).join("")}</div>`; }
+  return html;
+}
 function ntToggle(i){ const sel=document.querySelector(`input[name="hm${i}"]:checked`); const box=document.getElementById('hmReason'+i); if(box) box.style.display=(sel&&sel.value==='Không đạt')?'block':'none'; }
+function ntKpToggle(i){ const c=document.getElementById('hmKP'+i); const box=document.getElementById('hmKpBox'+i); if(box) box.style.display=(c&&c.checked)?'block':'none'; }
 function openNghiemThu(id){
   const t=DB.tickets.find(x=>x.id===id); if(!t)return;
   const hm=ensureHangMuc(t);
+  const md=SCORE.mucDoLoi||{nhe:20,tb:40,nang:60,lamlai:100};
   const rowsHtml=hm.map((h,i)=>{
     const passed=h.ketQua==='Đạt';
     return `<div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:${passed?'0':'8px'}">
         <b>${esc(h.ten)}</b><span class="muted" style="font-size:12px">(${h.trongSo}%)</span>
         ${passed?`<span class="pill green" style="font-size:11px">Đã đạt (lần ${h.datLan||h.soLan})</span>`:''}
+        ${(!passed&&h.choKhacPhuc&&h.khacPhucTicket)?`<span class="pill amber" style="font-size:11px">🔧 chờ khắc phục ${esc(h.khacPhucTicket)}${h.khacPhucXong?' · đã xong':''}</span>`:''}
       </div>
       ${passed?'':`
       <div style="display:flex;gap:18px;margin-bottom:6px">
         <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio" name="hm${i}" value="Đạt" style="width:auto;flex:none" onchange="ntToggle(${i})"> Đạt</label>
         <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio" name="hm${i}" value="Không đạt" style="width:auto;flex:none" onchange="ntToggle(${i})"> Không đạt</label>
       </div>
-      <div id="hmReason${i}" style="display:none"><textarea id="hmLyDo${i}" placeholder="Nêu rõ lý do Không đạt / nội dung cần bổ sung, sửa…" style="min-height:56px">${esc(h.lyDo||'')}</textarea></div>`}
+      <div id="hmReason${i}" style="display:none">
+        <textarea id="hmLyDo${i}" placeholder="Nêu rõ lý do Không đạt / nội dung cần bổ sung, sửa…" style="min-height:56px">${esc(h.lyDo||'')}</textarea>
+        <label style="display:flex;gap:8px;align-items:center;cursor:pointer;margin-top:6px;font-size:13px"><input type="checkbox" id="hmKP${i}" style="width:auto;flex:none" onchange="ntKpToggle(${i})"> <span>Cần <b>tạo Ticket khắc phục</b> (phải làm lại công việc thực tế, không chỉ sửa hồ sơ)</span></label>
+        <div id="hmKpBox${i}" style="display:none;margin-top:6px;padding:9px;border:1px dashed var(--line);border-radius:8px">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <label style="font-size:12.5px">Mức độ lỗi:</label>
+            <select id="hmMucDo${i}" style="width:auto"><option value="nhe">Lỗi nhẹ (-${md.nhe}%)</option><option value="tb" selected>Lỗi trung bình (-${md.tb}%)</option><option value="nang">Lỗi nặng (-${md.nang}%)</option><option value="lamlai">Làm lại toàn bộ (-${md.lamlai}%)</option></select>
+          </div>
+          <input id="hmNguoi${i}" placeholder="Người chịu trách nhiệm khắc phục" style="margin-top:6px" value="${esc(t.assignee||'')}">
+          <div class="hint" style="font-size:11px;margin-top:4px">Sẽ tạo Ticket con <b>${esc(t.id)}-0x</b> truy về ticket gốc; hạng mục này bị trừ điểm theo mức độ lỗi.</div>
+        </div>
+      </div>`}
     </div>`;
   }).join("");
   document.getElementById("overlay2").innerHTML=`<div class="modal" style="max-width:640px">
@@ -1581,32 +1658,62 @@ async function submitNghiemThu(id){
   const src=DB.tickets.find(x=>x.id===id); if(!src)return;
   const t=JSON.parse(JSON.stringify(src)); ensureHangMuc(t);
   const by=(ME&&(ME.name||ME.username))||''; const now=new Date().toISOString();
-  let anyPending=false, evaluated=0;
+  let evaluated=0, anyPathA=false; const toCreate=[];
   for(let i=0;i<t.hangMuc.length;i++){
     const h=t.hangMuc[i];
     if(h.ketQua==='Đạt'){ continue; } // đã đạt, khóa
     const sel=document.querySelector(`input[name="hm${i}"]:checked`);
-    if(!sel){ anyPending=true; continue; } // chưa chấm hạng mục này -> vẫn còn treo
-    const kq=sel.value; const lyDo=(document.getElementById('hmLyDo'+i)||{}).value||'';
-    if(kq==='Không đạt' && String(lyDo).trim().length<3){ toast('Hạng mục "'+h.ten+'": vui lòng ghi lý do Không đạt',true); return; }
+    if(!sel){ continue; } // chưa chấm hạng mục này -> vẫn còn treo
+    const kq=sel.value; const lyDo=((document.getElementById('hmLyDo'+i)||{}).value||'').trim();
+    if(kq==='Không đạt' && lyDo.length<3){ toast('Hạng mục "'+h.ten+'": vui lòng ghi lý do Không đạt',true); return; }
     evaluated++;
     if(!Array.isArray(h.lanList)) h.lanList=[];
-    h.lanList.push({at:now,by,ketQua:kq,lyDo:String(lyDo||'').trim()});
-    h.soLan=h.lanList.length; h.ketQua=kq; h.lyDo=String(lyDo||'').trim();
-    if(kq==='Đạt'){ h.datLan=h.soLan; } else { anyPending=true; }
+    if(kq==='Đạt'){
+      h.lanList.push({at:now,by,ketQua:'Đạt',lyDo}); h.soLan=h.lanList.length; h.ketQua='Đạt'; h.lyDo=lyDo; h.datLan=h.soLan; h.choKhacPhuc=false;
+    } else {
+      const kp=document.getElementById('hmKP'+i); const wantKp=kp&&kp.checked;
+      if(wantKp){
+        const mucdo=(document.getElementById('hmMucDo'+i)||{}).value||'tb';
+        const nguoi=((document.getElementById('hmNguoi'+i)||{}).value||t.assignee||'').trim();
+        h.lanList.push({at:now,by,ketQua:'Không đạt → tạo khắc phục',lyDo}); h.soLan=h.lanList.length;
+        h.ketQua='Không đạt'; h.lyDo=lyDo; h.mucDoLoi=mucdo; h.choKhacPhuc=true; h.khacPhucXong=false;
+        toCreate.push({key:h.key,ten:h.ten,mucDoLoi:mucdo,nguoi,lyDo});
+      } else {
+        h.lanList.push({at:now,by,ketQua:'Không đạt',lyDo}); h.soLan=h.lanList.length; h.ketQua='Không đạt'; h.lyDo=lyDo; h.choKhacPhuc=false; anyPathA=true;
+      }
+    }
   }
   if(evaluated===0){ toast('Vui lòng chấm ít nhất một hạng mục',true); return; }
   t.nghiemThuBy=by; t.tNghiemThu=now;
-  const allPass=t.hangMuc.every(h=>h.ketQua==='Đạt');
   closeQuickProject();
+  // Giai đoạn C — tạo ticket khắc phục con
+  const createdIds=[];
+  for(const c of toCreate){
+    try{
+      const child={ parentId:id, hangMucKey:c.key, hangMucTen:c.ten, mucDoLoi:c.mucDoLoi,
+        loai:t.loai, loaiKhac:t.loaiKhac||'', luong:t.luong||'', donvi:t.donvi||'', nguoiYC:t.nguoiYC||'', sdt:t.sdt||'', email:t.email||'',
+        uutien:t.uutien||'P2 - Ưu tiên cao', assignee:c.nguoi||'', doi:t.doi||'',
+        noidung:'[Khắc phục] '+c.ten+': '+c.lyDo, moTaThem:'Phát sinh từ nghiệm thu ticket '+id };
+      const r=await api('POST','/api/tickets',child);
+      if(r&&r.id){ createdIds.push(r.id); const h=t.hangMuc.find(x=>x.key===c.key); if(h) h.khacPhucTicket=r.id; }
+    }catch(e){ toast('Lỗi tạo ticket khắc phục: '+(e.message||''),true); }
+  }
+  const allPass=t.hangMuc.every(h=>h.ketQua==='Đạt');
   if(allPass){
     t.nghiemthu='Đạt - nghiệm thu đủ';
     await applyStatus(id,'Hoàn tất','Nghiệm thu đạt tất cả hạng mục',{hangMuc:t.hangMuc,nghiemThuBy:by,tNghiemThu:now,nghiemthu:t.nghiemthu});
-  } else {
+  } else if(anyPathA){
     t.nghiemthu='Không đạt - cần bổ sung/sửa';
-    const chuaDat=t.hangMuc.filter(h=>h.ketQua==='Không đạt').map(h=>h.ten).join(', ');
-    await applyStatus(id,'Đang xử lý','Nghiệm thu: chưa đạt ('+chuaDat+') — trả lại để sửa',{hangMuc:t.hangMuc,nghiemThuBy:by,tNghiemThu:now,nghiemthu:t.nghiemthu});
+    const names=t.hangMuc.filter(h=>h.ketQua==='Không đạt'&&!h.choKhacPhuc).map(h=>h.ten).join(', ');
+    await applyStatus(id,'Đang xử lý','Nghiệm thu: chưa đạt ('+names+') — trả lại để sửa',{hangMuc:t.hangMuc,nghiemThuBy:by,tNghiemThu:now,nghiemthu:t.nghiemthu});
+  } else {
+    // giữ ở "Đã xử lý" (chờ khắc phục hoặc còn hạng mục chưa chấm), KHÔNG reset đồng hồ gửi nghiệm thu
+    const anyKp=t.hangMuc.some(h=>h.choKhacPhuc && h.ketQua!=='Đạt');
+    t.nghiemthu=anyKp?'Chờ khắc phục':'Đang nghiệm thu (còn hạng mục chưa chấm)';
+    const note=anyKp?('Nghiệm thu: tạo ticket khắc phục '+createdIds.join(', ')+' — chờ khắc phục'):'Nghiệm thu: còn hạng mục chưa chấm — chờ nghiệm thu tiếp';
+    await applyStatus(id,'Đã xử lý',note,{hangMuc:t.hangMuc,nghiemThuBy:by,tNghiemThu:now,nghiemthu:t.nghiemthu,tSubmit:src.tSubmit});
   }
+  if(createdIds.length) toast('Đã tạo ticket khắc phục: '+createdIds.join(', '));
 }
 
 /* ============================ HÀNH ĐỘNG QUY TRÌNH (v3) ============================ */
@@ -1627,7 +1734,7 @@ function nextActions(t){
 }
 function actionAllowed(a,t){
   if(a.cap==='create') return can('create');
-  if(a.cap==='accept'){ return can('edit')||can('users')||(t&&ME&&(t.createdBy===ME.username||String(t.nguoiYC||'').trim()===String(ME.name||'').trim())); }
+  if(a.cap==='accept'){ return canAccept(t); }
   return can(a.cap);
 }
 function doAction(id, idx){
