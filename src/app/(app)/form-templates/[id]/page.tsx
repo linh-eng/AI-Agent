@@ -16,6 +16,7 @@ import { FormRenderer } from "@/components/form-renderer";
 import {
   FIELD_TYPES,
   FIELD_TYPE_LABEL,
+  CALC_OP_LABEL,
   newField,
   newSection,
   newGroup,
@@ -26,6 +27,7 @@ import {
   type FormField,
   type FieldType,
   type LogicRule,
+  type CalcOp,
 } from "@/lib/form-builder";
 
 const STATUSES = ["DRAFT", "REVIEW", "APPROVED", "ACTIVE", "ARCHIVED"];
@@ -303,13 +305,25 @@ function FieldProperties({ field, onChange, disabled, allFields }: { field: Form
           {!disabled && <Button size="sm" variant="ghost" onClick={() => onChange({ options: [...(field.options ?? []), { label: "Lựa chọn", value: "opt" + ((field.options?.length ?? 0) + 1) }] })}><Plus className="h-4 w-4" /> Lựa chọn</Button>}
         </div>
       )}
+      {(field.type === "TABLE" || field.type === "REPEATING_GROUP") && (
+        <div className="space-y-1.5">
+          <Label>Cột / trường con</Label>
+          {(field.columns ?? []).map((col, i) => (
+            <div key={i} className="flex gap-1">
+              <Input className="h-8" value={col} disabled={disabled} onChange={(e) => { const cols = [...(field.columns ?? [])]; cols[i] = e.target.value; onChange({ columns: cols }); }} />
+              {!disabled && <Button size="icon" variant="ghost" onClick={() => onChange({ columns: (field.columns ?? []).filter((_, j) => j !== i) })}><Trash2 className="h-4 w-4" /></Button>}
+            </div>
+          ))}
+          {!disabled && <Button size="sm" variant="ghost" onClick={() => onChange({ columns: [...(field.columns ?? []), `Cột ${(field.columns?.length ?? 0) + 1}`] })}><Plus className="h-4 w-4" /> Cột</Button>}
+        </div>
+      )}
       {field.type === "CALCULATED" && (
         <div className="space-y-1.5">
           <Label>Công thức</Label>
-          <Select value={field.calc?.op ?? "sum"} disabled={disabled} onChange={(e) => onChange({ calc: { op: e.target.value as any, fields: field.calc?.fields ?? [] } })}>
-            <option value="sum">Tổng</option><option value="product">Tích</option><option value="avg">Trung bình</option>
+          <Select value={field.calc?.op ?? "sum"} disabled={disabled} onChange={(e) => onChange({ calc: { op: e.target.value as CalcOp, fields: field.calc?.fields ?? [] } })}>
+            {(Object.entries(CALC_OP_LABEL) as [CalcOp, string][]).map(([op, label]) => <option key={op} value={op}>{label}</option>)}
           </Select>
-          <p className="text-xs text-muted-foreground">Chọn các trường số:</p>
+          <p className="text-xs text-muted-foreground">Chọn các trường số (theo thứ tự cho phép trừ/chia):</p>
           <div className="flex flex-wrap gap-1">
             {allFields.filter((f) => ["NUMBER", "CURRENCY", "PERCENTAGE", "SLIDER", "RATING"].includes(f.type) && f.id !== field.id).map((f) => {
               const on = field.calc?.fields.includes(f.id);

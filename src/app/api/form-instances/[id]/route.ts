@@ -20,11 +20,16 @@ export const GET = handle(async (_req, { params }) => {
 });
 
 export const PATCH = handle(async (req, { params }) => {
-  await requirePermission(PERMISSIONS.TREATMENT_WRITE);
+  const session = await requirePermission(PERMISSIONS.TREATMENT_WRITE);
   const parsed = formInstanceUpdateSchema.parse(await req.json());
   const data: Record<string, unknown> = {};
   if (parsed.name !== undefined) data.name = parsed.name;
   if (parsed.data !== undefined) data.data = parsed.data as any;
+  if (parsed.complete) {
+    data.status = "COMPLETED";
+    data.completedBy = session.name;
+    data.completedAt = new Date();
+  }
   const instance = await prisma.formInstance.update({ where: { id: params.id }, data });
   return ok(instance);
 });

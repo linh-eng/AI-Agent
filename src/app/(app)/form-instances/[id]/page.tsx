@@ -2,10 +2,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, CheckCircle2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/client";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
@@ -19,6 +20,8 @@ interface Instance {
   schemaSnapshot: FormSchema;
   data?: Record<string, any> | null;
   customerId?: string | null;
+  status?: string;
+  completedBy?: string | null;
   template: { name: string; code: string };
   customer?: { code: string; fullName: string } | null;
 }
@@ -43,11 +46,12 @@ export default function FormInstancePage() {
   }, [id]);
   useEffect(() => { load(); }, [load]);
 
-  async function save() {
+  async function save(complete = false) {
     setSaving(true); setError(null); setSaved(false);
     try {
-      await apiFetch(`/api/form-instances/${id}`, { method: "PATCH", body: JSON.stringify({ data: values }) });
+      await apiFetch(`/api/form-instances/${id}`, { method: "PATCH", body: JSON.stringify({ data: values, complete }) });
       setSaved(true);
+      if (complete) load();
     } catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); }
     finally { setSaving(false); }
   }
@@ -56,6 +60,7 @@ export default function FormInstancePage() {
   if (!inst) return <p className="text-destructive">Không tìm thấy phiếu.</p>;
 
   const schema = inst.schemaSnapshot?.sections ? inst.schemaSnapshot : emptySchema();
+  const done = inst.status === "COMPLETED";
 
   return (
     <div>
@@ -67,13 +72,20 @@ export default function FormInstancePage() {
       <PageHeader
         title={inst.name ?? inst.template.name}
         description={`${inst.template.code} · phiên bản mẫu v${inst.templateVersion}${inst.customer ? " · " + inst.customer.fullName : ""}`}
-        action={canWrite && <Button onClick={save} disabled={saving}><Save className="h-4 w-4" /> {saving ? "Đang lưu..." : "Lưu phiếu"}</Button>}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={done ? "success" : "muted"}>{done ? "Đã hoàn thành" : "Đang điền"}</Badge>
+            {canWrite && !done && <Button variant="outline" onClick={() => save(false)} disabled={saving}><Save className="h-4 w-4" /> {saving ? "..." : "Lưu"}</Button>}
+            {canWrite && !done && <Button onClick={() => save(true)} disabled={saving}><CheckCircle2 className="h-4 w-4" /> Hoàn thành</Button>}
+          </div>
+        }
       />
       {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
       {saved && <p className="mb-3 text-sm text-emerald-600">Đã lưu.</p>}
+      {done && <p className="mb-3 text-sm text-muted-foreground">Phiếu đã hoàn thành{inst.completedBy ? ` bởi ${inst.completedBy}` : ""} — lưu bất biến làm hồ sơ lịch sử.</p>}
       <Card>
         <CardContent className="p-5">
-          <FormRenderer schema={schema} values={values} onChange={setValues} disabled={!canWrite} />
+          <FormRenderer schema={schema} values={values} onChange={setValues} disabled={!canWrite || done} />
         </CardContent>
       </Card>
     </div>

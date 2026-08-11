@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Input, Label, Select, Checkbox } from "@/components/ui/input";
 import { apiFetch } from "@/lib/client";
 import {
@@ -100,7 +100,7 @@ export function FormRenderer({
         control = <Input placeholder="URL (ảnh/video/tệp)" value={val} disabled={disabled} onChange={(e) => set(f.id, e.target.value)} />;
         break;
       case "SIGNATURE":
-        control = <Input placeholder="Ký (nhập họ tên xác nhận)" value={val} disabled={disabled} onChange={(e) => set(f.id, e.target.value)} />;
+        control = <SignatureField value={values[f.id]} disabled={disabled} onChange={(v) => set(f.id, v)} />;
         break;
       case "SERVICE": case "TECHNOLOGY": case "PRODUCT": case "MATERIAL":
         control = <Select value={val} disabled={disabled} onChange={(e) => set(f.id, e.target.value)}><option value="">—</option>{(entityOpts[f.type] ?? []).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</Select>;
@@ -112,7 +112,7 @@ export function FormRenderer({
         control = <Select value={val} disabled={disabled} onChange={(e) => set(f.id, e.target.value)}><option value="">—</option>{(f.options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</Select>;
         break;
       case "TABLE": case "REPEATING_GROUP":
-        control = <textarea className="min-h-[70px] w-full rounded-md border border-input bg-card px-3 py-2 font-mono text-xs" placeholder="Mỗi dòng một bản ghi" value={val} disabled={disabled} onChange={(e) => set(f.id, e.target.value)} />;
+        control = <TableField columns={f.columns && f.columns.length ? f.columns : ["Cột 1"]} rows={Array.isArray(values[f.id]) ? values[f.id] : []} disabled={disabled} onChange={(rows) => set(f.id, rows)} />;
         break;
       case "CALCULATED": {
         const computed = computeCalc(f, values);
@@ -155,6 +155,130 @@ export function FormRenderer({
           ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Bảng/nhóm lặp: thêm–xóa dòng, mỗi cột lưu giá trị có cấu trúc. */
+function TableField({
+  columns,
+  rows,
+  onChange,
+  disabled,
+}: {
+  columns: string[];
+  rows: Record<string, any>[];
+  onChange: (rows: Record<string, any>[]) => void;
+  disabled?: boolean;
+}) {
+  const addRow = () => onChange([...rows, Object.fromEntries(columns.map((c) => [c, ""]))]);
+  const setCell = (ri: number, col: string, v: string) =>
+    onChange(rows.map((r, i) => (i === ri ? { ...r, [col]: v } : r)));
+  return (
+    <div className="space-y-2">
+      <div className="overflow-x-auto rounded-md border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr>
+              {columns.map((c) => <th key={c} className="px-2 py-1.5 text-left font-medium text-muted-foreground">{c}</th>)}
+              {!disabled && <th className="w-8" />}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && <tr><td colSpan={columns.length + 1} className="px-2 py-2 text-center text-xs text-muted-foreground">Chưa có dòng</td></tr>}
+            {rows.map((r, ri) => (
+              <tr key={ri} className="border-t">
+                {columns.map((c) => (
+                  <td key={c} className="px-1 py-1">
+                    <input className="h-8 w-full rounded border border-input bg-card px-2 text-sm" value={r[c] ?? ""} disabled={disabled} onChange={(e) => setCell(ri, c, e.target.value)} />
+                  </td>
+                ))}
+                {!disabled && <td className="px-1 text-center"><button type="button" onClick={() => onChange(rows.filter((_, i) => i !== ri))} className="text-muted-foreground hover:text-destructive">×</button></td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!disabled && <button type="button" onClick={addRow} className="rounded border px-2 py-1 text-xs hover:bg-accent">+ Thêm dòng</button>}
+    </div>
+  );
+}
+
+/** Ký điện tử: canvas vẽ chữ ký -> lưu {dataUrl, signedBy, signedAt}. */
+function SignatureField({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: any;
+  onChange: (v: any) => void;
+  disabled?: boolean;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const drawing = useRef(false);
+  const sig = value && typeof value === "object" ? value : {};
+
+  function pos(e: React.PointerEvent) {
+    const c = canvasRef.current!;
+    const rect = c.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+  function start(e: React.PointerEvent) {
+    if (disabled) return;
+    drawing.current = true;
+    const ctx = canvasRef.current!.getContext("2d")!;
+    const { x, y } = pos(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  }
+  function move(e: React.PointerEvent) {
+    if (!drawing.current || disabled) return;
+    const ctx = canvasRef.current!.getContext("2d")!;
+    const { x, y } = pos(e);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  function end() {
+    if (!drawing.current) return;
+    drawing.current = false;
+    const dataUrl = canvasRef.current!.toDataURL("image/png");
+    onChange({ ...sig, dataUrl, signedAt: sig.signedAt || new Date().toISOString() });
+  }
+  function clear() {
+    const c = canvasRef.current!;
+    c.getContext("2d")!.clearRect(0, 0, c.width, c.height);
+    onChange({ ...sig, dataUrl: "" });
+  }
+
+  // vẽ lại chữ ký đã lưu khi mở lại
+  useEffect(() => {
+    if (sig.dataUrl && canvasRef.current) {
+      const img = new Image();
+      img.onload = () => canvasRef.current?.getContext("2d")?.drawImage(img, 0, 0);
+      img.src = sig.dataUrl;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="space-y-1.5">
+      <canvas
+        ref={canvasRef}
+        width={360}
+        height={120}
+        onPointerDown={start}
+        onPointerMove={move}
+        onPointerUp={end}
+        onPointerLeave={end}
+        className="w-full max-w-sm touch-none rounded-md border bg-white"
+      />
+      <div className="flex items-center gap-2">
+        <Input className="h-8 max-w-[200px]" placeholder="Họ tên người ký" value={sig.signedBy ?? ""} disabled={disabled} onChange={(e) => onChange({ ...sig, signedBy: e.target.value })} />
+        {!disabled && <button type="button" onClick={clear} className="rounded border px-2 py-1 text-xs hover:bg-accent">Xóa ký</button>}
+        {sig.signedAt && <span className="text-xs text-muted-foreground">Ký lúc {new Date(sig.signedAt).toLocaleString("vi-VN")}</span>}
+      </div>
     </div>
   );
 }

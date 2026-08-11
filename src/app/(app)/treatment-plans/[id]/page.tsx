@@ -52,6 +52,9 @@ export default function TreatmentPlanDetailPage() {
   const [record, setRecord] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [formsFor, setFormsFor] = useState<any | null>(null);
+  const [sessionForms, setSessionForms] = useState<any[]>([]);
+  const [formTemplates, setFormTemplates] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,7 +65,21 @@ export default function TreatmentPlanDetailPage() {
     apiFetch<Opt[]>("/api/services").then(setServices).catch(() => {});
     apiFetch<Opt[]>("/api/technologies").then(setTechnologies).catch(() => {});
     apiFetch<Opt[]>("/api/brand-protocols").then(setProtocols).catch(() => {});
+    apiFetch<any[]>("/api/form-templates").then(setFormTemplates).catch(() => {});
   }, [load]);
+
+  async function openForms(s: any) {
+    setFormsFor(s);
+    setSessionForms(await apiFetch<any[]>(`/api/form-instances?sessionId=${s.id}`).catch(() => []));
+  }
+  async function attachForm(templateId: string) {
+    if (!formsFor || !p) return;
+    await apiFetch("/api/form-instances", {
+      method: "POST",
+      body: JSON.stringify({ templateId, sessionId: formsFor.id, customerId: (p as any).customerId, planId: id }),
+    }).catch(() => {});
+    setSessionForms(await apiFetch<any[]>(`/api/form-instances?sessionId=${formsFor.id}`).catch(() => []));
+  }
 
   // Kéo–thả sắp xếp buổi -> lưu orderIndex
   async function reorder(fromId: string, toId: string) {
@@ -181,7 +198,12 @@ export default function TreatmentPlanDetailPage() {
                     <TD>{s.performedAt ? formatDate(s.performedAt) : "—"}</TD>
                     {p.canSeeFinance && <TD className="text-right text-muted-foreground">{s.actualCost != null ? formatNumber(Number(s.actualCost)) + " ₫" : "—"}</TD>}
                     <TD><Badge tone={SESSION_STATUS_TONE[s.status]}>{SESSION_STATUS_LABEL[s.status]}</Badge></TD>
-                    <TD>{canWrite && <Button size="sm" variant="outline" onClick={() => setRecord(s)}>Ghi nhận</Button>}</TD>
+                    <TD>
+                      <div className="flex gap-1">
+                        {canWrite && <Button size="sm" variant="outline" onClick={() => setRecord(s)}>Ghi nhận</Button>}
+                        <Button size="sm" variant="ghost" onClick={() => openForms(s)}>Phiếu</Button>
+                      </div>
+                    </TD>
                   </TR>
                 ))
               )}
@@ -209,6 +231,40 @@ export default function TreatmentPlanDetailPage() {
           } catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); }
         }}
       />
+
+      {/* Biểu mẫu/protocol của buổi (mục 7) */}
+      {formsFor && (
+        <Modal open onClose={() => setFormsFor(null)} title={`Biểu mẫu buổi #${formsFor.sessionNumber}`}>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              {sessionForms.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Chưa có phiếu nào cho buổi này.</p>
+              ) : (
+                sessionForms.map((fm) => (
+                  <div key={fm.id} className="flex items-center justify-between rounded border p-2 text-sm">
+                    <div>
+                      <div className="font-medium">{fm.name ?? fm.template?.name}</div>
+                      <div className="text-xs text-muted-foreground">{fm.template?.code} · {fm.status === "COMPLETED" ? "Đã hoàn thành" : "Đang điền"}</div>
+                    </div>
+                    <Link href={`/form-instances/${fm.id}`} className="text-primary hover:underline">Mở / điền</Link>
+                  </div>
+                ))
+              )}
+            </div>
+            {canWrite && (
+              <div className="space-y-1.5 border-t pt-3">
+                <Label>Gắn biểu mẫu (mẫu đã duyệt/đang dùng)</Label>
+                <Select defaultValue="" onChange={(e) => { if (e.target.value) { attachForm(e.target.value); e.target.value = ""; } }}>
+                  <option value="">— Chọn mẫu để gắn vào buổi —</option>
+                  {formTemplates.filter((t) => t.status === "ACTIVE" || t.status === "APPROVED").map((t) => <option key={t.id} value={t.id}>{t.name} (v{t.version})</option>)}
+                </Select>
+                <p className="text-xs text-muted-foreground">Phiếu được snapshot theo phiên bản mẫu tại thời điểm gắn — sửa mẫu về sau không ảnh hưởng.</p>
+              </div>
+            )}
+            <div className="flex justify-end"><Button variant="outline" onClick={() => setFormsFor(null)}>Đóng</Button></div>
+          </div>
+        </Modal>
+      )}
 
       {/* Ghi nhận buổi */}
       {record && (

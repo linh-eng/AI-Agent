@@ -167,4 +167,5 @@ export const formInstanceCreateSchema = z.object({
 export const formInstanceUpdateSchema = z.object({
   name: z.string().optional().nullable(),
   data: jsonOpt,
+  complete: z.boolean().optional(), // đánh dấu hoàn thành phiếu (mục 7)
 });

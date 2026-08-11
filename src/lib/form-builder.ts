@@ -88,10 +88,29 @@ export interface FieldOption {
   value: string;
 }
 
+export type CalcOp =
+  | "sum"
+  | "avg"
+  | "add"
+  | "subtract"
+  | "multiply"
+  | "divide"
+  | "percentage";
+
 export interface CalcConfig {
-  op: "sum" | "avg" | "product";
-  fields: string[]; // id các field số tham chiếu
+  op: CalcOp;
+  fields: string[]; // id các field số tham chiếu (theo thứ tự chọn)
 }
+
+export const CALC_OP_LABEL: Record<CalcOp, string> = {
+  sum: "Tổng (Σ)",
+  avg: "Trung bình",
+  add: "Cộng (a+b+…)",
+  subtract: "Trừ (a−b−…)",
+  multiply: "Nhân (a×b×…)",
+  divide: "Chia (a÷b)",
+  percentage: "Phần trăm (a÷b×100)",
+};
 
 export interface FormField {
   id: string;
@@ -232,15 +251,36 @@ export function evaluateLogic(schema: FormSchema, values: Record<string, any>): 
   return { hidden, required };
 }
 
-/** Tính giá trị field CALCULATED từ các field số tham chiếu. */
+/**
+ * Tính giá trị field CALCULATED — engine AN TOÀN (KHÔNG dùng eval).
+ * Hỗ trợ: sum, avg, add, subtract, multiply, divide, percentage.
+ */
 export function computeCalc(field: FormField, values: Record<string, any>): number {
   const cfg = field.calc;
   if (!cfg || !cfg.fields.length) return 0;
   const nums = cfg.fields.map((id) => toNumber(values[id]));
-  if (cfg.op === "sum") return nums.reduce((a, b) => a + b, 0);
-  if (cfg.op === "product") return nums.reduce((a, b) => a * b, 1);
-  if (cfg.op === "avg") return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
-  return 0;
+  const round2 = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
+  switch (cfg.op) {
+    case "sum":
+    case "add":
+      return round2(nums.reduce((a, b) => a + b, 0));
+    case "avg":
+      return round2(nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0);
+    case "multiply":
+      return round2(nums.reduce((a, b) => a * b, 1));
+    case "subtract":
+      return round2(nums.slice(1).reduce((a, b) => a - b, nums[0] ?? 0));
+    case "divide": {
+      const [a, b] = nums;
+      return b ? round2(a / b) : 0;
+    }
+    case "percentage": {
+      const [a, b] = nums;
+      return b ? round2((a / b) * 100) : 0;
+    }
+    default:
+      return 0;
+  }
 }
 
 /** Danh sách tab (unique) theo thứ tự xuất hiện; section không tab -> "Chung". */
