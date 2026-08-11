@@ -103,6 +103,7 @@ async function main() {
     { code: "MP", name: "Mỹ phẩm & Skincare" },
     { code: "TPCN", name: "Thực phẩm chức năng" },
     { code: "VT", name: "Vật tư tiêu hao spa" },
+    { code: "TD", name: "Hàng tiêu dùng (tinh dầu, nến…)" },
     { code: "TB", name: "Thiết bị & máy spa" },
   ];
   const cats: Record<string, string> = {};
@@ -115,17 +116,27 @@ async function main() {
     cats[c.code] = cat.id;
   }
 
+  // ---- Thương hiệu ----
+  const brandData = ["Dermalogica", "DMK", "Klapp", "Sophia Wellness"];
+  for (const name of brandData) {
+    await prisma.brand.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+  }
+
   // ---- Nhà cung cấp ----
   const supData = [
-    { code: "NCC-COSMEDIX", name: "Cosmedix Việt Nam", phone: "0901234567" },
-    { code: "NCC-WELLNUTRI", name: "WellNutri Supplements", phone: "0912345678" },
-    { code: "NCC-SPAPRO", name: "SpaPro Thiết bị", phone: "0923456789" },
+    { code: "NCC-COSMEDIX", name: "Cosmedix Việt Nam", contactPerson: "Chị Lan", phone: "0901234567" },
+    { code: "NCC-WELLNUTRI", name: "WellNutri Supplements", contactPerson: "Anh Minh", phone: "0912345678" },
+    { code: "NCC-SPAPRO", name: "SpaPro Thiết bị", contactPerson: "Anh Tuấn", phone: "0923456789" },
   ];
   const sups: Record<string, string> = {};
   for (const s of supData) {
     const sup = await prisma.supplier.upsert({
       where: { code: s.code },
-      update: { name: s.name },
+      update: { name: s.name, contactPerson: s.contactPerson },
       create: s,
     });
     sups[s.code] = sup.id;

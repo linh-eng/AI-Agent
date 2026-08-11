@@ -19,6 +19,10 @@ interface Category {
   id: string;
   name: string;
 }
+interface Brand {
+  id: string;
+  name: string;
+}
 interface Row {
   id: string;
   sku: string;
@@ -28,6 +32,7 @@ interface Row {
   category?: Category | null;
   trackingMode: Mode;
   requiresExpiry: boolean;
+  isTester?: boolean;
   uom: string;
   minStock?: number | null;
 }
@@ -40,6 +45,7 @@ const EMPTY = {
   categoryId: "",
   trackingMode: "LOT" as Mode,
   requiresExpiry: true,
+  isTester: false,
   uom: "Cái",
   minStock: "",
   expiryAlertDays: "",
@@ -49,6 +55,7 @@ export default function ProductsPage() {
   const canWrite = useCan(PERMISSIONS.PRODUCT_WRITE);
   const [rows, setRows] = useState<Row[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +73,7 @@ export default function ProductsPage() {
   useEffect(() => {
     load();
     apiFetch<Category[]>("/api/categories").then(setCategories).catch(() => {});
+    apiFetch<Brand[]>("/api/brands").then(setBrands).catch(() => {});
   }, []);
 
   async function create(e: React.FormEvent) {
@@ -82,6 +90,7 @@ export default function ProductsPage() {
           categoryId: form.categoryId || null,
           trackingMode: form.trackingMode,
           requiresExpiry: form.trackingMode === "LOT" ? form.requiresExpiry : false,
+          isTester: form.isTester,
           uom: form.uom,
           minStock: form.minStock ? Number(form.minStock) : null,
           expiryAlertDays: form.expiryAlertDays ? Number(form.expiryAlertDays) : null,
@@ -153,7 +162,10 @@ export default function ProductsPage() {
                   <TR key={p.id}>
                     <TD className="font-mono text-xs font-medium">{p.sku}</TD>
                     <TD>
-                      <div className="font-medium">{p.name}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{p.name}</span>
+                        {p.isTester && <Badge tone="warning">Hàng test</Badge>}
+                      </div>
                       {p.brand && <div className="text-xs text-muted-foreground">{p.brand}</div>}
                     </TD>
                     <TD className="text-muted-foreground">{p.category?.name ?? "—"}</TD>
@@ -192,7 +204,14 @@ export default function ProductsPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Thương hiệu</Label>
-              <Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+              <Select value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })}>
+                <option value="">— Chọn thương hiệu —</option>
+                {brands.map((b) => (
+                  <option key={b.id} value={b.name}>
+                    {b.name}
+                  </option>
+                ))}
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Nhóm hàng</Label>
@@ -230,6 +249,13 @@ export default function ProductsPage() {
               />
             </div>
           </div>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={form.isTester}
+              onChange={(e) => setForm({ ...form, isTester: e.target.checked })}
+            />
+            Hàng test / tester (dùng thử, không bán)
+          </label>
           {form.trackingMode === "LOT" && (
             <div className="grid grid-cols-2 items-end gap-3">
               <label className="flex items-center gap-2 pb-2 text-sm">

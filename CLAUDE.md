@@ -13,8 +13,9 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
 ## Trạng thái hiện tại — **MVP + Phase 2 + Phase 3**
 
 - **Auth + RBAC:** JWT cookie httpOnly + bcrypt; 4 vai trò (ADMIN, MANAGER, WAREHOUSE, STAFF).
-- **Danh mục:** sản phẩm (chế độ `LOT`/`QUANTITY`, cờ `requiresExpiry`, định mức tồn, ngưỡng cảnh báo HSD),
-  nhóm hàng, nhà cung cấp, kho.
+- **Danh mục:** sản phẩm (chế độ `LOT`/`QUANTITY`, cờ `requiresExpiry`, cờ `isTester` = hàng test/tester,
+  định mức tồn, ngưỡng cảnh báo HSD; **thương hiệu chọn từ danh mục** `Brand`), nhóm hàng, **thương hiệu**
+  (`Brand`: Dermalogica, DMK, Klapp, Sophia Wellness…), nhà cung cấp (có **người liên hệ** `contactPerson`), kho.
 - **Nhập kho:** phiếu nhập theo NCC + kho, nhiều dòng (mã lô, HSD, ngày SX, SL, giá vốn). Ghi sổ ngay:
   sinh/cộng `StockBatch` + `StockMovement` (INBOUND). Ràng buộc: sản phẩm `LOT` phải có mã lô; nếu
   `requiresExpiry` thì bắt buộc HSD.

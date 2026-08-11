@@ -16,10 +16,17 @@ export const categoryCreateSchema = z.object({
   note: optionalString,
 });
 
+// ----- Thương hiệu -----
+export const brandCreateSchema = z.object({
+  name: z.string().trim().min(1, "Bắt buộc").max(120),
+  note: optionalString,
+});
+
 // ----- Nhà cung cấp -----
 export const supplierCreateSchema = z.object({
   code: z.string().trim().min(1, "Bắt buộc").max(30),
   name: z.string().trim().min(1, "Bắt buộc").max(160),
+  contactPerson: optionalString,
   phone: optionalString,
   email: z
     .string()
@@ -49,6 +56,7 @@ export const productCreateSchema = z.object({
   categoryId: optionalString,
   trackingMode: z.enum(["LOT", "QUANTITY"]).default("LOT"),
   requiresExpiry: z.boolean().default(false),
+  isTester: z.boolean().default(false),
   uom: z.string().trim().min(1).max(20).default("Cái"),
   minStock: z.number().nonnegative().nullable().optional(),
   expiryAlertDays: z.number().int().positive().max(3650).nullable().optional(),

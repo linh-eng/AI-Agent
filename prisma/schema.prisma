@@ -101,16 +101,17 @@ model Warehouse {
 }
 
 model Supplier {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  name      String
-  phone     String?
-  email     String?
-  address   String?
-  taxCode   String?  @map("tax_code")
-  note      String?
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  contactPerson String?  @map("contact_person") // người liên hệ
+  phone         String?
+  email         String?
+  address       String?
+  taxCode       String?  @map("tax_code")
+  note          String?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   receipts GoodsReceipt[]
   batches  StockBatch[]
@@ -129,6 +130,16 @@ model Category {
   products  Product[]
 
   @@map("categories")
+}
+
+// Thương hiệu (chọn từ danh sách khi khai báo sản phẩm)
+model Brand {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("brands")
 }
 
 // Chế độ quản lý tồn:
@@ -152,6 +163,7 @@ model Product {
   requiresExpiry  Boolean      @default(false) @map("requires_expiry")
   uom             String       @default("Cái") // đơn vị tính
   minStock        Float?       @map("min_stock") // định mức tồn tối thiểu
+  isTester        Boolean      @default(false) @map("is_tester") // hàng test/tester
   // Số ngày trước HSD bắt đầu cảnh báo; null = dùng mặc định hệ thống (60).
   expiryAlertDays Int?         @map("expiry_alert_days")
   note            String?

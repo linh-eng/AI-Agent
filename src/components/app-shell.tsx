@@ -13,6 +13,7 @@ import {
   Bell,
   Package,
   Tags,
+  Award,
   Truck,
   Warehouse,
   HeartPulse,
@@ -60,6 +61,7 @@ const NAV = [
     items: [
       { href: "/products", label: "Sản phẩm", icon: Package },
       { href: "/categories", label: "Nhóm hàng", icon: Tags },
+      { href: "/brands", label: "Thương hiệu", icon: Award },
       { href: "/suppliers", label: "Nhà cung cấp", icon: Truck },
       { href: "/warehouses", label: "Kho", icon: Warehouse },
     ],

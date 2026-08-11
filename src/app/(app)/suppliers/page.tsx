@@ -15,13 +15,14 @@ interface Row {
   id: string;
   code: string;
   name: string;
+  contactPerson?: string | null;
   phone?: string | null;
   email?: string | null;
   address?: string | null;
   taxCode?: string | null;
 }
 
-const EMPTY = { code: "", name: "", phone: "", email: "", address: "", taxCode: "", note: "" };
+const EMPTY = { code: "", name: "", contactPerson: "", phone: "", email: "", address: "", taxCode: "", note: "" };
 
 export default function SuppliersPage() {
   const canWrite = useCan(PERMISSIONS.SUPPLIER_WRITE);
@@ -76,9 +77,9 @@ export default function SuppliersPage() {
               <TR>
                 <TH>Mã</TH>
                 <TH>Tên</TH>
+                <TH>Người liên hệ</TH>
                 <TH>Điện thoại</TH>
                 <TH>Email</TH>
-                <TH>Địa chỉ</TH>
               </TR>
             </THead>
             <TBody>
@@ -99,9 +100,9 @@ export default function SuppliersPage() {
                   <TR key={r.id}>
                     <TD className="font-mono font-medium">{r.code}</TD>
                     <TD>{r.name}</TD>
+                    <TD className="text-muted-foreground">{r.contactPerson ?? "—"}</TD>
                     <TD className="text-muted-foreground">{r.phone ?? "—"}</TD>
                     <TD className="text-muted-foreground">{r.email ?? "—"}</TD>
-                    <TD className="text-muted-foreground">{r.address ?? "—"}</TD>
                   </TR>
                 ))
               )}
@@ -125,6 +126,14 @@ export default function SuppliersPage() {
           <div className="space-y-1.5">
             <Label>Tên NCC *</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Người liên hệ</Label>
+            <Input
+              value={form.contactPerson}
+              onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
+              placeholder="Tên người phụ trách bên NCC"
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
