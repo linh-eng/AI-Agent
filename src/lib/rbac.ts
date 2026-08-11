@@ -98,6 +98,17 @@ export const PERMISSIONS = {
   FORM_WRITE: "form.write", // thiết kế biểu mẫu (protocol/form builder)
   CATALOG_WRITE: "catalog.write", // product catalog (SpaProduct)
   RECOMMEND_WRITE: "recommend.write", // đề xuất sản phẩm cho khách
+
+  // --- Module 5–10 ---
+  PROPOSAL_READ: "proposal.read",
+  PROPOSAL_WRITE: "proposal.write", // lập/sửa phương án báo giá
+  PROPOSAL_ACCEPT: "proposal.accept", // ghi nhận khách chốt phương án
+  CARE_WRITE: "care.write", // thư viện + gửi hướng dẫn pre/post-care
+  MATERIAL_WRITE: "material.write", // yêu cầu/xuất/tiêu hao vật tư buổi
+  PRICE_READ: "price.read",
+  PRICE_WRITE: "price.write", // quản lý bảng giá có version
+  MARKETING_READ: "marketing.read",
+  MARKETING_WRITE: "marketing.write", // chiến dịch/lead/ROI
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -120,6 +131,8 @@ const CLINIC_READ: PermissionCode[] = [
   PERMISSIONS.BOOKING_READ,
   PERMISSIONS.TREATMENT_READ,
   PERMISSIONS.LIBRARY_READ,
+  PERMISSIONS.PROPOSAL_READ,
+  PERMISSIONS.PRICE_READ,
 ];
 
 /**
@@ -140,6 +153,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.FINANCE_READ,
     PERMISSIONS.PROTOCOL_APPROVE,
+    PERMISSIONS.MARKETING_READ,
   ],
 
   // Mua hàng: tạo PO/đề nghị nhập
@@ -198,9 +212,16 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.FORM_WRITE,
     PERMISSIONS.CATALOG_WRITE,
     PERMISSIONS.RECOMMEND_WRITE,
+    PERMISSIONS.PROPOSAL_WRITE,
+    PERMISSIONS.PROPOSAL_ACCEPT,
+    PERMISSIONS.CARE_WRITE,
+    PERMISSIONS.MATERIAL_WRITE,
+    PERMISSIONS.PRICE_WRITE,
+    PERMISSIONS.MARKETING_READ,
+    PERMISSIONS.MARKETING_WRITE,
   ],
 
-  // Lễ tân: tạo khách, đặt lịch, nhận thanh toán
+  // Lễ tân: tạo khách, đặt lịch, nhận thanh toán, chốt phương án, gửi hướng dẫn
   RECEPTION: [
     ...CLINIC_READ,
     PERMISSIONS.CUSTOMER_WRITE,
@@ -209,6 +230,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.PAYMENT_WRITE,
     PERMISSIONS.TASK_WRITE,
+    PERMISSIONS.PROPOSAL_ACCEPT,
+    PERMISSIONS.CARE_WRITE,
   ],
 
   // CSKH: nhật ký chăm sóc, follow-up, task (không xem tài chính)
@@ -219,7 +242,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.TASK_WRITE,
   ],
 
-  // Chuyên viên: đánh giá, thiết kế phác đồ/protocol/biểu mẫu, đề xuất sản phẩm
+  // Chuyên viên: đánh giá, thiết kế phác đồ/protocol/biểu mẫu, đề xuất, phương án, vật tư
   SPECIALIST: [
     ...CLINIC_READ,
     PERMISSIONS.TREATMENT_WRITE,
@@ -229,23 +252,29 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.TECHNOLOGY_WRITE,
     PERMISSIONS.FORM_WRITE,
     PERMISSIONS.RECOMMEND_WRITE,
+    PERMISSIONS.PROPOSAL_WRITE,
+    PERMISSIONS.CARE_WRITE,
+    PERMISSIONS.MATERIAL_WRITE,
   ],
 
-  // Thu ngân / Kế toán: thanh toán, công nợ, xem dữ liệu tài chính
+  // Thu ngân / Kế toán: thanh toán, công nợ, tài chính, bảng giá
   CASHIER: [
     ...CLINIC_READ,
     PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.PAYMENT_WRITE,
     PERMISSIONS.FINANCE_READ,
+    PERMISSIONS.PRICE_WRITE,
   ],
 
-  // Marketing: chiến dịch, nguồn khách, catalog sản phẩm bán lẻ, báo cáo
+  // Marketing: chiến dịch, nguồn khách, catalog sản phẩm bán lẻ, ROI, báo cáo
   MARKETING: [
     ...CLINIC_READ,
     PERMISSIONS.CAMPAIGN_WRITE,
     PERMISSIONS.CUSTOMER_WRITE,
     PERMISSIONS.FINANCE_READ,
     PERMISSIONS.CATALOG_WRITE,
+    PERMISSIONS.MARKETING_READ,
+    PERMISSIONS.MARKETING_WRITE,
   ],
 };
 

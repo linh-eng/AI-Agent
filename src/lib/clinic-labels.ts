@@ -114,6 +114,9 @@ export const TIMELINE_KIND_LABEL: Record<string, string> = {
   plan: "Phác đồ",
   session: "Buổi",
   payment: "Thanh toán",
+  proposal: "Báo giá",
+  care: "Hướng dẫn",
+  recommendation: "Đề xuất SP",
 };
 
 export const TIMELINE_KIND_TONE: Record<string, Tone> = {
@@ -123,6 +126,9 @@ export const TIMELINE_KIND_TONE: Record<string, Tone> = {
   plan: "success",
   session: "default",
   payment: "success",
+  proposal: "warning",
+  care: "muted",
+  recommendation: "default",
 };
 
 // ----- Thư viện: Protocol/Form status, kind, product type, priority -----
@@ -158,4 +164,42 @@ export const RECOMMENDATION_PRIORITY_TONE: Record<string, Tone> = {
   ESSENTIAL: "danger",
   RECOMMENDED: "default",
   OPTIONAL: "muted",
+};
+
+// ----- Module 5–10 labels -----
+export const PROPOSAL_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Nháp", SENT: "Đã gửi", ACCEPTED: "Đã chốt", REJECTED: "Từ chối", EXPIRED: "Hết hạn",
+};
+export const PROPOSAL_STATUS_TONE: Record<string, Tone> = {
+  DRAFT: "muted", SENT: "warning", ACCEPTED: "success", REJECTED: "danger", EXPIRED: "muted",
+};
+export const PROPOSAL_KIND_LABEL: Record<string, string> = {
+  ESSENTIAL: "Thiết yếu", RECOMMENDED: "Khuyến nghị", PREMIUM: "Cao cấp", CUSTOM: "Tùy chỉnh",
+};
+export const PROPOSAL_ITEM_TYPE_LABEL: Record<string, string> = {
+  SERVICE: "Dịch vụ", TECHNOLOGY: "Công nghệ", BRAND_PROTOCOL: "Protocol", PRODUCT: "Sản phẩm", CUSTOM: "Khác",
+};
+export const CARE_KIND_LABEL: Record<string, string> = {
+  PRE_CARE: "Trước dịch vụ", POST_CARE: "Sau dịch vụ", GENERAL: "Chung", FOLLOW_UP: "Theo dõi",
+};
+export const CARE_KIND_TONE: Record<string, Tone> = {
+  PRE_CARE: "warning", POST_CARE: "success", GENERAL: "muted", FOLLOW_UP: "default",
+};
+export const DELIVERY_CHANNEL_LABEL: Record<string, string> = {
+  IN_PERSON: "Trực tiếp", PORTAL: "Portal", EMAIL: "Email", ZALO: "Zalo", WHATSAPP: "WhatsApp", SMS: "SMS",
+};
+export const PRICE_TYPE_LABEL: Record<string, string> = {
+  STANDARD: "Niêm yết", BRANCH: "Chi nhánh", MEMBER: "Thành viên", VIP: "VIP", CAMPAIGN: "Khuyến mãi", CUSTOM: "Đặc biệt",
+};
+export const PRICE_TARGET_LABEL: Record<string, string> = {
+  SERVICE: "Dịch vụ", PRODUCT: "Sản phẩm", TECHNOLOGY: "Công nghệ", PACKAGE: "Gói",
+};
+export const LEAD_STATUS_LABEL: Record<string, string> = {
+  NEW: "Mới", CONTACTED: "Đã liên hệ", BOOKED: "Đã đặt lịch", WON: "Chuyển đổi", LOST: "Mất",
+};
+export const LEAD_STATUS_TONE: Record<string, Tone> = {
+  NEW: "muted", CONTACTED: "warning", BOOKED: "default", WON: "success", LOST: "danger",
+};
+export const MATERIAL_MOVEMENT_LABEL: Record<string, string> = {
+  REQUEST: "Yêu cầu", RESERVE: "Giữ hàng", ISSUE: "Xuất kho", CONSUME: "Tiêu hao", RETURN: "Hoàn trả", WASTE: "Hao hụt", DAMAGE: "Hư hỏng",
 };

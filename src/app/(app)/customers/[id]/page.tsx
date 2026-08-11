@@ -26,6 +26,9 @@ import {
   TIMELINE_KIND_TONE,
   RECOMMENDATION_PRIORITY_LABEL,
   RECOMMENDATION_PRIORITY_TONE,
+  CARE_KIND_LABEL,
+  CARE_KIND_TONE,
+  DELIVERY_CHANNEL_LABEL,
 } from "@/lib/clinic-labels";
 
 interface Customer {
@@ -53,7 +56,7 @@ interface Customer {
   canSeeFinance: boolean;
 }
 
-const TABS = ["timeline", "crm", "bookings", "plans", "assessments", "recommendations", "forms", "payments"] as const;
+const TABS = ["timeline", "crm", "bookings", "plans", "assessments", "recommendations", "forms", "care", "payments"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   timeline: "Timeline",
@@ -63,6 +66,7 @@ const TAB_LABEL: Record<Tab, string> = {
   assessments: "Đánh giá",
   recommendations: "Sản phẩm đề xuất",
   forms: "Biểu mẫu",
+  care: "Hướng dẫn",
   payments: "Thanh toán",
 };
 
@@ -73,16 +77,19 @@ export default function CustomerProfilePage() {
   const canPay = useCan(PERMISSIONS.PAYMENT_WRITE);
   const canTreat = useCan(PERMISSIONS.TREATMENT_WRITE);
   const canRecommend = useCan(PERMISSIONS.RECOMMEND_WRITE);
+  const canCare = useCan(PERMISSIONS.CARE_WRITE);
 
   const [c, setC] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("timeline");
-  const [modal, setModal] = useState<null | "crm" | "payment" | "assessment" | "recommend" | "applyForm">(null);
+  const [modal, setModal] = useState<null | "crm" | "payment" | "assessment" | "recommend" | "applyForm" | "care">(null);
   const [error, setError] = useState<string | null>(null);
   const [recs, setRecs] = useState<any[]>([]);
   const [forms, setForms] = useState<any[]>([]);
+  const [careItems, setCareItems] = useState<any[]>([]);
   const [spaProducts, setSpaProducts] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
+  const [careTemplates, setCareTemplates] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,6 +103,7 @@ export default function CustomerProfilePage() {
   const loadSecondary = useCallback(async () => {
     apiFetch<any[]>(`/api/product-recommendations?customerId=${id}`).then(setRecs).catch(() => {});
     apiFetch<any[]>(`/api/form-instances?customerId=${id}`).then(setForms).catch(() => {});
+    apiFetch<any[]>(`/api/care-instances?customerId=${id}`).then(setCareItems).catch(() => {});
   }, [id]);
 
   useEffect(() => {
@@ -103,6 +111,7 @@ export default function CustomerProfilePage() {
     loadSecondary();
     apiFetch<any[]>("/api/spa-products").then(setSpaProducts).catch(() => {});
     apiFetch<any[]>("/api/form-templates").then(setTemplates).catch(() => {});
+    apiFetch<any[]>("/api/care-instructions").then(setCareTemplates).catch(() => {});
   }, [load, loadSecondary]);
 
   async function submit(url: string, body: unknown) {
@@ -153,6 +162,11 @@ export default function CustomerProfilePage() {
             {canTreat && (
               <Button variant="outline" onClick={() => setModal("applyForm")}>
                 <Plus className="h-4 w-4" /> Áp biểu mẫu
+              </Button>
+            )}
+            {canCare && (
+              <Button variant="outline" onClick={() => setModal("care")}>
+                <Plus className="h-4 w-4" /> Gửi hướng dẫn
               </Button>
             )}
           </div>
@@ -406,6 +420,33 @@ export default function CustomerProfilePage() {
         </Card>
       )}
 
+      {tab === "care" && (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <THead>
+                <TR><TH>Loại</TH><TH>Tiêu đề</TH><TH>Kênh gửi</TH><TH>Đã gửi</TH><TH>Người gửi</TH></TR>
+              </THead>
+              <TBody>
+                {careItems.length === 0 ? (
+                  <TR><TD colSpan={5} className="py-6 text-center text-muted-foreground">Chưa gửi hướng dẫn nào</TD></TR>
+                ) : (
+                  careItems.map((ci) => (
+                    <TR key={ci.id}>
+                      <TD><Badge tone={CARE_KIND_TONE[ci.kind]}>{CARE_KIND_LABEL[ci.kind]}</Badge></TD>
+                      <TD className="font-medium">{ci.title}</TD>
+                      <TD>{DELIVERY_CHANNEL_LABEL[ci.deliveredVia] ?? ci.deliveredVia}</TD>
+                      <TD>{ci.deliveredAt ? formatDate(ci.deliveredAt) : "Chưa"}</TD>
+                      <TD>{ci.providedBy ?? "—"}</TD>
+                    </TR>
+                  ))
+                )}
+              </TBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       {tab === "payments" && (
         <Card>
           <CardContent className="p-0">
@@ -439,7 +480,54 @@ export default function CustomerProfilePage() {
       <AssessmentModal open={modal === "assessment"} onClose={() => setModal(null)} error={error} onSubmit={(body) => submit("/api/assessments", { ...body, customerId: id })} />
       <RecommendModal open={modal === "recommend"} onClose={() => setModal(null)} error={error} products={spaProducts} onSubmit={(body) => submit("/api/product-recommendations", { ...body, customerId: id })} />
       <ApplyFormModal open={modal === "applyForm"} onClose={() => setModal(null)} error={error} templates={templates} onSubmit={(body) => submit("/api/form-instances", { ...body, customerId: id })} />
+      <SendCareModal open={modal === "care"} onClose={() => setModal(null)} error={error} templates={careTemplates} onSubmit={(body) => submit("/api/care-instances", { ...body, customerId: id })} />
     </div>
+  );
+}
+
+function SendCareModal({ open, onClose, onSubmit, error, templates }: { open: boolean; onClose: () => void; onSubmit: (b: any) => void; error: string | null; templates: any[] }) {
+  const [f, setF] = useState({ templateId: "", kind: "PRE_CARE", title: "", content: "", deliveredVia: "IN_PERSON", markDelivered: true });
+  const usable = templates.filter((t) => t.status === "ACTIVE" || t.status === "APPROVED");
+  function applyTemplate(tid: string) {
+    const t = templates.find((x) => x.id === tid);
+    setF((prev) => ({ ...prev, templateId: tid, ...(t ? { kind: t.kind, title: t.title, content: t.content } : {}) }));
+  }
+  return (
+    <Modal open={open} onClose={onClose} title="Gửi hướng dẫn cho khách" className="max-w-2xl">
+      <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...f, templateId: f.templateId || undefined }); }} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>Mẫu (tùy chọn)</Label>
+            <Select value={f.templateId} onChange={(e) => applyTemplate(e.target.value)}>
+              <option value="">— Soạn tự do —</option>
+              {usable.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Loại</Label>
+            <Select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>
+              {Object.entries(CARE_KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </Select>
+          </div>
+        </div>
+        <div className="space-y-1.5"><Label>Tiêu đề *</Label><Input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} required /></div>
+        <div className="space-y-1.5">
+          <Label>Nội dung (cá nhân hóa được, không đổi mẫu gốc) *</Label>
+          <textarea className="min-h-[140px] w-full rounded-md border border-input bg-card px-3 py-2 text-sm" value={f.content} onChange={(e) => setF({ ...f, content: e.target.value })} required />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>Kênh gửi</Label>
+            <Select value={f.deliveredVia} onChange={(e) => setF({ ...f, deliveredVia: e.target.value })}>
+              {Object.entries(DELIVERY_CHANNEL_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </Select>
+          </div>
+          <label className="mt-6 flex items-center gap-2 text-sm"><input type="checkbox" checked={f.markDelivered} onChange={(e) => setF({ ...f, markDelivered: e.target.checked })} /> Đánh dấu đã gửi</label>
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Hủy</Button><Button type="submit">Gửi</Button></div>
+      </form>
+    </Modal>
   );
 }
 

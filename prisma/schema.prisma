@@ -1028,6 +1028,8 @@ model Customer {
   tasks           Task[]
   recommendations ProductRecommendation[]
   formInstances   FormInstance[]
+  proposals       TreatmentProposal[]
+  careInstances   CareInstructionInstance[]
 
   @@index([phone])
   @@map("customers")
@@ -1171,6 +1173,7 @@ model TreatmentPlan {
   tasks           Task[]
   recommendations ProductRecommendation[]
   formInstances   FormInstance[]
+  proposals       TreatmentProposal[]
 
   @@index([customerId])
   @@map("treatment_plans")
@@ -1239,6 +1242,7 @@ model TreatmentSession {
   brandProtocol BrandProtocol?  @relation(fields: [brandProtocolId], references: [id])
   tasks         Task[]
   formInstances FormInstance[]
+  careInstances CareInstructionInstance[]
 
   @@index([planId, sessionNumber])
   @@index([customerId])
@@ -1544,6 +1548,9 @@ model FormInstance {
   planId          String?
   sessionId       String?
   name            String?
+  status          FormInstanceStatus @default(DRAFT) // hoàn thành khi điền xong (mục 7)
+  completedBy     String?
+  completedAt     DateTime?
   createdBy       String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1555,5 +1562,186 @@ model FormInstance {
 
   @@index([customerId])
   @@index([templateId])
+  @@index([sessionId])
   @@map("form_instances")
+}
+
+enum FormInstanceStatus {
+  DRAFT
+  COMPLETED
+}
+
+// ============================================================================
+// MODULE 5 — TREATMENT PROPOSAL / PHƯƠNG ÁN NGÂN SÁCH
+// Nhiều phương án (Essential/Recommended/Premium/Custom) cho 1 khách; khách chốt
+// 1 phương án -> lưu SNAPSHOT bất biến (giá catalog đổi về sau không ảnh hưởng).
+// Giá vốn/margin/ghi chú nội bộ chỉ role finance.read thấy (mask ở server).
+// ============================================================================
+enum ProposalStatus {
+  DRAFT
+  SENT // đã gửi khách
+  ACCEPTED // khách đã chốt
+  REJECTED
+  EXPIRED
+}
+
+enum ProposalOptionKind {
+  ESSENTIAL
+  RECOMMENDED
+  PREMIUM
+  CUSTOM
+}
+
+enum ProposalItemType {
+  SERVICE
+  TECHNOLOGY
+  BRAND_PROTOCOL
+  PRODUCT // home-care hoặc professional (phân biệt bằng isHomeCare)
+  CUSTOM
+}
+
+model TreatmentProposal {
+  id             String         @id @default(cuid())
+  code           String         @unique
+  customerId     String
+  planId         String?
+  title          String
+  status         ProposalStatus @default(DRAFT)
+  version        Int            @default(1)
+  note           String? // ghi chú nội bộ (ẩn khỏi khách)
+  createdBy      String?
+  // --- Chốt phương án (snapshot bất biến) ---
+  acceptedOptionId String?
+  acceptedAt       DateTime?
+  acceptedBy       String?
+  agreedPrice      Decimal?     @db.Decimal(18, 2)
+  appliedDiscount  Decimal?     @db.Decimal(18, 2)
+  acceptedSnapshot Json? // bản đông cứng option đã chọn (item + giá) tại thời điểm chốt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  customer Customer                  @relation(fields: [customerId], references: [id])
+  plan     TreatmentPlan?            @relation(fields: [planId], references: [id])
+  options  TreatmentProposalOption[]
+
+  @@index([customerId])
+  @@map("treatment_proposals")
+}
+
+model TreatmentProposalOption {
+  id                  String             @id @default(cuid())
+  proposalId          String
+  kind                ProposalOptionKind @default(RECOMMENDED)
+  name                String
+  orderIndex          Int                @default(0)
+  sessions            Int? // số buổi
+  estimatedDurationDays Int? // thời gian dự kiến (ngày)
+  discount            Decimal?           @db.Decimal(18, 2)
+  totalPrice          Decimal?           @db.Decimal(18, 2) // tổng (tự tính, có thể lưu chốt)
+  note                String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  proposal TreatmentProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  items    ProposalItem[]
+
+  @@index([proposalId])
+  @@map("treatment_proposal_options")
+}
+
+model ProposalItem {
+  id          String           @id @default(cuid())
+  optionId    String
+  itemType    ProposalItemType @default(SERVICE)
+  refId       String? // id service/technology/brandProtocol/spaProduct (tham chiếu mềm)
+  name        String // snapshot tên tại thời điểm lập
+  quantity    Int              @default(1)
+  sessions    Int?
+  unitPrice   Decimal?         @db.Decimal(18, 2) // giá bán khách (snapshot)
+  unitCost    Decimal?         @db.Decimal(18, 2) // giá vốn nội bộ (nhạy cảm, mask)
+  isHomeCare  Boolean          @default(false) // phân biệt SP tại nhà vs dùng trong buổi
+  note        String?
+  orderIndex  Int              @default(0)
+
+  option TreatmentProposalOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@index([optionId])
+  @@map("proposal_items")
+}
+
+// ============================================================================
+// MODULE 6 — PRE/POST-CARE INSTRUCTION LIBRARY
+// Thư viện hướng dẫn tái sử dụng; khi gửi khách -> tạo INSTANCE (snapshot),
+// nhân viên cá nhân hóa bản của khách mà KHÔNG đổi template gốc.
+// ============================================================================
+enum CareKind {
+  PRE_CARE
+  POST_CARE
+  GENERAL
+  FOLLOW_UP
+}
+
+/// Kênh gửi (chuẩn bị cho Customer Portal/Email/Zalo/WhatsApp/SMS về sau)
+enum DeliveryChannel {
+  IN_PERSON
+  PORTAL
+  EMAIL
+  ZALO
+  WHATSAPP
+  SMS
+}
+
+model CareInstruction {
+  id              String        @id @default(cuid())
+  code            String        @unique
+  title           String
+  kind            CareKind      @default(PRE_CARE)
+  category        String?
+  content         String // nội dung template
+  version         Int           @default(1)
+  status          LibraryStatus @default(DRAFT)
+  attachments     String[]      @default([])
+  // liên kết mềm tới thực thể (lọc gợi ý theo dịch vụ/công nghệ/protocol/tình trạng/sản phẩm)
+  serviceId       String?
+  technologyId    String?
+  brandProtocolId String?
+  spaProductId    String?
+  condition       String?
+  changeLog       Json?
+  createdBy       String?
+  updatedBy       String?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  instances CareInstructionInstance[]
+
+  @@index([kind])
+  @@index([status])
+  @@map("care_instructions")
+}
+
+/// Bản đã gửi/áp cho khách/buổi — lưu ĐÚNG nội dung khách nhận (snapshot).
+model CareInstructionInstance {
+  id            String          @id @default(cuid())
+  templateId    String?
+  kind          CareKind        @default(PRE_CARE)
+  title         String
+  content       String // bản cá nhân hóa (đã snapshot từ template, có thể sửa)
+  templateVersion Int? // version template tại thời điểm áp
+  customerId    String
+  sessionId     String?
+  bookingId     String?
+  deliveredVia  DeliveryChannel @default(IN_PERSON)
+  deliveredAt   DateTime?
+  providedBy    String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  template CareInstruction?  @relation(fields: [templateId], references: [id])
+  customer Customer          @relation(fields: [customerId], references: [id])
+  session  TreatmentSession? @relation(fields: [sessionId], references: [id])
+
+  @@index([customerId])
+  @@map("care_instruction_instances")
 }

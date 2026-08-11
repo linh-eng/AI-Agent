@@ -30,6 +30,8 @@ import {
   ScrollText,
   ShoppingBag,
   FileText,
+  FileSpreadsheet,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
@@ -46,6 +48,7 @@ const NAV_GROUPS = [
       { href: "/bookings", label: "Booking", icon: CalendarDays },
       { href: "/services", label: "Dịch vụ", icon: Sparkles },
       { href: "/treatment-plans", label: "Phác đồ", icon: HeartPulse },
+      { href: "/proposals", label: "Báo giá", icon: FileSpreadsheet },
       { href: "/tasks", label: "Công việc / Follow-up", icon: ListTodo },
     ],
   },
@@ -57,6 +60,7 @@ const NAV_GROUPS = [
       { href: "/protocols", label: "Protocol", icon: ScrollText },
       { href: "/catalog", label: "Sản phẩm", icon: ShoppingBag },
       { href: "/form-templates", label: "Biểu mẫu", icon: FileText },
+      { href: "/care-instructions", label: "Hướng dẫn chăm sóc", icon: BookOpen },
     ],
   },
   {

@@ -78,7 +78,16 @@ function num(v: unknown): number {
 export interface TimelineEvent {
   id: string;
   at: string; // ISO
-  kind: "crm" | "booking" | "assessment" | "plan" | "session" | "payment";
+  kind:
+    | "crm"
+    | "booking"
+    | "assessment"
+    | "plan"
+    | "session"
+    | "payment"
+    | "proposal"
+    | "care"
+    | "recommendation";
   title: string;
   detail?: string;
   status?: string;
@@ -90,18 +99,26 @@ export interface TimelineEvent {
  * sắp xếp giảm dần theo thời gian.
  */
 export async function buildCustomerTimeline(customerId: string): Promise<TimelineEvent[]> {
-  const [activities, bookings, assessments, plans, sessions, payments] = await Promise.all([
-    prisma.crmActivity.findMany({ where: { customerId }, orderBy: { occurredAt: "desc" } }),
-    prisma.booking.findMany({
-      where: { customerId },
-      include: { service: { select: { name: true } } },
-      orderBy: { scheduledAt: "desc" },
-    }),
-    prisma.assessment.findMany({ where: { customerId }, orderBy: { assessedAt: "desc" } }),
-    prisma.treatmentPlan.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
-    prisma.treatmentSession.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
-    prisma.payment.findMany({ where: { customerId }, orderBy: { paidAt: "desc" } }),
-  ]);
+  const [activities, bookings, assessments, plans, sessions, payments, proposals, cares, recs] =
+    await Promise.all([
+      prisma.crmActivity.findMany({ where: { customerId }, orderBy: { occurredAt: "desc" } }),
+      prisma.booking.findMany({
+        where: { customerId },
+        include: { service: { select: { name: true } } },
+        orderBy: { scheduledAt: "desc" },
+      }),
+      prisma.assessment.findMany({ where: { customerId }, orderBy: { assessedAt: "desc" } }),
+      prisma.treatmentPlan.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
+      prisma.treatmentSession.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
+      prisma.payment.findMany({ where: { customerId }, orderBy: { paidAt: "desc" } }),
+      prisma.treatmentProposal.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
+      prisma.careInstructionInstance.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
+      prisma.productRecommendation.findMany({
+        where: { customerId },
+        include: { product: { select: { name: true } } },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
 
   const events: TimelineEvent[] = [];
 
@@ -166,9 +183,51 @@ export async function buildCustomerTimeline(customerId: string): Promise<Timelin
       status: p.method,
     });
   }
+  for (const pr of proposals) {
+    events.push({
+      id: `pr-${pr.id}`,
+      at: (pr.acceptedAt ?? pr.createdAt).toISOString(),
+      kind: "proposal",
+      title: `Báo giá ${pr.title}`,
+      detail: pr.acceptedAt
+        ? `Đã chốt · ${new Intl.NumberFormat("vi-VN").format(num(pr.agreedPrice))} ₫`
+        : undefined,
+      status: pr.status,
+      href: `/proposals/${pr.id}`,
+    });
+  }
+  for (const ci of cares) {
+    events.push({
+      id: `ci-${ci.id}`,
+      at: (ci.deliveredAt ?? ci.createdAt).toISOString(),
+      kind: "care",
+      title: `Hướng dẫn: ${ci.title}`,
+      detail: ci.deliveredAt ? `Đã gửi qua ${ci.deliveredVia}` : "Chưa gửi",
+      status: ci.kind,
+    });
+  }
+  for (const r of recs) {
+    events.push({
+      id: `rc-${r.id}`,
+      at: r.createdAt.toISOString(),
+      kind: "recommendation",
+      title: `Đề xuất SP: ${r.product?.name ?? ""}`,
+      detail: r.reason ?? undefined,
+      status: r.priority,
+    });
+  }
 
   events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
   return events;
+}
+
+/** Tổng giá 1 phương án báo giá = Σ(đơn giá × SL) − chiết khấu. */
+export function proposalOptionTotal(
+  items: { unitPrice?: unknown; quantity?: number | null }[],
+  discount?: unknown
+): number {
+  const sub = items.reduce((s, it) => s + num(it.unitPrice) * (it.quantity ?? 1), 0);
+  return Math.max(0, sub - num(discount));
 }
 
 /** Ghi audit log (append-only) cho hành động nghiệp vụ nhạy cảm (mục 25). */
