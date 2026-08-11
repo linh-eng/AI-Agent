@@ -126,3 +126,18 @@ export const materialMoveSchema = z.object({
   staff: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
 });
+
+// ===== Module 9 — Pricing =====
+export const priceRuleCreateSchema = z.object({
+  targetType: z.enum(["SERVICE", "PRODUCT", "TECHNOLOGY", "PACKAGE"]),
+  targetId: z.string().min(1, "Chọn đối tượng áp giá"),
+  targetName: z.string().optional().nullable(),
+  priceType: z.enum(["STANDARD", "BRANCH", "MEMBER", "VIP", "CAMPAIGN", "CUSTOM"]).default("STANDARD"),
+  branch: z.string().optional().nullable(),
+  price: z.coerce.number().nonnegative(),
+  effectiveFrom: dateOpt,
+  effectiveTo: dateOpt,
+  campaign: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+  supersedesId: z.string().optional().nullable(),
+});

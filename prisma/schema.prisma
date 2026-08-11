@@ -1813,3 +1813,49 @@ model MaterialMovement {
   @@index([sessionMaterialId])
   @@map("material_movements")
 }
+
+// ============================================================================
+// MODULE 9 — VERSIONED PRICE MANAGEMENT
+// Giá áp cho Dịch vụ/Sản phẩm/Công nghệ/Gói. KHÔNG ghi đè giá lịch sử: đổi giá =
+// tạo bản ghi mới (append-only), bản cũ archive. Booking/Proposal/Session đã lưu
+// SNAPSHOT giá tại thời điểm tạo -> đổi bảng giá không ảnh hưởng bản ghi lịch sử.
+// Tham chiếu target dạng soft String để không siết chặt các module khác.
+// ============================================================================
+enum PriceTargetType {
+  SERVICE
+  PRODUCT
+  TECHNOLOGY
+  PACKAGE
+}
+
+enum PriceType {
+  STANDARD // niêm yết
+  BRANCH // theo chi nhánh
+  MEMBER // thành viên
+  VIP
+  CAMPAIGN // khuyến mãi
+  CUSTOM // đặc biệt
+}
+
+model PriceRule {
+  id            String          @id @default(cuid())
+  targetType    PriceTargetType
+  targetId      String // id service/product/technology/package (soft ref)
+  targetName    String? // snapshot tên để hiển thị lịch sử
+  priceType     PriceType       @default(STANDARD)
+  branch        String?
+  price         Decimal         @db.Decimal(18, 2)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  campaign      String?
+  note          String?
+  version       Int             @default(1)
+  supersedesId  String? // trỏ tới bản giá bị thay thế (giữ lịch sử)
+  isActive      Boolean         @default(true)
+  createdBy     String?
+  createdAt     DateTime        @default(now())
+
+  @@index([targetType, targetId])
+  @@index([isActive])
+  @@map("price_rules")
+}

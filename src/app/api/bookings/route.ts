@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { bookingCreateSchema } from "@/lib/clinic-validation";
 import { sequentialCode } from "@/lib/clinic";
+import { resolvePrice } from "@/lib/pricing";
 
 export const GET = handle(async (req) => {
   await requirePermission(PERMISSIONS.BOOKING_READ);
@@ -43,14 +44,23 @@ export const POST = handle(async (req) => {
   const parsed = bookingCreateSchema.parse(await req.json());
   const code = parsed.code ?? sequentialCode("BK", await prisma.booking.count());
 
-  // Chốt giá tại thời điểm booking: nếu không nhập giá, lấy giá chuẩn của dịch vụ (mục 8).
+  // Chốt giá tại thời điểm booking (snapshot bất biến). Ưu tiên bảng giá có hiệu
+  // lực (Price Management), fallback giá chuẩn của dịch vụ.
   let price = parsed.price ?? undefined;
   if (price === undefined && parsed.serviceId) {
-    const svc = await prisma.service.findUnique({
-      where: { id: parsed.serviceId },
-      select: { standardPrice: true, durationMinutes: true },
+    const resolved = await resolvePrice("SERVICE", parsed.serviceId, {
+      at: parsed.scheduledAt,
+      branch: parsed.branch ?? undefined,
     });
-    if (svc) price = Number(svc.standardPrice);
+    if (resolved) {
+      price = resolved.price;
+    } else {
+      const svc = await prisma.service.findUnique({
+        where: { id: parsed.serviceId },
+        select: { standardPrice: true },
+      });
+      if (svc) price = Number(svc.standardPrice);
+    }
   }
 
   const booking = await prisma.booking.create({
