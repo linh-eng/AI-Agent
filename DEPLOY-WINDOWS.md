@@ -26,7 +26,7 @@ Dành cho việc chạy Sophia Wellness — Quản lý kho ngay trên máy Windo
    → tải bản mới (ví dụ PostgreSQL 16).
 2. Chạy file cài đặt:
    - Bấm **Next** qua các bước.
-   - Ở màn hình **Password**: đặt mật khẩu cho tài khoản `postgres` (ví dụ `Sophia@123`)
+   - Ở màn hình **Password**: đặt mật khẩu cho tài khoản `postgres` (ví dụ `SophiaKho2025`)
      — **ghi nhớ mật khẩu này**.
    - **Port**: để mặc định `5432`.
    - Các bước còn lại giữ mặc định → **Next** → cài xong.
@@ -55,12 +55,16 @@ Dành cho việc chạy Sophia Wellness — Quản lý kho ngay trên máy Windo
    > Nếu không thấy đuôi file: trong File Explorer bật **View → File name extensions**.
 3. Mở file **`.env`** bằng **Notepad**, sửa cho đúng rồi **Lưu (Ctrl+S)**:
    ```env
-   DATABASE_URL="postgresql://postgres:Sophia@123@localhost:5432/sophia_wellness?schema=public"
+   DATABASE_URL="postgresql://postgres:SophiaKho2025@localhost:5432/sophia_wellness?schema=public"
    AUTH_SECRET="dan-mot-chuoi-ngau-nhien-that-dai-vao-day"
    SESSION_MAX_AGE="28800"
    ```
-   - Thay `Sophia@123` bằng đúng mật khẩu PostgreSQL ở Bước 2.
+   - Thay `SophiaKho2025` bằng đúng mật khẩu PostgreSQL ở Bước 2.
    - `AUTH_SECRET`: gõ một chuỗi ngẫu nhiên thật dài (chữ + số).
+
+   > ⚠️ **Mật khẩu nên chỉ gồm chữ và số.** Nếu mật khẩu có ký tự đặc biệt thì phải mã hóa
+   > trong `DATABASE_URL`: `@` → `%40`, `:` → `%3A`, `/` → `%2F`, `#` → `%23`, `?` → `%3F`.
+   > Ví dụ mật khẩu `Sophia@123` phải ghi thành `Sophia%40123` trong chuỗi kết nối.
 
 ---
 
@@ -148,7 +152,8 @@ Mở **cmd**, chạy (nhập mật khẩu khi được hỏi):
 | Triệu chứng | Cách xử lý |
 |---|---|
 | `node` không phải lệnh hợp lệ | Chưa cài Node hoặc chưa khởi động lại cmd — cài lại Bước 1, mở cmd mới |
-| `Can't reach database server` | Sai mật khẩu trong `.env`, hoặc PostgreSQL chưa chạy (mở **Services.msc** → bật `postgresql-x64-16`) |
+| `Can't reach database server` | PostgreSQL chưa chạy (mở **Services.msc** → bật `postgresql-x64-16`) |
+| `P1000: Authentication failed ... for 'postgres'` | Sai mật khẩu trong `DATABASE_URL`. Kiểm tra đúng mật khẩu; nếu có ký tự đặc biệt (`@ : / # ?`) phải mã hóa (xem ghi chú Bước 4). Thử đăng nhập **SQL Shell (psql)** bằng mật khẩu đó để xác nhận |
 | Cửa sổ `.bat` hiện rồi tắt ngay | Bấm đúp để xem lỗi; thường do `.env` sai — sửa rồi chạy lại `setup-windows.bat` |
 | Máy khác không vào được | Chưa mở cổng 9000 (làm phần LAN ở trên), hoặc khác mạng WiFi |
 | Đăng nhập xong bị đá ra | `AUTH_SECRET` trống — điền vào `.env`, chạy lại `start-windows.bat` |

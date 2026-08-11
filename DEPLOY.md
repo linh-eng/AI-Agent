@@ -82,6 +82,10 @@ SESSION_MAX_AGE="28800"
 ```
 
 > Sinh nhanh một `AUTH_SECRET` ngẫu nhiên: `openssl rand -base64 48`
+>
+> ⚠️ Nếu mật khẩu DB có ký tự đặc biệt, phải mã hóa trong `DATABASE_URL`:
+> `@`→`%40`, `:`→`%3A`, `/`→`%2F`, `#`→`%23`, `?`→`%3F` (nếu không sẽ gặp lỗi
+> `P1000: Authentication failed`). Đơn giản nhất: đặt mật khẩu chỉ gồm chữ và số.
 
 ---
 
