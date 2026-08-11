@@ -169,6 +169,10 @@ Không. Dữ liệu đã lưu trong `data.db`, bật lại là còn nguyên.
 - 🆕 **Thông tin công ty & Logo**: nhập tên công ty, bộ phận, địa chỉ, ĐT, email, MST, website, ghi chú chân trang
   và tải **logo** (ảnh tự thu nhỏ, lưu dạng base64 trong cấu hình) ngay trong màn **Danh mục & Cấu hình**.
   Thông tin này làm **header (kèm logo)** và **footer** cho tất cả biểu mẫu in PDF.
+- 🆕 **Nghiệm thu theo hạng mục (Giai đoạn A)**: mỗi nhóm loại công việc có bộ **hạng mục nghiệm thu + trọng số**
+  (cấu hình trong **Danh mục & Cấu hình**). Khi người thực hiện bấm *"Đã hoàn tất — Gửi nghiệm thu"*, ticket sang
+  *Đã xử lý (chờ nghiệm thu)*. Người yêu cầu nghiệm thu **từng hạng mục** Đạt/Không đạt; hạng mục Không đạt được
+  trả lại để sửa (giữ **lịch sử từng lần** không ghi đè). Chỉ khi **tất cả hạng mục Đạt** ticket mới **Hoàn tất**.
 - **Báo cáo theo chu kỳ** (menu Báo cáo): lọc theo ngày/tuần/tháng/năm + khoảng ngày, xuất Excel (.xls),
   in 5 biểu mẫu PDF A4 (Phiếu yêu cầu / giao việc / biên bản phát sinh / nghiệm thu / báo cáo kỳ) — dùng
   cửa sổ in của trình duyệt, chọn "Save as PDF".

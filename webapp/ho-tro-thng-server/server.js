@@ -17,7 +17,7 @@ catch (e) {
   process.exit(1);
 }
 
-const APP_VERSION = "v3.7"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
+const APP_VERSION = "v3.8"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 const ROOT = __dirname;
@@ -189,6 +189,14 @@ const DEFAULT_CONFIG = {
     logo: "", // ảnh logo dạng data URI (base64)
     footer: "" // ghi chú chân trang biểu mẫu
   },
+  accept: { // bộ hạng mục nghiệm thu theo nhóm loại công việc (Giai đoạn A) — mỗi nhóm 1 mảng hạng mục, tổng trọng số nên = 100
+    default: [
+      { key:"thuchien", ten:"Chất lượng thực hiện", trongSo:40 },
+      { key:"baocao",   ten:"Báo cáo kết quả",       trongSo:20 },
+      { key:"hinhanh",  ten:"Hình ảnh",              trongSo:20 },
+      { key:"chungtu",  ten:"Chứng từ",              trongSo:20 }
+    ]
+  },
   quality: { csat:40, sla:25, sl:15, ps:10, reopen:10 },
   cat: {
     donvi: ["Phòng Hành chính","Phòng Kế toán","Phòng Kinh doanh","Phòng Mua hàng","Phòng Triển khai","Phòng Testing","Phòng Bảo hành","Phòng Tư vấn kỹ thuật","Ban Giám đốc","Trợ lý Giám đốc"],
@@ -205,6 +213,7 @@ function getConfig() {
     cat: { ...DEFAULT_CONFIG.cat, ...(c.cat||{}) },
     backup: { ...DEFAULT_CONFIG.backup, ...(c.backup||{}) },
     company: { ...DEFAULT_CONFIG.company, ...(c.company||{}) },
+    accept: (c.accept && typeof c.accept === "object") ? { ...DEFAULT_CONFIG.accept, ...c.accept } : DEFAULT_CONFIG.accept,
     worktypes: (Array.isArray(c.worktypes) && c.worktypes.length) ? c.worktypes : DEFAULT_CONFIG.worktypes };
 }
 // Danh mục Dự án (5H) — lưu trong settings, dùng chung mọi ticket
