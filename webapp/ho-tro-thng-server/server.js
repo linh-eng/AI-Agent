@@ -17,7 +17,7 @@ catch (e) {
   process.exit(1);
 }
 
-const APP_VERSION = "v3.6"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
+const APP_VERSION = "v3.7"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 const ROOT = __dirname;
@@ -182,6 +182,13 @@ const DEFAULT_CONFIG = {
   work: { mStart:8, mEnd:12, aStart:13, aEnd:17, sat:false }, // sat=true nếu làm Thứ 7
   warn: 0.8, overload: 3, maxUpload: 10, // maxUpload: dung lượng tối đa mỗi file (MB)
   backup: { enabled:true, everyHours:24, keep:7 }, // sao lưu tự động
+  company: { // thông tin công ty & logo — dùng làm header/footer biểu mẫu in
+    name: "CÔNG TY THÁI NGUYỄN (THNG)",
+    dept: "BỘ PHẬN HỖ TRỢ & TRIỂN KHAI",
+    address: "", phone: "", email: "", taxCode: "", website: "",
+    logo: "", // ảnh logo dạng data URI (base64)
+    footer: "" // ghi chú chân trang biểu mẫu
+  },
   quality: { csat:40, sla:25, sl:15, ps:10, reopen:10 },
   cat: {
     donvi: ["Phòng Hành chính","Phòng Kế toán","Phòng Kinh doanh","Phòng Mua hàng","Phòng Triển khai","Phòng Testing","Phòng Bảo hành","Phòng Tư vấn kỹ thuật","Ban Giám đốc","Trợ lý Giám đốc"],
@@ -197,6 +204,7 @@ function getConfig() {
   return { ...DEFAULT_CONFIG, ...c,
     cat: { ...DEFAULT_CONFIG.cat, ...(c.cat||{}) },
     backup: { ...DEFAULT_CONFIG.backup, ...(c.backup||{}) },
+    company: { ...DEFAULT_CONFIG.company, ...(c.company||{}) },
     worktypes: (Array.isArray(c.worktypes) && c.worktypes.length) ? c.worktypes : DEFAULT_CONFIG.worktypes };
 }
 // Danh mục Dự án (5H) — lưu trong settings, dùng chung mọi ticket
@@ -403,7 +411,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 200, getConfig());
       if (p === "/api/config" && req.method === "PUT") {
         if (!can(me, "users")) return sendJSON(res, 403, { error: "Chỉ quản trị viên" });
-        const b = await readBody(req); qSetSet.run("config", JSON.stringify(b)); return sendJSON(res, 200, { ok: true });
+        const b = await readBody(req, 8e6); qSetSet.run("config", JSON.stringify(b)); return sendJSON(res, 200, { ok: true });
       }
 
       /* ---- Danh mục Dự án (5H) ---- */

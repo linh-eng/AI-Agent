@@ -166,6 +166,9 @@ Không. Dữ liệu đã lưu trong `data.db`, bật lại là còn nguyên.
   **Sao lưu tự động** (`GET /api/backups`, `POST /api/backup`, `GET /api/backup/download`; thư mục `backups/`).
 - SLA & danh mục (loại việc, phòng ban, đội, dự án, trọng số điểm CL, dung lượng file…) chỉnh trực tiếp
   trong màn **Danh mục & Cấu hình** — lưu ở bảng `settings`, áp dụng ngay cho toàn hệ thống.
+- 🆕 **Thông tin công ty & Logo**: nhập tên công ty, bộ phận, địa chỉ, ĐT, email, MST, website, ghi chú chân trang
+  và tải **logo** (ảnh tự thu nhỏ, lưu dạng base64 trong cấu hình) ngay trong màn **Danh mục & Cấu hình**.
+  Thông tin này làm **header (kèm logo)** và **footer** cho tất cả biểu mẫu in PDF.
 - **Báo cáo theo chu kỳ** (menu Báo cáo): lọc theo ngày/tuần/tháng/năm + khoảng ngày, xuất Excel (.xls),
   in 5 biểu mẫu PDF A4 (Phiếu yêu cầu / giao việc / biên bản phát sinh / nghiệm thu / báo cáo kỳ) — dùng
   cửa sổ in của trình duyệt, chọn "Save as PDF".

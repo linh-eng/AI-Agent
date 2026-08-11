@@ -241,7 +241,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <aside class="side">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.6</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.7</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="userbox" id="userbox"></div>
@@ -269,7 +269,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <div class="login-card">
     <div class="login-top">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.6</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.7</span></div>
     </div>
     <div class="login-body">
       <h2>Đăng nhập hệ thống</h2>
@@ -363,7 +363,9 @@ let WORK = {mStart:8,mEnd:12,aStart:13,aEnd:17,sat:false}; // giờ làm việc
 let QCONF={csat:40, sla:25, sl:15, ps:10, reopen:10}; // trọng số điểm chất lượng
 let OVERLOAD_N=3; // ngưỡng quá tải P1/P2
 let CFG=null;
+let COMPANY={name:"CÔNG TY THÁI NGUYỄN (THNG)",dept:"BỘ PHẬN HỖ TRỢ & TRIỂN KHAI",address:"",phone:"",email:"",taxCode:"",website:"",logo:"",footer:""}; // thông tin công ty cho biểu mẫu in
 function applyConfig(c){ if(!c)return; CFG=c; if(c.sla)SLA=c.sla; if(c.work)WORK=Object.assign({sat:false},c.work); if(typeof c.warn==='number')WY_WARN=c.warn; if(typeof c.overload==='number')OVERLOAD_N=c.overload; if(c.quality)QCONF=c.quality;
+  if(c.company&&typeof c.company==='object') COMPANY=Object.assign({name:"",dept:"",address:"",phone:"",email:"",taxCode:"",website:"",logo:"",footer:""},c.company);
   if(c.cat){ ["donvi","doi","dvt","loaiPS","nghiemthu"].forEach(k=>{ if(Array.isArray(c.cat[k])) CAT[k]=c.cat[k]; }); }
   if(Array.isArray(c.worktypes)&&c.worktypes.length){ WORKTYPES=c.worktypes.map(w=>Array.isArray(w)?w:[w.ma||"",w.ten||"",w.luong||"",w.pri||"P3 - Ưu tiên trung bình",w.group||""]); rebuildWT(); }
 }
@@ -890,6 +892,7 @@ function renderCat(keep){
   ["donvi","doi","dvt","loaiPS","nghiemthu"].forEach(k=>{ if(!Array.isArray(c.cat[k])) c.cat[k]=CAT[k].slice(); });
   if(!Array.isArray(c.worktypes)||!c.worktypes.length) c.worktypes=WORKTYPES.map(w=>w.slice());
   if(!c.backup||typeof c.backup!=='object') c.backup={enabled:true,everyHours:24,keep:7};
+  if(!c.company||typeof c.company!=='object') c.company={name:"",dept:"",address:"",phone:"",email:"",taxCode:"",website:"",logo:"",footer:""};
   const num=(val,path,w)=>`<input type="number" value="${val}" style="width:${w||70}px" oninput="cfgSet('${path}',this.value)">`;
   const slaRows=Object.keys(c.sla).map(p=>`<tr><td><span class="pr ${p.split(' ')[0]}">${esc(p)}</span></td><td>${admin?num(c.sla[p][0],'sla.'+p+'.0'):c.sla[p][0]} phút</td><td>${admin?num(c.sla[p][1],'sla.'+p+'.1'):c.sla[p][1]} giờ</td></tr>`).join("");
   const qsum=c.quality.csat+c.quality.sla+c.quality.sl+c.quality.ps+c.quality.reopen;
@@ -932,6 +935,32 @@ function renderCat(keep){
         <div style="font-weight:700;color:${qsum===100?'var(--green)':'var(--red)'}">Tổng: <span id="qsum">${qsum}</span></div>
       </div></div>
     ${admin?`<div style="margin-top:16px"><button class="btn primary" onclick="saveConfig()">Lưu cấu hình</button> <span class="muted" style="font-size:12.5px">Áp dụng ngay cho toàn hệ thống.</span></div>`:''}
+    ${admin?`<div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Thông tin công ty &amp; Logo (biểu mẫu in)</h3></div>
+      <div class="panel-b">
+        <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">
+          <div style="flex:none;text-align:center">
+            <div id="logoPrev" style="width:150px;height:90px;border:1px dashed var(--line);border-radius:10px;display:grid;place-items:center;overflow:hidden;background:var(--bg-soft,#f6faf8)">${c.company.logo?`<img src="${c.company.logo}" style="max-width:100%;max-height:100%;object-fit:contain">`:'<span class="muted" style="font-size:12px">Chưa có logo</span>'}</div>
+            <input type="file" id="logoFile" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" onchange="pickLogo(this)">
+            <div style="margin-top:8px;display:flex;gap:6px;justify-content:center">
+              <button class="btn sm" onclick="document.getElementById('logoFile').click()">Chọn logo…</button>
+              ${c.company.logo?`<button class="btn sm danger" onclick="clearLogo()">Xóa</button>`:''}
+            </div>
+            <div class="hint" style="font-size:11px;margin-top:4px;max-width:160px">PNG/JPG. Ảnh tự thu nhỏ còn tối đa ~320px để nhẹ.</div>
+          </div>
+          <div style="flex:1;min-width:300px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="f" style="grid-column:1/-1"><label>Tên công ty</label><input value="${esc(c.company.name||'')}" oninput="cfgSet('company.name',this.value)"></div>
+            <div class="f" style="grid-column:1/-1"><label>Bộ phận / Phòng ban</label><input value="${esc(c.company.dept||'')}" oninput="cfgSet('company.dept',this.value)"></div>
+            <div class="f" style="grid-column:1/-1"><label>Địa chỉ</label><input value="${esc(c.company.address||'')}" oninput="cfgSet('company.address',this.value)"></div>
+            <div class="f"><label>Điện thoại</label><input value="${esc(c.company.phone||'')}" oninput="cfgSet('company.phone',this.value)"></div>
+            <div class="f"><label>Email</label><input value="${esc(c.company.email||'')}" oninput="cfgSet('company.email',this.value)"></div>
+            <div class="f"><label>Mã số thuế</label><input value="${esc(c.company.taxCode||'')}" oninput="cfgSet('company.taxCode',this.value)"></div>
+            <div class="f"><label>Website</label><input value="${esc(c.company.website||'')}" oninput="cfgSet('company.website',this.value)"></div>
+            <div class="f" style="grid-column:1/-1"><label>Ghi chú chân trang (footer)</label><input value="${esc(c.company.footer||'')}" oninput="cfgSet('company.footer',this.value)" placeholder="VD: Tài liệu nội bộ — không phổ biến ra ngoài"></div>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:10px">Thông tin này hiển thị ở <b>đầu trang (header)</b> kèm logo và <b>chân trang (footer)</b> của tất cả biểu mẫu in PDF (phiếu yêu cầu, giao việc, biên bản phát sinh, nghiệm thu, báo cáo kỳ).</div>
+        <div style="margin-top:10px"><button class="btn primary" onclick="saveConfig()">Lưu cấu hình</button> <span class="muted" style="font-size:12.5px">Áp dụng ngay cho các biểu mẫu in.</span></div>
+      </div></div>`:''}
     ${admin?`<div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Sao lưu &amp; khôi phục dữ liệu</h3><button class="btn primary sm" onclick="backupNow()">Sao lưu ngay</button></div>
       <div class="panel-b">
         <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:center;font-size:13.5px">
@@ -974,6 +1003,28 @@ async function loadBackups(){ const el=document.getElementById("backupRows"); if
   }catch(e){ el.innerHTML=`<tr><td colspan="3" class="muted" style="text-align:center;padding:10px">Không tải được danh sách.</td></tr>`; }
 }
 async function backupNow(){ try{ toast("Đang sao lưu…"); await api("POST","/api/backup",{}); toast("Đã sao lưu xong"); loadBackups(); }catch(e){ toast(e.message||"Lỗi sao lưu",true); } }
+function pickLogo(input){
+  const f=input.files&&input.files[0]; if(!f)return;
+  if(!/^image\//.test(f.type)){ toast('Vui lòng chọn tệp ảnh (PNG/JPG)',true); return; }
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=320; let w=img.width,h=img.height;
+      if(w>MAX||h>MAX){ const r=Math.min(MAX/w,MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+      let data; try{ data=cv.toDataURL('image/png'); }catch(e){ data=rd.result; }
+      if(!EDITCFG.company)EDITCFG.company={}; EDITCFG.company.logo=data;
+      renderCat(true); toast('Đã chọn logo — nhớ bấm Lưu cấu hình');
+    };
+    img.onerror=()=>{ toast('Không đọc được ảnh',true); };
+    img.src=rd.result;
+  };
+  rd.onerror=()=>{ toast('Không đọc được tệp',true); };
+  rd.readAsDataURL(f);
+}
+function clearLogo(){ if(!EDITCFG.company)EDITCFG.company={}; EDITCFG.company.logo=''; renderCat(true); toast('Đã xóa logo — nhớ bấm Lưu cấu hình'); }
 function catAdd(key){ if(!EDITCFG.cat[key])EDITCFG.cat[key]=[]; EDITCFG.cat[key].push(""); renderCat(true); }
 function catRemove(key,i){ EDITCFG.cat[key].splice(i,1); renderCat(true); }
 function wtAdd(){ EDITCFG.worktypes.push(["","","","P3 - Ưu tiên trung bình",""]); renderCat(true); }
@@ -988,6 +1039,7 @@ async function saveProjects(){
 }
 
 function cfgSet(path,val){
+  if(path.indexOf('company.')===0){ if(!EDITCFG.company)EDITCFG.company={}; EDITCFG.company[path.slice(8)]=val; return; }
   if(path==='warn%'){ EDITCFG.warn=(+val||0)/100; return; }
   if(path==='overload'){ EDITCFG.overload=+val||0; return; }
   if(path==='maxUpload'){ EDITCFG.maxUpload=Math.max(1,+val||10); return; }
@@ -2014,9 +2066,17 @@ function printDoc(title,bodyHTML){
     *{box-sizing:border-box} body{font-family:'Segoe UI',Arial,sans-serif;color:#111;font-size:13px;line-height:1.5;margin:0}
     .doc{max-width:190mm;margin:0 auto}
     .hd{text-align:center;border-bottom:2px solid #2f855a;padding-bottom:8px;margin-bottom:14px}
+    .hd .co-row{display:flex;align-items:center;justify-content:center;gap:14px}
+    .hd .lg{max-height:60px;max-width:130px;object-fit:contain}
+    .hd .co-info{text-align:center}
     .hd .co{font-weight:700;font-size:15px;color:#1a5}
-    .hd .ti{font-weight:800;font-size:19px;margin-top:6px;text-transform:uppercase}
+    .hd .dept{font-weight:600;font-size:12.5px;color:#333;margin-top:2px}
+    .hd .ct{font-size:10.5px;color:#666;margin-top:3px}
+    .hd .ti{font-weight:800;font-size:19px;margin-top:10px;text-transform:uppercase}
     .hd .mc{font-size:12px;color:#555;margin-top:3px}
+    .ft{margin-top:22px;border-top:1px solid #cfe0d8;padding-top:6px;text-align:center;color:#666}
+    .ft .ft-note{font-size:11px;font-style:italic}
+    .ft .ft-co{font-size:10.5px;margin-top:2px}
     h3{font-size:13px;color:#1a5;border-bottom:1px solid #cfe0d8;padding-bottom:3px;margin:16px 0 8px}
     table{width:100%;border-collapse:collapse;margin:6px 0} td,th{border:1px solid #bbb;padding:5px 7px;text-align:left;vertical-align:top;font-size:12px}
     th{background:#eef6f2}
@@ -2028,11 +2088,30 @@ function printDoc(title,bodyHTML){
     @media print{.noprint{display:none}}
     </style></head><body onload="setTimeout(function(){window.print()},250)">
     <div class="doc">${bodyHTML}
+    ${docFooter()}
     <div class="noprint" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="padding:8px 18px;font-size:14px;cursor:pointer">🖨️ In / Lưu PDF</button></div>
     </div></body></html>`);
   w.document.close();
 }
-function docHeader(title,ma){return `<div class="hd"><div class="co">CÔNG TY THÁI NGUYỄN (THNG) — BỘ PHẬN HỖ TRỢ & TRIỂN KHAI</div><div class="ti">${xmlEsc(title)}</div>${ma?`<div class="mc">Số phiếu: <b>${xmlEsc(ma)}</b> · Ngày in: ${new Date().toLocaleDateString('vi-VN')}</div>`:''}</div>`;}
+function docHeader(title,ma){
+  const c=COMPANY||{};
+  const contact=[c.address?('Địa chỉ: '+c.address):'', c.phone?('ĐT: '+c.phone):'', c.email?('Email: '+c.email):'', c.taxCode?('MST: '+c.taxCode):'', c.website||''].filter(Boolean).join('  ·  ');
+  const logo=c.logo?`<img class="lg" src="${c.logo}" alt="logo">`:'';
+  return `<div class="hd">
+    <div class="co-row">${logo}<div class="co-info">
+      ${c.name?`<div class="co">${xmlEsc(c.name)}</div>`:''}
+      ${c.dept?`<div class="dept">${xmlEsc(c.dept)}</div>`:''}
+      ${contact?`<div class="ct">${xmlEsc(contact)}</div>`:''}
+    </div></div>
+    <div class="ti">${xmlEsc(title)}</div>
+    ${ma?`<div class="mc">Số phiếu: <b>${xmlEsc(ma)}</b> · Ngày in: ${new Date().toLocaleDateString('vi-VN')}</div>`:`<div class="mc">Ngày in: ${new Date().toLocaleDateString('vi-VN')}</div>`}</div>`;
+}
+function docFooter(){
+  const c=COMPANY||{};
+  const contact=[c.name, c.phone?('ĐT: '+c.phone):'', c.email||'', c.website||''].filter(Boolean).join('  ·  ');
+  if(!c.footer && !contact) return '';
+  return `<div class="ft"><div class="ft-in">${c.footer?`<div class="ft-note">${xmlEsc(c.footer)}</div>`:''}${contact?`<div class="ft-co">${xmlEsc(contact)}</div>`:''}</div></div>`;
+}
 function kv(pairs){return `<div class="kv">${pairs.map(([k,v])=>`<div>${xmlEsc(k)}</div><div>${v==null||v===''?'—':xmlEsc(v)}</div>`).join("")}</div>`;}
 function signBlock(left,right){return `<div class="sign"><div><div class="r">${xmlEsc(left)}</div><div class="s">(Ký, ghi rõ họ tên)</div><div class="sp"></div></div><div><div class="r">${xmlEsc(right)}</div><div class="s">(Ký, ghi rõ họ tên)</div><div class="sp"></div></div></div>`;}
 function siteDocBlock(t){
