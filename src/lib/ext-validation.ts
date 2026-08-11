@@ -141,3 +141,37 @@ export const priceRuleCreateSchema = z.object({
   note: z.string().optional().nullable(),
   supersedesId: z.string().optional().nullable(),
 });
+
+// ===== Module 10 — Marketing =====
+export const campaignCreateSchema = z.object({
+  code: z.string().min(1).optional(),
+  name: z.string().min(1, "Tên chiến dịch"),
+  channel: z.string().optional().nullable(),
+  startDate: dateOpt,
+  endDate: dateOpt,
+  budget: money,
+  cost: money,
+  targetGroup: z.string().optional().nullable(),
+  owner: z.string().optional().nullable(),
+  status: z.enum(["ACTIVE", "ENDED"]).optional(),
+  note: z.string().optional().nullable(),
+});
+export const campaignUpdateSchema = campaignCreateSchema.partial().omit({ code: true });
+export const leadCreateSchema = z.object({
+  code: z.string().min(1).optional(),
+  name: z.string().min(1, "Tên lead"),
+  phone: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  source: z.string().optional().nullable(),
+  channel: z.string().optional().nullable(),
+  campaignId: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export const leadUpdateSchema = z.object({
+  status: z.enum(["NEW", "CONTACTED", "BOOKED", "WON", "LOST"]).optional(),
+  note: z.string().optional().nullable(),
+  campaignId: z.string().optional().nullable(),
+});
+export const leadConvertSchema = z.object({
+  customerId: z.string().optional().nullable(), // gắn khách có sẵn; nếu không -> tạo mới từ lead
+});

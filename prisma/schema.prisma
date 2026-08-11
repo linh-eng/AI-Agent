@@ -1008,7 +1008,8 @@ model Customer {
   email       String?
   address     String?
   source      String? // Nguồn khách hàng (marketing/campaign/giới thiệu...)
-  campaign    String? // Campaign gốc (mục 9)
+  campaign    String? // Campaign gốc (nhãn text tự do)
+  campaignId  String? // Attribution first-touch tới MarketingCampaign (mục 10)
   group       String? // Nhóm khách hàng (Thường/VIP...)
   tags        String[] @default([])
   assignedTo  String? // Nhân viên phụ trách (tên)
@@ -1030,8 +1031,10 @@ model Customer {
   formInstances   FormInstance[]
   proposals       TreatmentProposal[]
   careInstances   CareInstructionInstance[]
+  marketingCampaign MarketingCampaign? @relation(fields: [campaignId], references: [id])
 
   @@index([phone])
+  @@index([campaignId])
   @@map("customers")
 }
 
@@ -1107,7 +1110,8 @@ model Booking {
   price           Decimal?      @db.Decimal(18, 2) // Giá tại thời điểm booking (bất biến sau hoàn thành)
   discount        Decimal?      @db.Decimal(18, 2)
   deposit         Decimal?      @db.Decimal(18, 2)
-  campaign        String? // Nguồn campaign (mục 9)
+  campaign        String? // Nhãn nguồn campaign (text tự do)
+  campaignId      String? // Attribution tới MarketingCampaign (mục 10)
   note            String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -1117,6 +1121,7 @@ model Booking {
   session  TreatmentSession? // buổi thực hiện gắn với booking (1-1)
   payments Payment[]
   tasks    Task[]
+  marketingCampaign MarketingCampaign? @relation(fields: [campaignId], references: [id])
 
   @@index([scheduledAt])
   @@index([customerId])
@@ -1858,4 +1863,62 @@ model PriceRule {
   @@index([targetType, targetId])
   @@index([isActive])
   @@map("price_rules")
+}
+
+// ============================================================================
+// MODULE 10 — MARKETING / SOURCE / ROI
+// Chiến dịch → Lead → Khách hàng → Booking → Doanh thu. Attribution first-touch
+// (Customer.campaignId / Booking.campaignId) — thiết kế mở để mở rộng multi-touch.
+// ============================================================================
+enum LeadStatus {
+  NEW
+  CONTACTED
+  BOOKED
+  WON // đã chuyển thành khách
+  LOST
+}
+
+model MarketingCampaign {
+  id         String    @id @default(cuid())
+  code       String    @unique
+  name       String
+  channel    String? // kênh marketing (tự do, không hard-code)
+  startDate  DateTime?
+  endDate    DateTime?
+  budget     Decimal?  @db.Decimal(18, 2)
+  cost       Decimal?  @db.Decimal(18, 2) // chi phí thực tế (nhạy cảm)
+  targetGroup String?
+  owner      String?
+  status     String    @default("ACTIVE") // ACTIVE / ENDED
+  note       String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  leads     Lead[]
+  customers Customer[]
+  bookings  Booking[]
+
+  @@map("marketing_campaigns")
+}
+
+model Lead {
+  id         String     @id @default(cuid())
+  code       String     @unique
+  name       String
+  phone      String?
+  email      String?
+  source     String? // nguồn (facebook/zalo/giới thiệu...)
+  channel    String?
+  campaignId String?
+  status     LeadStatus @default(NEW)
+  note       String?
+  convertedCustomerId String? // khi WON -> id khách hàng đã tạo/gắn
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  campaign MarketingCampaign? @relation(fields: [campaignId], references: [id])
+
+  @@index([status])
+  @@index([campaignId])
+  @@map("leads")
 }

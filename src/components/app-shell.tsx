@@ -33,6 +33,7 @@ import {
   FileSpreadsheet,
   BookOpen,
   Tag,
+  Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
@@ -51,6 +52,7 @@ const NAV_GROUPS = [
       { href: "/treatment-plans", label: "Phác đồ", icon: HeartPulse },
       { href: "/proposals", label: "Báo giá", icon: FileSpreadsheet },
       { href: "/pricing", label: "Bảng giá", icon: Tag },
+      { href: "/marketing", label: "Marketing", icon: Megaphone },
       { href: "/tasks", label: "Công việc / Follow-up", icon: ListTodo },
     ],
   },
