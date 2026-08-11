@@ -901,3 +901,385 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
+
+// ============================================================================
+// MODULE SPA / THẨM MỸ — Quản lý Khách hàng · Booking · Dịch vụ · Phác đồ · Chi phí
+// (theo bản mô tả "Hệ thống quản lý Khách hàng – Booking – Dịch vụ – Phác đồ – Chi phí")
+//
+// Nguyên tắc bất biến được mã hóa:
+//   * Dữ liệu nghiệp vụ quan trọng KHÔNG hard-delete — dùng cờ isActive / status
+//     (soft delete) và giữ nguyên bản ghi lịch sử.
+//   * CrmActivity, Payment, TreatmentSession KHÔNG ghi đè — mỗi lần là một record
+//     độc lập tạo thành timeline.
+//   * TreatmentPlan có `version`; Booking đã hoàn thành giữ nguyên `price` tại thời
+//     điểm chốt (không đổi khi bảng giá thay đổi).
+//   * Tác nhân (nhân viên) lưu bằng tên (String) để đồng nhất với phần kho hiện có.
+// ============================================================================
+
+/// Giới tính khách hàng
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+/// Vòng đời booking (mục 6)
+enum BookingStatus {
+  NEW // Mới
+  PENDING // Chờ xác nhận
+  CONFIRMED // Đã xác nhận
+  ARRIVED // Khách đã đến
+  IN_PROGRESS // Đang thực hiện
+  COMPLETED // Hoàn thành
+  CANCELLED // Hủy
+  NO_SHOW // Khách không đến
+  RESCHEDULED // Đổi lịch
+}
+
+/// Loại tương tác CSKH (mục 5) — có thể mở rộng
+enum CrmActivityType {
+  CALL
+  SMS
+  ZALO
+  WHATSAPP
+  EMAIL
+  CONSULT // Tư vấn trực tiếp
+  FEEDBACK // Khách phản hồi
+  COMPLAINT // Khiếu nại
+  INTERNAL_NOTE // Ghi chú nội bộ
+  FOLLOW_UP // Follow-up
+  REMINDER // Nhắc lịch
+  AFTERCARE // Chăm sóc sau dịch vụ
+  OTHER
+}
+
+/// Trạng thái phác đồ khách hàng
+enum PlanStatus {
+  DRAFT // Nháp/thiết kế
+  ACTIVE // Đang thực hiện
+  PAUSED // Tạm dừng
+  COMPLETED // Hoàn thành
+  CANCELLED // Dừng giữa chừng
+}
+
+/// Trạng thái một buổi thực hiện
+enum SessionStatus {
+  PLANNED // Đã lên kế hoạch
+  IN_PROGRESS // Đang thực hiện
+  COMPLETED // Hoàn thành
+  CANCELLED // Hủy
+}
+
+/// Hình thức thanh toán
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  EWALLET
+  OTHER
+}
+
+/// Ưu tiên công việc
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+/// Trạng thái công việc/follow-up
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+// ----------------------------------------------------------------------------
+// KHÁCH HÀNG (mục 4) — hồ sơ trung tâm, mọi dữ liệu liên kết về đây
+// ----------------------------------------------------------------------------
+model Customer {
+  id          String    @id @default(cuid())
+  code        String    @unique // Mã khách hàng KH-xxxx
+  fullName    String
+  dob         DateTime?
+  gender      Gender?
+  phone       String?
+  email       String?
+  address     String?
+  source      String? // Nguồn khách hàng (marketing/campaign/giới thiệu...)
+  campaign    String? // Campaign gốc (mục 9)
+  group       String? // Nhóm khách hàng (Thường/VIP...)
+  tags        String[] @default([])
+  assignedTo  String? // Nhân viên phụ trách (tên)
+  goals       String? // Mong muốn/mục tiêu tổng quát của khách
+  note        String?
+  customFields Json? // Custom Fields do doanh nghiệp tự thêm
+  isActive    Boolean   @default(true) // soft delete
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  activities  CrmActivity[]
+  bookings    Booking[]
+  assessments Assessment[]
+  plans       TreatmentPlan[]
+  sessions    TreatmentSession[]
+  payments    Payment[]
+  tasks       Task[]
+
+  @@index([phone])
+  @@map("customers")
+}
+
+// ----------------------------------------------------------------------------
+// NHẬT KÝ CSKH — CRM TIMELINE (mục 5) — append-only, không ghi đè
+// ----------------------------------------------------------------------------
+model CrmActivity {
+  id            String          @id @default(cuid())
+  customerId    String
+  type          CrmActivityType
+  content       String
+  result        String?
+  occurredAt    DateTime        @default(now())
+  performedBy   String? // Người thực hiện (tên)
+  attachments   String[]        @default([]) // file/hình đính kèm (URL)
+  nextAction    String? // Công việc tiếp theo
+  followUpDate  DateTime? // Ngày cần follow-up tiếp theo
+  followUpOwner String? // Người chịu trách nhiệm follow-up
+  createdAt     DateTime        @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId, occurredAt])
+  @@map("crm_activities")
+}
+
+// ----------------------------------------------------------------------------
+// DỊCH VỤ (mục 7) + nhóm dịch vụ
+// ----------------------------------------------------------------------------
+model ServiceCategory {
+  id       String    @id @default(cuid())
+  code     String    @unique
+  name     String
+  services Service[]
+
+  @@map("service_categories")
+}
+
+model Service {
+  id              String   @id @default(cuid())
+  code            String   @unique // Mã dịch vụ
+  name            String
+  categoryId      String?
+  description     String?
+  durationMinutes Int? // Thời gian thực hiện
+  standardPrice   Decimal  @default(0) @db.Decimal(18, 2) // Giá chuẩn
+  expectedCost    Decimal? @db.Decimal(18, 2) // Giá vốn dự kiến (nhạy cảm)
+  process         String? // Quy trình thực hiện
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  category ServiceCategory?   @relation(fields: [categoryId], references: [id])
+  bookings Booking[]
+  sessions TreatmentSession[]
+
+  @@map("services")
+}
+
+// ----------------------------------------------------------------------------
+// BOOKING (mục 6) — module trung tâm
+// ----------------------------------------------------------------------------
+model Booking {
+  id              String        @id @default(cuid())
+  code            String        @unique // Mã booking
+  customerId      String
+  serviceId       String?
+  scheduledAt     DateTime // Ngày + giờ
+  durationMinutes Int?
+  branch          String?
+  room            String?
+  performer       String? // Người thực hiện (tên)
+  status          BookingStatus @default(NEW)
+  price           Decimal?      @db.Decimal(18, 2) // Giá tại thời điểm booking (bất biến sau hoàn thành)
+  discount        Decimal?      @db.Decimal(18, 2)
+  deposit         Decimal?      @db.Decimal(18, 2)
+  campaign        String? // Nguồn campaign (mục 9)
+  note            String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  customer Customer          @relation(fields: [customerId], references: [id])
+  service  Service?          @relation(fields: [serviceId], references: [id])
+  session  TreatmentSession? // buổi thực hiện gắn với booking (1-1)
+  payments Payment[]
+  tasks    Task[]
+
+  @@index([scheduledAt])
+  @@index([customerId])
+  @@map("bookings")
+}
+
+// ----------------------------------------------------------------------------
+// ĐÁNH GIÁ TÌNH TRẠNG (mục 10) — có thể đánh giá lại nhiều lần
+// ----------------------------------------------------------------------------
+model Assessment {
+  id          String   @id @default(cuid())
+  customerId  String
+  name        String // Tên tình trạng
+  area        String? // Vùng cần thực hiện
+  severity    String? // Mức độ
+  description String?
+  indicators  Json? // Chỉ số + custom fields
+  images      String[] @default([])
+  note        String? // Nhận xét chuyên viên
+  assessedBy  String? // Người đánh giá
+  assessedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId, assessedAt])
+  @@map("assessments")
+}
+
+// ----------------------------------------------------------------------------
+// PHÁC ĐỒ KHÁCH HÀNG (mục 11–16) — Treatment Plan + giai đoạn + buổi
+// ----------------------------------------------------------------------------
+model TreatmentPlan {
+  id          String     @id @default(cuid())
+  code        String     @unique
+  customerId  String
+  name        String
+  version     Int        @default(1) // phác đồ có version
+  status      PlanStatus @default(DRAFT)
+  goals       String? // Mục tiêu
+  diagnosis   String? // Tình trạng/vấn đề chính
+  totalPrice  Decimal?   @db.Decimal(18, 2)
+  discount    Decimal?   @db.Decimal(18, 2)
+  changeLog   Json? // Lịch sử thay đổi version (ai/khi/nội dung/lý do)
+  createdBy   String?
+  note        String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  customer Customer           @relation(fields: [customerId], references: [id])
+  stages   TreatmentStage[]
+  sessions TreatmentSession[]
+  payments Payment[]
+  tasks    Task[]
+
+  @@index([customerId])
+  @@map("treatment_plans")
+}
+
+model TreatmentStage {
+  id          String  @id @default(cuid())
+  planId      String
+  name        String // Giai đoạn (Chuẩn bị/Can thiệp/Phục hồi/Duy trì...)
+  orderIndex  Int     @default(0)
+  description String?
+
+  plan     TreatmentPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  sessions TreatmentSession[]
+
+  @@index([planId, orderIndex])
+  @@map("treatment_stages")
+}
+
+/// Mỗi buổi thực hiện là một record độc lập (mục 16) — không ghi đè buổi trước
+model TreatmentSession {
+  id              String        @id @default(cuid())
+  planId          String
+  stageId         String?
+  customerId      String
+  bookingId       String?       @unique
+  serviceId       String?
+  sessionNumber   Int // Buổi số mấy
+  name            String?
+  status          SessionStatus @default(PLANNED)
+  scheduledAt     DateTime?
+  performedAt     DateTime?
+  performer       String?
+  objective       String? // Mục tiêu buổi
+  plannedParams   Json? // Thông số dự kiến
+  actualParams    Json? // Thông số thực tế
+  plannedMaterials Json? // Vật tư dự kiến
+  actualMaterials Json? // Vật tư thực tế (liên kết chi phí)
+  conditionBefore String?
+  conditionAfter  String?
+  beforeImages    String[]      @default([]) // Báo cáo trước (mục 17)
+  afterImages     String[]      @default([]) // Báo cáo sau
+  customerFeedback String?
+  preCare         String? // Dặn dò trước
+  postCare        String? // Dặn dò sau
+  plannedCost     Decimal?      @db.Decimal(18, 2)
+  actualCost      Decimal?      @db.Decimal(18, 2) // Chi phí thực tế (mục 20)
+  price           Decimal?      @db.Decimal(18, 2)
+  note            String?
+  checkedBy       String? // Người kiểm tra/phê duyệt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  plan     TreatmentPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  stage    TreatmentStage? @relation(fields: [stageId], references: [id])
+  customer Customer        @relation(fields: [customerId], references: [id])
+  booking  Booking?        @relation(fields: [bookingId], references: [id])
+  service  Service?        @relation(fields: [serviceId], references: [id])
+  tasks    Task[]
+
+  @@index([planId, sessionNumber])
+  @@index([customerId])
+  @@map("treatment_sessions")
+}
+
+// ----------------------------------------------------------------------------
+// THANH TOÁN & CÔNG NỢ (mục 21) — nhiều lần thanh toán, append-only
+// ----------------------------------------------------------------------------
+model Payment {
+  id         String        @id @default(cuid())
+  customerId String
+  planId     String?
+  bookingId  String?
+  amount     Decimal       @db.Decimal(18, 2)
+  method     PaymentMethod @default(CASH)
+  paidAt     DateTime      @default(now())
+  receivedBy String?
+  note       String?
+  createdAt  DateTime      @default(now())
+
+  customer Customer       @relation(fields: [customerId], references: [id])
+  plan     TreatmentPlan? @relation(fields: [planId], references: [id])
+  booking  Booking?       @relation(fields: [bookingId], references: [id])
+
+  @@index([customerId, paidAt])
+  @@map("payments")
+}
+
+// ----------------------------------------------------------------------------
+// TASK & FOLLOW-UP (mục 22)
+// ----------------------------------------------------------------------------
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  customerId  String?
+  bookingId   String?
+  planId      String?
+  sessionId   String?
+  assignee    String? // Người phụ trách (tên)
+  dueDate     DateTime?
+  priority    TaskPriority @default(NORMAL)
+  status      TaskStatus   @default(OPEN)
+  createdBy   String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  customer Customer?         @relation(fields: [customerId], references: [id])
+  booking  Booking?          @relation(fields: [bookingId], references: [id])
+  plan     TreatmentPlan?    @relation(fields: [planId], references: [id])
+  session  TreatmentSession? @relation(fields: [sessionId], references: [id])
+
+  @@index([status, dueDate])
+  @@index([customerId])
+  @@map("tasks")
+}

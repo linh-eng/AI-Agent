@@ -21,6 +21,10 @@ import {
   ShieldCheck,
   Hammer,
   BarChart3,
+  Sparkles,
+  CalendarDays,
+  HeartPulse,
+  ListTodo,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
@@ -28,23 +32,38 @@ import type { SessionPayload } from "@/lib/auth";
 import { ROLE_LABELS, type RoleCode } from "@/lib/rbac";
 import { SessionProvider } from "@/components/session-provider";
 
-const NAV = [
-  { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
-  { href: "/inventory", label: "Tồn kho", icon: Gauge },
-  { href: "/inbound", label: "Nhập kho", icon: PackagePlus },
-  { href: "/outbound", label: "Xuất kho", icon: PackageMinus },
-  { href: "/work-orders", label: "Lắp ráp", icon: Wrench },
-  { href: "/warranty", label: "Bảo hành / RMA", icon: ShieldCheck },
-  { href: "/disassembly", label: "Rã máy", icon: Hammer },
-  { href: "/stock-counts", label: "Kiểm kê", icon: ClipboardList },
-  { href: "/serials", label: "Serial", icon: ScanBarcode },
-  { href: "/lots", label: "Lô hàng", icon: Boxes },
-  { href: "/reports", label: "Báo cáo", icon: BarChart3 },
-  { href: "/warehouses", label: "Danh mục kho", icon: Warehouse },
-  { href: "/bins", label: "Vị trí kệ", icon: MapPin },
-  { href: "/projects", label: "Dự án", icon: FolderKanban },
-  { href: "/partners", label: "NCC / Khách hàng", icon: Users },
-  { href: "/products", label: "Sản phẩm", icon: Package },
+const NAV_GROUPS = [
+  {
+    title: "Spa & CRM",
+    items: [
+      { href: "/crm", label: "Tổng quan", icon: LayoutDashboard },
+      { href: "/customers", label: "Khách hàng", icon: Users },
+      { href: "/bookings", label: "Booking", icon: CalendarDays },
+      { href: "/services", label: "Dịch vụ", icon: Sparkles },
+      { href: "/treatment-plans", label: "Phác đồ", icon: HeartPulse },
+      { href: "/tasks", label: "Công việc / Follow-up", icon: ListTodo },
+    ],
+  },
+  {
+    title: "Kho THNG",
+    items: [
+      { href: "/dashboard", label: "Tổng quan kho", icon: Gauge },
+      { href: "/inventory", label: "Tồn kho", icon: Boxes },
+      { href: "/inbound", label: "Nhập kho", icon: PackagePlus },
+      { href: "/outbound", label: "Xuất kho", icon: PackageMinus },
+      { href: "/work-orders", label: "Lắp ráp", icon: Wrench },
+      { href: "/warranty", label: "Bảo hành / RMA", icon: ShieldCheck },
+      { href: "/disassembly", label: "Rã máy", icon: Hammer },
+      { href: "/stock-counts", label: "Kiểm kê", icon: ClipboardList },
+      { href: "/serials", label: "Serial", icon: ScanBarcode },
+      { href: "/reports", label: "Báo cáo", icon: BarChart3 },
+      { href: "/warehouses", label: "Danh mục kho", icon: Warehouse },
+      { href: "/bins", label: "Vị trí kệ", icon: MapPin },
+      { href: "/projects", label: "Dự án", icon: FolderKanban },
+      { href: "/partners", label: "NCC / Đối tác", icon: Users },
+      { href: "/products", label: "Sản phẩm", icon: Package },
+    ],
+  },
 ];
 
 export function AppShell({
@@ -79,31 +98,39 @@ export function AppShell({
       >
         <div className="flex h-14 items-center gap-2 border-b px-4">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Warehouse className="h-4 w-4" />
+            <Sparkles className="h-4 w-4" />
           </div>
-          <span className="font-semibold">THNG Kho</span>
+          <span className="font-semibold">THNG Suite</span>
         </div>
-        <nav className="space-y-1 p-3">
-          {NAV.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="max-h-[calc(100vh-3.5rem)] space-y-4 overflow-y-auto p-3">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.title} className="space-y-1">
+              <div className="px-3 pb-1 pt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+                {group.title}
+              </div>
+              {group.items.map((item) => {
+                const active =
+                  pathname === item.href || pathname.startsWith(item.href + "/");
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      active
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
       </aside>
 

@@ -64,6 +64,13 @@ async function main() {
     { email: "qc@thng.com.vn", name: "Hoàng QC", role: ROLES.QC, password: "qc123" },
     { email: "kinhdoanh@thng.com.vn", name: "Đỗ Kinh Doanh", role: ROLES.SALES, password: "kinhdoanh123" },
     { email: "baohanh@thng.com.vn", name: "Vũ Bảo Hành", role: ROLES.WARRANTY, password: "baohanh123" },
+    // --- Module Spa / Thẩm mỹ ---
+    { email: "quanly@thng.com.vn", name: "Trần Quản Lý", role: ROLES.MANAGER, password: "quanly123" },
+    { email: "letan@thng.com.vn", name: "Nguyễn Lễ Tân", role: ROLES.RECEPTION, password: "letan123" },
+    { email: "cskh@thng.com.vn", name: "Lê Thị CSKH", role: ROLES.CUSTOMER_CARE, password: "cskh123" },
+    { email: "chuyenvien@thng.com.vn", name: "Phạm Chuyên Viên", role: ROLES.SPECIALIST, password: "chuyenvien123" },
+    { email: "thungan@thng.com.vn", name: "Đỗ Thu Ngân", role: ROLES.CASHIER, password: "thungan123" },
+    { email: "marketing@thng.com.vn", name: "Vũ Marketing", role: ROLES.MARKETING, password: "marketing123" },
   ];
   for (const u of users) {
     const user = await prisma.user.upsert({
@@ -381,9 +388,216 @@ async function main() {
     },
   });
 
+  // --- 10. MODULE SPA — dịch vụ + khách hàng + hành trình mẫu -----------------
+  // Nhóm & dịch vụ
+  const catFacial = await prisma.serviceCategory.upsert({
+    where: { code: "NHOM-FACIAL" },
+    update: { name: "Chăm sóc da mặt" },
+    create: { code: "NHOM-FACIAL", name: "Chăm sóc da mặt" },
+  });
+  const catLaser = await prisma.serviceCategory.upsert({
+    where: { code: "NHOM-LASER" },
+    update: { name: "Công nghệ cao / Laser" },
+    create: { code: "NHOM-LASER", name: "Công nghệ cao / Laser" },
+  });
+
+  async function ensureService(data: {
+    code: string;
+    name: string;
+    categoryId?: string;
+    durationMinutes?: number;
+    standardPrice: number;
+    expectedCost?: number;
+  }) {
+    return prisma.service.upsert({
+      where: { code: data.code },
+      update: { name: data.name, standardPrice: data.standardPrice },
+      create: data,
+    });
+  }
+  const svcDeepClean = await ensureService({ code: "DV-FACIAL-01", name: "Facial làm sạch sâu", categoryId: catFacial.id, durationMinutes: 60, standardPrice: 800_000, expectedCost: 250_000 });
+  await ensureService({ code: "DV-FACIAL-02", name: "Điện di dưỡng ẩm", categoryId: catFacial.id, durationMinutes: 45, standardPrice: 600_000, expectedCost: 180_000 });
+  const svcLaser = await ensureService({ code: "DV-LASER-01", name: "Laser trị nám Pico", categoryId: catLaser.id, durationMinutes: 40, standardPrice: 2_500_000, expectedCost: 700_000 });
+
+  // Khách hàng mẫu + hành trình đầy đủ (mục 23)
+  const existingCust = await prisma.customer.findUnique({ where: { code: "KH-000001" } });
+  if (!existingCust) {
+    const cust = await prisma.customer.create({
+      data: {
+        code: "KH-000001",
+        fullName: "Nguyễn Thị An",
+        gender: "FEMALE",
+        phone: "0909000111",
+        email: "an.nguyen@example.com",
+        source: "Facebook Ads",
+        campaign: "SUMMER-2026",
+        group: "VIP",
+        assignedTo: "Phạm Chuyên Viên",
+        goals: "Cải thiện nám, làm sáng da",
+        tags: ["nám", "da nhạy cảm"],
+      },
+    });
+
+    // Đánh giá tình trạng
+    await prisma.assessment.create({
+      data: {
+        customerId: cust.id,
+        name: "Nám má hai bên",
+        area: "Gò má",
+        severity: "Vừa",
+        description: "Nám mảng, chân nông–sâu hỗn hợp",
+        assessedBy: "Phạm Chuyên Viên",
+        indicators: { melanin: "cao", doDamHong: 3 },
+      },
+    });
+
+    // Phác đồ + giai đoạn + buổi
+    const plan = await prisma.treatmentPlan.create({
+      data: {
+        code: "TP-000001",
+        customerId: cust.id,
+        name: "Phác đồ trị nám 6 buổi",
+        version: 1,
+        status: "ACTIVE",
+        diagnosis: "Nám má mức độ vừa",
+        goals: "Giảm 70% nám sau 6 buổi, làm sáng đều màu",
+        totalPrice: 15_000_000,
+        createdBy: "Phạm Chuyên Viên",
+        stages: {
+          create: [
+            { name: "Chuẩn bị", orderIndex: 0, description: "Làm sạch, dưỡng ẩm nền" },
+            { name: "Can thiệp", orderIndex: 1, description: "Laser Pico định kỳ" },
+            { name: "Duy trì", orderIndex: 2, description: "Chăm sóc tại nhà" },
+          ],
+        },
+      },
+      include: { stages: { orderBy: { orderIndex: "asc" } } },
+    });
+    const stagePrep = plan.stages[0];
+    const stageInterv = plan.stages[1];
+
+    // Buổi 1 — đã hoàn thành (có before/after + chi phí thực tế)
+    const booking1 = await prisma.booking.create({
+      data: {
+        code: "BK-000001",
+        customerId: cust.id,
+        serviceId: svcDeepClean.id,
+        scheduledAt: new Date("2026-07-20T09:00:00Z"),
+        durationMinutes: 60,
+        room: "Phòng 1",
+        performer: "Phạm Chuyên Viên",
+        status: "COMPLETED",
+        price: 800_000,
+        campaign: "SUMMER-2026",
+      },
+    });
+    await prisma.treatmentSession.create({
+      data: {
+        planId: plan.id,
+        stageId: stagePrep.id,
+        customerId: cust.id,
+        bookingId: booking1.id,
+        serviceId: svcDeepClean.id,
+        sessionNumber: 1,
+        name: "Làm sạch & soi da nền",
+        status: "COMPLETED",
+        scheduledAt: new Date("2026-07-20T09:00:00Z"),
+        performedAt: new Date("2026-07-20T09:10:00Z"),
+        performer: "Phạm Chuyên Viên",
+        objective: "Làm sạch sâu, chuẩn bị nền da",
+        actualParams: { do_am: 42, do_dau: 30 },
+        actualMaterials: { text: "1 mặt nạ dịu nhẹ, 1 serum HA" },
+        conditionBefore: "Da xỉn màu, nám rõ",
+        conditionAfter: "Da sạch, dịu",
+        customerFeedback: "Hài lòng, da mềm hơn",
+        plannedCost: 250_000,
+        actualCost: 240_000,
+        price: 800_000,
+        checkedBy: "Trần Quản Lý",
+      },
+    });
+
+    // Buổi 2 — Laser, dự kiến (PLANNED)
+    await prisma.treatmentSession.create({
+      data: {
+        planId: plan.id,
+        stageId: stageInterv.id,
+        customerId: cust.id,
+        serviceId: svcLaser.id,
+        sessionNumber: 2,
+        name: "Laser Pico lần 1",
+        status: "PLANNED",
+        scheduledAt: new Date("2026-08-15T09:00:00Z"),
+        objective: "Bắn laser vùng gò má",
+        plannedParams: { buoc_song: "1064nm", nang_luong: "0.8J" },
+        plannedCost: 700_000,
+        price: 2_500_000,
+        preCare: "Không dùng AHA/BHA 3 ngày trước",
+      },
+    });
+
+    // Booking sắp tới cho buổi 2
+    await prisma.booking.create({
+      data: {
+        code: "BK-000002",
+        customerId: cust.id,
+        serviceId: svcLaser.id,
+        scheduledAt: new Date("2026-08-15T09:00:00Z"),
+        durationMinutes: 40,
+        room: "Phòng Laser",
+        performer: "Phạm Chuyên Viên",
+        status: "CONFIRMED",
+        price: 2_500_000,
+      },
+    });
+
+    // Nhật ký CSKH
+    await prisma.crmActivity.create({
+      data: {
+        customerId: cust.id,
+        type: "CALL",
+        content: "Gọi hỏi tình trạng sau buổi 1, khách phản hồi tốt.",
+        result: "Tốt",
+        performedBy: "Lê Thị CSKH",
+        occurredAt: new Date("2026-07-23T03:30:00Z"),
+        nextAction: "Nhắc lịch buổi Laser",
+        followUpDate: new Date("2026-08-13T02:00:00Z"),
+        followUpOwner: "Lê Thị CSKH",
+      },
+    });
+
+    // Thanh toán (đặt cọc)
+    await prisma.payment.create({
+      data: {
+        customerId: cust.id,
+        planId: plan.id,
+        amount: 5_000_000,
+        method: "TRANSFER",
+        receivedBy: "Đỗ Thu Ngân",
+        note: "Đặt cọc phác đồ trị nám",
+        paidAt: new Date("2026-07-20T10:00:00Z"),
+      },
+    });
+
+    // Task follow-up
+    await prisma.task.create({
+      data: {
+        title: "Nhắc khách lịch Laser buổi 2",
+        customerId: cust.id,
+        assignee: "Lê Thị CSKH",
+        dueDate: new Date("2026-08-13T02:00:00Z"),
+        priority: "HIGH",
+        status: "OPEN",
+        createdBy: "Lê Thị CSKH",
+      },
+    });
+  }
+
   console.log("✅ Seed hoàn tất.");
-  console.log("   Đăng nhập demo: admin@thng.com.vn / admin123");
+  console.log("   Đăng nhập kho: admin@thng.com.vn / admin123");
+  console.log("   Đăng nhập spa: quanly@thng.com.vn / quanly123 (Quản lý)");
   console.log("   Máy lắp ráp mẫu: WS-PRO-2026-0001 (as-built BOM v1, BH 2 tầng)");
+  console.log("   Khách spa mẫu: KH-000001 Nguyễn Thị An (phác đồ TP-000001)");
 }
 
 main()
