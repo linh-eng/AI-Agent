@@ -17,7 +17,7 @@ catch (e) {
   process.exit(1);
 }
 
-const APP_VERSION = "v3.9"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
+const APP_VERSION = "v3.9.1"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 const ROOT = __dirname;
@@ -375,7 +375,8 @@ function seedTickets() {
 const MIME = { ".html":"text/html; charset=utf-8", ".js":"text/javascript; charset=utf-8", ".css":"text/css; charset=utf-8",
   ".json":"application/json; charset=utf-8", ".svg":"image/svg+xml", ".ico":"image/x-icon", ".png":"image/png" };
 function sendJSON(res, code, obj, headers) { const s = JSON.stringify(obj); res.writeHead(code, Object.assign({ "Content-Type":"application/json; charset=utf-8", "Cache-Control":"no-store" }, headers||{})); res.end(s); }
-function readBody(req, max) { const cap = max || 5e6; return new Promise(r => { let b=""; req.on("data", c => { b+=c; if (b.length>cap) req.destroy(); }); req.on("end", () => { try { r(b?JSON.parse(b):{}); } catch { r({}); } }); }); }
+// Gom nguyên byte rồi mới giải mã UTF-8 MỘT LẦN — tránh vỡ ký tự nhiều byte (vd "Đ") khi bị cắt giữa 2 gói dữ liệu (body lớn)
+function readBody(req, max) { const cap = max || 5e6; return new Promise(r => { const chunks=[]; let len=0; req.on("data", c => { chunks.push(c); len += c.length; if (len>cap) req.destroy(); }); req.on("end", () => { try { const s = Buffer.concat(chunks).toString("utf8"); r(s ? JSON.parse(s) : {}); } catch { r({}); } }); }); }
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
