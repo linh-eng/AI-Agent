@@ -593,11 +593,153 @@ async function main() {
     });
   }
 
+  // --- 11. THƯ VIỆN SPA: Brand · Technology · Protocol · Product · Form -------
+  const brandDMK = await prisma.brand.upsert({
+    where: { code: "BR-DMK" },
+    update: { name: "DMK" },
+    create: { code: "BR-DMK", name: "DMK", description: "Danné Montague-King — enzyme therapy" },
+  });
+  await prisma.brand.upsert({
+    where: { code: "BR-DERMA" },
+    update: { name: "Dermalogica" },
+    create: { code: "BR-DERMA", name: "Dermalogica", description: "Professional skin care" },
+  });
+
+  const techPico = await prisma.technology.upsert({
+    where: { code: "CN-PICO" },
+    update: { name: "Laser Pico" },
+    create: {
+      code: "CN-PICO",
+      name: "Laser Pico",
+      group: "Laser",
+      deviceModel: "PicoSure",
+      area: "Mặt",
+      durationMinutes: 40,
+      indications: "Nám, tàn nhang, đồi mồi",
+      contraindications: "Da đang viêm, mang thai",
+      parameters: { buoc_song: "755nm", che_do: "Focus" },
+    },
+  });
+
+  const spDmkEnzyme = await prisma.spaProduct.upsert({
+    where: { sku: "SP-DMK-ENZYME" },
+    update: { name: "DMK Enzyme Masque" },
+    create: { sku: "SP-DMK-ENZYME", name: "DMK Enzyme Masque", brandId: brandDMK.id, category: "Mặt nạ", productType: "PROFESSIONAL", sellingPrice: 0, cost: 350_000 },
+  });
+  const spSerum = await prisma.spaProduct.upsert({
+    where: { sku: "SP-HA-SERUM" },
+    update: { name: "Serum HA phục hồi" },
+    create: { sku: "SP-HA-SERUM", name: "Serum HA phục hồi", brandId: brandDMK.id, category: "Serum", productType: "HOME_CARE", sellingPrice: 1_200_000, cost: 400_000, benefits: "Cấp ẩm, phục hồi hàng rào da" },
+  });
+  await prisma.spaProduct.upsert({
+    where: { sku: "SP-SPF50" },
+    update: { name: "Kem chống nắng SPF50" },
+    create: { sku: "SP-SPF50", name: "Kem chống nắng SPF50", category: "Chống nắng", productType: "HOME_CARE", sellingPrice: 650_000, cost: 200_000 },
+  });
+
+  const protoDmk = await prisma.brandProtocol.upsert({
+    where: { code: "PROTO-DMK-BRIGHT" },
+    update: { name: "DMK Enzyme Brightening" },
+    create: {
+      code: "PROTO-DMK-BRIGHT",
+      name: "DMK Enzyme Brightening",
+      kind: "BRAND",
+      brandId: brandDMK.id,
+      status: "ACTIVE",
+      purpose: "Làm sáng, đều màu da, hỗ trợ trị nám",
+      suitableFor: "Da nám, xỉn màu",
+      contraindications: "Da đang kích ứng nặng",
+      steps: { items: [{ name: "Làm sạch", durationMinutes: 10 }, { name: "Enzyme masque", durationMinutes: 45 }, { name: "Dưỡng phục hồi", durationMinutes: 15 }] },
+      durationMinutes: 70,
+      recommendedFreq: "2 tuần/lần",
+      recommendedCount: 6,
+      createdBy: "Phạm Chuyên Viên",
+    },
+  });
+  // Liên kết protocol ↔ công nghệ + sản phẩm (idempotent)
+  await prisma.brandProtocolTechnology.upsert({
+    where: { brandProtocolId_technologyId: { brandProtocolId: protoDmk.id, technologyId: techPico.id } },
+    update: {},
+    create: { brandProtocolId: protoDmk.id, technologyId: techPico.id },
+  });
+  await prisma.brandProtocolProduct.upsert({
+    where: { brandProtocolId_spaProductId: { brandProtocolId: protoDmk.id, spaProductId: spDmkEnzyme.id } },
+    update: {},
+    create: { brandProtocolId: protoDmk.id, spaProductId: spDmkEnzyme.id, usage: "Đắp enzyme masque" },
+  });
+
+  // Biểu mẫu mẫu: đánh giá da có conditional logic (nếu Nặng -> hiện nhóm chuyên sâu)
+  const fCond = "fld_cond_mucdo";
+  const fDeep = "fld_deep_note";
+  const formSchema = {
+    sections: [
+      {
+        id: "sec_main",
+        title: "Đánh giá da",
+        groups: [
+          {
+            id: "grp_main",
+            title: "",
+            fields: [
+              { id: "fld_vung", type: "BODY_AREA", label: "Vùng", options: [{ label: "Trán", value: "tran" }, { label: "Má", value: "ma" }, { label: "Cằm", value: "cam" }] },
+              { id: fCond, type: "DROPDOWN", label: "Mức độ", required: true, options: [{ label: "Nhẹ", value: "nhe" }, { label: "Vừa", value: "vua" }, { label: "Nặng", value: "nang" }] },
+              { id: "fld_melanin", type: "NUMBER", label: "Chỉ số melanin" },
+            ],
+          },
+        ],
+      },
+      {
+        id: "sec_deep",
+        title: "Đánh giá chuyên sâu",
+        groups: [
+          { id: "grp_deep", title: "", fields: [{ id: fDeep, type: "LONG_TEXT", label: "Ghi chú chuyên sâu" }] },
+        ],
+      },
+    ],
+    logic: [
+      { id: "rule1", match: "ALL", conditions: [{ fieldId: fCond, op: "eq", value: "nang" }], action: "show", targets: ["sec_deep", fDeep] },
+    ],
+  };
+  await prisma.formTemplate.upsert({
+    where: { code: "FORM-SKIN-ASSESS" },
+    update: { schema: formSchema as any },
+    create: {
+      code: "FORM-SKIN-ASSESS",
+      name: "Phiếu đánh giá da",
+      category: "Đánh giá",
+      status: "ACTIVE",
+      schema: formSchema as any,
+      createdBy: "Phạm Chuyên Viên",
+    },
+  });
+
+  // Đề xuất sản phẩm cho khách demo (nếu có)
+  const demoCust = await prisma.customer.findUnique({ where: { code: "KH-000001" } });
+  if (demoCust) {
+    const existingRec = await prisma.productRecommendation.findFirst({ where: { customerId: demoCust.id, spaProductId: spSerum.id } });
+    if (!existingRec) {
+      await prisma.productRecommendation.create({
+        data: {
+          customerId: demoCust.id,
+          spaProductId: spSerum.id,
+          priority: "ESSENTIAL",
+          reason: "Phục hồi hàng rào da sau laser",
+          goal: "Cấp ẩm, giảm kích ứng",
+          quantity: 1,
+          price: 1_200_000,
+          createdBy: "Phạm Chuyên Viên",
+        },
+      });
+    }
+  }
+
   console.log("✅ Seed hoàn tất.");
   console.log("   Đăng nhập kho: admin@thng.com.vn / admin123");
   console.log("   Đăng nhập spa: quanly@thng.com.vn / quanly123 (Quản lý)");
   console.log("   Máy lắp ráp mẫu: WS-PRO-2026-0001 (as-built BOM v1, BH 2 tầng)");
   console.log("   Khách spa mẫu: KH-000001 Nguyễn Thị An (phác đồ TP-000001)");
+  console.log("   Thư viện: brand DMK, công nghệ Laser Pico, protocol DMK Enzyme Brightening,");
+  console.log("             biểu mẫu FORM-SKIN-ASSESS (có conditional logic).");
 }
 
 main()

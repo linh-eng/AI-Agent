@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Plus, ArrowLeft, GitBranch } from "lucide-react";
+import { Plus, ArrowLeft, GitBranch, GripVertical } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -46,15 +46,38 @@ export default function TreatmentPlanDetailPage() {
   const [p, setP] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<Opt[]>([]);
+  const [technologies, setTechnologies] = useState<Opt[]>([]);
+  const [protocols, setProtocols] = useState<Opt[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [record, setRecord] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try { setP(await apiFetch<Plan>(`/api/treatment-plans/${id}`)); } finally { setLoading(false); }
   }, [id]);
-  useEffect(() => { load(); apiFetch<Opt[]>("/api/services").then(setServices).catch(() => {}); }, [load]);
+  useEffect(() => {
+    load();
+    apiFetch<Opt[]>("/api/services").then(setServices).catch(() => {});
+    apiFetch<Opt[]>("/api/technologies").then(setTechnologies).catch(() => {});
+    apiFetch<Opt[]>("/api/brand-protocols").then(setProtocols).catch(() => {});
+  }, [load]);
+
+  // Kéo–thả sắp xếp buổi -> lưu orderIndex
+  async function reorder(fromId: string, toId: string) {
+    if (!p || fromId === toId) return;
+    const ids = p.sessions.map((s) => s.id);
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(toId);
+    if (from < 0 || to < 0) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    const order = ids.map((sid, i) => ({ id: sid, orderIndex: i }));
+    // cập nhật lạc quan
+    setP({ ...p, sessions: order.map((o) => p.sessions.find((s) => s.id === o.id)!).filter(Boolean) });
+    await apiFetch("/api/treatment-sessions/reorder", { method: "PATCH", body: JSON.stringify({ order }) }).catch(() => {});
+    load();
+  }
 
   async function setStatus(status: string) {
     await apiFetch(`/api/treatment-plans/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }).catch(() => {});
@@ -126,7 +149,9 @@ export default function TreatmentPlanDetailPage() {
           <Table>
             <THead>
               <TR>
+                {canWrite && <TH></TH>}
                 <TH>Buổi</TH><TH>Tên / mục tiêu</TH><TH>Giai đoạn</TH><TH>Dịch vụ</TH>
+                <TH>Công nghệ</TH><TH>Protocol</TH>
                 <TH>Lịch</TH><TH>Thực hiện</TH>
                 {p.canSeeFinance && <TH className="text-right">Chi phí TT</TH>}
                 <TH>Trạng thái</TH><TH></TH>
@@ -134,14 +159,24 @@ export default function TreatmentPlanDetailPage() {
             </THead>
             <TBody>
               {p.sessions.length === 0 ? (
-                <TR><TD colSpan={p.canSeeFinance ? 9 : 8} className="py-8 text-center text-muted-foreground">Chưa có buổi nào</TD></TR>
+                <TR><TD colSpan={p.canSeeFinance ? 12 : 11} className="py-8 text-center text-muted-foreground">Chưa có buổi nào</TD></TR>
               ) : (
                 p.sessions.map((s) => (
-                  <TR key={s.id}>
+                  <TR
+                    key={s.id}
+                    draggable={canWrite}
+                    onDragStart={() => setDragId(s.id)}
+                    onDragOver={(e) => canWrite && e.preventDefault()}
+                    onDrop={() => { if (dragId) reorder(dragId, s.id); setDragId(null); }}
+                    className={dragId === s.id ? "opacity-50" : ""}
+                  >
+                    {canWrite && <TD className="cursor-grab text-muted-foreground"><GripVertical className="h-4 w-4" /></TD>}
                     <TD className="font-medium">#{s.sessionNumber}</TD>
                     <TD>{s.name ?? s.objective ?? "—"}</TD>
                     <TD>{s.stage?.name ?? "—"}</TD>
                     <TD>{s.service?.name ?? "—"}</TD>
+                    <TD>{s.technology?.name ?? "—"}</TD>
+                    <TD>{s.brandProtocol?.name ?? "—"}</TD>
                     <TD>{s.scheduledAt ? formatDate(s.scheduledAt) : "—"}</TD>
                     <TD>{s.performedAt ? formatDate(s.performedAt) : "—"}</TD>
                     {p.canSeeFinance && <TD className="text-right text-muted-foreground">{s.actualCost != null ? formatNumber(Number(s.actualCost)) + " ₫" : "—"}</TD>}
@@ -154,6 +189,7 @@ export default function TreatmentPlanDetailPage() {
           </Table>
         </CardContent>
       </Card>
+      {canWrite && p.sessions.length > 1 && <p className="mt-2 text-xs text-muted-foreground">Kéo–thả các dòng để sắp xếp lại thứ tự buổi.</p>}
 
       {/* Thêm buổi */}
       <AddSessionModal
@@ -162,6 +198,8 @@ export default function TreatmentPlanDetailPage() {
         error={error}
         stages={p.stages}
         services={services}
+        technologies={technologies}
+        protocols={protocols}
         nextNumber={nextNumber}
         onSubmit={async (body: any) => {
           setError(null);
@@ -192,18 +230,24 @@ export default function TreatmentPlanDetailPage() {
   );
 }
 
-function AddSessionModal({ open, onClose, onSubmit, error, stages, services, nextNumber }: any) {
-  const [f, setF] = useState<any>({ sessionNumber: nextNumber, name: "", stageId: "", serviceId: "", objective: "", scheduledAt: "", plannedCost: "", price: "", preCare: "" });
+function AddSessionModal({ open, onClose, onSubmit, error, stages, services, technologies, protocols, nextNumber }: any) {
+  const empty = { sessionNumber: nextNumber, name: "", stageId: "", serviceId: "", technologyId: "", brandProtocolId: "", objective: "", scheduledAt: "", plannedCost: "", price: "", preCare: "", postCare: "", professionalProductsText: "" };
+  const [f, setF] = useState<any>(empty);
+  const [steps, setSteps] = useState<string[]>([]);
   useEffect(() => { setF((p: any) => ({ ...p, sessionNumber: nextNumber })); }, [nextNumber, open]);
   return (
-    <Modal open={open} onClose={onClose} title="Thêm buổi thực hiện">
+    <Modal open={open} onClose={onClose} title="Thêm buổi thực hiện" className="max-w-2xl">
       <form
         onSubmit={(e) => {
           e.preventDefault();
           const b: any = { ...f, sessionNumber: Number(f.sessionNumber) };
-          ["stageId", "serviceId", "name", "objective", "scheduledAt", "preCare"].forEach((k) => { if (!b[k]) delete b[k]; });
+          ["stageId", "serviceId", "technologyId", "brandProtocolId", "name", "objective", "scheduledAt", "preCare", "postCare"].forEach((k) => { if (!b[k]) delete b[k]; });
           b.plannedCost = f.plannedCost ? Number(f.plannedCost) : undefined;
           b.price = f.price ? Number(f.price) : undefined;
+          const stepItems = steps.filter(Boolean);
+          if (stepItems.length) b.steps = { items: stepItems.map((name) => ({ name })) };
+          if (f.professionalProductsText) b.professionalProducts = { text: f.professionalProductsText };
+          delete b.professionalProductsText;
           onSubmit(b);
         }}
         className="space-y-4"
@@ -221,20 +265,51 @@ function AddSessionModal({ open, onClose, onSubmit, error, stages, services, nex
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Dịch vụ / công nghệ</Label>
+            <Label>Dịch vụ</Label>
             <Select value={f.serviceId} onChange={(e) => setF({ ...f, serviceId: e.target.value })}>
               <option value="">—</option>
               {services.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>Công nghệ</Label>
+            <Select value={f.technologyId} onChange={(e) => setF({ ...f, technologyId: e.target.value })}>
+              <option value="">—</option>
+              {(technologies ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Brand Protocol</Label>
+            <Select value={f.brandProtocolId} onChange={(e) => setF({ ...f, brandProtocolId: e.target.value })}>
+              <option value="">—</option>
+              {(protocols ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </Select>
+          </div>
+        </div>
         <div className="space-y-1.5"><Label>Mục tiêu buổi</Label><Input value={f.objective} onChange={(e) => setF({ ...f, objective: e.target.value })} /></div>
+        <div className="space-y-1.5">
+          <Label>Các bước thực hiện</Label>
+          {steps.map((s, i) => (
+            <div key={i} className="flex gap-2">
+              <span className="w-5 pt-2 text-sm text-muted-foreground">{i + 1}.</span>
+              <Input value={s} onChange={(e) => setSteps(steps.map((x, j) => (j === i ? e.target.value : x)))} />
+              <Button type="button" variant="outline" size="sm" onClick={() => setSteps(steps.filter((_, j) => j !== i))}>×</Button>
+            </div>
+          ))}
+          <Button type="button" variant="ghost" size="sm" onClick={() => setSteps([...steps, ""])}>+ Bước</Button>
+        </div>
+        <div className="space-y-1.5"><Label>Sản phẩm chuyên nghiệp dùng trong buổi</Label><Input value={f.professionalProductsText} onChange={(e) => setF({ ...f, professionalProductsText: e.target.value })} placeholder="VD: DMK Enzyme, serum..." /></div>
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1.5"><Label>Lịch dự kiến</Label><Input type="datetime-local" value={f.scheduledAt} onChange={(e) => setF({ ...f, scheduledAt: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Chi phí dự kiến</Label><Input type="number" value={f.plannedCost} onChange={(e) => setF({ ...f, plannedCost: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label>Giá</Label><Input type="number" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>Giá dự kiến</Label><Input type="number" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></div>
         </div>
-        <div className="space-y-1.5"><Label>Dặn dò trước</Label><Input value={f.preCare} onChange={(e) => setF({ ...f, preCare: e.target.value })} /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5"><Label>Dặn dò trước</Label><Input value={f.preCare} onChange={(e) => setF({ ...f, preCare: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>Dặn dò sau</Label><Input value={f.postCare} onChange={(e) => setF({ ...f, postCare: e.target.value })} /></div>
+        </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Hủy</Button><Button type="submit">Lưu</Button></div>
       </form>

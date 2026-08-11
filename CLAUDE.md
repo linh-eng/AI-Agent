@@ -77,9 +77,62 @@ Chi phí/Thanh toán → Follow-up.
 - **Seed:** thêm 6 user spa (mật khẩu `<role>123`, vd `quanly@thng.com.vn`/`quanly123`) + dịch vụ mẫu +
   khách `KH-000001` với hành trình đầy đủ (đánh giá, phác đồ `TP-000001`, 2 buổi, booking, CSKH, cọc, task).
 
-Chưa làm (mở rộng tương lai): Protocol/Form Builder kéo-thả + conditional logic, Brand/Technology/Product
-catalog & recommendation, Price Management có version riêng, Marketing campaign/ROI, kho vật tư liên kết
-session, Customer Portal. Kiến trúc dữ liệu đã tách quan hệ rõ để bổ sung dần.
+### Thư viện Spa — Brand · Technology · Protocol Library · Product Catalog · Form Builder (đã xong)
+
+Bổ sung theo bản "Bổ sung yêu cầu — Phác đồ / Công nghệ / Brand Protocol / Sản phẩm" (module 1–4 + phần builder).
+
+- **Dữ liệu (cuối `schema.prisma`):** `Brand`, `Technology`, `BrandProtocol` (+join `BrandProtocolTechnology`,
+  `BrandProtocolProduct`; enum `ProtocolKind` BRAND/INTERNAL, `LibraryStatus` DRAFT→REVIEW→APPROVED→ACTIVE→
+  ARCHIVED, `version`+`changeLog`), `SpaProduct` (`ProductType` PROFESSIONAL/HOME_CARE/BOTH, `cost` nhạy cảm,
+  `inventoryProductId` link mềm tới kho), `ProductRecommendation` (`RecommendationPriority` ESSENTIAL/
+  RECOMMENDED/OPTIONAL), `FormTemplate` + `FormInstance` (áp mẫu → snapshot `schemaSnapshot`, KHÔNG đổi bản
+  gốc). `TreatmentSession` thêm `technologyId`, `brandProtocolId`, `orderIndex` (kéo–thả), `steps`,
+  `professionalProducts`.
+- **RBAC:** `library.read` (thêm vào `CLINIC_READ`), `brand.write`, `technology.write`, `protocol.write`,
+  `protocol.approve`, `form.write`, `catalog.write`, `recommend.write`. Gán: MANAGER (đủ), SPECIALIST
+  (protocol/technology/form/recommend), MARKETING (catalog), BOD (protocol.approve).
+- **Lib:** `src/lib/form-builder.ts` (kiểu `FormSchema`: sections/groups/fields + 32 field types + tab;
+  `LogicRule` IF/AND(ALL)/OR(ANY)/THEN show|hide|require; `evaluateLogic`, `computeCalc`, `schemaTabs`,
+  `newField/newSection`). `src/lib/library-validation.ts` (Zod). Nhãn ở `clinic-labels.ts`.
+- **API:** `brands`(+`[id]`), `technologies`(+`[id]`), `brand-protocols`(+`[id]`: status/version/join;
+  chặn Approve/Active nếu thiếu `protocol.approve`), `spa-products`(+`[id]`, mask `cost`),
+  `product-recommendations`(+`[id]`), `form-templates`(+`[id]`), `form-instances`(+`[id]`: POST = snapshot
+  mẫu), `treatment-sessions/reorder`.
+- **UI:** nhóm sidebar **Thư viện Spa** → `/brands`, `/technologies`, `/protocols`(+`[id]` editor bước/
+  công nghệ/sản phẩm/workflow/version), `/catalog`, `/form-templates`(+`[id]` **builder kéo–thả 3 cột** +
+  tab Logic + Xem trước), `/form-instances/[id]` (điền phiếu). `components/form-renderer.tsx` render schema
+  động. Hồ sơ khách thêm tab **Sản phẩm đề xuất** + **Biểu mẫu** (áp mẫu). `/treatment-plans/[id]`: buổi
+  chọn công nghệ/brand protocol + bước + sản phẩm chuyên nghiệp; **kéo–thả sắp xếp thứ tự buổi**.
+- **Seed:** brand DMK/Dermalogica, công nghệ Laser Pico, protocol `PROTO-DMK-BRIGHT` (ACTIVE, có bước +
+  join), 3 sản phẩm, biểu mẫu `FORM-SKIN-ASSESS` (ACTIVE, có conditional logic), 1 đề xuất SP cho KH-000001.
+
+### Quyết định kiến trúc
+
+- **Coexistence, không viết lại:** module spa nằm chung repo/app với kho THNG, dùng chung User/Role/
+  Permission/AuditLog. Tác nhân (nhân viên) lưu **tên (String)** thay vì FK User — đồng nhất với phần kho,
+  tránh sửa model `User`.
+- **Bất biến & lịch sử:** protocol/form/plan có `version`+`changeLog`; FormInstance snapshot schema; Payment/
+  CrmActivity/Session append-only; soft delete `isActive`.
+- **Che dữ liệu tài chính:** mask ở server (`maskFinance`) theo `finance.read` cho `expectedCost`/`cost`/
+  `plannedCost`/`actualCost` và `cost/profit` dashboard.
+- **Form Builder dynamic:** schema lưu JSON, không hard-code; drag–drop dùng HTML5 DnD native (không thêm
+  thư viện), conditional logic đánh giá client-side qua `evaluateLogic`.
+
+### Migration DB
+
+Chưa tạo file migration SQL — dùng `npm run prisma:push` để đồng bộ schema mới (đã thêm ~10 bảng + cột mới
+trên `treatment_sessions`). Khi chuyển sang môi trường có lịch sử migration, chạy `prisma migrate dev`.
+
+### Còn lại / nợ kỹ thuật (theo yêu cầu MVP)
+
+- **Chưa làm (ưu tiên tiếp theo):** (5) Treatment Proposal + phương án ngân sách (Essential/Recommended/
+  Premium) có ẩn giá vốn; (6) thư viện Pre/Post-care riêng có version; (7) đã có bản ghi session độc lập,
+  cần đính kèm form-instance vào từng buổi (đã có `sessionId` trên FormInstance, chưa gắn UI ở buổi);
+  (8) nối vật tư session ↔ kho (đặt giữ → xuất → tiêu hao) — mới có `inventoryProductId` link mềm;
+  (9) Price Management có hiệu lực theo ngày + lịch sử; (10) Marketing campaign/lead/ROI.
+- **Nợ kỹ thuật/giới hạn:** field `TABLE`/`REPEATING_GROUP`/`SIGNATURE` render đơn giản (text/URL), chưa
+  upload file thật (nhập URL); `computeCalc` chỉ hỗ trợ sum/avg/product (chưa formula tùy ý); reorder buổi
+  không đổi `sessionNumber` (chỉ `orderIndex`); chưa có ràng buộc CHECK ở DB cho một số quan hệ.
 
 ## Tech stack
 

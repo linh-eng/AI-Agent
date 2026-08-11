@@ -24,6 +24,8 @@ import {
   PAYMENT_METHOD_LABEL,
   TIMELINE_KIND_LABEL,
   TIMELINE_KIND_TONE,
+  RECOMMENDATION_PRIORITY_LABEL,
+  RECOMMENDATION_PRIORITY_TONE,
 } from "@/lib/clinic-labels";
 
 interface Customer {
@@ -51,7 +53,7 @@ interface Customer {
   canSeeFinance: boolean;
 }
 
-const TABS = ["timeline", "crm", "bookings", "plans", "assessments", "payments"] as const;
+const TABS = ["timeline", "crm", "bookings", "plans", "assessments", "recommendations", "forms", "payments"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   timeline: "Timeline",
@@ -59,6 +61,8 @@ const TAB_LABEL: Record<Tab, string> = {
   bookings: "Booking",
   plans: "Phác đồ",
   assessments: "Đánh giá",
+  recommendations: "Sản phẩm đề xuất",
+  forms: "Biểu mẫu",
   payments: "Thanh toán",
 };
 
@@ -68,12 +72,17 @@ export default function CustomerProfilePage() {
   const canCrm = useCan(PERMISSIONS.CRM_WRITE);
   const canPay = useCan(PERMISSIONS.PAYMENT_WRITE);
   const canTreat = useCan(PERMISSIONS.TREATMENT_WRITE);
+  const canRecommend = useCan(PERMISSIONS.RECOMMEND_WRITE);
 
   const [c, setC] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("timeline");
-  const [modal, setModal] = useState<null | "crm" | "payment" | "assessment">(null);
+  const [modal, setModal] = useState<null | "crm" | "payment" | "assessment" | "recommend" | "applyForm">(null);
   const [error, setError] = useState<string | null>(null);
+  const [recs, setRecs] = useState<any[]>([]);
+  const [forms, setForms] = useState<any[]>([]);
+  const [spaProducts, setSpaProducts] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,9 +92,18 @@ export default function CustomerProfilePage() {
       setLoading(false);
     }
   }, [id]);
+
+  const loadSecondary = useCallback(async () => {
+    apiFetch<any[]>(`/api/product-recommendations?customerId=${id}`).then(setRecs).catch(() => {});
+    apiFetch<any[]>(`/api/form-instances?customerId=${id}`).then(setForms).catch(() => {});
+  }, [id]);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadSecondary();
+    apiFetch<any[]>("/api/spa-products").then(setSpaProducts).catch(() => {});
+    apiFetch<any[]>("/api/form-templates").then(setTemplates).catch(() => {});
+  }, [load, loadSecondary]);
 
   async function submit(url: string, body: unknown) {
     setError(null);
@@ -93,6 +111,7 @@ export default function CustomerProfilePage() {
       await apiFetch(url, { method: "POST", body: JSON.stringify(body) });
       setModal(null);
       load();
+      loadSecondary();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi");
     }
@@ -124,6 +143,16 @@ export default function CustomerProfilePage() {
             {canTreat && (
               <Button variant="outline" onClick={() => setModal("assessment")}>
                 <Plus className="h-4 w-4" /> Đánh giá
+              </Button>
+            )}
+            {canRecommend && (
+              <Button variant="outline" onClick={() => setModal("recommend")}>
+                <Plus className="h-4 w-4" /> Đề xuất SP
+              </Button>
+            )}
+            {canTreat && (
+              <Button variant="outline" onClick={() => setModal("applyForm")}>
+                <Plus className="h-4 w-4" /> Áp biểu mẫu
               </Button>
             )}
           </div>
@@ -322,6 +351,61 @@ export default function CustomerProfilePage() {
         </Card>
       )}
 
+      {tab === "recommendations" && (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <THead>
+                <TR><TH>Sản phẩm</TH><TH>Brand</TH><TH>Ưu tiên</TH><TH>Lý do</TH><TH>SL</TH><TH className="text-right">Giá</TH></TR>
+              </THead>
+              <TBody>
+                {recs.length === 0 ? (
+                  <TR><TD colSpan={6} className="py-6 text-center text-muted-foreground">Chưa có đề xuất sản phẩm</TD></TR>
+                ) : (
+                  recs.map((r) => (
+                    <TR key={r.id}>
+                      <TD className="font-medium">{r.product?.name ?? "—"}</TD>
+                      <TD>{r.product?.brand?.name ?? "—"}</TD>
+                      <TD><Badge tone={RECOMMENDATION_PRIORITY_TONE[r.priority]}>{RECOMMENDATION_PRIORITY_LABEL[r.priority]}</Badge></TD>
+                      <TD>{r.reason ?? "—"}</TD>
+                      <TD>{r.quantity}</TD>
+                      <TD className="text-right">{r.price != null ? formatNumber(Number(r.price)) + " ₫" : "—"}</TD>
+                    </TR>
+                  ))
+                )}
+              </TBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === "forms" && (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <THead>
+                <TR><TH>Biểu mẫu</TH><TH>Mã mẫu</TH><TH>Ver mẫu</TH><TH>Ngày tạo</TH><TH></TH></TR>
+              </THead>
+              <TBody>
+                {forms.length === 0 ? (
+                  <TR><TD colSpan={5} className="py-6 text-center text-muted-foreground">Chưa áp biểu mẫu nào</TD></TR>
+                ) : (
+                  forms.map((fm) => (
+                    <TR key={fm.id}>
+                      <TD className="font-medium">{fm.name ?? fm.template?.name}</TD>
+                      <TD className="font-mono">{fm.template?.code}</TD>
+                      <TD>v{fm.templateVersion}</TD>
+                      <TD>{formatDate(fm.createdAt)}</TD>
+                      <TD><Link href={`/form-instances/${fm.id}`} className="text-sm text-primary hover:underline">Mở / điền</Link></TD>
+                    </TR>
+                  ))
+                )}
+              </TBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       {tab === "payments" && (
         <Card>
           <CardContent className="p-0">
@@ -353,7 +437,65 @@ export default function CustomerProfilePage() {
       <CrmModal open={modal === "crm"} onClose={() => setModal(null)} error={error} onSubmit={(body) => submit("/api/crm-activities", { ...body, customerId: id })} />
       <PaymentModal open={modal === "payment"} onClose={() => setModal(null)} error={error} debt={c.financials.debt} onSubmit={(body) => submit("/api/payments", { ...body, customerId: id })} />
       <AssessmentModal open={modal === "assessment"} onClose={() => setModal(null)} error={error} onSubmit={(body) => submit("/api/assessments", { ...body, customerId: id })} />
+      <RecommendModal open={modal === "recommend"} onClose={() => setModal(null)} error={error} products={spaProducts} onSubmit={(body) => submit("/api/product-recommendations", { ...body, customerId: id })} />
+      <ApplyFormModal open={modal === "applyForm"} onClose={() => setModal(null)} error={error} templates={templates} onSubmit={(body) => submit("/api/form-instances", { ...body, customerId: id })} />
     </div>
+  );
+}
+
+function RecommendModal({ open, onClose, onSubmit, error, products }: { open: boolean; onClose: () => void; onSubmit: (b: any) => void; error: string | null; products: any[] }) {
+  const [f, setF] = useState({ spaProductId: "", priority: "RECOMMENDED", reason: "", goal: "", usage: "", quantity: "1", price: "" });
+  return (
+    <Modal open={open} onClose={onClose} title="Đề xuất sản phẩm">
+      <form onSubmit={(e) => { e.preventDefault(); const b: any = { ...f, quantity: Number(f.quantity || 1) }; if (f.price) b.price = Number(f.price); else delete b.price; onSubmit(b); }} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label>Sản phẩm *</Label>
+          <Select value={f.spaProductId} onChange={(e) => setF({ ...f, spaProductId: e.target.value })} required>
+            <option value="">— Chọn sản phẩm —</option>
+            {products.map((p) => <option key={p.id} value={p.id}>{p.name}{p.brand ? ` · ${p.brand.name}` : ""}</option>)}
+          </Select>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>Mức ưu tiên</Label>
+            <Select value={f.priority} onChange={(e) => setF({ ...f, priority: e.target.value })}>
+              {Object.entries(RECOMMENDATION_PRIORITY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </Select>
+          </div>
+          <div className="space-y-1.5"><Label>Số lượng</Label><Input type="number" value={f.quantity} onChange={(e) => setF({ ...f, quantity: e.target.value })} /></div>
+        </div>
+        <div className="space-y-1.5"><Label>Lý do đề xuất</Label><Input value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5"><Label>Mục tiêu sử dụng</Label><Input value={f.goal} onChange={(e) => setF({ ...f, goal: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>Giá (bỏ trống = giá bán)</Label><Input type="number" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></div>
+        </div>
+        <div className="space-y-1.5"><Label>Hướng dẫn sử dụng</Label><Input value={f.usage} onChange={(e) => setF({ ...f, usage: e.target.value })} /></div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Hủy</Button><Button type="submit">Lưu</Button></div>
+      </form>
+    </Modal>
+  );
+}
+
+function ApplyFormModal({ open, onClose, onSubmit, error, templates }: { open: boolean; onClose: () => void; onSubmit: (b: any) => void; error: string | null; templates: any[] }) {
+  const [templateId, setTemplateId] = useState("");
+  const usable = templates.filter((t) => t.status === "ACTIVE" || t.status === "APPROVED");
+  return (
+    <Modal open={open} onClose={onClose} title="Áp biểu mẫu cho khách">
+      <form onSubmit={(e) => { e.preventDefault(); onSubmit({ templateId }); }} className="space-y-4">
+        <p className="text-xs text-muted-foreground">Tạo một phiếu riêng cho khách (snapshot mẫu, không đổi bản gốc). Chỉ mẫu đã duyệt/đang dùng.</p>
+        <div className="space-y-1.5">
+          <Label>Biểu mẫu *</Label>
+          <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)} required>
+            <option value="">— Chọn biểu mẫu —</option>
+            {usable.map((t) => <option key={t.id} value={t.id}>{t.name} (v{t.version})</option>)}
+          </Select>
+          {usable.length === 0 && <p className="text-xs text-amber-600">Chưa có biểu mẫu ở trạng thái Đã duyệt/Đang dùng.</p>}
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Hủy</Button><Button type="submit" disabled={!templateId}>Áp dụng</Button></div>
+      </form>
+    </Modal>
   );
 }
 
