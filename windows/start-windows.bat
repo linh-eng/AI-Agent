@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0.."
-set PORT=3000
+set PORT=9000
 echo ============================================
 echo   SOPHIA WELLNESS - Quan ly kho
 echo ============================================

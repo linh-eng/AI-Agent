@@ -81,7 +81,7 @@ Chờ đến khi hiện **"HOAN TAT!"** rồi bấm phím bất kỳ để đón
 Bấm đúp **`start-windows.bat`** (trong thư mục `windows`).
 Giữ nguyên cửa sổ đen đang chạy, rồi mở trình duyệt:
 
-- Trên chính máy này: **http://localhost:3000**
+- Trên chính máy này: **http://localhost:9000**
 - Đăng nhập: **admin@sophia.vn** / **admin123**
 
 Muốn dừng: bấm vào cửa sổ đen rồi nhấn **Ctrl + C**, hoặc đóng cửa sổ.
@@ -94,12 +94,12 @@ Nếu muốn nhân viên dùng máy/điện thoại khác (cùng WiFi/mạng n�
 
 1. **Xem IP máy chủ:** mở `cmd`, gõ `ipconfig`, tìm dòng **IPv4 Address**
    (ví dụ `192.168.1.50`).
-2. **Mở cổng 3000 trên tường lửa** (mở **cmd với quyền Administrator** — chuột phải
+2. **Mở cổng 9000 trên tường lửa** (mở **cmd với quyền Administrator** — chuột phải
    *Command Prompt* → *Run as administrator*), dán lệnh:
    ```
-   netsh advfirewall firewall add rule name="Sophia 3000" dir=in action=allow protocol=TCP localport=3000
+   netsh advfirewall firewall add rule name="Sophia 9000" dir=in action=allow protocol=TCP localport=9000
    ```
-3. Máy khác mở trình duyệt vào: **http://192.168.1.50:3000** (đổi theo IP thật).
+3. Máy khác mở trình duyệt vào: **http://192.168.1.50:9000** (đổi theo IP thật).
 
 > `start-windows.bat` đã cấu hình lắng nghe mọi thiết bị trong LAN (`-H 0.0.0.0`).
 
@@ -150,7 +150,7 @@ Mở **cmd**, chạy (nhập mật khẩu khi được hỏi):
 | `node` không phải lệnh hợp lệ | Chưa cài Node hoặc chưa khởi động lại cmd — cài lại Bước 1, mở cmd mới |
 | `Can't reach database server` | Sai mật khẩu trong `.env`, hoặc PostgreSQL chưa chạy (mở **Services.msc** → bật `postgresql-x64-16`) |
 | Cửa sổ `.bat` hiện rồi tắt ngay | Bấm đúp để xem lỗi; thường do `.env` sai — sửa rồi chạy lại `setup-windows.bat` |
-| Máy khác không vào được | Chưa mở cổng 3000 (làm phần LAN ở trên), hoặc khác mạng WiFi |
+| Máy khác không vào được | Chưa mở cổng 9000 (làm phần LAN ở trên), hoặc khác mạng WiFi |
 | Đăng nhập xong bị đá ra | `AUTH_SECRET` trống — điền vào `.env`, chạy lại `start-windows.bat` |
 
 ---

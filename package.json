@@ -4,9 +4,9 @@
   "private": true,
   "description": "Webapp quản lý kho Sophia Wellness — Nhập/Xuất kho, tồn theo lô & hạn sử dụng, cảnh báo",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 9000",
     "build": "prisma generate && next build",
-    "start": "next start",
+    "start": "next start -p 9000",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",

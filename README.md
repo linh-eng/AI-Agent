@@ -22,7 +22,7 @@ npm install
 cp .env.example .env          # sửa DATABASE_URL và AUTH_SECRET
 npm run prisma:push           # tạo bảng theo schema
 npm run db:seed               # nạp dữ liệu mẫu (sản phẩm + tồn theo lô, có lô sắp/đã hết hạn)
-npm run dev                   # http://localhost:3000
+npm run dev                   # http://localhost:9000
 ```
 
 ### Tài khoản demo

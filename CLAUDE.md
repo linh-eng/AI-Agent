@@ -89,7 +89,7 @@ npm install                 # cài deps (postinstall tự chạy prisma generate
 cp .env.example .env        # cấu hình DATABASE_URL, AUTH_SECRET
 npm run prisma:push         # đồng bộ schema vào Postgres
 npm run db:seed             # nạp dữ liệu mẫu
-npm run dev                 # chạy dev (http://localhost:3000)
+npm run dev                 # chạy dev (http://localhost:9000)
 npm run build               # build production
 npm run typecheck           # kiểm tra kiểu TS
 ```

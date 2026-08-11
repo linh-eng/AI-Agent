@@ -106,7 +106,7 @@ npm run build          # build bản production
 ### Cách A — Chạy nhanh (thử nghiệm)
 
 ```bash
-npm run start        # chạy ở cổng 3000 → http://<IP-máy-chủ>:3000
+npm run start        # chạy ở cổng 9000 → http://<IP-máy-chủ>:9000
 ```
 
 ### Cách B — Chạy nền ổn định với PM2 (khuyến nghị)
@@ -125,7 +125,7 @@ pm2 logs sophia
 pm2 restart sophia
 ```
 
-Ứng dụng lắng nghe cổng **3000**. Đổi cổng bằng biến môi trường `PORT`:
+Ứng dụng lắng nghe cổng **9000**. Đổi cổng bằng biến môi trường `PORT`:
 `pm2 start npm --name sophia -- run start` với `PORT=8080` đặt trong `.env` hoặc trước lệnh.
 
 ---
@@ -147,7 +147,7 @@ server {
     server_name kho.sophia.vn;   # đổi thành tên miền của bạn
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:9000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -224,7 +224,7 @@ Nên đặt lịch `cron` sao lưu hằng ngày và lưu bản sao ở nơi khá
 | `Can't reach database server` | Sai `DATABASE_URL`, PostgreSQL chưa chạy (`sudo systemctl status postgresql`) |
 | Trang trắng / lỗi 500 | Xem log: `pm2 logs sophia`; kiểm tra đã `npm run build` chưa |
 | Đăng nhập xong bị đá ra | `AUTH_SECRET` trống hoặc đổi giữa chừng → đặt cố định trong `.env`, `pm2 restart` |
-| Cổng 3000 bị chiếm | Đổi `PORT` trong `.env` rồi `pm2 restart sophia` |
+| Cổng 9000 bị chiếm | Đổi `PORT` trong `.env` rồi `pm2 restart sophia` |
 | `permission denied for schema public` | Chạy lại `GRANT ALL ON SCHEMA public TO sophia;` (bước 3) |
 
 ---
