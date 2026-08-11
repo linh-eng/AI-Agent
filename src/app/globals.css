@@ -4,24 +4,27 @@
 
 @layer base {
   :root {
-    --background: 160 30% 98%;
-    --foreground: 175 30% 12%;
+    /* Bảng màu spa cao cấp: hồng phấn / rose-gold + kem ấm + tím mận */
+    --background: 32 33% 98%;
+    --foreground: 335 18% 18%;
     --card: 0 0% 100%;
-    --card-foreground: 175 30% 12%;
-    --primary: 170 55% 32%;
-    --primary-foreground: 160 40% 98%;
-    --secondary: 160 25% 92%;
-    --secondary-foreground: 175 30% 15%;
-    --muted: 160 25% 95%;
-    --muted-foreground: 175 12% 42%;
-    --accent: 158 40% 90%;
-    --accent-foreground: 175 30% 15%;
-    --destructive: 0 72% 51%;
+    --card-foreground: 335 18% 18%;
+    --primary: 344 42% 46%;
+    --primary-foreground: 40 44% 98%;
+    --secondary: 345 40% 94%;
+    --secondary-foreground: 335 20% 24%;
+    --muted: 340 28% 96%;
+    --muted-foreground: 335 10% 46%;
+    --accent: 345 46% 92%;
+    --accent-foreground: 335 20% 24%;
+    --destructive: 2 68% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 160 20% 87%;
-    --input: 160 20% 87%;
-    --ring: 170 55% 32%;
-    --radius: 0.5rem;
+    --border: 340 24% 90%;
+    --input: 340 24% 90%;
+    --ring: 344 42% 46%;
+    /* Nhấn ánh kim champagne cho biểu đồ & điểm nhấn nhỏ */
+    --gold: 38 46% 56%;
+    --radius: 0.625rem;
   }
 }
 
@@ -32,6 +35,11 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  /* Kiểu chữ tiêu đề thanh lịch (serif) cho cảm giác cao cấp */
+  .font-display {
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+    letter-spacing: -0.01em;
   }
 }
 
@@ -51,4 +59,3 @@
     background: #fff;
   }
 }
-

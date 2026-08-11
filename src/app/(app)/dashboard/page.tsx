@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/client";
 import { formatNumber, formatDate } from "@/lib/utils";
 import { ISSUE_TYPE_LABEL } from "@/lib/labels";
+import { BarList, Donut } from "@/components/charts";
 
 interface Stats {
   productCount: number;
@@ -73,18 +74,25 @@ function StatCard({
   );
 }
 
+interface InvRow {
+  category: string | null;
+  value: number;
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<{
     stats: Stats;
     recentReceipts: Recent[];
     recentIssues: Recent[];
   } | null>(null);
+  const [inventory, setInventory] = useState<InvRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiFetch<any>("/api/dashboard")
       .then(setData)
       .finally(() => setLoading(false));
+    apiFetch<InvRow[]>("/api/inventory").then(setInventory).catch(() => {});
   }, []);
 
   if (loading || !data) {
@@ -97,6 +105,24 @@ export default function DashboardPage() {
   }
 
   const s = data.stats;
+
+  // Giá trị tồn theo nhóm hàng (từ tồn kho realtime)
+  const byCat = new Map<string, number>();
+  for (const r of inventory) {
+    const k = r.category ?? "Khác";
+    byCat.set(k, (byCat.get(k) ?? 0) + r.value);
+  }
+  const catBars = Array.from(byCat.entries())
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
+
+  const alertSlices = [
+    { label: "Sắp hết hạn", value: s.nearExpiryCount, color: "hsl(38 92% 50%)" },
+    { label: "Đã hết hạn", value: s.expiredCount, color: "hsl(2 68% 50%)" },
+    { label: "Dưới định mức", value: s.lowStockCount, color: "hsl(var(--gold))" },
+  ];
+  const alertTotal = alertSlices.reduce((a, b) => a + b.value, 0);
+
   return (
     <div>
       <PageHeader title="Bảng điều khiển" description="Tổng quan kho Sophia Wellness" />
@@ -132,6 +158,25 @@ export default function DashboardPage() {
         />
         <StatCard label="Phiếu nhập tháng này" value={formatNumber(s.receiptsThisMonth)} icon={PackagePlus} />
         <StatCard label="Phiếu xuất tháng này" value={formatNumber(s.issuesThisMonth)} icon={PackageMinus} />
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardContent className="p-5">
+            <h3 className="mb-4 font-semibold">Giá trị tồn theo nhóm hàng</h3>
+            <BarList items={catBars} unit="đ" empty="Chưa có tồn kho" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <h3 className="mb-4 font-semibold">Cơ cấu cảnh báo</h3>
+            {alertTotal === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">Không có cảnh báo nào 🎉</p>
+            ) : (
+              <Donut slices={alertSlices} centerLabel={`${alertTotal}`} />
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">

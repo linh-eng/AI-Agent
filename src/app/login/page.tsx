@@ -34,14 +34,14 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
-      <Card className="w-full max-w-sm">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-rose-50 via-[#faf3f0] to-pink-100 p-4">
+      <Card className="w-full max-w-sm shadow-lg">
         <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Sparkles className="h-6 w-6" />
+          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[hsl(344_50%_58%)] text-primary-foreground shadow-sm">
+            <Sparkles className="h-7 w-7" />
           </div>
-          <CardTitle>Sophia Wellness — Quản lý kho</CardTitle>
-          <CardDescription>Đăng nhập để tiếp tục</CardDescription>
+          <CardTitle className="font-display text-xl">Sophia Wellness</CardTitle>
+          <CardDescription>Hệ thống quản lý kho · Đăng nhập để tiếp tục</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">

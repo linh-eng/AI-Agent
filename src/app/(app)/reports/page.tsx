@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
 import { formatNumber, formatDate } from "@/lib/utils";
 import { toCsv, downloadCsv } from "@/lib/csv";
+import { BarList } from "@/components/charts";
 
 interface Warehouse { id: string; name: string }
 interface NxtRow {
@@ -179,7 +180,23 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <>
+          {svc?.rows.length ? (
+            <Card className="mb-4">
+              <CardContent className="p-5">
+                <h3 className="mb-4 font-semibold">Doanh thu theo dịch vụ</h3>
+                <BarList
+                  items={svc.rows.map((r) => ({
+                    label: r.name,
+                    value: r.revenue,
+                    hint: `Lợi nhuận ${formatNumber(r.profit)} đ · ${r.sessions} lượt`,
+                  }))}
+                  unit="đ"
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+          <Card>
           <CardContent className="p-0">
             <Table>
               <THead>
@@ -221,7 +238,8 @@ export default function ReportsPage() {
               </TBody>
             </Table>
           </CardContent>
-        </Card>
+          </Card>
+        </>
       )}
       <p className="mt-2 text-xs text-muted-foreground">Kỳ báo cáo: {formatDate(from)} – {formatDate(to)}</p>
     </div>

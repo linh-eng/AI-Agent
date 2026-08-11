@@ -99,8 +99,8 @@ export function AppShell({
             <Sparkles className="h-5 w-5" />
           </div>
           <div className="leading-tight">
-            <div className="font-semibold">Sophia Wellness</div>
-            <div className="text-[11px] text-muted-foreground">Quản lý kho</div>
+            <div className="font-display text-[15px] font-semibold">Sophia Wellness</div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Quản lý kho</div>
           </div>
         </div>
         <nav className="space-y-4 p-3">
