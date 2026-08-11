@@ -117,9 +117,9 @@ export default function DashboardPage() {
     .sort((a, b) => b.value - a.value);
 
   const alertSlices = [
-    { label: "Sắp hết hạn", value: s.nearExpiryCount, color: "hsl(38 92% 50%)" },
-    { label: "Đã hết hạn", value: s.expiredCount, color: "hsl(2 68% 50%)" },
-    { label: "Dưới định mức", value: s.lowStockCount, color: "hsl(var(--gold))" },
+    { label: "Sắp hết hạn", value: s.nearExpiryCount, color: "hsl(var(--gold))" },
+    { label: "Đã hết hạn", value: s.expiredCount, color: "hsl(2 72% 50%)" },
+    { label: "Dưới định mức", value: s.lowStockCount, color: "hsl(var(--primary))" },
   ];
   const alertTotal = alertSlices.reduce((a, b) => a + b.value, 0);
 

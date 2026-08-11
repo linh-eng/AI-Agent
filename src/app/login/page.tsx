@@ -34,10 +34,10 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-rose-50 via-[#faf3f0] to-pink-100 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-[#eef4fc] to-blue-100 p-4">
       <Card className="w-full max-w-sm shadow-lg">
         <CardHeader className="items-center text-center">
-          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[hsl(344_50%_58%)] text-primary-foreground shadow-sm">
+          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[hsl(204_90%_58%)] text-primary-foreground shadow-sm">
             <Sparkles className="h-7 w-7" />
           </div>
           <CardTitle className="font-display text-xl">Sophia Wellness</CardTitle>

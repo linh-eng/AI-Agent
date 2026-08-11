@@ -4,26 +4,26 @@
 
 @layer base {
   :root {
-    /* Bảng màu spa cao cấp: hồng phấn / rose-gold + kem ấm + tím mận */
-    --background: 32 33% 98%;
-    --foreground: 335 18% 18%;
+    /* Bảng màu xanh dương sapphire cao cấp + nền lạnh trắng ngà + mực navy */
+    --background: 214 38% 98%;
+    --foreground: 220 44% 16%;
     --card: 0 0% 100%;
-    --card-foreground: 335 18% 18%;
-    --primary: 344 42% 46%;
-    --primary-foreground: 40 44% 98%;
-    --secondary: 345 40% 94%;
-    --secondary-foreground: 335 20% 24%;
-    --muted: 340 28% 96%;
-    --muted-foreground: 335 10% 46%;
-    --accent: 345 46% 92%;
-    --accent-foreground: 335 20% 24%;
-    --destructive: 2 68% 50%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 340 24% 90%;
-    --input: 340 24% 90%;
-    --ring: 344 42% 46%;
-    /* Nhấn ánh kim champagne cho biểu đồ & điểm nhấn nhỏ */
-    --gold: 38 46% 56%;
+    --card-foreground: 220 44% 16%;
+    --primary: 216 80% 47%;
+    --primary-foreground: 210 45% 99%;
+    --secondary: 214 44% 93%;
+    --secondary-foreground: 220 42% 22%;
+    --muted: 214 34% 96%;
+    --muted-foreground: 218 16% 45%;
+    --accent: 213 50% 92%;
+    --accent-foreground: 220 42% 22%;
+    --destructive: 2 72% 50%;
+    --destructive-foreground: 0 0% 99%;
+    --border: 214 30% 88%;
+    --input: 214 30% 88%;
+    --ring: 216 80% 47%;
+    /* Nhấn hổ phách (amber) làm màu tương phản cho biểu đồ & điểm nhấn nhỏ */
+    --gold: 38 92% 52%;
     --radius: 0.625rem;
   }
 }
