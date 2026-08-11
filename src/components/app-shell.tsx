@@ -19,6 +19,7 @@ import {
   HeartPulse,
   ClipboardList,
   Cpu,
+  Zap,
   BarChart3,
   Users,
   Settings,
@@ -54,6 +55,7 @@ const NAV = [
       { href: "/services", label: "Liệu trình dịch vụ", icon: HeartPulse },
       { href: "/service-usage", label: "Ghi nhận dịch vụ", icon: ClipboardList },
       { href: "/assets", label: "Tài sản / Thiết bị", icon: Cpu },
+      { href: "/handpieces", label: "Tay cầm / Shot", icon: Zap },
     ],
   },
   {

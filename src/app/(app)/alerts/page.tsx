@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CalendarClock, TrendingDown, ShieldCheck } from "lucide-react";
+import { CalendarClock, TrendingDown, ShieldCheck, Zap } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -38,19 +38,36 @@ interface WarrantyAlert {
   status: string;
   isExpired: boolean;
 }
+interface ShotAlert {
+  handpieceId: string;
+  code: string;
+  name: string;
+  machine: string | null;
+  maxShots: number;
+  usedShots: number;
+  remaining: number;
+  isDepleted: boolean;
+}
 
 export default function AlertsPage() {
   const [expiry, setExpiry] = useState<ExpiryAlert[]>([]);
   const [lowStock, setLowStock] = useState<LowStock[]>([]);
   const [warranty, setWarranty] = useState<WarrantyAlert[]>([]);
+  const [shots, setShots] = useState<ShotAlert[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch<{ expiry: ExpiryAlert[]; lowStock: LowStock[]; warranty: WarrantyAlert[] }>("/api/alerts")
+    apiFetch<{
+      expiry: ExpiryAlert[];
+      lowStock: LowStock[];
+      warranty: WarrantyAlert[];
+      shots: ShotAlert[];
+    }>("/api/alerts")
       .then((d) => {
         setExpiry(d.expiry);
         setLowStock(d.lowStock);
         setWarranty(d.warranty ?? []);
+        setShots(d.shots ?? []);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -59,7 +76,7 @@ export default function AlertsPage() {
     <div>
       <PageHeader
         title="Cảnh báo"
-        description="Lô sắp/đã hết hạn sử dụng và sản phẩm dưới định mức tồn tối thiểu."
+        description="Lô sắp/đã hết hạn, sản phẩm dưới định mức tồn, thiết bị sắp hết bảo hành và tay cầm sắp hết shot."
       />
 
       {/* HSD */}
@@ -217,6 +234,61 @@ export default function AlertsPage() {
                         <Badge tone="danger">Hết BH {Math.abs(w.daysLeft)} ngày</Badge>
                       ) : (
                         <Badge tone="warning">Còn {w.daysLeft} ngày</Badge>
+                      )}
+                    </TD>
+                  </TR>
+                ))
+              )}
+            </TBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Tay cầm / shot */}
+      <Card className="mt-6">
+        <CardContent className="p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Zap className="h-5 w-5 text-amber-600" />
+            <h3 className="font-semibold">Tay cầm sắp hết shot</h3>
+            <Badge tone={shots.length ? "warning" : "success"}>{shots.length} tay cầm</Badge>
+          </div>
+          <Table>
+            <THead>
+              <TR>
+                <TH>Mã</TH>
+                <TH>Tay cầm</TH>
+                <TH>Máy</TH>
+                <TH className="text-right">Đã dùng</TH>
+                <TH className="text-right">Định mức</TH>
+                <TH className="text-right">Còn lại</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {loading ? (
+                <TR>
+                  <TD colSpan={6} className="py-6 text-center text-muted-foreground">
+                    Đang tải…
+                  </TD>
+                </TR>
+              ) : shots.length === 0 ? (
+                <TR>
+                  <TD colSpan={6} className="py-6 text-center text-muted-foreground">
+                    Tất cả tay cầm đều còn đủ shot 🎉
+                  </TD>
+                </TR>
+              ) : (
+                shots.map((s) => (
+                  <TR key={s.handpieceId}>
+                    <TD className="font-mono text-xs">{s.code}</TD>
+                    <TD className="font-medium">{s.name}</TD>
+                    <TD className="text-muted-foreground">{s.machine ?? "—"}</TD>
+                    <TD className="text-right">{formatNumber(s.usedShots)}</TD>
+                    <TD className="text-right text-muted-foreground">{formatNumber(s.maxShots)}</TD>
+                    <TD className="text-right">
+                      {s.isDepleted ? (
+                        <Badge tone="danger">Hết shot — cần thay</Badge>
+                      ) : (
+                        <Badge tone="warning">Còn {formatNumber(s.remaining)} shot</Badge>
                       )}
                     </TD>
                   </TR>

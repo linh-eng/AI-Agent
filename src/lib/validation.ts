@@ -204,6 +204,35 @@ export const assetUpdateSchema = z.object({
   note: optionalString,
 });
 
+// ----- Tay cầm / vật tư theo máy (đếm shot) -----
+export const handpieceCreateSchema = z.object({
+  code: optionalString, // để trống -> sinh tự động TC-xxxx
+  name: z.string().trim().min(1, "Nhập tên tay cầm").max(160),
+  assetId: optionalString,
+  machine: optionalString,
+  maxShots: z.number().int().positive("Định mức shot > 0"),
+  usedShots: z.number().int().nonnegative().default(0),
+  warnShots: z.number().int().nonnegative().max(1_000_000).default(1000),
+  note: optionalString,
+});
+
+export const handpieceUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(160).optional(),
+  assetId: optionalString,
+  machine: optionalString,
+  maxShots: z.number().int().positive().optional(),
+  warnShots: z.number().int().nonnegative().max(1_000_000).optional(),
+  status: z.enum(["ACTIVE", "RETIRED"]).optional(),
+  note: optionalString,
+});
+
+export const shotLogSchema = z.object({
+  shots: z.number().int().positive("Số shot > 0"),
+  customerName: optionalString,
+  performedAt: optionalString,
+  note: optionalString,
+});
+
 // ----- Người dùng -----
 const roleCodes = ["ADMIN", "MANAGER", "WAREHOUSE", "STAFF"] as const;
 

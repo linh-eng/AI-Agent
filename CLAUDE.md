@@ -27,6 +27,9 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
   N lượt (`ServiceUsage`) → tự lập phiếu xuất `INTERNAL_USE` (FEFO) trừ kho theo định mức × số lượt.
 - **Tài sản/thiết bị (Phase 2):** `Asset` theo serial, trạng thái (IN_STOCK/IN_USE/MAINTENANCE/RETIRED),
   ngày mua & hạn bảo hành — quản lý riêng, không nằm trong tồn theo lô.
+- **Tay cầm / vật tư theo máy (đếm shot):** `Handpiece` gắn với 1 máy (`Asset` tùy chọn hoặc tên máy),
+  có định mức shot tối đa (`maxShots`) + số shot đã dùng (`usedShots`) + ngưỡng cảnh báo (`warnShots`).
+  Ghi nhận số shot đã bắn (`ShotLog`) cộng dồn `usedShots`; cảnh báo khi shot còn lại ≤ `warnShots` để thay tay cầm.
 - **Kiểm kê định kỳ (Phase 3):** phiếu kiểm kê (`StockCount` + `StockCountItem`) chốt tồn hệ thống theo lô;
   nhập số thực đếm; khi duyệt cập nhật tồn lô về số đếm và ghi `StockMovement` ADJUSTMENT cho chênh lệch.
 - **In phiếu/tem (Phase 3):** in phía client qua `src/lib/print.ts` (`window.open` viết HTML rồi `print()`) —

@@ -328,6 +328,30 @@ async function main() {
     }
   }
 
+  // ---- Tay cầm / vật tư theo máy (đếm shot) ----
+  if ((await prisma.handpiece.count()) === 0) {
+    const hpData = [
+      { name: "Tay cầm HIFU 4.5mm", machine: "Máy HIFU Doublo", max: 20000, used: 12000, warn: 3000 },
+      { name: "Tay cầm HIFU 3.0mm", machine: "Máy HIFU Doublo", max: 20000, used: 19200, warn: 1500 }, // sắp hết -> cảnh báo
+      { name: "Đầu tip Laser Pico", machine: "Máy Laser Pico", max: 500000, used: 120000, warn: 50000 },
+      { name: "Tay cầm IPL", machine: "Máy IPL Triệt lông", max: 100000, used: 99500, warn: 2000 }, // sắp hết -> cảnh báo
+    ];
+    let hi = 0;
+    for (const h of hpData) {
+      hi += 1;
+      await prisma.handpiece.create({
+        data: {
+          code: `TC-${String(hi).padStart(4, "0")}`,
+          name: h.name,
+          machine: h.machine,
+          maxShots: h.max,
+          usedShots: h.used,
+          warnShots: h.warn,
+        },
+      });
+    }
+  }
+
   // ---- Cấu hình công ty mặc định ----
   await prisma.companySetting.upsert({
     where: { id: "company" },

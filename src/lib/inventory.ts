@@ -193,6 +193,42 @@ export async function getWarrantyAlerts(days = 60): Promise<WarrantyAlert[]> {
   return out;
 }
 
+export interface ShotAlert {
+  handpieceId: string;
+  code: string;
+  name: string;
+  machine: string | null;
+  maxShots: number;
+  usedShots: number;
+  remaining: number;
+  isDepleted: boolean;
+}
+
+/** Tay cầm sắp/đã hết định mức shot (còn lại <= warnShots). */
+export async function getShotAlerts(): Promise<ShotAlert[]> {
+  const hps = await prisma.handpiece.findMany({
+    where: { status: "ACTIVE" },
+    include: { asset: { select: { product: { select: { name: true } } } } },
+    orderBy: { code: "asc" },
+  });
+  const out: ShotAlert[] = [];
+  for (const h of hps) {
+    const remaining = h.maxShots - h.usedShots;
+    if (remaining > h.warnShots) continue;
+    out.push({
+      handpieceId: h.id,
+      code: h.code,
+      name: h.name,
+      machine: h.asset?.product?.name ?? h.machine,
+      maxShots: h.maxShots,
+      usedShots: h.usedShots,
+      remaining,
+      isDepleted: remaining <= 0,
+    });
+  }
+  return out;
+}
+
 export interface DashboardStats {
   productCount: number;
   totalOnHand: number;

@@ -32,6 +32,7 @@ model User {
   serviceUsages ServiceUsage[]   @relation("ServicePerformedBy")
   stockCounts   StockCount[]     @relation("CountCreatedBy")
   maintenance   MaintenanceLog[] @relation("MaintenanceCreatedBy")
+  shotLogs      ShotLog[]        @relation("ShotCreatedBy")
   auditLogs     AuditLog[]
 
   @@map("users")
@@ -441,10 +442,57 @@ model Asset {
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
   maintenance MaintenanceLog[]
+  handpieces  Handpiece[]
 
   @@index([status])
   @@index([warrantyUntil])
   @@map("assets")
+}
+
+// -----------------------------------------------------------------------------
+// Tay cầm / vật tư theo máy đếm theo shot tiêu hao: mỗi tay cầm gắn với 1 máy,
+// có định mức shot tối đa + số shot đã dùng; cảnh báo khi gần hết để thay mới.
+// -----------------------------------------------------------------------------
+enum HandpieceStatus {
+  ACTIVE // đang dùng
+  RETIRED // đã thay/loại bỏ
+}
+
+model Handpiece {
+  id        String          @id @default(cuid())
+  code      String          @unique // mã tay cầm TC-xxxx
+  name      String // tên tay cầm (VD: Tay cầm HIFU 4.5mm)
+  assetId   String?         @map("asset_id") // máy gắn tay cầm (tùy chọn)
+  asset     Asset?          @relation(fields: [assetId], references: [id])
+  machine   String? // tên máy nhập tay (khi không chọn tài sản cụ thể)
+  maxShots  Int             @map("max_shots") // định mức shot tối đa
+  usedShots Int             @default(0) @map("used_shots") // số shot đã dùng
+  warnShots Int             @default(1000) @map("warn_shots") // cảnh báo khi số shot còn lại <= giá trị này
+  status    HandpieceStatus @default(ACTIVE)
+  note      String?
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  shotLogs ShotLog[]
+
+  @@index([status])
+  @@map("handpieces")
+}
+
+model ShotLog {
+  id           String    @id @default(cuid())
+  handpieceId  String    @map("handpiece_id")
+  handpiece    Handpiece @relation(fields: [handpieceId], references: [id])
+  shots        Int // số shot bắn trong lần ghi nhận
+  customerName String?   @map("customer_name")
+  note         String?
+  performedAt  DateTime  @default(now()) @map("performed_at")
+  createdById  String    @map("created_by_id")
+  createdBy    User      @relation("ShotCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([handpieceId])
+  @@map("shot_logs")
 }
 
 // -----------------------------------------------------------------------------

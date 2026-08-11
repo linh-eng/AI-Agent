@@ -49,6 +49,12 @@ export async function nextAssetCode(): Promise<string> {
   return `TS-${String(count + 1).padStart(4, "0")}`;
 }
 
+/** TC-0001 — mã tay cầm (tuần tự toàn cục). */
+export async function nextHandpieceCode(): Promise<string> {
+  const count = await prisma.handpiece.count();
+  return `TC-${String(count + 1).padStart(4, "0")}`;
+}
+
 /** PK-20260810-0001 — phiếu kiểm kê. */
 export async function nextStockCountCode(): Promise<string> {
   const prefix = `PK-${ymd()}`;
