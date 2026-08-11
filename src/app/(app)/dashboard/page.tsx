@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/client";
 import { formatNumber, formatDate } from "@/lib/utils";
+import { ISSUE_TYPE_LABEL } from "@/lib/labels";
 
 interface Stats {
   productCount: number;
@@ -36,13 +37,6 @@ interface Recent {
   issuedAt?: string | null;
   _count: { items: number };
 }
-
-const ISSUE_LABEL: Record<string, string> = {
-  SALE: "Bán hàng",
-  INTERNAL_USE: "Dùng nội bộ",
-  DISPOSAL: "Hủy",
-  ADJUSTMENT: "Điều chỉnh",
-};
 
 function StatCard({
   label,
@@ -191,7 +185,7 @@ export default function DashboardPage() {
                         {r.code}
                       </Link>
                       <div className="text-xs text-muted-foreground">
-                        <Badge tone="muted">{ISSUE_LABEL[r.issueType ?? ""] ?? r.issueType}</Badge>{" "}
+                        <Badge tone="muted">{ISSUE_TYPE_LABEL[r.issueType ?? ""] ?? r.issueType}</Badge>{" "}
                         {r.customerName}
                       </div>
                     </div>

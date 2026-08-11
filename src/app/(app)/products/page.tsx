@@ -12,6 +12,7 @@ import { apiFetch } from "@/lib/client";
 import { formatNumber } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
+import { TRACKING_MODE_LABEL, TRACKING_MODE_TONE } from "@/lib/labels";
 
 type Mode = "LOT" | "QUANTITY";
 interface Category {
@@ -157,11 +158,10 @@ export default function ProductsPage() {
                     </TD>
                     <TD className="text-muted-foreground">{p.category?.name ?? "—"}</TD>
                     <TD>
-                      {p.trackingMode === "LOT" ? (
-                        <Badge tone="default">Theo lô{p.requiresExpiry ? " · HSD" : ""}</Badge>
-                      ) : (
-                        <Badge tone="muted">Số lượng</Badge>
-                      )}
+                      <Badge tone={TRACKING_MODE_TONE[p.trackingMode]}>
+                        {TRACKING_MODE_LABEL[p.trackingMode]}
+                        {p.trackingMode === "LOT" && p.requiresExpiry ? " · HSD" : ""}
+                      </Badge>
                     </TD>
                     <TD>{p.uom}</TD>
                     <TD className="text-right">{p.minStock != null ? formatNumber(p.minStock) : "—"}</TD>

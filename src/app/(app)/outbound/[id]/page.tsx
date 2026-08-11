@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Printer } from "lucide-react";
+import { printIssue } from "@/lib/print";
+import { ISSUE_TYPE_LABEL } from "@/lib/labels";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -28,13 +30,6 @@ interface Issue {
   items: Item[];
 }
 
-const ISSUE_LABEL: Record<string, string> = {
-  SALE: "Bán hàng",
-  INTERNAL_USE: "Dùng nội bộ",
-  DISPOSAL: "Hủy",
-  ADJUSTMENT: "Điều chỉnh",
-};
-
 export default function IssueDetailPage({ params }: { params: { id: string } }) {
   const [data, setData] = useState<Issue | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,14 +47,12 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
     <div>
       <PageHeader
         title={`Phiếu xuất ${data.code}`}
-        description={`${ISSUE_LABEL[data.issueType] ?? data.issueType} · Kho: ${data.warehouse.name}`}
+        description={`${ISSUE_TYPE_LABEL[data.issueType] ?? data.issueType} · Kho: ${data.warehouse.name}`}
         action={
           <>
-            <a href={`/print/issue/${data.id}`} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline">
-                <Printer className="h-4 w-4" /> In phiếu
-              </Button>
-            </a>
+            <Button variant="outline" onClick={() => printIssue(data)}>
+              <Printer className="h-4 w-4" /> In phiếu
+            </Button>
             <Link href="/outbound">
               <Button variant="outline">
                 <ArrowLeft className="h-4 w-4" /> Danh sách
@@ -72,7 +65,7 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
         <CardContent className="grid gap-4 p-5 text-sm sm:grid-cols-4">
           <div>
             <div className="text-xs text-muted-foreground">Loại xuất</div>
-            <Badge tone="default">{ISSUE_LABEL[data.issueType] ?? data.issueType}</Badge>
+            <Badge tone="default">{ISSUE_TYPE_LABEL[data.issueType] ?? data.issueType}</Badge>
           </div>
           <Info label="Khách / Bộ phận" value={data.customerName ?? "—"} />
           <Info label="Người xuất" value={data.createdBy.name} />

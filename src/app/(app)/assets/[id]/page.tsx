@@ -13,6 +13,7 @@ import { apiFetch } from "@/lib/client";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
+import { ASSET_STATUS_LABEL, ASSET_STATUS_TONE, MAINTENANCE_TYPE_LABEL, MAINTENANCE_TYPE_TONE } from "@/lib/labels";
 
 interface Maint {
   id: string;
@@ -38,18 +39,6 @@ interface Asset {
   note?: string | null;
   maintenance: Maint[];
 }
-
-const STATUS: Record<string, { label: string; tone: "success" | "default" | "warning" | "muted" }> = {
-  IN_STOCK: { label: "Trong kho", tone: "success" },
-  IN_USE: { label: "Đang dùng", tone: "default" },
-  MAINTENANCE: { label: "Bảo trì", tone: "warning" },
-  RETIRED: { label: "Thanh lý", tone: "muted" },
-};
-const MTYPE: Record<string, string> = {
-  MAINTENANCE: "Bảo trì",
-  REPAIR: "Sửa chữa",
-  INSPECTION: "Kiểm tra",
-};
 
 export default function AssetDetailPage({ params }: { params: { id: string } }) {
   const canWrite = useCan(PERMISSIONS.ASSET_WRITE);
@@ -118,7 +107,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
         <CardContent className="grid gap-4 p-5 text-sm sm:grid-cols-4">
           <div>
             <div className="text-xs text-muted-foreground">Trạng thái</div>
-            <Badge tone={STATUS[data.status]?.tone ?? "muted"}>{STATUS[data.status]?.label ?? data.status}</Badge>
+            <Badge tone={ASSET_STATUS_TONE[data.status] ?? "muted"}>{ASSET_STATUS_LABEL[data.status] ?? data.status}</Badge>
           </div>
           <Info label="Vị trí" value={data.location ?? data.warehouse?.name ?? "—"} />
           <Info label="Nhà cung cấp" value={data.supplier?.name ?? "—"} />
@@ -156,8 +145,8 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                   <TR key={m.id}>
                     <TD>{formatDate(m.performedAt)}</TD>
                     <TD>
-                      <Badge tone={m.type === "REPAIR" ? "danger" : m.type === "INSPECTION" ? "muted" : "default"}>
-                        {MTYPE[m.type] ?? m.type}
+                      <Badge tone={MAINTENANCE_TYPE_TONE[m.type] ?? "default"}>
+                        {MAINTENANCE_TYPE_LABEL[m.type] ?? m.type}
                       </Badge>
                     </TD>
                     <TD>

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Printer } from "lucide-react";
+import { printTransfer } from "@/lib/print";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -47,11 +48,9 @@ export default function TransferDetailPage({ params }: { params: { id: string } 
         description={`${data.fromWarehouse.name} → ${data.toWarehouse.name}`}
         action={
           <>
-            <a href={`/print/transfer/${data.id}`} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline">
-                <Printer className="h-4 w-4" /> In phiếu
-              </Button>
-            </a>
+            <Button variant="outline" onClick={() => printTransfer(data)}>
+              <Printer className="h-4 w-4" /> In phiếu
+            </Button>
             <Link href="/transfers">
               <Button variant="outline">
                 <ArrowLeft className="h-4 w-4" /> Danh sách

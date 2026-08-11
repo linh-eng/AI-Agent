@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Printer, Tag } from "lucide-react";
+import { printReceipt, printBatchLabels } from "@/lib/print";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -51,16 +52,12 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         description={`NCC: ${data.supplier.name} · Kho: ${data.warehouse.name}`}
         action={
           <>
-            <a href={`/print/labels/${data.id}`} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline">
-                <Tag className="h-4 w-4" /> In tem lô
-              </Button>
-            </a>
-            <a href={`/print/receipt/${data.id}`} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline">
-                <Printer className="h-4 w-4" /> In phiếu
-              </Button>
-            </a>
+            <Button variant="outline" onClick={() => printBatchLabels(data)}>
+              <Tag className="h-4 w-4" /> In tem lô
+            </Button>
+            <Button variant="outline" onClick={() => printReceipt(data)}>
+              <Printer className="h-4 w-4" /> In phiếu
+            </Button>
             <Link href="/inbound">
               <Button variant="outline">
                 <ArrowLeft className="h-4 w-4" /> Danh sách

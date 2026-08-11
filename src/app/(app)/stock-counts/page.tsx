@@ -14,6 +14,7 @@ import { apiFetch } from "@/lib/client";
 import { formatDate } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
+import { COUNT_STATUS_LABEL, COUNT_STATUS_TONE } from "@/lib/labels";
 
 interface Warehouse { id: string; name: string }
 interface Row {
@@ -26,12 +27,6 @@ interface Row {
   createdAt: string;
   _count: { items: number };
 }
-
-const STATUS: Record<string, { label: string; tone: "warning" | "success" | "muted" }> = {
-  DRAFT: { label: "Đang kiểm", tone: "warning" },
-  POSTED: { label: "Đã duyệt", tone: "success" },
-  CANCELLED: { label: "Đã hủy", tone: "muted" },
-};
 
 export default function StockCountsPage() {
   const router = useRouter();
@@ -120,7 +115,7 @@ export default function StockCountsPage() {
                     <TD className="text-muted-foreground">{r.createdBy.name}</TD>
                     <TD className="text-center">{r._count.items}</TD>
                     <TD className="text-center">
-                      <Badge tone={STATUS[r.status]?.tone ?? "muted"}>{STATUS[r.status]?.label ?? r.status}</Badge>
+                      <Badge tone={COUNT_STATUS_TONE[r.status] ?? "muted"}>{COUNT_STATUS_LABEL[r.status] ?? r.status}</Badge>
                     </TD>
                     <TD>{r.countedAt ? formatDate(r.countedAt) : "—"}</TD>
                   </TR>

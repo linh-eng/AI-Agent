@@ -13,6 +13,7 @@ import { apiFetch } from "@/lib/client";
 import { formatDate } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
+import { ASSET_STATUS_LABEL, ASSET_STATUS_TONE } from "@/lib/labels";
 
 interface Product { id: string; sku: string; name: string }
 interface Warehouse { id: string; name: string }
@@ -28,13 +29,6 @@ interface Asset {
   purchaseDate?: string | null;
   warrantyUntil?: string | null;
 }
-
-const STATUS: Record<string, { label: string; tone: "success" | "default" | "warning" | "muted" }> = {
-  IN_STOCK: { label: "Trong kho", tone: "success" },
-  IN_USE: { label: "Đang dùng", tone: "default" },
-  MAINTENANCE: { label: "Bảo trì", tone: "warning" },
-  RETIRED: { label: "Thanh lý", tone: "muted" },
-};
 
 function daysUntil(iso: string): number {
   const d = new Date(iso);
@@ -197,7 +191,7 @@ export default function AssetsPage() {
                       <TD className="font-mono text-xs">{a.serialNumber ?? "—"}</TD>
                       <TD className="text-muted-foreground">{a.location ?? a.warehouse?.name ?? "—"}</TD>
                       <TD className="text-center">
-                        <Badge tone={STATUS[a.status]?.tone ?? "muted"}>{STATUS[a.status]?.label ?? a.status}</Badge>
+                        <Badge tone={ASSET_STATUS_TONE[a.status] ?? "muted"}>{ASSET_STATUS_LABEL[a.status] ?? a.status}</Badge>
                       </TD>
                       <TD>
                         {a.warrantyUntil ? (
@@ -254,8 +248,8 @@ export default function AssetsPage() {
             <div className="space-y-1.5">
               <Label>Trạng thái</Label>
               <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                {Object.entries(STATUS).map(([k, v]) => (
-                  <option key={k} value={k}>{v.label}</option>
+                {Object.entries(ASSET_STATUS_LABEL).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
                 ))}
               </Select>
             </div>

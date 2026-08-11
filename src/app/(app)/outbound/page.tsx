@@ -11,6 +11,7 @@ import { apiFetch } from "@/lib/client";
 import { formatDate } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
+import { ISSUE_TYPE_LABEL, ISSUE_TYPE_TONE } from "@/lib/labels";
 
 interface Row {
   id: string;
@@ -22,19 +23,6 @@ interface Row {
   issuedAt?: string | null;
   _count: { items: number };
 }
-
-const ISSUE_LABEL: Record<string, string> = {
-  SALE: "Bán hàng",
-  INTERNAL_USE: "Dùng nội bộ",
-  DISPOSAL: "Hủy",
-  ADJUSTMENT: "Điều chỉnh",
-};
-const ISSUE_TONE: Record<string, "default" | "success" | "warning" | "danger" | "muted"> = {
-  SALE: "success",
-  INTERNAL_USE: "default",
-  DISPOSAL: "danger",
-  ADJUSTMENT: "muted",
-};
 
 export default function OutboundPage() {
   const canWrite = useCan(PERMISSIONS.OUTBOUND_WRITE);
@@ -98,7 +86,7 @@ export default function OutboundPage() {
                       </Link>
                     </TD>
                     <TD>
-                      <Badge tone={ISSUE_TONE[r.issueType]}>{ISSUE_LABEL[r.issueType] ?? r.issueType}</Badge>
+                      <Badge tone={ISSUE_TYPE_TONE[r.issueType]}>{ISSUE_TYPE_LABEL[r.issueType] ?? r.issueType}</Badge>
                     </TD>
                     <TD>{r.customerName ?? "—"}</TD>
                     <TD className="text-muted-foreground">{r.warehouse.name}</TD>

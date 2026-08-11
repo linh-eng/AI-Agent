@@ -28,8 +28,8 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
   ngày mua & hạn bảo hành — quản lý riêng, không nằm trong tồn theo lô.
 - **Kiểm kê định kỳ (Phase 3):** phiếu kiểm kê (`StockCount` + `StockCountItem`) chốt tồn hệ thống theo lô;
   nhập số thực đếm; khi duyệt cập nhật tồn lô về số đếm và ghi `StockMovement` ADJUSTMENT cho chênh lệch.
-- **In phiếu/tem (Phase 3):** route độc lập `/print/{receipt,issue,transfer}/[id]` in phiếu A4 và
-  `/print/labels/[receiptId]` in tem lô (mã lô + HSD); dùng `PrintFrame` + `window.print()`.
+- **In phiếu/tem (Phase 3):** in phía client qua `src/lib/print.ts` (`window.open` viết HTML rồi `print()`) —
+  `printReceipt` / `printIssue` / `printTransfer` (phiếu A4) và `printBatchLabels` (tem lô: mã lô + HSD).
 - **Lịch sử bảo trì (Phase 3):** `MaintenanceLog` (bảo trì/sửa chữa/kiểm tra, chi phí, đơn vị) gắn với `Asset`;
   xem tại trang chi tiết tài sản `/assets/[id]`.
 - **Doanh thu dịch vụ (Phase 3):** `Service.price` (đơn giá/lượt); mỗi `ServiceUsage` chốt `revenue` (giá×lượt)
@@ -71,11 +71,11 @@ src/
       reports/       # Báo cáo N-X-T + Doanh thu dịch vụ (2 tab) + xuất CSV
       alerts/        # Trung tâm cảnh báo (HSD + dưới định mức + bảo hành)
       products/ categories/ suppliers/ warehouses/   # Danh mục
-    print/           # Trang in độc lập: receipt/issue/transfer/[id] + labels/[receiptId]
     api/             # Route handlers REST (auth + catalog + inventory/alerts/dashboard/receipts/
                      # issues/transfers/stock-counts/services/service-usages/assets(+maintenance)/reports)
-  components/        # app-shell, page-header, session-provider, print-frame, ui/*
+  components/        # app-shell, page-header, session-provider, ui/*
   lib/               # prisma, auth, session, rbac, api, client, utils, codes (sinh mã phiếu),
+                     # labels (nhãn+tone enum dùng chung), print (in phiếu/tem qua window.open),
                      # validation (Zod), inventory (tồn + cảnh báo + bảo hành), reports (N-X-T + doanh thu),
                      # csv, inbound-service, outbound-service (FEFO), transfer-service,
                      # service-service (tiêu hao dịch vụ), stockcount-service (kiểm kê)
@@ -121,5 +121,6 @@ Tài khoản demo: `admin@sophia.vn` / `admin123` (mỗi vai trò 1 user, mật 
   kho nội bộ (tồn cuối vẫn đúng).
 - Kiểm kê chốt danh sách lô lúc tạo phiếu; khi duyệt tính chênh lệch theo tồn hiện tại của lô (an toàn nếu
   có phát sinh xen giữa). Doanh thu/giá vốn dịch vụ được chốt vào `ServiceUsage` tại thời điểm ghi nhận.
-- Trang `/print/*` render phía client rồi tự gọi `window.print()`; vẫn qua `middleware` nên cần đăng nhập.
+- In ấn: `lib/print.ts` mở cửa sổ mới viết HTML rồi `print()` (không tạo route riêng). Nhãn/tone enum gom ở
+  `lib/labels.ts` — mọi trang import từ đây, không khai báo lặp trong page.
 - Hướng phát triển tiếp: in mã vạch/QR trên tem, xuất PDF phiếu, phân bổ chi phí, báo cáo tồn theo thời điểm.
