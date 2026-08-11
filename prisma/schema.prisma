@@ -1230,6 +1230,7 @@ model TreatmentSession {
   orderIndex      Int           @default(0) // thứ tự buổi (kéo–thả sắp xếp)
   steps           Json? // Các bước thực hiện của buổi (từ protocol hoặc tùy chỉnh)
   professionalProducts Json? // Sản phẩm chuyên nghiệp dùng trong buổi (khác vật tư)
+  materialCost    Decimal?      @db.Decimal(18, 2) // chi phí vật tư tiêu hao (tự tính, mục 8)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -1243,6 +1244,7 @@ model TreatmentSession {
   tasks         Task[]
   formInstances FormInstance[]
   careInstances CareInstructionInstance[]
+  materials     SessionMaterial[]
 
   @@index([planId, sessionNumber])
   @@index([customerId])
@@ -1481,6 +1483,7 @@ model SpaProduct {
   brand           Brand?                  @relation(fields: [brandId], references: [id])
   protocols       BrandProtocolProduct[]
   recommendations ProductRecommendation[]
+  sessionMaterials SessionMaterial[]
 
   @@map("spa_products")
 }
@@ -1744,4 +1747,69 @@ model CareInstructionInstance {
 
   @@index([customerId])
   @@map("care_instruction_instances")
+}
+
+// ============================================================================
+// MODULE 8 — MATERIALS ↔ INVENTORY ↔ TREATMENT SESSION
+// Luồng: kế hoạch vật tư → yêu cầu → giữ hàng → xuất → tiêu hao → hoàn/hao/hỏng.
+// Tiêu hao thực tế đóng góp vào chi phí thật của buổi (materialCost).
+// Tham chiếu kho (Product/Warehouse) dạng soft String để tránh siết chặt phần kho;
+// SpaProduct (sản phẩm chuyên nghiệp) liên kết cứng để lấy giá vốn.
+// ============================================================================
+enum MaterialMovementType {
+  REQUEST // yêu cầu vật tư
+  RESERVE // giữ hàng
+  ISSUE // xuất kho
+  CONSUME // tiêu hao thực tế
+  RETURN // hoàn trả về kho
+  WASTE // hao hụt
+  DAMAGE // hư hỏng
+}
+
+model SessionMaterial {
+  id             String   @id @default(cuid())
+  sessionId      String
+  name           String // snapshot tên vật tư/sản phẩm
+  spaProductId   String? // sản phẩm chuyên nghiệp (có giá vốn)
+  inventoryProductId String? // Product kho (soft ref)
+  warehouseId    String? // kho (soft ref)
+  uom            String? // đơn vị
+  isProfessional Boolean  @default(false) // SP chuyên nghiệp dùng trong buổi (≠ home-care bán khách)
+  plannedQty     Decimal  @default(0) @db.Decimal(14, 3)
+  reservedQty    Decimal  @default(0) @db.Decimal(14, 3)
+  issuedQty      Decimal  @default(0) @db.Decimal(14, 3)
+  consumedQty    Decimal  @default(0) @db.Decimal(14, 3)
+  returnedQty    Decimal  @default(0) @db.Decimal(14, 3)
+  wasteQty       Decimal  @default(0) @db.Decimal(14, 3)
+  unitCost       Decimal? @db.Decimal(18, 2) // giá vốn snapshot tại thời điểm lập
+  note           String?
+  createdBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  session   TreatmentSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  product   SpaProduct?        @relation(fields: [spaProductId], references: [id])
+  movements MaterialMovement[]
+
+  @@index([sessionId])
+  @@map("session_materials")
+}
+
+model MaterialMovement {
+  id                String               @id @default(cuid())
+  sessionMaterialId String
+  type              MaterialMovementType
+  quantity          Decimal              @db.Decimal(14, 3)
+  unitCost          Decimal?             @db.Decimal(18, 2) // snapshot giá vốn
+  warehouseId       String?
+  bookingId         String?
+  customerId        String?
+  staff             String?
+  note              String?
+  createdAt         DateTime             @default(now())
+
+  sessionMaterial SessionMaterial @relation(fields: [sessionMaterialId], references: [id], onDelete: Cascade)
+
+  @@index([sessionMaterialId])
+  @@map("material_movements")
 }

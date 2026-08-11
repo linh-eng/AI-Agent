@@ -106,3 +106,23 @@ export const careInstanceUpdateSchema = z.object({
   deliveredVia: deliveryChannel.optional(),
   markDelivered: z.boolean().optional(),
 });
+
+// ===== Module 8 — Session materials / inventory =====
+export const sessionMaterialCreateSchema = z.object({
+  sessionId: z.string().min(1),
+  name: z.string().min(1, "Tên vật tư"),
+  spaProductId: z.string().optional().nullable(),
+  inventoryProductId: z.string().optional().nullable(),
+  warehouseId: z.string().optional().nullable(),
+  uom: z.string().optional().nullable(),
+  isProfessional: z.boolean().default(false),
+  plannedQty: z.coerce.number().nonnegative().default(0),
+  unitCost: money,
+});
+export const materialMoveSchema = z.object({
+  type: z.enum(["REQUEST", "RESERVE", "ISSUE", "CONSUME", "RETURN", "WASTE", "DAMAGE"]),
+  quantity: z.coerce.number().positive("Số lượng > 0"),
+  warehouseId: z.string().optional().nullable(),
+  staff: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});

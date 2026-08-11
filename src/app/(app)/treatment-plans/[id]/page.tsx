@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input, Label, Select } from "@/components/ui/input";
+import { Input, Label, Select, Checkbox } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { formatDate, formatNumber } from "@/lib/utils";
@@ -55,6 +55,9 @@ export default function TreatmentPlanDetailPage() {
   const [formsFor, setFormsFor] = useState<any | null>(null);
   const [sessionForms, setSessionForms] = useState<any[]>([]);
   const [formTemplates, setFormTemplates] = useState<any[]>([]);
+  const [matsFor, setMatsFor] = useState<any | null>(null);
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [spaProducts, setSpaProducts] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,7 +69,31 @@ export default function TreatmentPlanDetailPage() {
     apiFetch<Opt[]>("/api/technologies").then(setTechnologies).catch(() => {});
     apiFetch<Opt[]>("/api/brand-protocols").then(setProtocols).catch(() => {});
     apiFetch<any[]>("/api/form-templates").then(setFormTemplates).catch(() => {});
+    apiFetch<any[]>("/api/spa-products").then(setSpaProducts).catch(() => {});
   }, [load]);
+
+  async function openMaterials(s: any) {
+    setMatsFor(s);
+    setMaterials(await apiFetch<any[]>(`/api/session-materials?sessionId=${s.id}`).catch(() => []));
+  }
+  async function refreshMaterials() {
+    if (!matsFor) return;
+    setMaterials(await apiFetch<any[]>(`/api/session-materials?sessionId=${matsFor.id}`).catch(() => []));
+    load();
+  }
+  async function addMaterial(body: any) {
+    if (!matsFor) return;
+    await apiFetch("/api/session-materials", { method: "POST", body: JSON.stringify({ ...body, sessionId: matsFor.id }) }).catch((e) => setError(e.message));
+    refreshMaterials();
+  }
+  async function moveMaterial(matId: string, type: string, quantity: number) {
+    await apiFetch(`/api/session-materials/${matId}/move`, { method: "POST", body: JSON.stringify({ type, quantity }) }).catch(() => {});
+    refreshMaterials();
+  }
+  async function delMaterial(matId: string) {
+    await apiFetch(`/api/session-materials/${matId}`, { method: "DELETE" }).catch((e) => setError(e.message));
+    refreshMaterials();
+  }
 
   async function openForms(s: any) {
     setFormsFor(s);
@@ -202,6 +229,7 @@ export default function TreatmentPlanDetailPage() {
                       <div className="flex gap-1">
                         {canWrite && <Button size="sm" variant="outline" onClick={() => setRecord(s)}>Ghi nhận</Button>}
                         <Button size="sm" variant="ghost" onClick={() => openForms(s)}>Phiếu</Button>
+                        <Button size="sm" variant="ghost" onClick={() => openMaterials(s)}>Vật tư</Button>
                       </div>
                     </TD>
                   </TR>
@@ -264,6 +292,21 @@ export default function TreatmentPlanDetailPage() {
             <div className="flex justify-end"><Button variant="outline" onClick={() => setFormsFor(null)}>Đóng</Button></div>
           </div>
         </Modal>
+      )}
+
+      {/* Vật tư buổi (mục 8) */}
+      {matsFor && (
+        <MaterialsModal
+          session={matsFor}
+          materials={materials}
+          spaProducts={spaProducts}
+          canFinance={p.canSeeFinance}
+          canWrite={canWrite}
+          onClose={() => setMatsFor(null)}
+          onAdd={addMaterial}
+          onMove={moveMaterial}
+          onDelete={delMaterial}
+        />
       )}
 
       {/* Ghi nhận buổi */}
@@ -441,6 +484,89 @@ function RecordSessionModal({ session, onClose, onSubmit, error, canFinance }: a
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Hủy</Button><Button type="submit">Lưu</Button></div>
       </form>
+    </Modal>
+  );
+}
+
+const MOVE_TYPES: { t: string; label: string }[] = [
+  { t: "RESERVE", label: "Giữ" },
+  { t: "ISSUE", label: "Xuất" },
+  { t: "CONSUME", label: "Tiêu hao" },
+  { t: "RETURN", label: "Hoàn" },
+  { t: "WASTE", label: "Hao" },
+];
+
+function MaterialsModal({ session, materials, spaProducts, canFinance, canWrite, onClose, onAdd, onMove, onDelete }: any) {
+  const [f, setF] = useState<any>({ name: "", spaProductId: "", isProfessional: false, plannedQty: "1", uom: "", unitCost: "" });
+  const [moveQty, setMoveQty] = useState<Record<string, string>>({});
+  const totalCost = materials.reduce((s: number, m: any) => s + Number(m.consumedQty || 0) * Number(m.unitCost || 0), 0);
+
+  function pickProduct(pid: string) {
+    const sp = spaProducts.find((x: any) => x.id === pid);
+    setF((prev: any) => ({ ...prev, spaProductId: pid, ...(sp ? { name: sp.name, isProfessional: sp.productType !== "HOME_CARE", unitCost: sp.cost != null ? String(sp.cost) : prev.unitCost } : {}) }));
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`Vật tư buổi #${session.sessionNumber}`} className="max-w-3xl">
+      <div className="space-y-4">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr><th className="p-1.5 text-left">Vật tư</th><th>ĐVT</th><th>KH</th><th>Giữ</th><th>Xuất</th><th>Tiêu hao</th><th>Hao</th>{canFinance && <th>Giá vốn</th>}{canWrite && <th>Ghi biến động</th>}</tr>
+            </thead>
+            <tbody>
+              {materials.length === 0 ? (
+                <tr><td colSpan={canFinance ? 9 : 8} className="p-3 text-center text-muted-foreground">Chưa có vật tư</td></tr>
+              ) : materials.map((m: any) => (
+                <tr key={m.id} className="border-t">
+                  <td className="p-1.5">{m.name}{m.isProfessional && <span className="ml-1 text-[10px] text-amber-600">(CN)</span>}</td>
+                  <td className="text-center">{m.uom ?? "—"}</td>
+                  <td className="text-center">{Number(m.plannedQty)}</td>
+                  <td className="text-center">{Number(m.reservedQty)}</td>
+                  <td className="text-center">{Number(m.issuedQty)}</td>
+                  <td className="text-center font-medium">{Number(m.consumedQty)}</td>
+                  <td className="text-center">{Number(m.wasteQty)}</td>
+                  {canFinance && <td className="text-center">{m.unitCost != null ? formatNumber(Number(m.unitCost)) : "—"}</td>}
+                  {canWrite && (
+                    <td className="p-1">
+                      <div className="flex items-center gap-1">
+                        <Input className="h-7 w-14 text-xs" type="number" placeholder="SL" value={moveQty[m.id] ?? ""} onChange={(e) => setMoveQty({ ...moveQty, [m.id]: e.target.value })} />
+                        {MOVE_TYPES.map((mt) => (
+                          <button key={mt.t} type="button" onClick={() => { const q = Number(moveQty[m.id]); if (q > 0) onMove(m.id, mt.t, q); }} className="rounded border px-1.5 py-0.5 text-[11px] hover:bg-accent">{mt.label}</button>
+                        ))}
+                        {Number(m.consumedQty) === 0 && <button type="button" onClick={() => onDelete(m.id)} className="text-muted-foreground hover:text-destructive">×</button>}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {canFinance && <div className="text-right text-sm">Chi phí vật tư tiêu hao: <span className="font-semibold">{formatNumber(totalCost)} ₫</span></div>}
+
+        {canWrite && (
+          <form onSubmit={(e) => { e.preventDefault(); const b: any = { name: f.name, isProfessional: f.isProfessional, plannedQty: Number(f.plannedQty || 0), uom: f.uom || undefined, spaProductId: f.spaProductId || undefined, unitCost: f.unitCost ? Number(f.unitCost) : undefined }; onAdd(b); setF({ name: "", spaProductId: "", isProfessional: false, plannedQty: "1", uom: "", unitCost: "" }); }} className="space-y-2 border-t pt-3">
+            <div className="text-xs font-medium text-muted-foreground">Thêm vật tư / sản phẩm chuyên nghiệp</div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Select className="h-8 text-xs" value={f.spaProductId} onChange={(e) => pickProduct(e.target.value)}>
+                <option value="">— SP catalog —</option>
+                {spaProducts.map((sp: any) => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
+              </Select>
+              <Input className="h-8 text-xs" placeholder="Tên vật tư *" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required />
+              <Input className="h-8 text-xs" placeholder="ĐVT" value={f.uom} onChange={(e) => setF({ ...f, uom: e.target.value })} />
+              <Input className="h-8 text-xs" type="number" placeholder="SL kế hoạch" value={f.plannedQty} onChange={(e) => setF({ ...f, plannedQty: e.target.value })} />
+            </div>
+            <div className="flex items-center gap-3">
+              {canFinance && <Input className="h-8 w-40 text-xs" type="number" placeholder="Giá vốn/đv" value={f.unitCost} onChange={(e) => setF({ ...f, unitCost: e.target.value })} />}
+              <label className="flex items-center gap-1 text-xs"><Checkbox checked={f.isProfessional} onChange={(e) => setF({ ...f, isProfessional: e.target.checked })} /> SP chuyên nghiệp</label>
+              <Button type="submit" size="sm" className="ml-auto">Thêm</Button>
+            </div>
+          </form>
+        )}
+        <p className="text-[11px] text-muted-foreground">Tiêu hao (CONSUME) tự cộng vào chi phí thật của buổi. SP chuyên nghiệp khác với sản phẩm bán tại nhà (home-care).</p>
+        <div className="flex justify-end"><Button variant="outline" onClick={onClose}>Đóng</Button></div>
+      </div>
     </Modal>
   );
 }
