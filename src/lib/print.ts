@@ -34,9 +34,9 @@ function openPrint(title: string, bodyHtml: string, styles = "") {
       .brand{display:flex;align-items:center;gap:12px;border-bottom:2px solid ${BRAND};padding-bottom:12px;margin-bottom:18px}
       .brand .mark{width:40px;height:40px;border-radius:10px;background:${BRAND};color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none}
       img.mark{object-fit:contain;background:#fff;border:1px solid #d8e3f0}
-      .brand-name{font-family:Georgia,serif;font-size:19px;font-weight:700;letter-spacing:.02em;line-height:1.1}
+      .brand-name{font-family:Cambria,"Times New Roman","Liberation Serif",serif;font-size:19px;font-weight:700;letter-spacing:.02em;line-height:1.1}
       .brand-sub{font-size:11px;color:#64748b;margin-top:3px}
-      h1{font-family:Georgia,serif;font-size:20px;text-align:center;margin:0 0 4px;color:${BRAND}}
+      h1{font-family:Cambria,"Times New Roman","Liberation Serif",serif;font-size:20px;text-align:center;margin:0 0 4px;color:${BRAND}}
       h2{font-size:14px;margin:14px 0 6px}
       .code{text-align:center;color:#64748b;margin-bottom:16px}
       .meta{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;font-size:13px;margin-bottom:14px}

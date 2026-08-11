@@ -35,11 +35,14 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  /* Kiểu chữ tiêu đề thanh lịch (serif) cho cảm giác cao cấp */
+  /* Kiểu chữ tiêu đề: Be Vietnam Pro đậm — dấu tiếng Việt hiển thị chuẩn, cảm giác hiện đại & rõ ràng */
   .font-display {
-    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
-    letter-spacing: -0.01em;
+    font-family: "Be Vietnam Pro", system-ui, "Segoe UI", sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
 }
 

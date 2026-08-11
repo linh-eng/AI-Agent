@@ -55,6 +55,10 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
 
 - **Framework:** Next.js 14 (App Router) + TypeScript
 - **UI:** TailwindCSS + component shadcn-style tự viết (`src/components/ui`)
+- **Phông chữ:** **Be Vietnam Pro** (thiết kế riêng cho tiếng Việt, dấu hiển thị chuẩn) — self-host trong
+  `public/fonts/*.woff2` + `@font-face` ở `src/app/fonts.css` (không phụ thuộc CDN, chạy offline trên LAN).
+  `fontFamily.sans` (tailwind) dùng font này cho toàn UI; `.font-display` = Be Vietnam Pro 700. Phiếu in
+  (`lib/print.ts`) dùng serif Cambria (hỗ trợ tiếng Việt). Middleware bỏ qua `/fonts/*` để tải không cần đăng nhập.
 - **DB:** PostgreSQL + Prisma ORM (`prisma/schema.prisma`)
 - **Auth:** JWT (jose) trong cookie httpOnly + bcrypt; RBAC theo vai trò/quyền
 - **Validation:** Zod

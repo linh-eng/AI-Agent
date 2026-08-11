@@ -32,6 +32,8 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Bỏ qua static assets & ảnh; áp dụng cho phần còn lại.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // Bỏ qua static assets, ảnh & phông chữ; áp dụng cho phần còn lại.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|fonts/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?|ttf|otf|eot)$).*)",
+  ],
 };
