@@ -17,7 +17,7 @@ catch (e) {
   process.exit(1);
 }
 
-const APP_VERSION = "v3.9.1"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
+const APP_VERSION = "v3.9.2"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 const ROOT = __dirname;
@@ -550,6 +550,13 @@ const server = http.createServer(async (req, res) => {
           const ownerResubmit = can(me, "create") && cur.createdBy === me.username && baseStatus(cur.trangthai) === "Trả lại bổ sung";
           if (!can(me, "edit") && !ownerResubmit) return sendJSON(res, 403, { error: "Không có quyền sửa ticket" });
           const t = await readBody(req); t.id = id; t.createdBy = cur.createdBy;
+          // Chỉ người TẠO yêu cầu (hoặc Quản trị) mới được sửa "Thông tin yêu cầu" (Bước 1).
+          // Người khác (người được yêu cầu, người xử lý…) sửa gì ở Bước 1 sẽ bị giữ nguyên theo bản gốc.
+          const isReq = (me.username === cur.createdBy) || (cur.nguoiYC && String(cur.nguoiYC).trim() === String(me.name||"").trim());
+          if (!isReq && !can(me, "users")) {
+            const REQ_FIELDS = ["loai","loaiKhac","luong","moTaThem","donvi","nguoiYC","sdt","email","nguoiDuocYC","nguoiDuocYCName","nguoiDuocYCSdt","riengTu","watchers","noidung","soluong","dvt","quycach","diadiemGiao","diadiemNhan"];
+            REQ_FIELDS.forEach(f => { t[f] = cur[f]; });
+          }
           const note = String(t._reason || "").trim();
           const nowISO = new Date().toISOString();
           t.history = Array.isArray(cur.history) ? cur.history.slice() : [];

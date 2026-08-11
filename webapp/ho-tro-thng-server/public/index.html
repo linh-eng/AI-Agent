@@ -242,7 +242,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <aside class="side">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.1</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.2</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="userbox" id="userbox"></div>
@@ -270,7 +270,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <div class="login-card">
     <div class="login-top">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.1</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.2</span></div>
     </div>
     <div class="login-body">
       <h2>Đăng nhập hệ thống</h2>
@@ -509,6 +509,8 @@ function mucDoLabel(m){ return {nhe:'Lỗi nhẹ',tb:'Lỗi trung bình',nang:'L
 function acceptSlaOf(t){ const g=groupOfT(t)||'default'; const h=(ACCEPT_SLA&&ACCEPT_SLA[g]!=null?ACCEPT_SLA[g]:(ACCEPT_SLA&&ACCEPT_SLA.default)); return +h||1; }
 function acceptSlaStatus(t){ if(!t.tSubmit) return null; const end=t.tNghiemThu||new Date().toISOString(); const used=workingHours(t.tSubmit,end); const lim=acceptSlaOf(t); const pending=baseStatus(t.trangthai)==='Đã xử lý'&&!t.tNghiemThu; return {used:used==null?0:used,lim,breach:(used||0)>lim,pending}; }
 function canAccept(t){ return can('edit')||can('users')||(t&&ME&&(t.createdBy===ME.username||String(t.nguoiYC||'').trim()===String(ME.name||'').trim())); }
+// Người tạo yêu cầu (chủ phiếu) — chỉ họ (hoặc Quản trị) mới được sửa "Thông tin yêu cầu" của ticket
+function isRequester(t){ return !!(t&&ME&&(t.createdBy===ME.username||String(t.nguoiYC||'').trim()===String(ME.name||'').trim())); }
 // Điểm chất lượng thực hiện (thang 100) — chỉ tính khi ticket đã đóng
 function computeQuality(t){
   const hm=Array.isArray(t.hangMuc)?t.hangMuc:[];
@@ -1333,6 +1335,10 @@ function drawForm(){
       <div style="margin-top:8px"><input type="file" id="attachInput" multiple style="width:auto;flex:none;font-size:13px" onchange="uploadFiles('${t.id}')">
       <span class="muted" style="font-size:12px">Ảnh, PDF, Word, Excel… tối đa ${(CFG&&CFG.maxUpload)||10} MB/tệp.</span></div></div></div>` : '';
   const steps=[step0,step1,step2,step3];
+  // Khóa "Thông tin yêu cầu" (Bước 1): chỉ người tạo yêu cầu / Quản trị mới sửa được
+  const reqLock = !isNew && !(isRequester(t) || can('users'));
+  const lockNote = reqLock ? `<div class="note" style="margin:0 0 12px;border-color:var(--amber);background:var(--amber-bg,#fdf3e0)">🔒 <b>Thông tin yêu cầu</b> chỉ do <b>người tạo yêu cầu</b> chỉnh sửa. Bạn vẫn cập nhật được phần phân công / xử lý / nghiệm thu bên dưới.</div>` : '';
+  const step0Locked = reqLock ? `<fieldset disabled style="border:0;margin:0;padding:0;min-inline-size:auto">${lockNote}${step0}</fieldset>` : step0;
   const o=document.getElementById("overlay");
   if(isNew){
     // TẠO MỚI = Bước 1 (Yêu cầu hỗ trợ). Các bước sau (phân công, thực hiện, nghiệm thu, CSAT)
@@ -1351,7 +1357,7 @@ function drawForm(){
       <div class="modal-h"><h3>Cập nhật ticket ${esc(t.id)}</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
       <div class="modal-b">
         <div class="sec-title" style="margin-top:0">Thông tin yêu cầu</div>
-        ${step0}${siteSec}${step1}${step2}${attachSec}${step3}
+        ${step0Locked}${siteSec}${step1}${step2}${attachSec}${step3}
       </div>
       <div class="modal-f">
         ${can('del')?`<button class="btn danger" onclick="delTicket('${t.id}')">Xóa</button>`:''}
