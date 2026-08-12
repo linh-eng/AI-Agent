@@ -19,7 +19,8 @@
     "postinstall": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:seed:demo": "tsx prisma/seed-demo.ts"
+    "db:seed:demo": "tsx prisma/seed-demo.ts",
+    "start:lan": "next start -H 0.0.0.0 -p 3100"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -63,7 +63,11 @@ export function sessionCookieOptions(maxAge = MAX_AGE) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    // Mặc định bật Secure ở production; đặt COOKIE_SECURE=false khi chạy HTTP LAN
+    // nội bộ (không HTTPS) để trình duyệt vẫn gửi cookie.
+    secure: process.env.COOKIE_SECURE
+      ? process.env.COOKIE_SECURE === "true"
+      : process.env.NODE_ENV === "production",
     path: "/",
     maxAge,
   };

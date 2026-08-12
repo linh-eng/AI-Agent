@@ -54,7 +54,10 @@ export function portalCookieOptions(maxAge = MAX_AGE) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    // COOKIE_SECURE=false cho HTTP LAN nội bộ (không HTTPS).
+    secure: process.env.COOKIE_SECURE
+      ? process.env.COOKIE_SECURE === "true"
+      : process.env.NODE_ENV === "production",
     path: "/",
     maxAge,
   };
