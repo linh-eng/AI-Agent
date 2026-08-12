@@ -12,11 +12,12 @@ import { apiFetch } from "@/lib/client";
 import { formatDate } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
-import { ISSUE_TYPE_LABEL, ISSUE_TYPE_TONE } from "@/lib/labels";
+import { ISSUE_TYPE_LABEL, ISSUE_TYPE_TONE, DOC_STATUS_LABEL, DOC_STATUS_TONE } from "@/lib/labels";
 
 interface Row {
   id: string;
   code: string;
+  status: string;
   issueType: string;
   customerName?: string | null;
   warehouse: { name: string };
@@ -79,19 +80,20 @@ export default function OutboundPage() {
                 <TH>Kho</TH>
                 <TH>Người xuất</TH>
                 <TH>Ngày xuất</TH>
+                <TH>Trạng thái</TH>
                 <TH className="text-center">Số dòng</TH>
               </TR>
             </THead>
             <TBody>
               {loading ? (
                 <TR>
-                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={8} className="py-8 text-center text-muted-foreground">
                     Đang tải…
                   </TD>
                 </TR>
               ) : filtered.length === 0 ? (
                 <TR>
-                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={8} className="py-8 text-center text-muted-foreground">
                     {rows.length === 0 ? "Chưa có phiếu xuất" : "Không tìm thấy phiếu phù hợp"}
                   </TD>
                 </TR>
@@ -110,6 +112,9 @@ export default function OutboundPage() {
                     <TD className="text-muted-foreground">{r.warehouse.name}</TD>
                     <TD className="text-muted-foreground">{r.createdBy.name}</TD>
                     <TD>{formatDate(r.issuedAt)}</TD>
+                    <TD>
+                      <Badge tone={DOC_STATUS_TONE[r.status]}>{DOC_STATUS_LABEL[r.status]}</Badge>
+                    </TD>
                     <TD className="text-center">{r._count.items}</TD>
                   </TR>
                 ))

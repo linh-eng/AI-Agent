@@ -21,6 +21,12 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
   `requiresExpiry` thì bắt buộc HSD.
 - **Xuất kho:** phiếu xuất (SALE / INTERNAL_USE / DISPOSAL / ADJUSTMENT); tự phân bổ lô **FEFO**
   (HSD sớm nhất trước, cùng HSD thì lô cũ trước; lô không HSD xếp sau), chặn xuất vượt tồn.
+- **Sửa/hủy phiếu nhập–xuất (chỉ ADMIN & MANAGER):** quyền `inbound.manage` / `outbound.manage`.
+  **Hủy** = hoàn tồn (ghi `StockMovement` đảo chiều, `refType=RECEIPT_CANCEL`/`ISSUE_CANCEL`) rồi đánh dấu
+  phiếu `CANCELLED`, **bắt buộc lý do** (lưu `cancelReason` + `cancelledAt`). **Sửa** = hủy phiếu cũ (hoàn tồn) +
+  tạo phiếu mới theo dữ liệu mới trong 1 transaction (giữ phiếu cũ để tra cứu, ghi chú liên kết 2 phiếu).
+  Chặn hủy/sửa nếu hàng đã nhập bị xuất/dùng bớt (không đủ tồn để hoàn) hoặc phiếu xuất phát sinh từ ghi
+  nhận dịch vụ (`ServiceUsage`). Mọi thao tác ghi `audit_logs` (RECEIPT_CANCEL/EDIT, ISSUE_CANCEL/EDIT).
 - **Chuyển kho (Phase 2):** phiếu chuyển giữa 2 kho; rút lô ở kho nguồn theo FEFO, tạo/cộng lô tương ứng
   (giữ nguyên mã lô + HSD) ở kho đích; mỗi lần tách lô ghi 2 `StockMovement` (OUTBOUND + INBOUND, `refType=TRANSFER`).
 - **Dịch vụ/liệu trình (Phase 2):** khai báo định mức tiêu hao (`Service` + `ServiceItem`); ghi nhận thực hiện

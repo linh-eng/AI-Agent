@@ -6,11 +6,13 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/client";
 import { formatDate } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
+import { DOC_STATUS_LABEL, DOC_STATUS_TONE } from "@/lib/labels";
 
 interface Row {
   id: string;
@@ -76,19 +78,20 @@ export default function InboundPage() {
                 <TH>Kho</TH>
                 <TH>Người nhập</TH>
                 <TH>Ngày nhập</TH>
+                <TH>Trạng thái</TH>
                 <TH className="text-center">Số dòng</TH>
               </TR>
             </THead>
             <TBody>
               {loading ? (
                 <TR>
-                  <TD colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">
                     Đang tải…
                   </TD>
                 </TR>
               ) : filtered.length === 0 ? (
                 <TR>
-                  <TD colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">
                     {rows.length === 0 ? "Chưa có phiếu nhập" : "Không tìm thấy phiếu phù hợp"}
                   </TD>
                 </TR>
@@ -104,6 +107,9 @@ export default function InboundPage() {
                     <TD className="text-muted-foreground">{r.warehouse.name}</TD>
                     <TD className="text-muted-foreground">{r.createdBy.name}</TD>
                     <TD>{formatDate(r.receivedAt)}</TD>
+                    <TD>
+                      <Badge tone={DOC_STATUS_TONE[r.status]}>{DOC_STATUS_LABEL[r.status]}</Badge>
+                    </TD>
                     <TD className="text-center">{r._count.items}</TD>
                   </TR>
                 ))

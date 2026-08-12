@@ -82,6 +82,16 @@ export const receiptCreateSchema = z.object({
   items: z.array(receiptItemSchema).min(1, "Cần ít nhất 1 dòng hàng"),
 });
 
+// Lý do khi hủy/sửa phiếu (bắt buộc, tối thiểu 3 ký tự).
+export const cancelReasonSchema = z.object({
+  reason: z.string().trim().min(3, "Nhập lý do (tối thiểu 3 ký tự)").max(300),
+});
+
+// Sửa phiếu = hủy phiếu cũ + tạo phiếu mới; cần đủ dữ liệu phiếu + lý do sửa.
+export const receiptUpdateSchema = receiptCreateSchema.extend({
+  reason: z.string().trim().min(3, "Nhập lý do sửa (tối thiểu 3 ký tự)").max(300),
+});
+
 // ----- Phiếu xuất -----
 export const issueItemSchema = z.object({
   productId: z.string().min(1, "Chọn sản phẩm"),
@@ -95,6 +105,10 @@ export const issueCreateSchema = z.object({
   customerName: optionalString,
   note: optionalString,
   items: z.array(issueItemSchema).min(1, "Cần ít nhất 1 dòng hàng"),
+});
+
+export const issueUpdateSchema = issueCreateSchema.extend({
+  reason: z.string().trim().min(3, "Nhập lý do sửa (tối thiểu 3 ký tự)").max(300),
 });
 
 export type ReceiptCreateInput = z.infer<typeof receiptCreateSchema>;

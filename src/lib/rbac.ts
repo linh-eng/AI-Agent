@@ -32,7 +32,9 @@ export const PERMISSIONS = {
 
   INVENTORY_READ: "inventory.read",
   INBOUND_WRITE: "inbound.write",
+  INBOUND_MANAGE: "inbound.manage", // sửa/hủy phiếu nhập đã ghi sổ (ADMIN/MANAGER)
   OUTBOUND_WRITE: "outbound.write",
+  OUTBOUND_MANAGE: "outbound.manage", // sửa/hủy phiếu xuất đã ghi sổ (ADMIN/MANAGER)
   TRANSFER_WRITE: "transfer.write",
   STOCKCOUNT_WRITE: "stockcount.write",
 
@@ -64,7 +66,9 @@ export const PERMISSION_LABELS: Record<PermissionCode, string> = {
   "warehouse.write": "Sửa kho",
   "inventory.read": "Xem tồn kho",
   "inbound.write": "Nhập kho",
+  "inbound.manage": "Sửa/hủy phiếu nhập",
   "outbound.write": "Xuất kho",
+  "outbound.manage": "Sửa/hủy phiếu xuất",
   "transfer.write": "Chuyển kho",
   "stockcount.write": "Kiểm kê kho",
   "service.read": "Xem liệu trình dịch vụ",
@@ -98,7 +102,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PRODUCT_WRITE,
     PERMISSIONS.WAREHOUSE_WRITE,
     PERMISSIONS.INBOUND_WRITE,
+    PERMISSIONS.INBOUND_MANAGE,
     PERMISSIONS.OUTBOUND_WRITE,
+    PERMISSIONS.OUTBOUND_MANAGE,
     PERMISSIONS.TRANSFER_WRITE,
     PERMISSIONS.STOCKCOUNT_WRITE,
     PERMISSIONS.SERVICE_WRITE,
