@@ -104,7 +104,14 @@ class S3StorageProvider implements StorageProvider {
   async put(key: string, data: Buffer, contentType: string): Promise<void> {
     const { PutObjectCommand } = await import("@aws-sdk/client-s3");
     const client = await this.client();
-    await client.send(new PutObjectCommand({ Bucket: STORAGE_CONFIG.s3.bucket, Key: key, Body: data, ContentType: contentType }));
+    await client.send(new PutObjectCommand({
+      Bucket: STORAGE_CONFIG.s3.bucket,
+      Key: key,
+      Body: data,
+      ContentType: contentType,
+      // Mã hóa at-rest phía server (S3/R2 SSE). Bucket vẫn PRIVATE; không set ACL public.
+      ServerSideEncryption: "AES256",
+    }));
   }
   async get(key: string): Promise<Buffer> {
     const { GetObjectCommand } = await import("@aws-sdk/client-s3");
@@ -162,4 +169,55 @@ export function validateUpload(filename: string, contentType: string, size: numb
   const ext = path.extname(filename).toLowerCase();
   if (STORAGE_CONFIG.blockedExtensions.includes(ext)) return `Đuôi tệp bị chặn: ${ext}`;
   return null;
+}
+
+/**
+ * Nhận diện loại nội dung THẬT bằng magic bytes (không tin MIME/filename do browser
+ * khai báo). Trả về MIME suy ra từ chữ ký byte, hoặc null nếu không nhận ra.
+ * Chỉ nhận các định dạng nghiệp vụ cho phép: JPEG, PNG, WEBP, GIF, PDF, MP4/QuickTime.
+ */
+export function sniffContentType(buf: Buffer): string | null {
+  if (buf.length < 12) return null;
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
+  // GIF: "GIF8"
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) return "image/gif";
+  // PDF: "%PDF"
+  if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) return "application/pdf";
+  // RIFF....WEBP
+  if (buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+  // ISO Base Media (mp4/quicktime/heic): bytes 4..8 == "ftyp"
+  if (buf.toString("ascii", 4, 8) === "ftyp") {
+    const brand = buf.toString("ascii", 8, 12);
+    if (brand.startsWith("qt")) return "video/quicktime";
+    if (brand.startsWith("hei") || brand.startsWith("mif")) return "image/heic";
+    return "video/mp4";
+  }
+  return null;
+}
+
+/**
+ * Xác thực upload dựa trên NỘI DUNG THẬT (magic bytes) — tầng bảo vệ mạnh hơn
+ * `validateUpload`. Chống: đổi đuôi tệp, giả MIME, upload script/thực thi ngụy trang
+ * thành ảnh. Trả về `{ error }` nếu chặn, hoặc `{ contentType }` (MIME đã suy ra tin cậy).
+ */
+export function validateUploadBytes(
+  filename: string,
+  declaredType: string,
+  buf: Buffer
+): { error: string } | { contentType: string } {
+  const basic = validateUpload(filename, declaredType, buf.length);
+  if (basic) return { error: basic };
+  const sniffed = sniffContentType(buf);
+  if (!sniffed) return { error: "Không xác thực được nội dung tệp (magic bytes không hợp lệ)" };
+  if (!STORAGE_CONFIG.allowedContentTypes.includes(sniffed)) {
+    return { error: `Nội dung tệp không được phép: ${sniffed}` };
+  }
+  // MIME khai báo phải KHỚP nội dung thật (cho phép heic/heif tương đương).
+  if (sniffed !== declaredType && !(sniffed === "image/heic" && declaredType.startsWith("image/"))) {
+    return { error: `MIME khai báo (${declaredType}) không khớp nội dung thật (${sniffed})` };
+  }
+  return { contentType: sniffed };
 }

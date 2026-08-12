@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { Prisma } from "@prisma/client";
 import { HttpError } from "./session";
+import { logger } from "./logger";
 
 export function ok(data: unknown, init?: number) {
   return NextResponse.json({ data }, { status: init ?? 200 });
@@ -51,8 +52,14 @@ export function handle(
         }
         if (err.code === "P2025") return fail(404, "Không tìm thấy bản ghi");
       }
-      console.error("[API] Lỗi không xử lý:", err);
-      return fail(500, "Lỗi máy chủ");
+      // Log có REDACT (không lộ secret/token/PII); người dùng chỉ nhận thông báo chung.
+      logger.error("Lỗi API không xử lý", {
+        method: (req as any)?.method,
+        url: (req as any)?.url,
+        name: (err as any)?.name,
+        message: (err as any)?.message,
+      });
+      return fail(500, "Đã xảy ra lỗi. Vui lòng thử lại sau.");
     }
   };
 }

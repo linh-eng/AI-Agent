@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, created, handle, fail } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
-import { storage, newStorageKey, kindFromContentType, validateUpload } from "@/lib/storage";
+import { storage, newStorageKey, kindFromContentType, validateUploadBytes } from "@/lib/storage";
 
 const VALID_KINDS = ["IMAGE", "BEFORE_IMAGE", "AFTER_IMAGE", "VIDEO", "FILE", "SIGNATURE"];
 
@@ -18,13 +18,15 @@ export const POST = handle(async (req) => {
   if (!file || typeof file === "string") return fail(400, "Thiếu tệp (field 'file')");
 
   const blob = file as unknown as File;
-  const contentType = blob.type || "application/octet-stream";
-  const size = blob.size;
+  const declaredType = blob.type || "application/octet-stream";
   const filename = (blob.name || "upload").slice(0, 200);
 
-  // Kiểm size + MIME allowlist + chặn đuôi thực thi/script.
-  const err = validateUpload(filename, contentType, size);
-  if (err) return fail(415, err);
+  // Đọc nội dung TRƯỚC rồi xác thực bằng magic bytes — KHÔNG tin MIME/filename browser.
+  const buffer = Buffer.from(await blob.arrayBuffer());
+  const check = validateUploadBytes(filename, declaredType, buffer);
+  if ("error" in check) return fail(415, check.error);
+  const contentType = check.contentType; // MIME đã suy ra tin cậy từ nội dung thật
+  const size = buffer.length;
 
   const kindRaw = String(form.get("kind") ?? "").toUpperCase();
   const kind = VALID_KINDS.includes(kindRaw) ? kindRaw : kindFromContentType(contentType);
@@ -41,7 +43,6 @@ export const POST = handle(async (req) => {
     if (!s) return fail(400, "sessionId không hợp lệ");
   }
 
-  const buffer = Buffer.from(await blob.arrayBuffer());
   const storageKey = newStorageKey(filename);
   await storage.put(storageKey, buffer, contentType);
 

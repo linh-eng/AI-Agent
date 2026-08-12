@@ -5,6 +5,7 @@ import { ok, created, handle, fail } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { formInstanceCreateSchema } from "@/lib/library-validation";
+import { persistInlineSignatures } from "@/lib/signature-storage";
 
 export const GET = handle(async (req) => {
   await requirePermission(PERMISSIONS.LIBRARY_READ);
@@ -32,12 +33,21 @@ export const POST = handle(async (req) => {
   const template = await prisma.formTemplate.findUnique({ where: { id: parsed.templateId } });
   if (!template) return fail(404, "Không tìm thấy biểu mẫu");
 
+  // Chữ ký/ảnh nhúng base64 -> đẩy lên storage riêng tư, thay bằng tham chiếu mediaId.
+  const data = parsed.data
+    ? await persistInlineSignatures(parsed.data, {
+        customerId: parsed.customerId ?? null,
+        sessionId: parsed.sessionId ?? null,
+        uploadedBy: session.name,
+      })
+    : undefined;
+
   const instance = await prisma.formInstance.create({
     data: {
       templateId: template.id,
       templateVersion: template.version,
       schemaSnapshot: template.schema as any,
-      data: (parsed.data as any) ?? undefined,
+      data: (data as any) ?? undefined,
       customerId: parsed.customerId ?? null,
       planId: parsed.planId ?? null,
       sessionId: parsed.sessionId ?? null,

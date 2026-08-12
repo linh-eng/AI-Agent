@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input, Label, Select, Checkbox } from "@/components/ui/input";
 import { apiFetch } from "@/lib/client";
+import { mediaSrc } from "@/lib/utils";
 import {
   evaluateLogic,
   computeCalc,
@@ -252,13 +253,17 @@ function SignatureField({
     onChange({ ...sig, dataUrl: "" });
   }
 
-  // vẽ lại chữ ký đã lưu khi mở lại
+  // vẽ lại chữ ký đã lưu khi mở lại.
+  // Ưu tiên dataUrl (vừa ký, chưa lưu); nếu đã lưu storage thì lấy qua mediaId
+  // (ảnh riêng tư, tải qua route có kiểm quyền — không có URL công khai).
   useEffect(() => {
-    if (sig.dataUrl && canvasRef.current) {
-      const img = new Image();
-      img.onload = () => canvasRef.current?.getContext("2d")?.drawImage(img, 0, 0);
-      img.src = sig.dataUrl;
-    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const src = sig.dataUrl || (sig.mediaId ? mediaSrc(sig.mediaId) : "");
+    if (!src) return;
+    const img = new Image();
+    img.onload = () => canvas.getContext("2d")?.drawImage(img, 0, 0);
+    img.src = src;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

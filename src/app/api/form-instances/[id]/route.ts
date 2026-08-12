@@ -5,6 +5,7 @@ import { ok, handle, fail } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { formInstanceUpdateSchema } from "@/lib/library-validation";
+import { persistInlineSignatures } from "@/lib/signature-storage";
 
 export const GET = handle(async (_req, { params }) => {
   await requirePermission(PERMISSIONS.LIBRARY_READ);
@@ -24,7 +25,18 @@ export const PATCH = handle(async (req, { params }) => {
   const parsed = formInstanceUpdateSchema.parse(await req.json());
   const data: Record<string, unknown> = {};
   if (parsed.name !== undefined) data.name = parsed.name;
-  if (parsed.data !== undefined) data.data = parsed.data as any;
+  if (parsed.data !== undefined) {
+    // Đẩy chữ ký/ảnh base64 nhúng lên storage riêng tư trước khi lưu.
+    const existing = await prisma.formInstance.findUnique({
+      where: { id: params.id },
+      select: { customerId: true, sessionId: true },
+    });
+    data.data = (await persistInlineSignatures(parsed.data, {
+      customerId: existing?.customerId ?? null,
+      sessionId: existing?.sessionId ?? null,
+      uploadedBy: session.name,
+    })) as any;
+  }
   if (parsed.complete) {
     data.status = "COMPLETED";
     data.completedBy = session.name;
