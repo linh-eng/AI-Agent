@@ -238,6 +238,9 @@ export function statusLabel(value?: string | null): string {
     LIBRARY_STATUS_LABEL[value] ??
     PROPOSAL_STATUS_LABEL[value] ??
     LEAD_STATUS_LABEL[value] ??
+    RECOMMENDATION_PRIORITY_LABEL[value] ??
+    PAYMENT_METHOD_LABEL[value] ??
+    CARE_KIND_LABEL[value] ??
     COMMON_STATUS_LABEL[value] ??
     value
   );
