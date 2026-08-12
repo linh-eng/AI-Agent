@@ -13,6 +13,7 @@ import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { MediaUpload } from "@/components/media-upload";
+import { SessionMediaShare } from "@/components/session-media-share";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import {
@@ -44,6 +45,7 @@ const SESSION_STATUSES = ["PLANNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
 export default function TreatmentPlanDetailPage() {
   const { id } = useParams<{ id: string }>();
   const canWrite = useCan(PERMISSIONS.TREATMENT_WRITE);
+  const canMedia = useCan(PERMISSIONS.MEDIA_WRITE);
   const [p, setP] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<Opt[]>([]);
@@ -327,6 +329,7 @@ export default function TreatmentPlanDetailPage() {
         <RecordSessionModal
           session={record}
           canFinance={p.canSeeFinance}
+          canShare={canMedia}
           error={error}
           onClose={() => setRecord(null)}
           onSubmit={async (body: any) => {
@@ -429,7 +432,7 @@ function AddSessionModal({ open, onClose, onSubmit, error, stages, services, tec
   );
 }
 
-function RecordSessionModal({ session, onClose, onSubmit, error, canFinance }: any) {
+function RecordSessionModal({ session, onClose, onSubmit, error, canFinance, canShare }: any) {
   const [f, setF] = useState<any>({
     status: session.status,
     performer: session.performer ?? "",
@@ -494,6 +497,13 @@ function RecordSessionModal({ session, onClose, onSubmit, error, canFinance }: a
             <MediaUpload kind="AFTER_IMAGE" customerId={session.customerId} sessionId={session.id} value={f.afterImages} onChange={(ids) => setF({ ...f, afterImages: ids })} />
           </div>
         </div>
+        {session.id && (
+          <div className="space-y-1.5">
+            <Label>Chia sẻ ảnh cho khách (Cổng khách)</Label>
+            <p className="text-[11px] text-muted-foreground">Mặc định ảnh là RIÊNG TƯ. Chỉ ảnh được bật &quot;Khách thấy&quot; mới hiển thị trên Cổng khách hàng.</p>
+            <SessionMediaShare sessionId={session.id} canShare={canShare} />
+          </div>
+        )}
         <div className="space-y-1.5"><Label>Phản hồi của khách</Label><Input value={f.customerFeedback} onChange={(e) => setF({ ...f, customerFeedback: e.target.value })} /></div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5"><Label>Dặn dò sau</Label><Input value={f.postCare} onChange={(e) => setF({ ...f, postCare: e.target.value })} /></div>

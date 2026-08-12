@@ -5,6 +5,7 @@ import { ok, handle, fail } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { storage } from "@/lib/storage";
+import { auditLog } from "@/lib/clinic";
 
 // Tải blob media — CHỈ nhân viên có quyền đọc khách. Không có URL công khai.
 // (Cổng khách hàng dùng route riêng /api/portal/media với kiểm quyền sở hữu.)
@@ -41,12 +42,22 @@ export const DELETE = handle(async (_req, { params }) => {
 });
 
 // Cập nhật cờ chia sẻ cho khách (nhân viên chủ động chọn ảnh trước/sau để khách xem).
+// Mặc định media là RIÊNG TƯ (sharedWithCustomer=false); chỉ chia sẻ khi bật rõ ràng.
 export const PATCH = handle(async (req, { params }) => {
-  await requirePermission(PERMISSIONS.MEDIA_WRITE);
+  const session = await requirePermission(PERMISSIONS.MEDIA_WRITE);
   const body = await req.json().catch(() => ({}));
+  const shared = !!body.sharedWithCustomer;
   const asset = await prisma.mediaAsset.update({
     where: { id: params.id },
-    data: { sharedWithCustomer: !!body.sharedWithCustomer },
+    data: { sharedWithCustomer: shared },
+  });
+  // Audit ai đổi trạng thái chia sẻ và khi nào.
+  await auditLog({
+    userId: session.userId,
+    action: shared ? "MEDIA_SHARED" : "MEDIA_UNSHARED",
+    entityType: "MediaAsset",
+    entityId: asset.id,
+    changes: { sharedWithCustomer: shared },
   });
   return ok({ id: asset.id, sharedWithCustomer: asset.sharedWithCustomer });
 });
