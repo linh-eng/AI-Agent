@@ -1035,6 +1035,7 @@ model Customer {
   proposals       TreatmentProposal[]
   careInstances   CareInstructionInstance[]
   mediaAssets     MediaAsset[]
+  portalAccount   CustomerPortalAccount?
   marketingCampaign MarketingCampaign? @relation(fields: [campaignId], references: [id])
 
   @@index([phone])
@@ -1747,6 +1748,7 @@ model CareInstructionInstance {
   bookingId     String?
   deliveredVia  DeliveryChannel @default(IN_PERSON)
   deliveredAt   DateTime?
+  acknowledgedAt DateTime? // khách xác nhận đã đọc (qua Customer Portal)
   providedBy    String?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
@@ -1969,4 +1971,22 @@ model MediaAsset {
   @@index([customerId])
   @@index([sessionId])
   @@map("media_assets")
+}
+
+// ============================================================================
+// P5 — CUSTOMER PORTAL: tài khoản đăng nhập riêng của KHÁCH (tách khỏi User staff).
+// Phiên portal mang customerId; MỌI truy vấn portal chỉ trong phạm vi khách đó.
+// ============================================================================
+model CustomerPortalAccount {
+  id           String    @id @default(cuid())
+  customerId   String    @unique
+  email        String    @unique
+  passwordHash String
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@map("customer_portal_accounts")
 }

@@ -827,6 +827,28 @@ async function main() {
     }
   }
 
+  // --- 13. CỔNG KHÁCH: tài khoản portal + media chia sẻ cho khách demo ---
+  if (demo) {
+    await prisma.customerPortalAccount.upsert({
+      where: { customerId: demo.id },
+      update: {},
+      create: {
+        customerId: demo.id,
+        email: "khachhang@example.com",
+        passwordHash: await hashPassword("khach123"),
+      },
+    });
+    const hasMedia = await prisma.mediaAsset.findFirst({ where: { customerId: demo.id } });
+    if (!hasMedia) {
+      await prisma.mediaAsset.createMany({
+        data: [
+          { storageKey: "seed/before-demo.txt", filename: "truoc.jpg", contentType: "image/jpeg", size: 1, kind: "BEFORE_IMAGE", customerId: demo.id, sharedWithCustomer: true, uploadedBy: "Phạm Chuyên Viên" },
+          { storageKey: "seed/after-demo.txt", filename: "sau.jpg", contentType: "image/jpeg", size: 1, kind: "AFTER_IMAGE", customerId: demo.id, sharedWithCustomer: true, uploadedBy: "Phạm Chuyên Viên" },
+        ],
+      });
+    }
+  }
+
   console.log("✅ Seed hoàn tất.");
   console.log("   Đăng nhập kho: admin@thng.com.vn / admin123");
   console.log("   Đăng nhập spa: quanly@thng.com.vn / quanly123 (Quản lý)");
@@ -836,6 +858,7 @@ async function main() {
   console.log("             biểu mẫu FORM-SKIN-ASSESS (có conditional logic).");
   console.log("   Module 5-10: báo giá PROP-000001, hướng dẫn CARE-POST-LASER, bảng giá Laser,");
   console.log("                chiến dịch CAMP-SUMMER-2026 + LEAD-000001.");
+  console.log("   Cổng khách: khachhang@example.com / khach123 (/portal)");
 }
 
 main()

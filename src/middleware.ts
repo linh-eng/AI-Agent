@@ -1,22 +1,41 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth";
+import { PORTAL_COOKIE, verifyPortalSession } from "@/lib/portal-auth";
 
-// Các đường dẫn công khai (không cần đăng nhập).
+// Đường dẫn công khai (không cần đăng nhập).
 const PUBLIC_PATHS = ["/login", "/api/auth/login"];
+// Cổng khách: tự xác thực bằng phiên PORTAL riêng (không dùng phiên nhân viên).
+const PORTAL_PUBLIC = ["/portal/login", "/api/portal/login", "/api/portal/logout"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  const isPublic = PUBLIC_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(p + "/")
-  );
+  // --- Khu vực CỔNG KHÁCH HÀNG (tách hoàn toàn khỏi phiên nhân viên) ---
+  if (pathname.startsWith("/portal") || pathname.startsWith("/api/portal")) {
+    if (PORTAL_PUBLIC.some((p) => pathname === p)) return NextResponse.next();
+
+    // API portal: để route handler tự enforce requirePortal() (trả 401 JSON).
+    if (pathname.startsWith("/api/portal")) return NextResponse.next();
+
+    // Trang portal: cần phiên portal hợp lệ, nếu không -> /portal/login.
+    const token = req.cookies.get(PORTAL_COOKIE)?.value;
+    const portal = token ? await verifyPortalSession(token) : null;
+    if (!portal) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/portal/login";
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
+
+  const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
   if (isPublic) return NextResponse.next();
 
+  // --- Khu vực NHÂN VIÊN (phiên staff) ---
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const session = token ? await verifySession(token) : null;
 
   if (!session) {
-    // API -> 401 JSON; trang -> redirect về /login
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
     }

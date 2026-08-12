@@ -78,11 +78,12 @@ export default function CustomerProfilePage() {
   const canTreat = useCan(PERMISSIONS.TREATMENT_WRITE);
   const canRecommend = useCan(PERMISSIONS.RECOMMEND_WRITE);
   const canCare = useCan(PERMISSIONS.CARE_WRITE);
+  const canCustomerWrite = useCan(PERMISSIONS.CUSTOMER_WRITE);
 
   const [c, setC] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("timeline");
-  const [modal, setModal] = useState<null | "crm" | "payment" | "assessment" | "recommend" | "applyForm" | "care">(null);
+  const [modal, setModal] = useState<null | "crm" | "payment" | "assessment" | "recommend" | "applyForm" | "care" | "portal">(null);
   const [error, setError] = useState<string | null>(null);
   const [recs, setRecs] = useState<any[]>([]);
   const [forms, setForms] = useState<any[]>([]);
@@ -167,6 +168,11 @@ export default function CustomerProfilePage() {
             {canCare && (
               <Button variant="outline" onClick={() => setModal("care")}>
                 <Plus className="h-4 w-4" /> Gửi hướng dẫn
+              </Button>
+            )}
+            {canCustomerWrite && (
+              <Button variant="outline" onClick={() => setModal("portal")}>
+                <User className="h-4 w-4" /> Cổng khách
               </Button>
             )}
           </div>
@@ -481,7 +487,36 @@ export default function CustomerProfilePage() {
       <RecommendModal open={modal === "recommend"} onClose={() => setModal(null)} error={error} products={spaProducts} onSubmit={(body) => submit("/api/product-recommendations", { ...body, customerId: id })} />
       <ApplyFormModal open={modal === "applyForm"} onClose={() => setModal(null)} error={error} templates={templates} onSubmit={(body) => submit("/api/form-instances", { ...body, customerId: id })} />
       <SendCareModal open={modal === "care"} onClose={() => setModal(null)} error={error} templates={careTemplates} onSubmit={(body) => submit("/api/care-instances", { ...body, customerId: id })} />
+      <PortalAccountModal open={modal === "portal"} onClose={() => setModal(null)} customerId={id} defaultEmail={c.email ?? ""} />
     </div>
+  );
+}
+
+function PortalAccountModal({ open, onClose, customerId, defaultEmail }: { open: boolean; onClose: () => void; customerId: string; defaultEmail: string }) {
+  const [email, setEmail] = useState(defaultEmail);
+  const [password, setPassword] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null); setMsg(null);
+    try {
+      await apiFetch(`/api/customers/${customerId}/portal-account`, { method: "POST", body: JSON.stringify({ email, password }) });
+      setMsg("Đã cấp tài khoản Cổng khách. Gửi thông tin đăng nhập cho khách qua kênh an toàn.");
+      setPassword("");
+    } catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); }
+  }
+  return (
+    <Modal open={open} onClose={onClose} title="Cấp tài khoản Cổng khách hàng">
+      <form onSubmit={submit} className="space-y-4">
+        <p className="text-xs text-muted-foreground">Khách đăng nhập tại <b>/portal</b> để xem báo giá, phác đồ, lịch hẹn, hướng dẫn và tự chốt phương án.</p>
+        <div className="space-y-1.5"><Label>Email đăng nhập *</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+        <div className="space-y-1.5"><Label>Mật khẩu * (≥ 6 ký tự)</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} /></div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {msg && <p className="text-sm text-emerald-600">{msg}</p>}
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Đóng</Button><Button type="submit">Lưu tài khoản</Button></div>
+      </form>
+    </Modal>
   );
 }
 
