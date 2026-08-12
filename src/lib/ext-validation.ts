@@ -113,6 +113,7 @@ export const sessionMaterialCreateSchema = z.object({
   name: z.string().min(1, "Tên vật tư"),
   spaProductId: z.string().optional().nullable(),
   inventoryProductId: z.string().optional().nullable(),
+  lotId: z.string().optional().nullable(), // gắn lô kho thật -> trừ tồn khi xuất
   warehouseId: z.string().optional().nullable(),
   uom: z.string().optional().nullable(),
   isProfessional: z.boolean().default(false),

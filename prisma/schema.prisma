@@ -429,6 +429,8 @@ model Lot {
   manufactureDate   DateTime?
   expiryDate        DateTime?
   quantity          Int       @default(0)
+  /// Số lượng đang bị GIỮ bởi các phiếu (reservation) — available = quantity - reservedQty
+  reservedQty       Int       @default(0)
   supplierId        String?
   projectId         String?
   isCommercialStock Boolean   @default(false)
@@ -440,6 +442,7 @@ model Lot {
   project    Project?   @relation(fields: [projectId], references: [id])
   origins    Origin[]
   warranties Warranty[]
+  sessionMaterials SessionMaterial[]
 
   @@unique([productId, lotNumber, warehouseId])
   @@index([productId])
@@ -1777,7 +1780,8 @@ model SessionMaterial {
   name           String // snapshot tên vật tư/sản phẩm
   spaProductId   String? // sản phẩm chuyên nghiệp (có giá vốn)
   inventoryProductId String? // Product kho (soft ref)
-  warehouseId    String? // kho (soft ref)
+  lotId          String? // Lô kho thực (khi có -> trừ tồn thật qua StockMovement)
+  warehouseId    String? // kho (soft ref / suy ra từ lot)
   uom            String? // đơn vị
   isProfessional Boolean  @default(false) // SP chuyên nghiệp dùng trong buổi (≠ home-care bán khách)
   plannedQty     Decimal  @default(0) @db.Decimal(14, 3)
@@ -1794,9 +1798,11 @@ model SessionMaterial {
 
   session   TreatmentSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   product   SpaProduct?        @relation(fields: [spaProductId], references: [id])
+  lot       Lot?               @relation(fields: [lotId], references: [id])
   movements MaterialMovement[]
 
   @@index([sessionId])
+  @@index([lotId])
   @@map("session_materials")
 }
 
@@ -1807,6 +1813,8 @@ model MaterialMovement {
   quantity          Decimal              @db.Decimal(14, 3)
   unitCost          Decimal?             @db.Decimal(18, 2) // snapshot giá vốn
   warehouseId       String?
+  lotId             String? // lô kho bị tác động (nếu có)
+  stockMovementId   String? // liên kết tới StockMovement (ledger kho — source of truth)
   bookingId         String?
   customerId        String?
   staff             String?

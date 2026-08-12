@@ -32,6 +32,15 @@ export function handle(
       return await fn(req, ctx);
     } catch (err) {
       if (err instanceof HttpError) return fail(err.status, err.message);
+      // Lỗi nghiệp vụ có mã HTTP (vd InsufficientStockError -> 409)
+      if (
+        err &&
+        typeof err === "object" &&
+        typeof (err as any).status === "number" &&
+        typeof (err as any).message === "string"
+      ) {
+        return fail((err as any).status, (err as any).message);
+      }
       if (err instanceof ZodError) {
         return fail(422, "Dữ liệu không hợp lệ", err.flatten().fieldErrors);
       }

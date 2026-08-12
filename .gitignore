@@ -32,3 +32,6 @@ next-env.d.ts
 
 # prisma
 /prisma/*.db
+
+# Local test env (contains local DB creds)
+.env.test

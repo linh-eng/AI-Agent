@@ -58,6 +58,7 @@ export default function TreatmentPlanDetailPage() {
   const [matsFor, setMatsFor] = useState<any | null>(null);
   const [materials, setMaterials] = useState<any[]>([]);
   const [spaProducts, setSpaProducts] = useState<any[]>([]);
+  const [lots, setLots] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,21 +75,30 @@ export default function TreatmentPlanDetailPage() {
 
   async function openMaterials(s: any) {
     setMatsFor(s);
+    setError(null);
     setMaterials(await apiFetch<any[]>(`/api/session-materials?sessionId=${s.id}`).catch(() => []));
+    setLots(await apiFetch<any[]>(`/api/inventory/lots`).catch(() => []));
   }
   async function refreshMaterials() {
     if (!matsFor) return;
     setMaterials(await apiFetch<any[]>(`/api/session-materials?sessionId=${matsFor.id}`).catch(() => []));
+    setLots(await apiFetch<any[]>(`/api/inventory/lots`).catch(() => []));
     load();
   }
   async function addMaterial(body: any) {
     if (!matsFor) return;
-    await apiFetch("/api/session-materials", { method: "POST", body: JSON.stringify({ ...body, sessionId: matsFor.id }) }).catch((e) => setError(e.message));
-    refreshMaterials();
+    setError(null);
+    try {
+      await apiFetch("/api/session-materials", { method: "POST", body: JSON.stringify({ ...body, sessionId: matsFor.id }) });
+      refreshMaterials();
+    } catch (e) { setError(e instanceof Error ? e.message : "Lỗi"); }
   }
   async function moveMaterial(matId: string, type: string, quantity: number) {
-    await apiFetch(`/api/session-materials/${matId}/move`, { method: "POST", body: JSON.stringify({ type, quantity }) }).catch(() => {});
-    refreshMaterials();
+    setError(null);
+    try {
+      await apiFetch(`/api/session-materials/${matId}/move`, { method: "POST", body: JSON.stringify({ type, quantity }) });
+      refreshMaterials();
+    } catch (e) { setError(e instanceof Error ? e.message : "Lỗi"); }
   }
   async function delMaterial(matId: string) {
     await apiFetch(`/api/session-materials/${matId}`, { method: "DELETE" }).catch((e) => setError(e.message));
@@ -300,9 +310,11 @@ export default function TreatmentPlanDetailPage() {
           session={matsFor}
           materials={materials}
           spaProducts={spaProducts}
+          lots={lots}
+          error={error}
           canFinance={p.canSeeFinance}
           canWrite={canWrite}
-          onClose={() => setMatsFor(null)}
+          onClose={() => { setMatsFor(null); setError(null); }}
           onAdd={addMaterial}
           onMove={moveMaterial}
           onDelete={delMaterial}
@@ -496,14 +508,18 @@ const MOVE_TYPES: { t: string; label: string }[] = [
   { t: "WASTE", label: "Hao" },
 ];
 
-function MaterialsModal({ session, materials, spaProducts, canFinance, canWrite, onClose, onAdd, onMove, onDelete }: any) {
-  const [f, setF] = useState<any>({ name: "", spaProductId: "", isProfessional: false, plannedQty: "1", uom: "", unitCost: "" });
+function MaterialsModal({ session, materials, spaProducts, lots, error, canFinance, canWrite, onClose, onAdd, onMove, onDelete }: any) {
+  const [f, setF] = useState<any>({ name: "", spaProductId: "", lotId: "", isProfessional: false, plannedQty: "1", uom: "", unitCost: "" });
   const [moveQty, setMoveQty] = useState<Record<string, string>>({});
   const totalCost = materials.reduce((s: number, m: any) => s + Number(m.consumedQty || 0) * Number(m.unitCost || 0), 0);
 
   function pickProduct(pid: string) {
     const sp = spaProducts.find((x: any) => x.id === pid);
     setF((prev: any) => ({ ...prev, spaProductId: pid, ...(sp ? { name: sp.name, isProfessional: sp.productType !== "HOME_CARE", unitCost: sp.cost != null ? String(sp.cost) : prev.unitCost } : {}) }));
+  }
+  function pickLot(lid: string) {
+    const lot = (lots ?? []).find((x: any) => x.id === lid);
+    setF((prev: any) => ({ ...prev, lotId: lid, ...(lot ? { name: lot.productName, uom: lot.uom ?? prev.uom } : {}) }));
   }
 
   return (
@@ -512,14 +528,15 @@ function MaterialsModal({ session, materials, spaProducts, canFinance, canWrite,
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="bg-muted/50 text-muted-foreground">
-              <tr><th className="p-1.5 text-left">Vật tư</th><th>ĐVT</th><th>KH</th><th>Giữ</th><th>Xuất</th><th>Tiêu hao</th><th>Hao</th>{canFinance && <th>Giá vốn</th>}{canWrite && <th>Ghi biến động</th>}</tr>
+              <tr><th className="p-1.5 text-left">Vật tư</th><th>Kho/Lô</th><th>ĐVT</th><th>KH</th><th>Giữ</th><th>Xuất</th><th>Tiêu hao</th><th>Hao</th>{canFinance && <th>Giá vốn</th>}{canWrite && <th>Ghi biến động</th>}</tr>
             </thead>
             <tbody>
               {materials.length === 0 ? (
-                <tr><td colSpan={canFinance ? 9 : 8} className="p-3 text-center text-muted-foreground">Chưa có vật tư</td></tr>
+                <tr><td colSpan={canFinance ? 10 : 9} className="p-3 text-center text-muted-foreground">Chưa có vật tư</td></tr>
               ) : materials.map((m: any) => (
                 <tr key={m.id} className="border-t">
                   <td className="p-1.5">{m.name}{m.isProfessional && <span className="ml-1 text-[10px] text-amber-600">(CN)</span>}</td>
+                  <td className="text-center">{m.lotId ? <span className="text-[10px] text-emerald-600">Kho</span> : <span className="text-[10px] text-muted-foreground">—</span>}</td>
                   <td className="text-center">{m.uom ?? "—"}</td>
                   <td className="text-center">{Number(m.plannedQty)}</td>
                   <td className="text-center">{Number(m.reservedQty)}</td>
@@ -544,27 +561,32 @@ function MaterialsModal({ session, materials, spaProducts, canFinance, canWrite,
           </table>
         </div>
         {canFinance && <div className="text-right text-sm">Chi phí vật tư tiêu hao: <span className="font-semibold">{formatNumber(totalCost)} ₫</span></div>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
         {canWrite && (
-          <form onSubmit={(e) => { e.preventDefault(); const b: any = { name: f.name, isProfessional: f.isProfessional, plannedQty: Number(f.plannedQty || 0), uom: f.uom || undefined, spaProductId: f.spaProductId || undefined, unitCost: f.unitCost ? Number(f.unitCost) : undefined }; onAdd(b); setF({ name: "", spaProductId: "", isProfessional: false, plannedQty: "1", uom: "", unitCost: "" }); }} className="space-y-2 border-t pt-3">
+          <form onSubmit={(e) => { e.preventDefault(); const b: any = { name: f.name, isProfessional: f.isProfessional, plannedQty: Number(f.plannedQty || 0), uom: f.uom || undefined, spaProductId: f.spaProductId || undefined, lotId: f.lotId || undefined, unitCost: f.unitCost ? Number(f.unitCost) : undefined }; onAdd(b); setF({ name: "", spaProductId: "", lotId: "", isProfessional: false, plannedQty: "1", uom: "", unitCost: "" }); }} className="space-y-2 border-t pt-3">
             <div className="text-xs font-medium text-muted-foreground">Thêm vật tư / sản phẩm chuyên nghiệp</div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Select className="h-8 text-xs" value={f.lotId} onChange={(e) => pickLot(e.target.value)}>
+                <option value="">— Lô kho (trừ tồn thật) —</option>
+                {(lots ?? []).map((lot: any) => <option key={lot.id} value={lot.id}>{lot.productName} · {lot.warehouse} · KD {lot.available}</option>)}
+              </Select>
               <Select className="h-8 text-xs" value={f.spaProductId} onChange={(e) => pickProduct(e.target.value)}>
                 <option value="">— SP catalog —</option>
                 {spaProducts.map((sp: any) => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
               </Select>
               <Input className="h-8 text-xs" placeholder="Tên vật tư *" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required />
-              <Input className="h-8 text-xs" placeholder="ĐVT" value={f.uom} onChange={(e) => setF({ ...f, uom: e.target.value })} />
               <Input className="h-8 text-xs" type="number" placeholder="SL kế hoạch" value={f.plannedQty} onChange={(e) => setF({ ...f, plannedQty: e.target.value })} />
             </div>
             <div className="flex items-center gap-3">
-              {canFinance && <Input className="h-8 w-40 text-xs" type="number" placeholder="Giá vốn/đv" value={f.unitCost} onChange={(e) => setF({ ...f, unitCost: e.target.value })} />}
+              <Input className="h-8 w-20 text-xs" placeholder="ĐVT" value={f.uom} onChange={(e) => setF({ ...f, uom: e.target.value })} />
+              {canFinance && <Input className="h-8 w-36 text-xs" type="number" placeholder="Giá vốn/đv" value={f.unitCost} onChange={(e) => setF({ ...f, unitCost: e.target.value })} />}
               <label className="flex items-center gap-1 text-xs"><Checkbox checked={f.isProfessional} onChange={(e) => setF({ ...f, isProfessional: e.target.checked })} /> SP chuyên nghiệp</label>
               <Button type="submit" size="sm" className="ml-auto">Thêm</Button>
             </div>
           </form>
         )}
-        <p className="text-[11px] text-muted-foreground">Tiêu hao (CONSUME) tự cộng vào chi phí thật của buổi. SP chuyên nghiệp khác với sản phẩm bán tại nhà (home-care).</p>
+        <p className="text-[11px] text-muted-foreground">Gắn <b>Lô kho</b> để trừ tồn thật (Giữ→Xuất→Tiêu hao); không gắn lô = chỉ tính chi phí. Tiêu hao cộng vào chi phí thật của buổi.</p>
         <div className="flex justify-end"><Button variant="outline" onClick={onClose}>Đóng</Button></div>
       </div>
     </Modal>
