@@ -13,6 +13,10 @@ const SECRET = new TextEncoder().encode(
 );
 const MAX_AGE = Number(process.env.SESSION_MAX_AGE ?? 60 * 60 * 8); // 8h mặc định
 
+if (process.env.NODE_ENV === "production" && !process.env.AUTH_SECRET) {
+  console.warn("[SECURITY] AUTH_SECRET (staff) chưa đặt trong production!");
+}
+
 export interface SessionPayload {
   userId: string;
   email: string;

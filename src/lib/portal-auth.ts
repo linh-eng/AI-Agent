@@ -9,8 +9,23 @@ import { SignJWT, jwtVerify } from "jose";
 
 export const PORTAL_COOKIE = "thng_portal";
 
-const SECRET = new TextEncoder().encode(process.env.AUTH_SECRET ?? "dev-secret-change-me");
+// Bí mật RIÊNG cho phiên khách — TÁCH khỏi staff (AUTH_SECRET). Nếu chưa cấu hình
+// PORTAL_AUTH_SECRET, phái sinh một giá trị KHÁC staff (hậu tố ::portal) để chữ ký
+// token staff không bao giờ verify được ở portal (và ngược lại), kể cả môi trường dev.
+const PORTAL_SECRET_RAW =
+  process.env.PORTAL_AUTH_SECRET ??
+  `${process.env.AUTH_SECRET ?? "dev-secret-change-me"}::portal`;
+const SECRET = new TextEncoder().encode(PORTAL_SECRET_RAW);
 const MAX_AGE = Number(process.env.PORTAL_SESSION_MAX_AGE ?? 60 * 60 * 24 * 7); // 7 ngày
+
+if (
+  process.env.NODE_ENV === "production" &&
+  !process.env.PORTAL_AUTH_SECRET &&
+  !process.env.AUTH_SECRET
+) {
+  // Cảnh báo (không throw để tránh chặn edge middleware) — production PHẢI đặt secret.
+  console.warn("[SECURITY] PORTAL_AUTH_SECRET/AUTH_SECRET chưa đặt trong production!");
+}
 
 export interface PortalSession {
   customerId: string;

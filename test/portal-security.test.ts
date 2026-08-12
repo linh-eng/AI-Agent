@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { signPortalSession, verifyPortalSession } from "@/lib/portal-auth";
-import { signSession } from "@/lib/auth";
+import { signSession, verifySession } from "@/lib/auth";
 import { resetDb, uniq, makeCustomer } from "./helpers";
 
 describe("P5 — bảo mật Cổng khách hàng", () => {
@@ -13,9 +13,12 @@ describe("P5 — bảo mật Cổng khách hàng", () => {
     const s = await verifyPortalSession(token);
     expect(s?.customerId).toBe("cust-1");
 
-    // Token nhân viên (scope khác) KHÔNG được chấp nhận làm phiên portal.
+    // Token nhân viên KHÔNG được chấp nhận làm phiên portal (khác secret + scope).
     const staff = await signSession({ userId: "u", email: "s@t.com", name: "NV", roles: ["MANAGER"], permissions: ["finance.read"] });
     expect(await verifyPortalSession(staff)).toBeNull();
+
+    // Và ngược lại: token portal KHÔNG verify được như phiên nhân viên (khác secret).
+    expect(await verifySession(token)).toBeNull();
   });
 
   it("IDOR: điều kiện scope chỉ trả báo giá của chính khách", async () => {
