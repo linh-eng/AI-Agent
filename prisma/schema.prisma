@@ -1990,3 +1990,19 @@ model CustomerPortalAccount {
 
   @@map("customer_portal_accounts")
 }
+
+// ============================================================================
+// SEC1 — Chống brute-force đăng nhập (DB-backed -> đúng trên multi-instance/serverless).
+// Đếm thất bại theo "key" (ip / account) trong cửa sổ thời gian; khóa TẠM THỜI
+// lũy tiến. KHÔNG bao giờ khóa vĩnh viễn; không lưu mật khẩu/bí mật.
+// ============================================================================
+model AuthThrottle {
+  key         String    @id // vd: "staff:ip:1.2.3.4", "staff:acct:<email>", "portal:acct:<email>"
+  failures    Int       @default(0)
+  firstFailAt DateTime  @default(now())
+  lockedUntil DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@index([lockedUntil])
+  @@map("auth_throttles")
+}

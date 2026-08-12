@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword, signSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
 import { ok, fail, handle } from "@/lib/api";
+import { checkThrottle, recordFailure, recordSuccess, getClientIp } from "@/lib/rate-limit";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -14,18 +15,34 @@ const loginSchema = z.object({
 export const POST = handle(async (req) => {
   const body = await req.json();
   const { email, password } = loginSchema.parse(body);
+  const emailNorm = email.toLowerCase();
+  const ip = getClientIp(req);
+  const keys = [`staff:ip:${ip}`, `staff:acct:${emailNorm}`];
+
+  // Chặn brute-force TRƯỚC khi kiểm tra mật khẩu.
+  const throttled = await checkThrottle(keys);
+  if (throttled.locked) {
+    return fail(429, `Quá nhiều lần thử. Vui lòng thử lại sau ${throttled.retryAfterSec}s`);
+  }
 
   const user = await prisma.user.findUnique({
-    where: { email },
+    where: { email: emailNorm },
     include: {
       roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
     },
   });
 
-  if (!user || !user.isActive) return fail(401, "Email hoặc mật khẩu không đúng");
+  // Lỗi chung + ghi nhận thất bại (áp dụng dù account tồn tại hay không).
+  const invalid = async () => {
+    await recordFailure(keys, "staff-login");
+    return fail(401, "Email hoặc mật khẩu không đúng");
+  };
+  if (!user || !user.isActive) return invalid();
 
   const valid = await verifyPassword(password, user.passwordHash);
-  if (!valid) return fail(401, "Email hoặc mật khẩu không đúng");
+  if (!valid) return invalid();
+
+  await recordSuccess(keys);
 
   const roles = user.roles.map((ur) => ur.role.code);
   const permissions = Array.from(
