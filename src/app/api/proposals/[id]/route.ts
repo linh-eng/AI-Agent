@@ -6,6 +6,7 @@ import { requirePermission, getSession } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { proposalUpdateSchema } from "@/lib/ext-validation";
 import { proposalOptionTotal, canSeeFinance, auditLog } from "@/lib/clinic";
+import { enrichProposalOptions } from "@/lib/pricing";
 
 export const GET = handle(async (_req, { params }) => {
   await requirePermission(PERMISSIONS.PROPOSAL_READ);
@@ -55,6 +56,8 @@ export const PATCH = handle(async (req, { params }) => {
 
   // Thay thế toàn bộ options nếu gửi (chưa chốt)
   if (parsed.options) {
+    const cust = await prisma.customer.findUnique({ where: { id: current.customerId }, select: { group: true } });
+    await enrichProposalOptions(parsed.options, cust?.group);
     await prisma.treatmentProposalOption.deleteMany({ where: { proposalId: params.id } });
     data.options = {
       create: parsed.options.map((o, oi) => ({

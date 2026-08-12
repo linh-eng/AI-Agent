@@ -5,6 +5,7 @@ import { ok, created, handle } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { recommendationCreateSchema } from "@/lib/library-validation";
+import { resolveItemPricing } from "@/lib/pricing";
 
 export const GET = handle(async (req) => {
   await requirePermission(PERMISSIONS.LIBRARY_READ);
@@ -22,14 +23,13 @@ export const GET = handle(async (req) => {
 export const POST = handle(async (req) => {
   const session = await requirePermission(PERMISSIONS.RECOMMEND_WRITE);
   const parsed = recommendationCreateSchema.parse(await req.json());
-  // Nếu không nhập giá, lấy giá bán của sản phẩm tại thời điểm đề xuất.
+  // Nếu không nhập giá: lấy từ Price Management (theo nhóm khách) rồi fallback giá
+  // bán niêm yết — SNAPSHOT tại thời điểm đề xuất.
   let price = parsed.price ?? undefined;
   if (price === undefined) {
-    const prod = await prisma.spaProduct.findUnique({
-      where: { id: parsed.spaProductId },
-      select: { sellingPrice: true },
-    });
-    if (prod?.sellingPrice != null) price = Number(prod.sellingPrice);
+    const cust = await prisma.customer.findUnique({ where: { id: parsed.customerId }, select: { group: true } });
+    const { unitPrice } = await resolveItemPricing("PRODUCT", parsed.spaProductId, cust?.group);
+    if (unitPrice !== null) price = unitPrice;
   }
   const rec = await prisma.productRecommendation.create({
     data: { ...parsed, price: price ?? null, createdBy: parsed.createdBy ?? session.name },

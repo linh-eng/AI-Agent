@@ -5,6 +5,7 @@ import { ok, created, handle, fail } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { sessionCreateSchema } from "@/lib/clinic-validation";
+import { resolveItemPricing } from "@/lib/pricing";
 
 export const GET = handle(async (req) => {
   await requirePermission(PERMISSIONS.TREATMENT_READ);
@@ -26,12 +27,25 @@ export const POST = handle(async (req) => {
 
   const plan = await prisma.treatmentPlan.findUnique({
     where: { id: parsed.planId },
-    select: { customerId: true },
+    select: { customerId: true, customer: { select: { group: true } } },
   });
   if (!plan) return fail(404, "Không tìm thấy phác đồ");
 
   // orderIndex mặc định = sessionNumber nếu không truyền
   const orderIndex = parsed.orderIndex ?? parsed.sessionNumber;
+
+  // Giá buổi: nếu chưa nhập & có dịch vụ, lấy từ Price Management (theo nhóm khách),
+  // fallback giá niêm yết -> LƯU SNAPSHOT (đổi bảng giá sau không ảnh hưởng buổi đã lập).
+  let price = parsed.price ?? undefined;
+  if (price === undefined && parsed.serviceId) {
+    const { unitPrice } = await resolveItemPricing(
+      "SERVICE",
+      parsed.serviceId,
+      plan.customer?.group,
+      parsed.scheduledAt ?? undefined
+    );
+    if (unitPrice !== null) price = unitPrice;
+  }
 
   const session = await prisma.treatmentSession.create({
     data: {
@@ -53,7 +67,7 @@ export const POST = handle(async (req) => {
       plannedParams: (parsed.plannedParams as any) ?? undefined,
       plannedMaterials: (parsed.plannedMaterials as any) ?? undefined,
       plannedCost: parsed.plannedCost ?? null,
-      price: parsed.price ?? null,
+      price: price ?? null,
       preCare: parsed.preCare ?? null,
       postCare: parsed.postCare ?? null,
       note: parsed.note ?? null,

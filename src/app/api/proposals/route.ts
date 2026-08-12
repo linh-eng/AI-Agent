@@ -5,7 +5,8 @@ import { ok, created, handle } from "@/lib/api";
 import { requirePermission, getSession } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { proposalCreateSchema } from "@/lib/ext-validation";
-import { sequentialCode, proposalOptionTotal, auditLog, canSeeFinance } from "@/lib/clinic";
+import { sequentialCode, proposalOptionTotal, auditLog } from "@/lib/clinic";
+import { enrichProposalOptions } from "@/lib/pricing";
 
 export const GET = handle(async (req) => {
   await requirePermission(PERMISSIONS.PROPOSAL_READ);
@@ -27,6 +28,8 @@ export const POST = handle(async (req) => {
   const session = await requirePermission(PERMISSIONS.PROPOSAL_WRITE);
   const parsed = proposalCreateSchema.parse(await req.json());
   const code = sequentialCode("PROP", await prisma.treatmentProposal.count());
+  const cust = await prisma.customer.findUnique({ where: { id: parsed.customerId }, select: { group: true } });
+  await enrichProposalOptions(parsed.options, cust?.group);
 
   const proposal = await prisma.treatmentProposal.create({
     data: {
