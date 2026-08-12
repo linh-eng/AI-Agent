@@ -9,6 +9,15 @@ echo   (Chay sau khi da giai nen ban moi de len, giu nguyen .env)
 echo ============================================================
 echo.
 
+REM --- DUNG app dang chay tren cong 9500 (de tranh khoa file Prisma) ---
+REM     Chi tat dung tien trinh o cong 9500 - KHONG dung 3000/9000 cua app khac.
+sc query SpaDemo >nul 2>nul && ( echo Dung service SpaDemo... & net stop SpaDemo >nul 2>nul )
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":9500" ^| findstr LISTENING') do (
+  echo Dung tien trinh dang chay o cong 9500 ^(PID %%p^)...
+  taskkill /PID %%p /F >nul 2>nul
+)
+timeout /t 2 /nobreak >nul
+
 REM --- Neu dung git thi keo code moi ---
 where git >nul 2>nul && ( echo Keo code moi tu git... & git pull )
 
