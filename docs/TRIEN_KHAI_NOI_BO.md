@@ -8,12 +8,12 @@
 > - Webapp Hỗ Trợ — `172.168.11.60:3000`
 > - Webapp Kho Sophia — `172.168.11.60:9000`
 >
-> → Webapp này dùng **cổng khác: `8000`** (có thể đổi). Đây là bản DEMO nội bộ, chạy
+> → Webapp này dùng **cổng khác: `9500`** (có thể đổi). Đây là bản DEMO nội bộ, chạy
 > HTTP trong LAN (không cần HTTPS / domain).
 
 Sau khi chạy xong:
-- Nhân viên: **http://172.168.11.60:8000**
-- Cổng khách: **http://172.168.11.60:8000/portal**
+- Nhân viên: **http://172.168.11.60:9500**
+- Cổng khách: **http://172.168.11.60:9500/portal**
 
 ---
 
@@ -23,7 +23,7 @@ Sau khi chạy xong:
 - **git** (để lấy mã nguồn) và **pm2** (giữ app chạy nền): `sudo npm i -g pm2`.
 
 > App này là 1 tiến trình Next.js phục vụ **cả** giao diện nhân viên và Cổng khách
-> (`/portal`) trên cùng cổng 8000. Không cần Nginx cho bản demo (có thể thêm sau).
+> (`/portal`) trên cùng cổng 9500. Không cần Nginx cho bản demo (có thể thêm sau).
 
 ---
 
@@ -53,9 +53,9 @@ nano .env
 ```
 NODE_ENV=production
 COOKIE_SECURE=false
-PORT=8000
-APP_URL=http://172.168.11.60:8000
-NEXT_PUBLIC_APP_URL=http://172.168.11.60:8000
+PORT=9500
+APP_URL=http://172.168.11.60:9500
+NEXT_PUBLIC_APP_URL=http://172.168.11.60:9500
 DATABASE_URL=postgresql://spa_user:DOI_MAT_KHAU_NAY@localhost:5432/spa_demo?schema=public
 AUTH_SECRET=<sinh chuỗi ngẫu nhiên>
 PORTAL_AUTH_SECRET=<sinh chuỗi ngẫu nhiên khác>
@@ -79,15 +79,15 @@ npm run build                     # build production
 
 ## 5. Chạy nền bằng pm2 (khuyến nghị)
 ```bash
-# Chạy đúng cổng 8000, lắng nghe mọi IP (0.0.0.0) để LAN truy cập được:
+# Chạy đúng cổng 9500, lắng nghe mọi IP (0.0.0.0) để LAN truy cập được:
 pm2 start npm --name spa-demo -- run start:lan
 pm2 save
 pm2 startup            # làm theo dòng lệnh nó in ra để tự chạy lại khi reboot
 ```
 Xem log: `pm2 logs spa-demo` · Dừng: `pm2 stop spa-demo` · Khởi động lại: `pm2 restart spa-demo`.
 
-> `start:lan` = `next start -H 0.0.0.0 -p 8000`. Muốn đổi cổng: sửa script `start:lan`
-> trong `package.json` **hoặc** chạy `PORT=8000 pm2 start npm --name spa-demo -- start`.
+> `start:lan` = `next start -H 0.0.0.0 -p 9500`. Muốn đổi cổng: sửa script `start:lan`
+> trong `package.json` **hoặc** chạy `PORT=9500 pm2 start npm --name spa-demo -- start`.
 
 ### (Thay thế) chạy bằng systemd
 Tạo `/etc/systemd/system/spa-demo.service`:
@@ -112,14 +112,14 @@ sudo systemctl daemon-reload && sudo systemctl enable --now spa-demo
 
 ## 6. Mở cổng tường lửa (nếu có bật firewall)
 ```bash
-sudo ufw allow 8000/tcp        # Ubuntu/UFW
+sudo ufw allow 9500/tcp        # Ubuntu/UFW
 # hoặc firewalld:
-sudo firewall-cmd --permanent --add-port=8000/tcp && sudo firewall-cmd --reload
+sudo firewall-cmd --permanent --add-port=9500/tcp && sudo firewall-cmd --reload
 ```
 
 ## 7. Kiểm tra
-- Trên chính máy chủ: `curl -I http://localhost:8000/login` → `HTTP/1.1 200`.
-- Từ máy khác trong LAN: mở trình duyệt **http://172.168.11.60:8000**.
+- Trên chính máy chủ: `curl -I http://localhost:9500/login` → `HTTP/1.1 200`.
+- Từ máy khác trong LAN: mở trình duyệt **http://172.168.11.60:9500**.
 - Đăng nhập thử: `quanly@thng.com.vn` / `quanly123` (Quản lý). Cổng khách: `/portal` với
   `linh.do@example.com` / `khach123`.
 
@@ -146,7 +146,7 @@ tar czf uploads_$(date +%F).tgz -C /opt/spa-demo var/uploads
 ---
 
 ## Không đụng 2 webapp đang chạy
-- App này **chỉ** dùng cổng **8000** (khác 3000 và 9000) → không xung đột.
+- App này **chỉ** dùng cổng **9500** (khác 3000 và 9000) → không xung đột.
 - Dùng **database riêng** `spa_demo` → không ảnh hưởng dữ liệu 2 webapp kia.
 - Nếu 2 webapp kia dùng chung PostgreSQL trên máy này thì vẫn an toàn vì khác database.
 

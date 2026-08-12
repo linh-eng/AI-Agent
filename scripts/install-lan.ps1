@@ -9,7 +9,7 @@ Set-Location (Split-Path $PSScriptRoot -Parent)
 
 if (-not (Test-Path ".env")) {
   Write-Host "[X] Chua co file .env. Hay: copy .env.example .env  roi sua DATABASE_URL," -ForegroundColor Red
-  Write-Host "    AUTH_SECRET, PORTAL_AUTH_SECRET, COOKIE_SECURE=false, PORT=8000." -ForegroundColor Red
+  Write-Host "    AUTH_SECRET, PORTAL_AUTH_SECRET, COOKIE_SECURE=false, PORT=9500." -ForegroundColor Red
   exit 1
 }
 
@@ -32,5 +32,5 @@ Write-Host ""
 Write-Host "[OK] Xong. Khoi dong app:" -ForegroundColor Green
 Write-Host "     npm run start:lan"
 Write-Host "   Hoac chay nen bang pm2:  pm2 start npm --name spa-demo -- run start:lan ; pm2 save"
-Write-Host "   Roi mo:  http://172.168.11.60:8000  (nhan vien)  |  /portal  (khach)"
+Write-Host "   Roi mo:  http://172.168.11.60:9500  (nhan vien)  |  /portal  (khach)"
 Write-Host "   Dang nhap thu: quanly@thng.com.vn / quanly123"

@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 
 if [ ! -f .env ]; then
   echo "❌ Chưa có file .env. Hãy: cp .env.example .env  rồi sửa DATABASE_URL, AUTH_SECRET,"
-  echo "   PORTAL_AUTH_SECRET, COOKIE_SECURE=false, PORT=8000 (xem docs/TRIEN_KHAI_NOI_BO.md)."
+  echo "   PORTAL_AUTH_SECRET, COOKIE_SECURE=false, PORT=9500 (xem docs/TRIEN_KHAI_NOI_BO.md)."
   exit 1
 fi
 
@@ -34,5 +34,5 @@ npm run build
 echo ""
 echo "✅ Xong. Khởi động app (chạy nền bằng pm2):"
 echo "     pm2 start npm --name spa-demo -- run start:lan && pm2 save && pm2 startup"
-echo "   Rồi mở:  http://172.168.11.60:8000  (nhân viên)  ·  /portal  (khách)"
+echo "   Rồi mở:  http://172.168.11.60:9500  (nhân viên)  ·  /portal  (khách)"
 echo "   Đăng nhập thử: quanly@thng.com.vn / quanly123"

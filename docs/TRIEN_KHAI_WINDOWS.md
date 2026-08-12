@@ -1,13 +1,13 @@
 # Triển khai Webapp Demo trên MÁY CHỦ WINDOWS 10 Pro (LAN)
 
 > Chạy webapp này trên máy chủ Windows `172.168.11.60` để mọi máy trong mạng nội bộ truy cập,
-> **chạy cạnh** 2 webapp sẵn có, dùng **cổng 8000** và **database riêng** nên không xung đột:
+> **chạy cạnh** 2 webapp sẵn có, dùng **cổng 9500** và **database riêng** nên không xung đột:
 > - Webapp Hỗ Trợ — `172.168.11.60:3000`
 > - Webapp Kho Sophia — `172.168.11.60:9000`
 >
 > Sau khi chạy xong:
-> - Nhân viên: **http://172.168.11.60:8000**
-> - Cổng khách: **http://172.168.11.60:8000/portal**
+> - Nhân viên: **http://172.168.11.60:9500**
+> - Cổng khách: **http://172.168.11.60:9500/portal**
 
 Tất cả lệnh chạy trong **PowerShell** (bấm Start → gõ *PowerShell* → chuột phải **Run as administrator**).
 
@@ -59,9 +59,9 @@ GRANT ALL ON SCHEMA public TO spa_user;
    ```
    NODE_ENV=production
    COOKIE_SECURE=false
-   PORT=8000
-   APP_URL=http://172.168.11.60:8000
-   NEXT_PUBLIC_APP_URL=http://172.168.11.60:8000
+   PORT=9500
+   APP_URL=http://172.168.11.60:9500
+   NEXT_PUBLIC_APP_URL=http://172.168.11.60:9500
    DATABASE_URL=postgresql://spa_user:DoiMatKhauNay@localhost:5432/spa_demo?schema=public
    AUTH_SECRET=chuoi_ngau_nhien_dai_1
    PORTAL_AUTH_SECRET=chuoi_ngau_nhien_dai_2
@@ -96,7 +96,7 @@ Script sẽ tự: `npm install` → tạo bảng (10 migration) → nạp tài k
 ```powershell
 npm run start:lan
 ```
-Mở trình duyệt **http://172.168.11.60:8000**. (Đóng cửa sổ là app tắt — dùng cách B để chạy nền.)
+Mở trình duyệt **http://172.168.11.60:9500**. (Đóng cửa sổ là app tắt — dùng cách B để chạy nền.)
 
 ### Cách B — chạy NỀN, tự bật khi khởi động máy (khuyến nghị)
 
@@ -119,16 +119,16 @@ pm2 save
 pm2-startup install
 ```
 
-## 6. Mở cổng 8000 trên Windows Firewall
+## 6. Mở cổng 9500 trên Windows Firewall
 
 PowerShell **Run as administrator**:
 ```powershell
-netsh advfirewall firewall add rule name="Spa Demo 8000" dir=in action=allow protocol=TCP localport=8000
+netsh advfirewall firewall add rule name="Spa Demo 9500" dir=in action=allow protocol=TCP localport=9500
 ```
 
 ## 7. Kiểm tra
-- Trên máy chủ: mở http://localhost:8000 → thấy trang đăng nhập.
-- Từ máy khác trong LAN: http://172.168.11.60:8000
+- Trên máy chủ: mở http://localhost:9500 → thấy trang đăng nhập.
+- Từ máy khác trong LAN: http://172.168.11.60:9500
 - Đăng nhập: **quanly@thng.com.vn / quanly123** (nhân viên). Cổng khách `/portal`:
   **linh.do@example.com / khach123**.
 
@@ -153,7 +153,7 @@ Compress-Archive C:\spa-demo\var\uploads C:\backup\uploads.zip
 ```
 
 ## Không đụng 2 webapp đang chạy
-- Cổng **8000** khác 3000/9000 · **database riêng `spa_demo`** · nếu dùng chung PostgreSQL vẫn an
+- Cổng **9500** khác 3000/9000 · **database riêng `spa_demo`** · nếu dùng chung PostgreSQL vẫn an
   toàn vì khác database.
 
 ## Ghi chú
