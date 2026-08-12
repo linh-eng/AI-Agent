@@ -35,3 +35,7 @@ next-env.d.ts
 
 # Local test env (contains local DB creds)
 .env.test
+
+# Private uploaded media (blobs)
+/var/uploads/
+var/uploads/

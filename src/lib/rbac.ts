@@ -109,6 +109,7 @@ export const PERMISSIONS = {
   PRICE_WRITE: "price.write", // quản lý bảng giá có version
   MARKETING_READ: "marketing.read",
   MARKETING_WRITE: "marketing.write", // chiến dịch/lead/ROI
+  MEDIA_WRITE: "media.write", // upload/xóa media (ảnh khách, before/after, tệp)
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -219,6 +220,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PRICE_WRITE,
     PERMISSIONS.MARKETING_READ,
     PERMISSIONS.MARKETING_WRITE,
+    PERMISSIONS.MEDIA_WRITE,
   ],
 
   // Lễ tân: tạo khách, đặt lịch, nhận thanh toán, chốt phương án, gửi hướng dẫn
@@ -232,6 +234,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.TASK_WRITE,
     PERMISSIONS.PROPOSAL_ACCEPT,
     PERMISSIONS.CARE_WRITE,
+    PERMISSIONS.MEDIA_WRITE,
   ],
 
   // CSKH: nhật ký chăm sóc, follow-up, task (không xem tài chính)
@@ -240,6 +243,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.CUSTOMER_WRITE,
     PERMISSIONS.CRM_WRITE,
     PERMISSIONS.TASK_WRITE,
+    PERMISSIONS.MEDIA_WRITE,
   ],
 
   // Chuyên viên: đánh giá, thiết kế phác đồ/protocol/biểu mẫu, đề xuất, phương án, vật tư
@@ -255,6 +259,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PROPOSAL_WRITE,
     PERMISSIONS.CARE_WRITE,
     PERMISSIONS.MATERIAL_WRITE,
+    PERMISSIONS.MEDIA_WRITE,
   ],
 
   // Thu ngân / Kế toán: thanh toán, công nợ, tài chính, bảng giá

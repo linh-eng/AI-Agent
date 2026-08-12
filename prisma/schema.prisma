@@ -1034,6 +1034,7 @@ model Customer {
   formInstances   FormInstance[]
   proposals       TreatmentProposal[]
   careInstances   CareInstructionInstance[]
+  mediaAssets     MediaAsset[]
   marketingCampaign MarketingCampaign? @relation(fields: [campaignId], references: [id])
 
   @@index([phone])
@@ -1253,6 +1254,7 @@ model TreatmentSession {
   formInstances FormInstance[]
   careInstances CareInstructionInstance[]
   materials     SessionMaterial[]
+  mediaAssets   MediaAsset[]
 
   @@index([planId, sessionNumber])
   @@index([customerId])
@@ -1929,4 +1931,42 @@ model Lead {
   @@index([status])
   @@index([campaignId])
   @@map("leads")
+}
+
+// ============================================================================
+// P3 — LƯU TRỮ MEDIA RIÊNG TƯ (ảnh khách / before-after / tệp / chữ ký)
+// Blob lưu qua StorageProvider (local FS ngoài public/, có thể đổi sang S3).
+// KHÔNG dùng URL công khai — truy cập qua /api/media/[id] có kiểm quyền.
+// Xóa = archive mềm (không mồ côi bản ghi tham chiếu).
+// ============================================================================
+enum MediaKind {
+  IMAGE
+  BEFORE_IMAGE
+  AFTER_IMAGE
+  VIDEO
+  FILE
+  SIGNATURE
+}
+
+model MediaAsset {
+  id          String    @id @default(cuid())
+  storageKey  String    @unique // khóa/đường dẫn trong storage (không public)
+  filename    String // tên gốc
+  contentType String
+  size        Int // bytes
+  kind        MediaKind @default(FILE)
+  customerId  String? // phạm vi thuộc khách nào (dùng cho authz portal)
+  sessionId   String?
+  protocolId  String? // soft ref
+  sharedWithCustomer Boolean @default(false) // nhân viên chủ động chia sẻ cho khách xem
+  uploadedBy  String?
+  isArchived  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  customer Customer?         @relation(fields: [customerId], references: [id])
+  session  TreatmentSession? @relation(fields: [sessionId], references: [id])
+
+  @@index([customerId])
+  @@index([sessionId])
+  @@map("media_assets")
 }

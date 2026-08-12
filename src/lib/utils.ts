@@ -12,6 +12,15 @@ export function formatNumber(value: number | null | undefined): string {
   return new Intl.NumberFormat("vi-VN").format(value);
 }
 
+/**
+ * Nguồn hiển thị cho một media: nếu là URL/dataURL cũ thì giữ nguyên (tương thích
+ * ngược); nếu là media asset id thì trỏ tới route riêng tư có kiểm quyền.
+ */
+export function mediaSrc(idOrUrl: string): string {
+  if (/^(https?:|data:|blob:|\/api\/)/.test(idOrUrl)) return idOrUrl;
+  return `/api/media/${idOrUrl}`;
+}
+
 /** Định dạng ngày kiểu VN dd/MM/yyyy. */
 export function formatDate(value: Date | string | null | undefined): string {
   if (!value) return "—";

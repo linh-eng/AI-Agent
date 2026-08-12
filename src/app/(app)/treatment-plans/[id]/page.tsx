@@ -12,6 +12,7 @@ import { Input, Label, Select, Checkbox } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { formatDate, formatNumber } from "@/lib/utils";
+import { MediaUpload } from "@/components/media-upload";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import {
@@ -436,8 +437,8 @@ function RecordSessionModal({ session, onClose, onSubmit, error, canFinance }: a
     conditionAfter: session.conditionAfter ?? "",
     actualParamsText: paramsToText(session.actualParams),
     actualMaterialsText: paramsToText(session.actualMaterials),
-    beforeImages: (session.beforeImages ?? []).join(", "),
-    afterImages: (session.afterImages ?? []).join(", "),
+    beforeImages: session.beforeImages ?? [],
+    afterImages: session.afterImages ?? [],
     customerFeedback: session.customerFeedback ?? "",
     postCare: session.postCare ?? "",
     actualCost: session.actualCost ?? "",
@@ -456,8 +457,8 @@ function RecordSessionModal({ session, onClose, onSubmit, error, canFinance }: a
             customerFeedback: f.customerFeedback || undefined,
             postCare: f.postCare || undefined,
             note: f.note || undefined,
-            beforeImages: splitList(f.beforeImages),
-            afterImages: splitList(f.afterImages),
+            beforeImages: f.beforeImages,
+            afterImages: f.afterImages,
           };
           if (f.actualParamsText) b.actualParams = { text: f.actualParamsText };
           if (f.actualMaterialsText) b.actualMaterials = { text: f.actualMaterialsText };
@@ -484,8 +485,14 @@ function RecordSessionModal({ session, onClose, onSubmit, error, canFinance }: a
           <div className="space-y-1.5"><Label>Tình trạng sau</Label><Input value={f.conditionAfter} onChange={(e) => setF({ ...f, conditionAfter: e.target.value })} /></div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5"><Label>Ảnh trước (URL, phẩy)</Label><Input value={f.beforeImages} onChange={(e) => setF({ ...f, beforeImages: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label>Ảnh sau (URL, phẩy)</Label><Input value={f.afterImages} onChange={(e) => setF({ ...f, afterImages: e.target.value })} /></div>
+          <div className="space-y-1.5">
+            <Label>Ảnh trước</Label>
+            <MediaUpload kind="BEFORE_IMAGE" customerId={session.customerId} sessionId={session.id} value={f.beforeImages} onChange={(ids) => setF({ ...f, beforeImages: ids })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Ảnh sau</Label>
+            <MediaUpload kind="AFTER_IMAGE" customerId={session.customerId} sessionId={session.id} value={f.afterImages} onChange={(ids) => setF({ ...f, afterImages: ids })} />
+          </div>
         </div>
         <div className="space-y-1.5"><Label>Phản hồi của khách</Label><Input value={f.customerFeedback} onChange={(e) => setF({ ...f, customerFeedback: e.target.value })} /></div>
         <div className="grid grid-cols-2 gap-3">

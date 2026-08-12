@@ -11,6 +11,25 @@ export const INVENTORY_CONFIG = {
   allowNegativeStock: process.env.ALLOW_NEGATIVE_STOCK === "true",
 };
 
+export const STORAGE_CONFIG = {
+  /** Thư mục lưu blob RIÊNG TƯ (ngoài public/). Đổi sang S3 bằng STORAGE_DRIVER=s3 sau. */
+  driver: process.env.STORAGE_DRIVER ?? "local",
+  dir: process.env.STORAGE_DIR ?? `${process.cwd()}/var/uploads`,
+  /** Kích thước tối đa mỗi tệp (mặc định 25MB). */
+  maxBytes: Number(process.env.STORAGE_MAX_BYTES ?? 25 * 1024 * 1024),
+  /** Loại nội dung cho phép (ảnh/video/pdf phổ biến). */
+  allowedContentTypes: [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "image/heic",
+    "video/mp4",
+    "video/quicktime",
+    "application/pdf",
+  ],
+};
+
 /** Lỗi tồn không đủ — API map sang HTTP 409. */
 export class InsufficientStockError extends Error {
   status = 409 as const;
