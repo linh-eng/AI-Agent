@@ -5,6 +5,7 @@ import { ok, created, handle } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { warehouseCreateSchema } from "@/lib/validation";
+import { ensureUnique } from "@/lib/unique";
 
 export const GET = handle(async () => {
   await requirePermission(PERMISSIONS.WAREHOUSE_READ);
@@ -15,6 +16,7 @@ export const GET = handle(async () => {
 export const POST = handle(async (req) => {
   await requirePermission(PERMISSIONS.WAREHOUSE_WRITE);
   const data = warehouseCreateSchema.parse(await req.json());
+  await ensureUnique("warehouse", "code", data.code, "Mã kho");
   const row = await prisma.warehouse.create({ data });
   return created(row);
 });

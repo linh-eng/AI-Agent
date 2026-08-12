@@ -5,6 +5,7 @@ import { ok, created, handle } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { categoryCreateSchema } from "@/lib/validation";
+import { ensureUnique } from "@/lib/unique";
 
 export const GET = handle(async () => {
   await requirePermission(PERMISSIONS.CATEGORY_READ);
@@ -18,6 +19,7 @@ export const GET = handle(async () => {
 export const POST = handle(async (req) => {
   await requirePermission(PERMISSIONS.CATEGORY_WRITE);
   const data = categoryCreateSchema.parse(await req.json());
+  await ensureUnique("category", "code", data.code, "Mã nhóm hàng");
   const row = await prisma.category.create({ data });
   return created(row);
 });

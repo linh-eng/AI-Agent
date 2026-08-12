@@ -5,6 +5,7 @@ import { ok, created, handle } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { brandCreateSchema } from "@/lib/validation";
+import { ensureUnique } from "@/lib/unique";
 
 export const GET = handle(async () => {
   await requirePermission(PERMISSIONS.PRODUCT_READ);
@@ -15,6 +16,7 @@ export const GET = handle(async () => {
 export const POST = handle(async (req) => {
   await requirePermission(PERMISSIONS.PRODUCT_WRITE);
   const data = brandCreateSchema.parse(await req.json());
+  await ensureUnique("brand", "name", data.name, "Thương hiệu");
   const row = await prisma.brand.create({ data });
   return created(row);
 });
