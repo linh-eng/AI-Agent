@@ -40,8 +40,8 @@ function LoginForm() {
           <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <Sparkles className="h-6 w-6" />
           </div>
-          <CardTitle>THNG Spa — Quản lý khách hàng</CardTitle>
-          <CardDescription>Đăng nhập để tiếp tục</CardDescription>
+          <CardTitle>{process.env.NEXT_PUBLIC_BRAND_NAME || "Sophia Wellness"}</CardTitle>
+          <CardDescription>Quản lý khách hàng · Đăng nhập để tiếp tục</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">

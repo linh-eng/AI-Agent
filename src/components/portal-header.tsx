@@ -20,7 +20,7 @@ export function PortalHeader() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Sparkles className="h-4 w-4" />
           </div>
-          <span className="font-semibold">Cổng khách hàng THNG Spa</span>
+          <span className="font-semibold">Cổng khách hàng · {process.env.NEXT_PUBLIC_BRAND_NAME || "Sophia Wellness"}</span>
         </div>
         <button onClick={logout} className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-accent">
           <LogOut className="h-4 w-4" /> Đăng xuất

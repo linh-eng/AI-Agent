@@ -132,7 +132,7 @@ export function AppShell({
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Sparkles className="h-4 w-4" />
           </div>
-          <span className="font-semibold">THNG Spa</span>
+          <span className="font-semibold">{process.env.NEXT_PUBLIC_BRAND_NAME || "Sophia Wellness"}</span>
         </div>
         <nav className="max-h-[calc(100vh-3.5rem)] space-y-4 overflow-y-auto p-3">
           {NAV_GROUPS.filter(

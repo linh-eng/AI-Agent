@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "THNG Spa — Quản lý khách hàng",
+  title: `${process.env.NEXT_PUBLIC_BRAND_NAME || "Sophia Wellness"} — Quản lý khách hàng`,
   description: "Phần mềm quản lý spa/thẩm mỹ: Khách hàng, Booking, Phác đồ, Vật tư, CSKH",
 };
 
