@@ -37,6 +37,18 @@ interface Row {
   isTester?: boolean;
   uom: string;
   minStock?: number | null;
+  expiryDate?: string | null;
+  expiryAlertDays?: number | null;
+}
+
+// Số ngày còn lại tới HSD (âm = đã quá hạn). null nếu chưa nhập HSD.
+function daysToExpiry(iso?: string | null): number | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - today.getTime()) / 86_400_000);
 }
 
 const EMPTY = {
@@ -51,6 +63,9 @@ const EMPTY = {
   uom: "Cái",
   minStock: "",
   expiryAlertDays: "",
+  purchaseDate: "",
+  openedDate: "",
+  expiryDate: "",
 };
 
 export default function ProductsPage() {
@@ -96,6 +111,9 @@ export default function ProductsPage() {
           uom: form.uom,
           minStock: form.minStock ? Number(form.minStock) : null,
           expiryAlertDays: form.expiryAlertDays ? Number(form.expiryAlertDays) : null,
+          purchaseDate: form.purchaseDate || null,
+          openedDate: form.openedDate || null,
+          expiryDate: form.expiryDate || null,
         }),
       });
       setOpen(false);
@@ -144,18 +162,19 @@ export default function ProductsPage() {
                 <TH>Chế độ QL</TH>
                 <TH>ĐVT</TH>
                 <TH className="text-right">Định mức</TH>
+                <TH>HSD</TH>
               </TR>
             </THead>
             <TBody>
               {loading ? (
                 <TR>
-                  <TD colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">
                     Đang tải…
                   </TD>
                 </TR>
               ) : filtered.length === 0 ? (
                 <TR>
-                  <TD colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">
                     Chưa có sản phẩm
                   </TD>
                 </TR>
@@ -179,6 +198,17 @@ export default function ProductsPage() {
                     </TD>
                     <TD>{p.uom}</TD>
                     <TD className="text-right">{p.minStock != null ? formatNumber(p.minStock) : "—"}</TD>
+                    <TD>
+                      {(() => {
+                        const days = daysToExpiry(p.expiryDate);
+                        if (days == null) return <span className="text-muted-foreground">—</span>;
+                        const threshold = p.expiryAlertDays ?? 60;
+                        if (days < 0) return <Badge tone="danger">Đã hết hạn</Badge>;
+                        if (days <= threshold)
+                          return <Badge tone="warning">Còn {formatNumber(days)} ngày</Badge>;
+                        return <span className="text-muted-foreground">Còn {formatNumber(days)} ngày</span>;
+                      })()}
+                    </TD>
                   </TR>
                 ))
               )}
@@ -255,16 +285,45 @@ export default function ProductsPage() {
             Hàng test / tester (dùng thử, không bán)
           </label>
           {form.trackingMode === "LOT" && (
-            <div className="grid grid-cols-2 items-end gap-3">
-              <label className="flex items-center gap-2 pb-2 text-sm">
-                <Checkbox
-                  checked={form.requiresExpiry}
-                  onChange={(e) => setForm({ ...form, requiresExpiry: e.target.checked })}
-                />
-                Bắt buộc nhập HSD khi nhận hàng
-              </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={form.requiresExpiry}
+                onChange={(e) => setForm({ ...form, requiresExpiry: e.target.checked })}
+              />
+              Bắt buộc nhập HSD khi nhận hàng (theo lô)
+            </label>
+          )}
+          <div className="rounded-lg border bg-muted/30 p-3">
+            <div className="mb-2 text-sm font-medium">Mốc hạn sử dụng (hệ thống tự tính số ngày cảnh báo)</div>
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <Label>Số ngày cảnh báo trước HSD</Label>
+                <Label>Ngày mua</Label>
+                <Input
+                  type="date"
+                  value={form.purchaseDate}
+                  onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Ngày mở nắp</Label>
+                <Input
+                  type="date"
+                  value={form.openedDate}
+                  onChange={(e) => setForm({ ...form, openedDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Hạn sử dụng (HSD)</Label>
+                <Input
+                  type="date"
+                  value={form.expiryDate}
+                  onChange={(e) => setForm({ ...form, expiryDate: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Cảnh báo trước HSD (số ngày)</Label>
                 <Input
                   type="number"
                   placeholder="Mặc định 60"
@@ -273,7 +332,11 @@ export default function ProductsPage() {
                 />
               </div>
             </div>
-          )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              Nhập HSD ở đây để hệ thống tự tính “còn bao nhiêu ngày” và cảnh báo khi tới ngưỡng. Sản phẩm
+              quản lý theo lô vẫn theo dõi HSD riêng của từng lô khi nhập kho.
+            </p>
+          </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

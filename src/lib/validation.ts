@@ -11,6 +11,17 @@ const optionalString = z
   .nullish()
   .transform((v) => (v ? v : null));
 
+// Ngày tùy chọn: nhận chuỗi "yyyy-mm-dd" (hoặc rỗng/null) -> Date | null để ghi DB.
+const optionalDate = z
+  .string()
+  .trim()
+  .nullish()
+  .transform((v) => {
+    if (!v) return null;
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  });
+
 // ----- Nhóm hàng -----
 export const categoryCreateSchema = z.object({
   code: z.string().trim().min(1, "Bắt buộc").max(30),
@@ -62,6 +73,9 @@ export const productCreateSchema = z.object({
   uom: z.string().trim().min(1).max(20).default("Cái"),
   minStock: z.number().nonnegative().nullable().optional(),
   expiryAlertDays: z.number().int().positive().max(3650).nullable().optional(),
+  purchaseDate: optionalDate,
+  openedDate: optionalDate,
+  expiryDate: optionalDate,
   note: optionalString,
 });
 
