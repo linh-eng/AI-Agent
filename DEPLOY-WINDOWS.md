@@ -134,9 +134,16 @@ Nếu muốn nhân viên dùng máy/điện thoại khác (cùng WiFi/mạng n�
 
 ## Cập nhật phiên bản mới
 
+> ⚠️ Khi **cập nhật** (đã cài trước đó, đã có dữ liệu) hãy dùng **`update-windows.bat`** — **KHÔNG** dùng
+> `setup-windows.bat`. `setup` sẽ nạp lại dữ liệu mẫu và báo lỗi *"Unique constraint failed on (sku)"* vì
+> hàng mẫu đã có sẵn (lỗi này vô hại nhưng gây hoang mang). `update-windows.bat` chỉ cài phụ thuộc →
+> đồng bộ bảng → build, **giữ nguyên toàn bộ dữ liệu**.
+
 1. Giải nén bản zip mới, **giữ lại file `.env`** cũ (copy `.env` sang thư mục mới).
-2. Bấm đúp lại **`setup-windows.bat`** (nó chạy lại install → prisma push → build).
+2. Bấm đúp vào **`windows\update-windows.bat`** (install → prisma push (thêm bảng/cột mới) → build).
 3. Mở lại **`start-windows.bat`** (hoặc `nssm restart SophiaWellness`).
+
+> Chỉ dùng **`setup-windows.bat`** cho **lần cài đầu tiên** (khi DB còn trống).
 
 ---
 
@@ -160,6 +167,7 @@ Mở **cmd**, chạy (nhập mật khẩu khi được hỏi):
 | Cửa sổ `.bat` hiện rồi tắt ngay | Bấm đúp để xem lỗi; thường do `.env` sai — sửa rồi chạy lại `setup-windows.bat` |
 | Máy khác không vào được | Chưa mở cổng 9000 (làm phần LAN ở trên), hoặc khác mạng WiFi |
 | Đăng nhập đúng mật khẩu nhưng không vào được giao diện | Đặt `COOKIE_SECURE="false"` trong `.env` (cookie yêu cầu HTTPS sẽ bị chặn khi chạy HTTP). Và chắc chắn đã chạy `npm run db:seed` để có tài khoản. Sau đó build lại + `start-windows.bat` |
+| `prisma:error ... Unique constraint failed on the fields: (sku)` khi cài | **Vô hại** — do chạy `setup-windows.bat` (nạp dữ liệu mẫu) trên DB **đã có dữ liệu**. Dữ liệu cũ vẫn nguyên. Lần sau **cập nhật** hãy dùng **`update-windows.bat`** (không nạp lại mẫu) |
 
 ---
 

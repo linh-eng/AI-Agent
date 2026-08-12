@@ -2,20 +2,17 @@
 chcp 65001 >nul
 cd /d "%~dp0.."
 echo ============================================
-echo   SOPHIA WELLNESS - Cai dat lan dau
+echo   SOPHIA WELLNESS - Cap nhat phien ban moi
+echo   (GIU NGUYEN du lieu - KHONG nap lai mau)
 echo ============================================
 echo.
-echo [1/4] Cai dat phu thuoc (npm install)...
+echo [1/3] Cai dat phu thuoc (npm install)...
 call npm install || goto :err
 echo.
-echo [2/4] Tao bang trong PostgreSQL (prisma db push)...
+echo [2/3] Dong bo cau truc bang - them bang/cot moi (prisma db push)...
 call npm run prisma:push || goto :err
 echo.
-echo [3/4] Nap du lieu mau (db seed)...
-echo   (Neu DB da co du lieu, buoc nay se bo qua - khong sao)
-call npm run db:seed
-echo.
-echo [4/4] Build ban production...
+echo [3/3] Build ban production...
 call npm run build || goto :err
 echo.
 echo ============================================
