@@ -195,8 +195,78 @@ sau KHÔNG đổi bản ghi đã chốt.
   ngoài nhập tay tên.
 - **M10**: attribution mới first-touch (1 campaign/khách); multi-touch để mở rộng sau.
 - `TABLE`/`REPEATING_GROUP` dùng chung renderer lưới (REPEATING_GROUP chưa render subFields lồng nhau).
-- Chưa có test tự động; kiểm chứng bằng `tsc --noEmit` + `next build` (đều pass) — chưa chạy migration/seed
-  trên Postgres thật trong môi trường này.
+- (Đã bổ sung ở Phase Production Hardening — xem mục dưới.)
+
+## Phase Production Hardening (P1–P5) — inventory thật · pricing · storage · tests · Customer Portal
+
+Giai đoạn củng cố tính đúng đắn & sẵn sàng production. **Đã xác thực trên PostgreSQL 16 thật**
+(migrate deploy + seed + 25 test vitest đều pass; `tsc`, `next build`, `next lint` sạch lỗi).
+
+### Database migrations (thêm)
+`5_inventory_link` (Lot.reservedQty, SessionMaterial.lotId, MaterialMovement.lotId/stockMovementId) →
+`6_media_assets` (media_assets + MediaKind) → `7_customer_portal` (customer_portal_accounts,
+CareInstructionInstance.acknowledgedAt). **Tất cả additive, 0 lệnh DROP.** Tổng 8 migration: `0_init`
+… `7_customer_portal`. Quy trình deploy/baseline như mục "Migration DB".
+
+### P1 — Inventory rules (nguồn sự thật = StockMovement)
+- Vật tư buổi gắn **Lot kho** (`SessionMaterial.lotId`) sẽ **trừ tồn thật**. `Lot.quantity` = tồn vật lý,
+  `Lot.reservedQty` = đang giữ; **khả dụng = quantity − reservedQty**.
+- Vòng đời: `REQUEST → RESERVE → ISSUE → CONSUME/WASTE/DAMAGE → RETURN`. **ISSUE** là điểm trừ tồn duy nhất
+  (ghi `StockMovement` OUTBOUND + snapshot giá vốn); RETURN cộng lại (INBOUND); CONSUME/WASTE/DAMAGE định
+  đoạt phần đã xuất (không trừ tồn lần 2, chặn vượt phần đang cầm).
+- **Chặn tồn âm** khi RESERVE/ISSUE, trừ khi `ALLOW_NEGATIVE_STOCK=true` (config). **An toàn đồng thời**:
+  khóa dòng Lot bằng `SELECT … FOR UPDATE` trong transaction (test: 2 ISSUE đồng thời không oversell).
+- **CONSUME** cộng vào `session.materialCost` và `actualCost` (tiêu hao = chi phí thật). SP chuyên nghiệp
+  (không gắn lô) chỉ tính chi phí, không đụng tồn. `src/lib/material-service.ts`, `src/lib/config.ts`.
+
+### P2 — Price resolution rules
+- **Thứ tự ưu tiên:** `CUSTOM > CAMPAIGN > VIP > MEMBER > BRANCH > STANDARD`, chỉ giá **còn hiệu lực** theo
+  ngày, và **lọc theo nhóm khách** (`priceTypesForCustomer`): khách thường KHÔNG hưởng MEMBER/VIP.
+- `resolvePrice` + `resolveItemPricing` áp khi tạo **booking, treatment session, product recommendation,
+  proposal (POST & PATCH item)** → **LƯU SNAPSHOT** giá tại thời điểm tạo. Đổi bảng giá/catalog về sau
+  KHÔNG đổi bản ghi đã lập/đã chốt (proposal `acceptedSnapshot`, booking/session `price`, ProposalItem
+  `unitPrice`). PACKAGE là target giá hợp lệ (UI `/pricing`). `src/lib/pricing.ts`.
+
+### P3 — Storage architecture (media riêng tư)
+- Interface `StorageProvider` (put/get/delete) — `LocalStorageProvider` ghi vào thư mục **ngoài `public/`**
+  (`STORAGE_DIR`, mode 0600, chống path-traversal). Đổi sang S3/GCS chỉ cần thêm provider + `STORAGE_DRIVER`.
+- `MediaAsset`: metadata (filename, contentType, size, kind, customerId, sessionId, uploadedBy,
+  `sharedWithCustomer`, `isArchived`). **Không có URL công khai** — chỉ tải qua `/api/media/[id]` (nhân viên,
+  `customer.read`) hoặc `/api/portal/media/[id]` (khách, phải sở hữu + đã chia sẻ). Upload kiểm size + MIME
+  allowlist. **Xóa = archive mềm** (không mồ côi tham chiếu). Ảnh trước/sau ở màn ghi buổi dùng upload thật.
+
+### Tests (test/, vitest + DB `thng_test`) — 25 test
+`inventory` (reserve/issue/consume/return, chặn oversell, đồng thời, chi phí) · `pricing` (precedence,
+tier, hiệu lực, snapshot bất biến) · `workflow` (customer→assessment→plan→session→form instance snapshot→
+care snapshot→booking→media→payment→timeline; proposal accept snapshot) · `storage` (roundtrip, traversal)
+· `rbac` (ma trận finance.read, maskFinance) · `portal-security` (IDOR, cross-session, media share-gating).
+Chạy: `npm test` (cần `.env.test` trỏ `thng_test`, không chạy trên DB thật).
+
+### P5 — Customer Portal + Security decisions
+- **Xác thực tách biệt:** phiên portal cookie riêng `thng_portal`, scope `"portal"`, payload chỉ có
+  `customerId`. `verifyPortalSession` từ chối token nhân viên và ngược lại. Middleware tách khu `/portal` &
+  `/api/portal`.
+- **Chống IDOR (enforce ở SERVER):** mọi truy vấn portal scope theo `customerId` **lấy từ phiên** (không tin
+  client); route đối tượng kiểm ownership và trả **404** nếu không sở hữu (không lộ tồn tại). Media khách chỉ
+  trả khi `customerId` khớp + `sharedWithCustomer` + chưa archive.
+- **Chống rò rỉ:** endpoint portal whitelist trường — KHÔNG trả giá vốn/chi phí/margin/ghi chú nội bộ/đánh
+  giá nội bộ/vật tư/tồn/audit. Nhân viên: `maskFinance` theo `finance.read`. Media không public.
+- **Audit:** ghi `PROPOSAL_ACCEPTED_PORTAL`, `PORTAL_ACCOUNT_SET`, `PRICE_SET`, biến động vật tư.
+- Đăng nhập trả lỗi chung (không lộ email tồn tại); mật khẩu bcrypt.
+- Rà soát: mọi route API đều có `require*` (trừ auth/portal login-logout, `auth/me` chỉ trả phiên của chính
+  người gọi). `grep` xác nhận portal routes không select trường nhạy cảm.
+
+### Còn lại / nợ kỹ thuật (Phase Hardening)
+- **SIGNATURE** vẫn lưu dataURL base64 trong JSON phiếu (chưa đẩy blob sang storage); attachments của
+  form-instance chưa đổi sang upload.
+- Chưa có **UI bật cờ `sharedWithCustomer`** cho từng ảnh (mới qua API/seed) — cần thêm nút chia sẻ ở màn
+  ghi buổi để khách thấy ảnh trước/sau.
+- Inventory tích hợp qua **Lot** (LOT-tracking). Sản phẩm QUANTITY thuần & serial chưa nối vào luồng vật tư
+  buổi. Chưa trừ tồn cho `professionalProducts` nhập tay không gắn lô.
+- `resolvePrice` chưa có UI **gói (PACKAGE)** dạng danh sách hạng mục (mới nhập tên + giá).
+- Storage mới có **LocalStorageProvider**; production nên cấu hình S3/GCS + backup. Test tích hợp mức HTTP
+  route (Next runtime) chưa có — test hiện ở tầng service/DB + đơn vị.
+- Chưa có rate-limiting cho đăng nhập portal/nhân viên (khuyến nghị trước production).
 
 ## Tech stack
 
