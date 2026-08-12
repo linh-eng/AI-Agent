@@ -13,6 +13,7 @@ import { apiFetch } from "@/lib/client";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import { WO_STATUS_LABEL, WO_STATUS_TONE, WO_MODE_LABEL } from "@/lib/labels";
+import { statusLabel } from "@/lib/clinic-labels";
 
 export default function WorkOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -181,7 +182,7 @@ export default function WorkOrderDetailPage() {
                     <TD>
                       {a.parentSerialId ? <Badge tone="success">Đã lắp</Badge>
                         : a.status === "WIP" ? <Badge tone="warning">WIP</Badge>
-                        : <Badge tone="muted">{a.status}</Badge>}
+                        : <Badge tone="muted">{statusLabel(a.status)}</Badge>}
                     </TD>
                   </TR>
                 ))}

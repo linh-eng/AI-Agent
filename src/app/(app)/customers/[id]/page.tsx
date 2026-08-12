@@ -29,6 +29,7 @@ import {
   CARE_KIND_LABEL,
   CARE_KIND_TONE,
   DELIVERY_CHANNEL_LABEL,
+  statusLabel,
 } from "@/lib/clinic-labels";
 
 interface Customer {
@@ -243,7 +244,7 @@ export default function CustomerProfilePage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone={TIMELINE_KIND_TONE[e.kind] ?? "muted"}>{TIMELINE_KIND_LABEL[e.kind] ?? e.kind}</Badge>
                       <span className="font-medium">{e.title}</span>
-                      {e.status && <span className="text-xs text-muted-foreground">· {e.status}</span>}
+                      {e.status && <span className="text-xs text-muted-foreground">· {statusLabel(e.status)}</span>}
                       <span className="ml-auto text-xs text-muted-foreground">{formatDate(e.at)}</span>
                     </div>
                     {e.detail && <p className="mt-1 text-sm text-muted-foreground">{e.detail}</p>}

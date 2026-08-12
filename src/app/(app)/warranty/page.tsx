@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { statusLabel } from "@/lib/clinic-labels";
 import { Plus, ShieldCheck, Truck, PackageX, RotateCcw } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -159,7 +160,7 @@ export default function WarrantyPage() {
                     <TR key={c.id}>
                       <TD className="font-mono font-medium">{c.number}</TD>
                       <TD className="font-mono">{c.serial?.serialNumber ?? "—"}</TD>
-                      <TD><Badge tone="warning">{c.status}</Badge></TD>
+                      <TD><Badge tone="warning">{statusLabel(c.status)}</Badge></TD>
                     </TR>
                   ))}
               </TBody>

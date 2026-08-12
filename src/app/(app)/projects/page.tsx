@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { statusLabel } from "@/lib/clinic-labels";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -123,7 +124,7 @@ export default function ProjectsPage() {
                     <TD>{r.customer?.name ?? "—"}</TD>
                     <TD>{r.customerPo ?? "—"}</TD>
                     <TD>
-                      <Badge tone={r.status === "ACTIVE" ? "success" : "muted"}>{r.status}</Badge>
+                      <Badge tone={r.status === "ACTIVE" ? "success" : "muted"}>{statusLabel(r.status)}</Badge>
                     </TD>
                     <TD className="text-muted-foreground">{formatDate(r.createdAt)}</TD>
                   </TR>

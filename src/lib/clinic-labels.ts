@@ -203,3 +203,42 @@ export const LEAD_STATUS_TONE: Record<string, Tone> = {
 export const MATERIAL_MOVEMENT_LABEL: Record<string, string> = {
   REQUEST: "Yêu cầu", RESERVE: "Giữ hàng", ISSUE: "Xuất kho", CONSUME: "Tiêu hao", RETURN: "Hoàn trả", WASTE: "Hao hụt", DAMAGE: "Hư hỏng",
 };
+
+// ---------------------------------------------------------------------------
+// VN2 — Nhãn trạng thái GỘP CHUNG (fallback). Dùng khi điểm hiển thị nhận status
+// từ nhiều loại thực thể khác nhau (vd timeline khách) hoặc module kho chưa có
+// map riêng. Ưu tiên map chuyên biệt tại chỗ; helper này là lưới an toàn để KHÔNG
+// bao giờ lộ giá trị enum tiếng Anh ra giao diện.
+// ---------------------------------------------------------------------------
+export const COMMON_STATUS_LABEL: Record<string, string> = {
+  // Vòng đời chung
+  ACTIVE: "Đang hoạt động", INACTIVE: "Ngưng hoạt động",
+  OPEN: "Đang mở", CLOSED: "Đã đóng",
+  DRAFT: "Bản nháp", PENDING: "Chờ xử lý", SUBMITTED: "Đã gửi",
+  APPROVED: "Đã duyệt", REJECTED: "Từ chối",
+  IN_PROGRESS: "Đang thực hiện", COMPLETED: "Hoàn thành", DONE: "Hoàn thành",
+  CANCELLED: "Đã hủy", CANCELED: "Đã hủy", ARCHIVED: "Lưu trữ",
+  CONFIRMED: "Đã xác nhận", NEW: "Mới",
+  // Bảo hành / RMA / kho
+  RECEIVED: "Đã tiếp nhận", DIAGNOSING: "Đang chẩn đoán", REPAIRING: "Đang sửa",
+  WAITING_VENDOR: "Chờ hãng", RETURNED: "Đã trả", SCRAPPED: "Đã thanh lý",
+  RESOLVED: "Đã xử lý", ON_HOLD: "Tạm dừng",
+  // Kho / lắp ráp
+  WIP: "Đang lắp", CONSUMED: "Đã tiêu hao", ALLOCATED: "Đã cấp phát", IN_STOCK: "Trong kho",
+};
+
+/** Trả nhãn tiếng Việt cho một status BẤT KỲ, thử các map chuyên biệt rồi tới map chung. */
+export function statusLabel(value?: string | null): string {
+  if (!value) return "—";
+  return (
+    BOOKING_STATUS_LABEL[value] ??
+    PLAN_STATUS_LABEL[value] ??
+    SESSION_STATUS_LABEL[value] ??
+    TASK_STATUS_LABEL[value] ??
+    LIBRARY_STATUS_LABEL[value] ??
+    PROPOSAL_STATUS_LABEL[value] ??
+    LEAD_STATUS_LABEL[value] ??
+    COMMON_STATUS_LABEL[value] ??
+    value
+  );
+}
