@@ -241,7 +241,24 @@ export function statusLabel(value?: string | null): string {
     RECOMMENDATION_PRIORITY_LABEL[value] ??
     PAYMENT_METHOD_LABEL[value] ??
     CARE_KIND_LABEL[value] ??
+    CONTAINER_STATUS_LABEL[value] ??
+    CUSTOMER_MATERIAL_STATUS_LABEL[value] ??
+    MATERIAL_SOURCE_LABEL[value] ??
     COMMON_STATUS_LABEL[value] ??
     value
   );
 }
+
+// --- Vật tư spa ---
+export const CONTAINER_STATUS_LABEL: Record<string, string> = {
+  IN_USE: "Đang sử dụng", LOW: "Sắp hết", EMPTY: "Hết", DISPOSED: "Đã hủy",
+};
+export const CONTAINER_STATUS_TONE: Record<string, Tone> = {
+  IN_USE: "success", LOW: "warning", EMPTY: "muted", DISPOSED: "danger",
+};
+export const CUSTOMER_MATERIAL_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: "Đang sử dụng", USED_UP: "Đã dùng hết", CANCELLED: "Đã hủy",
+};
+export const MATERIAL_SOURCE_LABEL: Record<string, string> = {
+  SHARED_STOCK: "Kho vật tư sử dụng", CUSTOMER_OWNED: "Vật tư khách hàng",
+};

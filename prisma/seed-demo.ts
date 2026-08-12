@@ -16,6 +16,7 @@
 // =============================================================================
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/auth";
+import { consumeFromContainer, consumeFromCustomerMaterial } from "../src/lib/spa-material-service";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
@@ -213,7 +214,7 @@ async function main() {
       performer: "Phạm Chuyên Viên", objective: "RF vùng má", actualParams: { nang_luong: "làm ấm 42°C" }, conditionBefore: "Da chùng nhẹ", conditionAfter: "Săn hơn tức thì", customerFeedback: "Ưng ý", plannedCost: 500_000, actualCost: 480_000, price: 1_800_000, checkedBy: "Trần Quản Lý",
     },
   });
-  await prisma.treatmentSession.create({
+  const sLinh2 = await prisma.treatmentSession.create({
     data: {
       planId: planLinh.id, stageId: planLinh.stages[1].id, customerId: kDangPD.id, serviceId: svcHIFU.id,
       sessionNumber: 2, name: "HIFU nâng cơ buổi 2", status: "PLANNED", scheduledAt: new Date("2026-08-20T07:00:00Z"),
@@ -267,8 +268,10 @@ async function main() {
       stages: { create: [ { name: "Điều trị", orderIndex: 0 } ] } },
     include: { stages: true },
   });
+  let sChi1: any = null;
   for (let i = 1; i <= 4; i++) {
-    await prisma.treatmentSession.create({ data: { planId: planChi.id, stageId: planChi.stages[0].id, customerId: kXong.id, sessionNumber: i, name: `Trị mụn buổi ${i}`, status: "COMPLETED", performedAt: new Date(`2026-06-${10 + i}T07:00:00Z`), performer: "Phạm Chuyên Viên", actualCost: 300_000, price: 1_500_000, checkedBy: "Trần Quản Lý" } });
+    const s = await prisma.treatmentSession.create({ data: { planId: planChi.id, stageId: planChi.stages[0].id, customerId: kXong.id, sessionNumber: i, name: `Trị mụn buổi ${i}`, status: "COMPLETED", performedAt: new Date(`2026-06-${10 + i}T07:00:00Z`), performer: "Phạm Chuyên Viên", actualCost: 300_000, price: 1_500_000, checkedBy: "Trần Quản Lý" } });
+    if (i === 1) sChi1 = s;
   }
   await prisma.payment.create({ data: { customerId: kXong.id, planId: planChi.id, amount: 6_000_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đủ phác đồ trị mụn", paidAt: new Date("2026-06-11T09:00:00Z") } });
   await prisma.crmActivity.create({ data: { customerId: kXong.id, type: "INTERNAL_NOTE", content: "Hoàn thành phác đồ, khách hài lòng, giới thiệu bạn.", result: "Rất hài lòng", performedBy: "Lê Thị CSKH", occurredAt: new Date("2026-07-01T03:00:00Z") } });
@@ -287,6 +290,31 @@ async function main() {
   await prisma.assessment.create({ data: { customerId: kNam.id, name: "Sẹo rỗ hai bên má", area: "Má", severity: "Vừa", description: "Sẹo box/rolling nông", assessedBy: "Phạm Chuyên Viên" } });
   await prisma.booking.create({ data: { code: "BK-100003", customerId: kNam.id, serviceId: svcRF.id, scheduledAt: new Date("2026-08-21T08:00:00Z"), durationMinutes: 45, room: "Phòng 3", performer: "Phạm Chuyên Viên", status: "NEW", price: 1_800_000 } });
 
+  // ==========================================================================
+  // DEMO VẬT TƯ — 2 trường hợp bắt buộc.
+  // ==========================================================================
+  // A) Kho vật tư sử dụng: JetPeel Solution (1 lọ 100ml, giá vốn 2.000.000₫, định mức 5ml/buổi).
+  const jetpeel = await prisma.usageMaterial.create({
+    data: { code: "VT-JETPEEL", name: "JetPeel Solution Demo", unit: "ml", category: "Dung dịch", expectedPerSession: 5, lowThreshold: 20, createdBy: "Phạm Chuyên Viên" },
+  });
+  const jetContainer = await prisma.materialContainer.create({
+    data: { usageMaterialId: jetpeel.id, containerNo: "JETPEEL-2026-01", initialQty: 100, remainingQty: 100, unit: "ml", costSnapshot: 2_000_000, openedAt: new Date("2026-08-01"), expiryDate: new Date("2026-09-15"), status: "IN_USE", createdBy: "Phạm Chuyên Viên" },
+  });
+  // Customer A (Đỗ Thùy Linh) dùng 5ml; Customer B (Vũ Khánh Chi) dùng 7ml; A dùng tiếp 6ml.
+  await consumeFromContainer(jetContainer.id, { sessionId: sLinh1.id, performedBy: "Phạm Chuyên Viên", quantity: 5 });
+  await consumeFromContainer(jetContainer.id, { sessionId: sChi1?.id ?? null, performedBy: "Phạm Chuyên Viên", quantity: 7 });
+  await consumeFromContainer(jetContainer.id, { sessionId: sLinh2.id, performedBy: "Phạm Chuyên Viên", quantity: 6 });
+  // -> còn lại 82ml; chi phí: 100k + 140k + 120k (đơn giá 20.000₫/ml).
+
+  // B) Vật tư khách hàng: Customer A có 10 đơn vị riêng; buổi 1 dùng 3, buổi 2 dùng 2 -> còn 5.
+  const custMat = await prisma.customerMaterial.create({
+    data: { code: "VTKH-DEMO-01", customerId: kDangPD.id, name: "Bộ kit dưỡng tại nhà (demo)", unit: "đơn vị", allocatedQty: 10, unitCost: 50_000, status: "ACTIVE", createdBy: "Phạm Chuyên Viên" },
+  });
+  await consumeFromCustomerMaterial(custMat.id, { sessionId: sLinh1.id, performedBy: "Phạm Chuyên Viên", quantity: 3 });
+  await consumeFromCustomerMaterial(custMat.id, { sessionId: sLinh2.id, performedBy: "Phạm Chuyên Viên", quantity: 2 });
+  // -> đã dùng 5, còn 5. (Khách khác KHÔNG dùng được — chặn ở service, có test.)
+
+  console.log("   Vật tư demo: JetPeel 100ml (còn 82ml), Vật tư khách hàng 10đv (còn 5).");
   console.log("✅ Seed DEMO hoàn tất: 7 khách (KH-100001..007), brand Klapp, CN RF/HIFU,");
   console.log("   protocol DEMO có version, kho vật tư spa, 2 chiến dịch, báo giá 3 phương án.");
   console.log("   Cổng khách demo #2: linh.do@example.com / khach123 (KH-100004).");

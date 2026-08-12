@@ -68,6 +68,15 @@ const NAV_GROUPS = [
     ],
   },
   {
+    title: "Vật tư",
+    items: [
+      { href: "/materials", label: "Kho vật tư sử dụng", icon: Boxes },
+      { href: "/customer-materials", label: "Vật tư khách hàng", icon: Package },
+      { href: "/material-usages", label: "Lịch sử sử dụng", icon: ClipboardList },
+      { href: "/materials/report", label: "Báo cáo vật tư", icon: BarChart3 },
+    ],
+  },
+  {
     title: "Kho THNG",
     items: [
       { href: "/dashboard", label: "Tổng quan kho", icon: Gauge },

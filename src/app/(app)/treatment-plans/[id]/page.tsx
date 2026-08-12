@@ -14,6 +14,7 @@ import { apiFetch } from "@/lib/client";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { MediaUpload } from "@/components/media-upload";
 import { SessionMediaShare } from "@/components/session-media-share";
+import { SpaMaterialConsume } from "@/components/spa-material-consume";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import {
@@ -46,6 +47,7 @@ export default function TreatmentPlanDetailPage() {
   const { id } = useParams<{ id: string }>();
   const canWrite = useCan(PERMISSIONS.TREATMENT_WRITE);
   const canMedia = useCan(PERMISSIONS.MEDIA_WRITE);
+  const canMaterial = useCan(PERMISSIONS.MATERIAL_WRITE);
   const [p, setP] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<Opt[]>([]);
@@ -330,6 +332,7 @@ export default function TreatmentPlanDetailPage() {
           session={record}
           canFinance={p.canSeeFinance}
           canShare={canMedia}
+          canMaterial={canMaterial}
           error={error}
           onClose={() => setRecord(null)}
           onSubmit={async (body: any) => {
@@ -432,7 +435,7 @@ function AddSessionModal({ open, onClose, onSubmit, error, stages, services, tec
   );
 }
 
-function RecordSessionModal({ session, onClose, onSubmit, error, canFinance, canShare }: any) {
+function RecordSessionModal({ session, onClose, onSubmit, error, canFinance, canShare, canMaterial }: any) {
   const [f, setF] = useState<any>({
     status: session.status,
     performer: session.performer ?? "",
@@ -502,6 +505,13 @@ function RecordSessionModal({ session, onClose, onSubmit, error, canFinance, can
             <Label>Chia sẻ ảnh cho khách (Cổng khách)</Label>
             <p className="text-[11px] text-muted-foreground">Mặc định ảnh là RIÊNG TƯ. Chỉ ảnh được bật &quot;Khách thấy&quot; mới hiển thị trên Cổng khách hàng.</p>
             <SessionMediaShare sessionId={session.id} canShare={canShare} />
+          </div>
+        )}
+        {session.id && (
+          <div className="space-y-1.5">
+            <Label>Vật tư sử dụng trong buổi</Label>
+            <p className="text-[11px] text-muted-foreground">Chọn nguồn (Kho vật tư sử dụng hoặc Vật tư khách hàng) → chọn lọ/vật tư → nhập số lượng thực dùng. Hệ thống trừ tồn còn lại và cộng chi phí buổi.</p>
+            <SpaMaterialConsume sessionId={session.id} customerId={session.customerId} canWrite={canMaterial} />
           </div>
         )}
         <div className="space-y-1.5"><Label>Phản hồi của khách</Label><Input value={f.customerFeedback} onChange={(e) => setF({ ...f, customerFeedback: e.target.value })} /></div>

@@ -436,12 +436,12 @@ model Lot {
   isCommercialStock Boolean   @default(false)
   createdAt         DateTime  @default(now())
 
-  product    Product    @relation(fields: [productId], references: [id])
-  warehouse  Warehouse  @relation(fields: [warehouseId], references: [id])
-  supplier   Partner?   @relation("LotSupplier", fields: [supplierId], references: [id])
-  project    Project?   @relation(fields: [projectId], references: [id])
-  origins    Origin[]
-  warranties Warranty[]
+  product          Product           @relation(fields: [productId], references: [id])
+  warehouse        Warehouse         @relation(fields: [warehouseId], references: [id])
+  supplier         Partner?          @relation("LotSupplier", fields: [supplierId], references: [id])
+  project          Project?          @relation(fields: [projectId], references: [id])
+  origins          Origin[]
+  warranties       Warranty[]
   sessionMaterials SessionMaterial[]
 
   @@unique([productId, lotNumber, warehouseId])
@@ -562,18 +562,18 @@ model InboundLine {
 }
 
 model OutboundOrder {
-  id          String         @id @default(cuid())
-  number      String         @unique
-  type        OutboundType
-  customerId  String?
-  projectId   String?
-  status      DocumentStatus @default(DRAFT)
-  approvedBy  String?
-  approvedAt  DateTime?
+  id           String         @id @default(cuid())
+  number       String         @unique
+  type         OutboundType
+  customerId   String?
+  projectId    String?
+  status       DocumentStatus @default(DRAFT)
+  approvedBy   String?
+  approvedAt   DateTime?
   rejectReason String?
-  deliveredAt DateTime?
-  note        String?
-  createdAt   DateTime       @default(now())
+  deliveredAt  DateTime?
+  note         String?
+  createdAt    DateTime       @default(now())
 
   customer        Partner?         @relation(fields: [customerId], references: [id])
   project         Project?         @relation(fields: [projectId], references: [id])
@@ -1002,41 +1002,42 @@ enum TaskStatus {
 // KHÁCH HÀNG (mục 4) — hồ sơ trung tâm, mọi dữ liệu liên kết về đây
 // ----------------------------------------------------------------------------
 model Customer {
-  id          String    @id @default(cuid())
-  code        String    @unique // Mã khách hàng KH-xxxx
-  fullName    String
-  dob         DateTime?
-  gender      Gender?
-  phone       String?
-  email       String?
-  address     String?
-  source      String? // Nguồn khách hàng (marketing/campaign/giới thiệu...)
-  campaign    String? // Campaign gốc (nhãn text tự do)
-  campaignId  String? // Attribution first-touch tới MarketingCampaign (mục 10)
-  group       String? // Nhóm khách hàng (Thường/VIP...)
-  tags        String[] @default([])
-  assignedTo  String? // Nhân viên phụ trách (tên)
-  goals       String? // Mong muốn/mục tiêu tổng quát của khách
-  note        String?
+  id           String    @id @default(cuid())
+  code         String    @unique // Mã khách hàng KH-xxxx
+  fullName     String
+  dob          DateTime?
+  gender       Gender?
+  phone        String?
+  email        String?
+  address      String?
+  source       String? // Nguồn khách hàng (marketing/campaign/giới thiệu...)
+  campaign     String? // Campaign gốc (nhãn text tự do)
+  campaignId   String? // Attribution first-touch tới MarketingCampaign (mục 10)
+  group        String? // Nhóm khách hàng (Thường/VIP...)
+  tags         String[]  @default([])
+  assignedTo   String? // Nhân viên phụ trách (tên)
+  goals        String? // Mong muốn/mục tiêu tổng quát của khách
+  note         String?
   customFields Json? // Custom Fields do doanh nghiệp tự thêm
-  isActive    Boolean   @default(true) // soft delete
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isActive     Boolean   @default(true) // soft delete
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  activities      CrmActivity[]
-  bookings        Booking[]
-  assessments     Assessment[]
-  plans           TreatmentPlan[]
-  sessions        TreatmentSession[]
-  payments        Payment[]
-  tasks           Task[]
-  recommendations ProductRecommendation[]
-  formInstances   FormInstance[]
-  proposals       TreatmentProposal[]
-  careInstances   CareInstructionInstance[]
-  mediaAssets     MediaAsset[]
-  portalAccount   CustomerPortalAccount?
-  marketingCampaign MarketingCampaign? @relation(fields: [campaignId], references: [id])
+  activities        CrmActivity[]
+  bookings          Booking[]
+  assessments       Assessment[]
+  plans             TreatmentPlan[]
+  sessions          TreatmentSession[]
+  payments          Payment[]
+  tasks             Task[]
+  recommendations   ProductRecommendation[]
+  formInstances     FormInstance[]
+  proposals         TreatmentProposal[]
+  careInstances     CareInstructionInstance[]
+  mediaAssets       MediaAsset[]
+  customerMaterials CustomerMaterial[]
+  portalAccount     CustomerPortalAccount?
+  marketingCampaign MarketingCampaign?        @relation(fields: [campaignId], references: [id])
 
   @@index([phone])
   @@index([campaignId])
@@ -1121,11 +1122,11 @@ model Booking {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  customer Customer          @relation(fields: [customerId], references: [id])
-  service  Service?          @relation(fields: [serviceId], references: [id])
-  session  TreatmentSession? // buổi thực hiện gắn với booking (1-1)
-  payments Payment[]
-  tasks    Task[]
+  customer          Customer           @relation(fields: [customerId], references: [id])
+  service           Service?           @relation(fields: [serviceId], references: [id])
+  session           TreatmentSession? // buổi thực hiện gắn với booking (1-1)
+  payments          Payment[]
+  tasks             Task[]
   marketingCampaign MarketingCampaign? @relation(fields: [campaignId], references: [id])
 
   @@index([scheduledAt])
@@ -1160,23 +1161,23 @@ model Assessment {
 // PHÁC ĐỒ KHÁCH HÀNG (mục 11–16) — Treatment Plan + giai đoạn + buổi
 // ----------------------------------------------------------------------------
 model TreatmentPlan {
-  id          String     @id @default(cuid())
-  code        String     @unique
-  customerId  String
-  name        String
-  version     Int        @default(1) // phác đồ có version
-  status      PlanStatus @default(DRAFT)
-  goals       String? // Mục tiêu
-  diagnosis   String? // Tình trạng/vấn đề chính
-  totalPrice  Decimal?   @db.Decimal(18, 2)
-  discount    Decimal?   @db.Decimal(18, 2)
-  changeLog   Json? // Lịch sử thay đổi version (ai/khi/nội dung/lý do)
-  createdBy   String?
-  note        String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id         String     @id @default(cuid())
+  code       String     @unique
+  customerId String
+  name       String
+  version    Int        @default(1) // phác đồ có version
+  status     PlanStatus @default(DRAFT)
+  goals      String? // Mục tiêu
+  diagnosis  String? // Tình trạng/vấn đề chính
+  totalPrice Decimal?   @db.Decimal(18, 2)
+  discount   Decimal?   @db.Decimal(18, 2)
+  changeLog  Json? // Lịch sử thay đổi version (ai/khi/nội dung/lý do)
+  createdBy  String?
+  note       String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
-  customer Customer           @relation(fields: [customerId], references: [id])
+  customer        Customer                @relation(fields: [customerId], references: [id])
   stages          TreatmentStage[]
   sessions        TreatmentSession[]
   payments        Payment[]
@@ -1205,57 +1206,58 @@ model TreatmentStage {
 
 /// Mỗi buổi thực hiện là một record độc lập (mục 16) — không ghi đè buổi trước
 model TreatmentSession {
-  id              String        @id @default(cuid())
-  planId          String
-  stageId         String?
-  customerId      String
-  bookingId       String?       @unique
-  serviceId       String?
-  sessionNumber   Int // Buổi số mấy
-  name            String?
-  status          SessionStatus @default(PLANNED)
-  scheduledAt     DateTime?
-  performedAt     DateTime?
-  performer       String?
-  objective       String? // Mục tiêu buổi
-  plannedParams   Json? // Thông số dự kiến
-  actualParams    Json? // Thông số thực tế
-  plannedMaterials Json? // Vật tư dự kiến
-  actualMaterials Json? // Vật tư thực tế (liên kết chi phí)
-  conditionBefore String?
-  conditionAfter  String?
-  beforeImages    String[]      @default([]) // Báo cáo trước (mục 17)
-  afterImages     String[]      @default([]) // Báo cáo sau
-  customerFeedback String?
-  preCare         String? // Dặn dò trước
-  postCare        String? // Dặn dò sau
-  plannedCost     Decimal?      @db.Decimal(18, 2)
-  actualCost      Decimal?      @db.Decimal(18, 2) // Chi phí thực tế (mục 20)
-  price           Decimal?      @db.Decimal(18, 2)
-  note            String?
-  checkedBy       String? // Người kiểm tra/phê duyệt
+  id                   String        @id @default(cuid())
+  planId               String
+  stageId              String?
+  customerId           String
+  bookingId            String?       @unique
+  serviceId            String?
+  sessionNumber        Int // Buổi số mấy
+  name                 String?
+  status               SessionStatus @default(PLANNED)
+  scheduledAt          DateTime?
+  performedAt          DateTime?
+  performer            String?
+  objective            String? // Mục tiêu buổi
+  plannedParams        Json? // Thông số dự kiến
+  actualParams         Json? // Thông số thực tế
+  plannedMaterials     Json? // Vật tư dự kiến
+  actualMaterials      Json? // Vật tư thực tế (liên kết chi phí)
+  conditionBefore      String?
+  conditionAfter       String?
+  beforeImages         String[]      @default([]) // Báo cáo trước (mục 17)
+  afterImages          String[]      @default([]) // Báo cáo sau
+  customerFeedback     String?
+  preCare              String? // Dặn dò trước
+  postCare             String? // Dặn dò sau
+  plannedCost          Decimal?      @db.Decimal(18, 2)
+  actualCost           Decimal?      @db.Decimal(18, 2) // Chi phí thực tế (mục 20)
+  price                Decimal?      @db.Decimal(18, 2)
+  note                 String?
+  checkedBy            String? // Người kiểm tra/phê duyệt
   // --- Treatment Plan Designer: buổi có thể phối công nghệ + brand protocol ---
-  technologyId    String?
-  brandProtocolId String?
-  orderIndex      Int           @default(0) // thứ tự buổi (kéo–thả sắp xếp)
-  steps           Json? // Các bước thực hiện của buổi (từ protocol hoặc tùy chỉnh)
+  technologyId         String?
+  brandProtocolId      String?
+  orderIndex           Int           @default(0) // thứ tự buổi (kéo–thả sắp xếp)
+  steps                Json? // Các bước thực hiện của buổi (từ protocol hoặc tùy chỉnh)
   professionalProducts Json? // Sản phẩm chuyên nghiệp dùng trong buổi (khác vật tư)
-  materialCost    Decimal?      @db.Decimal(18, 2) // chi phí vật tư tiêu hao (tự tính, mục 8)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  materialCost         Decimal?      @db.Decimal(18, 2) // chi phí vật tư tiêu hao (tự tính, mục 8)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
-  plan          TreatmentPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
-  stage         TreatmentStage? @relation(fields: [stageId], references: [id])
-  customer      Customer        @relation(fields: [customerId], references: [id])
-  booking       Booking?        @relation(fields: [bookingId], references: [id])
-  service       Service?        @relation(fields: [serviceId], references: [id])
-  technology    Technology?     @relation(fields: [technologyId], references: [id])
-  brandProtocol BrandProtocol?  @relation(fields: [brandProtocolId], references: [id])
-  tasks         Task[]
-  formInstances FormInstance[]
-  careInstances CareInstructionInstance[]
-  materials     SessionMaterial[]
-  mediaAssets   MediaAsset[]
+  plan           TreatmentPlan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  stage          TreatmentStage?           @relation(fields: [stageId], references: [id])
+  customer       Customer                  @relation(fields: [customerId], references: [id])
+  booking        Booking?                  @relation(fields: [bookingId], references: [id])
+  service        Service?                  @relation(fields: [serviceId], references: [id])
+  technology     Technology?               @relation(fields: [technologyId], references: [id])
+  brandProtocol  BrandProtocol?            @relation(fields: [brandProtocolId], references: [id])
+  tasks          Task[]
+  formInstances  FormInstance[]
+  careInstances  CareInstructionInstance[]
+  materials      SessionMaterial[]
+  materialUsages MaterialUsage[]
+  mediaAssets    MediaAsset[]
 
   @@index([planId, sessionNumber])
   @@index([customerId])
@@ -1398,9 +1400,9 @@ model Technology {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  brand        Brand?                     @relation(fields: [brandId], references: [id])
-  protocols    BrandProtocolTechnology[]
-  sessions     TreatmentSession[]
+  brand     Brand?                    @relation(fields: [brandId], references: [id])
+  protocols BrandProtocolTechnology[]
+  sessions  TreatmentSession[]
 
   @@map("technologies")
 }
@@ -1410,33 +1412,33 @@ model Technology {
 // Khác với TreatmentPlan (phác đồ riêng của khách).
 // ----------------------------------------------------------------------------
 model BrandProtocol {
-  id                 String        @id @default(cuid())
-  code               String        @unique
-  name               String
-  kind               ProtocolKind  @default(BRAND)
-  brandId            String?
-  version            Int           @default(1)
-  status             LibraryStatus @default(DRAFT)
-  purpose            String? // Mục tiêu
-  suitableFor        String? // Đối tượng/tình trạng phù hợp
-  contraindications  String? // Chống chỉ định
-  steps              Json? // Các bước + thời gian từng bước
-  durationMinutes    Int?
-  parameters         Json? // Thông số
-  preCare            String? // Hướng dẫn trước
-  postCare           String? // Hướng dẫn sau
-  recommendedFreq    String? // Tần suất khuyến nghị
-  recommendedCount   Int? // Số lần khuyến nghị
-  attachments        String[]      @default([]) // hình ảnh/video/tài liệu (URL)
-  note               String? // Ghi chú chuyên môn
-  sourceRef          String? // Nguồn tham khảo (khi INTERNAL compose từ nhiều hãng)
-  changeLog          Json? // Lịch sử version
-  createdBy          String?
-  isActive           Boolean       @default(true)
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  id                String        @id @default(cuid())
+  code              String        @unique
+  name              String
+  kind              ProtocolKind  @default(BRAND)
+  brandId           String?
+  version           Int           @default(1)
+  status            LibraryStatus @default(DRAFT)
+  purpose           String? // Mục tiêu
+  suitableFor       String? // Đối tượng/tình trạng phù hợp
+  contraindications String? // Chống chỉ định
+  steps             Json? // Các bước + thời gian từng bước
+  durationMinutes   Int?
+  parameters        Json? // Thông số
+  preCare           String? // Hướng dẫn trước
+  postCare          String? // Hướng dẫn sau
+  recommendedFreq   String? // Tần suất khuyến nghị
+  recommendedCount  Int? // Số lần khuyến nghị
+  attachments       String[]      @default([]) // hình ảnh/video/tài liệu (URL)
+  note              String? // Ghi chú chuyên môn
+  sourceRef         String? // Nguồn tham khảo (khi INTERNAL compose từ nhiều hãng)
+  changeLog         Json? // Lịch sử version
+  createdBy         String?
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  brand        Brand?                     @relation(fields: [brandId], references: [id])
+  brand        Brand?                    @relation(fields: [brandId], references: [id])
   technologies BrandProtocolTechnology[]
   products     BrandProtocolProduct[]
   sessions     TreatmentSession[]
@@ -1473,27 +1475,27 @@ model BrandProtocolProduct {
 // PRODUCT CATALOG (mục 11 phần bổ sung) — tách riêng với Product (kho THNG)
 // ----------------------------------------------------------------------------
 model SpaProduct {
-  id                String      @id @default(cuid())
-  sku               String      @unique
-  name              String
-  brandId           String?
-  category          String?
-  imageUrl          String?
-  description       String?
-  benefits          String? // Công dụng
-  suitableFor       String? // Tình trạng phù hợp
-  usage             String? // Hướng dẫn sử dụng
-  sellingPrice      Decimal?    @db.Decimal(18, 2)
-  cost              Decimal?    @db.Decimal(18, 2) // Giá vốn (nhạy cảm)
-  productType       ProductType @default(HOME_CARE)
+  id                 String      @id @default(cuid())
+  sku                String      @unique
+  name               String
+  brandId            String?
+  category           String?
+  imageUrl           String?
+  description        String?
+  benefits           String? // Công dụng
+  suitableFor        String? // Tình trạng phù hợp
+  usage              String? // Hướng dẫn sử dụng
+  sellingPrice       Decimal?    @db.Decimal(18, 2)
+  cost               Decimal?    @db.Decimal(18, 2) // Giá vốn (nhạy cảm)
+  productType        ProductType @default(HOME_CARE)
   inventoryProductId String? // Liên kết mềm tới Product kho (module 8 — sẽ nối sau)
-  isActive          Boolean     @default(true)
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  isActive           Boolean     @default(true)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
-  brand           Brand?                  @relation(fields: [brandId], references: [id])
-  protocols       BrandProtocolProduct[]
-  recommendations ProductRecommendation[]
+  brand            Brand?                  @relation(fields: [brandId], references: [id])
+  protocols        BrandProtocolProduct[]
+  recommendations  ProductRecommendation[]
   sessionMaterials SessionMaterial[]
 
   @@map("spa_products")
@@ -1553,7 +1555,7 @@ model FormTemplate {
 
 /// Instance riêng khi áp template cho khách/phác đồ/buổi — KHÔNG đổi template gốc.
 model FormInstance {
-  id              String   @id @default(cuid())
+  id              String             @id @default(cuid())
   templateId      String
   templateVersion Int // version template tại thời điểm áp
   schemaSnapshot  Json // bản sao schema tại thời điểm áp (bất biến)
@@ -1566,8 +1568,8 @@ model FormInstance {
   completedBy     String?
   completedAt     DateTime?
   createdBy       String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   template FormTemplate      @relation(fields: [templateId], references: [id])
   customer Customer?         @relation(fields: [customerId], references: [id])
@@ -1615,24 +1617,24 @@ enum ProposalItemType {
 }
 
 model TreatmentProposal {
-  id             String         @id @default(cuid())
-  code           String         @unique
-  customerId     String
-  planId         String?
-  title          String
-  status         ProposalStatus @default(DRAFT)
-  version        Int            @default(1)
-  note           String? // ghi chú nội bộ (ẩn khỏi khách)
-  createdBy      String?
+  id               String         @id @default(cuid())
+  code             String         @unique
+  customerId       String
+  planId           String?
+  title            String
+  status           ProposalStatus @default(DRAFT)
+  version          Int            @default(1)
+  note             String? // ghi chú nội bộ (ẩn khỏi khách)
+  createdBy        String?
   // --- Chốt phương án (snapshot bất biến) ---
   acceptedOptionId String?
   acceptedAt       DateTime?
   acceptedBy       String?
-  agreedPrice      Decimal?     @db.Decimal(18, 2)
-  appliedDiscount  Decimal?     @db.Decimal(18, 2)
+  agreedPrice      Decimal?       @db.Decimal(18, 2)
+  appliedDiscount  Decimal?       @db.Decimal(18, 2)
   acceptedSnapshot Json? // bản đông cứng option đã chọn (item + giá) tại thời điểm chốt
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   customer Customer                  @relation(fields: [customerId], references: [id])
   plan     TreatmentPlan?            @relation(fields: [planId], references: [id])
@@ -1643,18 +1645,18 @@ model TreatmentProposal {
 }
 
 model TreatmentProposalOption {
-  id                  String             @id @default(cuid())
-  proposalId          String
-  kind                ProposalOptionKind @default(RECOMMENDED)
-  name                String
-  orderIndex          Int                @default(0)
-  sessions            Int? // số buổi
+  id                    String             @id @default(cuid())
+  proposalId            String
+  kind                  ProposalOptionKind @default(RECOMMENDED)
+  name                  String
+  orderIndex            Int                @default(0)
+  sessions              Int? // số buổi
   estimatedDurationDays Int? // thời gian dự kiến (ngày)
-  discount            Decimal?           @db.Decimal(18, 2)
-  totalPrice          Decimal?           @db.Decimal(18, 2) // tổng (tự tính, có thể lưu chốt)
-  note                String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  discount              Decimal?           @db.Decimal(18, 2)
+  totalPrice            Decimal?           @db.Decimal(18, 2) // tổng (tự tính, có thể lưu chốt)
+  note                  String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
   proposal TreatmentProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
   items    ProposalItem[]
@@ -1664,18 +1666,18 @@ model TreatmentProposalOption {
 }
 
 model ProposalItem {
-  id          String           @id @default(cuid())
-  optionId    String
-  itemType    ProposalItemType @default(SERVICE)
-  refId       String? // id service/technology/brandProtocol/spaProduct (tham chiếu mềm)
-  name        String // snapshot tên tại thời điểm lập
-  quantity    Int              @default(1)
-  sessions    Int?
-  unitPrice   Decimal?         @db.Decimal(18, 2) // giá bán khách (snapshot)
-  unitCost    Decimal?         @db.Decimal(18, 2) // giá vốn nội bộ (nhạy cảm, mask)
-  isHomeCare  Boolean          @default(false) // phân biệt SP tại nhà vs dùng trong buổi
-  note        String?
-  orderIndex  Int              @default(0)
+  id         String           @id @default(cuid())
+  optionId   String
+  itemType   ProposalItemType @default(SERVICE)
+  refId      String? // id service/technology/brandProtocol/spaProduct (tham chiếu mềm)
+  name       String // snapshot tên tại thời điểm lập
+  quantity   Int              @default(1)
+  sessions   Int?
+  unitPrice  Decimal?         @db.Decimal(18, 2) // giá bán khách (snapshot)
+  unitCost   Decimal?         @db.Decimal(18, 2) // giá vốn nội bộ (nhạy cảm, mask)
+  isHomeCare Boolean          @default(false) // phân biệt SP tại nhà vs dùng trong buổi
+  note       String?
+  orderIndex Int              @default(0)
 
   option TreatmentProposalOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
 
@@ -1737,21 +1739,21 @@ model CareInstruction {
 
 /// Bản đã gửi/áp cho khách/buổi — lưu ĐÚNG nội dung khách nhận (snapshot).
 model CareInstructionInstance {
-  id            String          @id @default(cuid())
-  templateId    String?
-  kind          CareKind        @default(PRE_CARE)
-  title         String
-  content       String // bản cá nhân hóa (đã snapshot từ template, có thể sửa)
+  id              String          @id @default(cuid())
+  templateId      String?
+  kind            CareKind        @default(PRE_CARE)
+  title           String
+  content         String // bản cá nhân hóa (đã snapshot từ template, có thể sửa)
   templateVersion Int? // version template tại thời điểm áp
-  customerId    String
-  sessionId     String?
-  bookingId     String?
-  deliveredVia  DeliveryChannel @default(IN_PERSON)
-  deliveredAt   DateTime?
-  acknowledgedAt DateTime? // khách xác nhận đã đọc (qua Customer Portal)
-  providedBy    String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  customerId      String
+  sessionId       String?
+  bookingId       String?
+  deliveredVia    DeliveryChannel @default(IN_PERSON)
+  deliveredAt     DateTime?
+  acknowledgedAt  DateTime? // khách xác nhận đã đọc (qua Customer Portal)
+  providedBy      String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   template CareInstruction?  @relation(fields: [templateId], references: [id])
   customer Customer          @relation(fields: [customerId], references: [id])
@@ -1779,26 +1781,26 @@ enum MaterialMovementType {
 }
 
 model SessionMaterial {
-  id             String   @id @default(cuid())
-  sessionId      String
-  name           String // snapshot tên vật tư/sản phẩm
-  spaProductId   String? // sản phẩm chuyên nghiệp (có giá vốn)
+  id                 String   @id @default(cuid())
+  sessionId          String
+  name               String // snapshot tên vật tư/sản phẩm
+  spaProductId       String? // sản phẩm chuyên nghiệp (có giá vốn)
   inventoryProductId String? // Product kho (soft ref)
-  lotId          String? // Lô kho thực (khi có -> trừ tồn thật qua StockMovement)
-  warehouseId    String? // kho (soft ref / suy ra từ lot)
-  uom            String? // đơn vị
-  isProfessional Boolean  @default(false) // SP chuyên nghiệp dùng trong buổi (≠ home-care bán khách)
-  plannedQty     Decimal  @default(0) @db.Decimal(14, 3)
-  reservedQty    Decimal  @default(0) @db.Decimal(14, 3)
-  issuedQty      Decimal  @default(0) @db.Decimal(14, 3)
-  consumedQty    Decimal  @default(0) @db.Decimal(14, 3)
-  returnedQty    Decimal  @default(0) @db.Decimal(14, 3)
-  wasteQty       Decimal  @default(0) @db.Decimal(14, 3)
-  unitCost       Decimal? @db.Decimal(18, 2) // giá vốn snapshot tại thời điểm lập
-  note           String?
-  createdBy      String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  lotId              String? // Lô kho thực (khi có -> trừ tồn thật qua StockMovement)
+  warehouseId        String? // kho (soft ref / suy ra từ lot)
+  uom                String? // đơn vị
+  isProfessional     Boolean  @default(false) // SP chuyên nghiệp dùng trong buổi (≠ home-care bán khách)
+  plannedQty         Decimal  @default(0) @db.Decimal(14, 3)
+  reservedQty        Decimal  @default(0) @db.Decimal(14, 3)
+  issuedQty          Decimal  @default(0) @db.Decimal(14, 3)
+  consumedQty        Decimal  @default(0) @db.Decimal(14, 3)
+  returnedQty        Decimal  @default(0) @db.Decimal(14, 3)
+  wasteQty           Decimal  @default(0) @db.Decimal(14, 3)
+  unitCost           Decimal? @db.Decimal(18, 2) // giá vốn snapshot tại thời điểm lập
+  note               String?
+  createdBy          String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   session   TreatmentSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   product   SpaProduct?        @relation(fields: [spaProductId], references: [id])
@@ -1891,20 +1893,20 @@ enum LeadStatus {
 }
 
 model MarketingCampaign {
-  id         String    @id @default(cuid())
-  code       String    @unique
-  name       String
-  channel    String? // kênh marketing (tự do, không hard-code)
-  startDate  DateTime?
-  endDate    DateTime?
-  budget     Decimal?  @db.Decimal(18, 2)
-  cost       Decimal?  @db.Decimal(18, 2) // chi phí thực tế (nhạy cảm)
+  id          String    @id @default(cuid())
+  code        String    @unique
+  name        String
+  channel     String? // kênh marketing (tự do, không hard-code)
+  startDate   DateTime?
+  endDate     DateTime?
+  budget      Decimal?  @db.Decimal(18, 2)
+  cost        Decimal?  @db.Decimal(18, 2) // chi phí thực tế (nhạy cảm)
   targetGroup String?
-  owner      String?
-  status     String    @default("ACTIVE") // ACTIVE / ENDED
-  note       String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  owner       String?
+  status      String    @default("ACTIVE") // ACTIVE / ENDED
+  note        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   leads     Lead[]
   customers Customer[]
@@ -1914,19 +1916,19 @@ model MarketingCampaign {
 }
 
 model Lead {
-  id         String     @id @default(cuid())
-  code       String     @unique
-  name       String
-  phone      String?
-  email      String?
-  source     String? // nguồn (facebook/zalo/giới thiệu...)
-  channel    String?
-  campaignId String?
-  status     LeadStatus @default(NEW)
-  note       String?
+  id                  String     @id @default(cuid())
+  code                String     @unique
+  name                String
+  phone               String?
+  email               String?
+  source              String? // nguồn (facebook/zalo/giới thiệu...)
+  channel             String?
+  campaignId          String?
+  status              LeadStatus @default(NEW)
+  note                String?
   convertedCustomerId String? // khi WON -> id khách hàng đã tạo/gắn
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
   campaign MarketingCampaign? @relation(fields: [campaignId], references: [id])
 
@@ -1951,19 +1953,19 @@ enum MediaKind {
 }
 
 model MediaAsset {
-  id          String    @id @default(cuid())
-  storageKey  String    @unique // khóa/đường dẫn trong storage (không public)
-  filename    String // tên gốc
-  contentType String
-  size        Int // bytes
-  kind        MediaKind @default(FILE)
-  customerId  String? // phạm vi thuộc khách nào (dùng cho authz portal)
-  sessionId   String?
-  protocolId  String? // soft ref
-  sharedWithCustomer Boolean @default(false) // nhân viên chủ động chia sẻ cho khách xem
-  uploadedBy  String?
-  isArchived  Boolean   @default(false)
-  createdAt   DateTime  @default(now())
+  id                 String    @id @default(cuid())
+  storageKey         String    @unique // khóa/đường dẫn trong storage (không public)
+  filename           String // tên gốc
+  contentType        String
+  size               Int // bytes
+  kind               MediaKind @default(FILE)
+  customerId         String? // phạm vi thuộc khách nào (dùng cho authz portal)
+  sessionId          String?
+  protocolId         String? // soft ref
+  sharedWithCustomer Boolean   @default(false) // nhân viên chủ động chia sẻ cho khách xem
+  uploadedBy         String?
+  isArchived         Boolean   @default(false)
+  createdAt          DateTime  @default(now())
 
   customer Customer?         @relation(fields: [customerId], references: [id])
   session  TreatmentSession? @relation(fields: [sessionId], references: [id])
@@ -2005,4 +2007,135 @@ model AuthThrottle {
 
   @@index([lockedUntil])
   @@map("auth_throttles")
+}
+
+// ============================================================================
+// MODULE VẬT TƯ SPA (đơn giản hóa — 2 khái niệm nghiệp vụ)
+//   1) "Kho vật tư sử dụng"  = UsageMaterial + MaterialContainer (lọ/chai/lô dùng
+//      chung nhiều khách, nhiều buổi; theo dõi tồn còn lại + cost snapshot).
+//   2) "Vật tư khách hàng"   = CustomerMaterial (dành riêng 1 khách, không dùng
+//      cho khách khác; dùng qua nhiều buổi).
+//   Lịch sử tiêu hao chung: MaterialUsage (ghi từng lần dùng theo buổi/khách/NV).
+//   Tách hoàn toàn khỏi Kho THNG (phần cứng) — không đụng SessionMaterial cũ.
+// ============================================================================
+enum MaterialSource {
+  SHARED_STOCK // Kho vật tư sử dụng (container dùng chung)
+  CUSTOMER_OWNED // Vật tư khách hàng
+}
+
+enum ContainerStatus {
+  IN_USE // Đang sử dụng
+  LOW // Sắp hết
+  EMPTY // Hết
+  DISPOSED // Đã hủy
+}
+
+enum CustomerMaterialStatus {
+  ACTIVE // Đang sử dụng
+  USED_UP // Đã dùng hết
+  CANCELLED // Đã hủy
+}
+
+// Danh mục vật tư dùng chung ("Kho vật tư sử dụng")
+model UsageMaterial {
+  id                 String   @id @default(cuid())
+  code               String   @unique
+  name               String
+  unit               String // đơn vị tiêu hao (ml, cái, lần...)
+  category           String?
+  serviceId          String? // liên kết mềm dịch vụ
+  technologyId       String? // liên kết mềm công nghệ
+  brandProtocolId    String? // liên kết mềm protocol
+  expectedPerSession Decimal? @db.Decimal(14, 3) // định mức dự kiến / buổi
+  lowThreshold       Decimal? @db.Decimal(14, 3) // ngưỡng cảnh báo sắp hết (theo container còn lại)
+  isActive           Boolean  @default(true)
+  createdBy          String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  containers MaterialContainer[]
+
+  @@index([isActive])
+  @@map("usage_materials")
+}
+
+// Một lọ/chai/lô vật lý của UsageMaterial (dùng chung nhiều khách/buổi)
+model MaterialContainer {
+  id              String          @id @default(cuid())
+  usageMaterialId String
+  containerNo     String // mã lọ/lô (VD JETPEEL-2026-01)
+  initialQty      Decimal         @db.Decimal(14, 3) // số lượng ban đầu
+  remainingQty    Decimal         @db.Decimal(14, 3) // số lượng còn lại
+  unit            String // đơn vị (snapshot từ material)
+  costSnapshot    Decimal?        @db.Decimal(18, 2) // giá vốn cả lọ (để phân bổ chi phí)
+  openedAt        DateTime? // ngày mở nắp
+  expiryDate      DateTime? // hạn dùng / hạn sau mở nắp
+  status          ContainerStatus @default(IN_USE)
+  note            String?
+  createdBy       String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  material UsageMaterial   @relation(fields: [usageMaterialId], references: [id], onDelete: Cascade)
+  usages   MaterialUsage[]
+
+  @@index([usageMaterialId])
+  @@index([status])
+  @@map("material_containers")
+}
+
+// Vật tư dành riêng cho 1 khách ("Vật tư khách hàng")
+model CustomerMaterial {
+  id              String                 @id @default(cuid())
+  code            String                 @unique
+  customerId      String
+  name            String
+  unit            String
+  allocatedQty    Decimal                @db.Decimal(14, 3) // đã cấp
+  usedQty         Decimal                @default(0) @db.Decimal(14, 3) // đã dùng
+  unitCost        Decimal?               @db.Decimal(18, 2) // giá vốn/đơn vị (tùy chọn)
+  planId          String? // liên kết mềm phác đồ
+  brandProtocolId String? // liên kết mềm protocol
+  status          CustomerMaterialStatus @default(ACTIVE)
+  note            String?
+  createdBy       String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  customer Customer        @relation(fields: [customerId], references: [id])
+  usages   MaterialUsage[]
+
+  @@index([customerId])
+  @@map("customer_materials")
+}
+
+// Lịch sử tiêu hao vật tư (dùng cho cả 2 nguồn)
+model MaterialUsage {
+  id                 String         @id @default(cuid())
+  source             MaterialSource
+  containerId        String? // khi SHARED_STOCK
+  customerMaterialId String? // khi CUSTOMER_OWNED
+  sessionId          String?
+  customerId         String?
+  performedBy        String?
+  quantity           Decimal        @db.Decimal(14, 3)
+  unitCost           Decimal?       @db.Decimal(18, 2) // snapshot giá vốn/đơn vị
+  costAllocated      Decimal?       @db.Decimal(18, 2) // chi phí phân bổ = quantity * unitCost
+  serviceId          String? // snapshot (báo cáo theo dịch vụ)
+  technologyId       String? // snapshot (báo cáo theo công nghệ)
+  brandProtocolId    String? // snapshot (báo cáo theo protocol)
+  note               String?
+  occurredAt         DateTime       @default(now())
+  createdAt          DateTime       @default(now())
+
+  container        MaterialContainer? @relation(fields: [containerId], references: [id])
+  customerMaterial CustomerMaterial?  @relation(fields: [customerMaterialId], references: [id])
+  session          TreatmentSession?  @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId])
+  @@index([customerId])
+  @@index([containerId])
+  @@index([customerMaterialId])
+  @@index([occurredAt])
+  @@map("material_usages")
 }

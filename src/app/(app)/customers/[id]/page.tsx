@@ -57,7 +57,7 @@ interface Customer {
   canSeeFinance: boolean;
 }
 
-const TABS = ["timeline", "crm", "bookings", "plans", "assessments", "recommendations", "forms", "care", "payments"] as const;
+const TABS = ["timeline", "crm", "bookings", "plans", "assessments", "recommendations", "materials", "forms", "care", "payments"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   timeline: "Timeline",
@@ -66,6 +66,7 @@ const TAB_LABEL: Record<Tab, string> = {
   plans: "Phác đồ",
   assessments: "Đánh giá",
   recommendations: "Sản phẩm đề xuất",
+  materials: "Vật tư khách hàng",
   forms: "Biểu mẫu",
   care: "Hướng dẫn",
   payments: "Thanh toán",
@@ -87,6 +88,7 @@ export default function CustomerProfilePage() {
   const [modal, setModal] = useState<null | "crm" | "payment" | "assessment" | "recommend" | "applyForm" | "care" | "portal">(null);
   const [error, setError] = useState<string | null>(null);
   const [recs, setRecs] = useState<any[]>([]);
+  const [custMaterials, setCustMaterials] = useState<any[]>([]);
   const [forms, setForms] = useState<any[]>([]);
   const [careItems, setCareItems] = useState<any[]>([]);
   const [spaProducts, setSpaProducts] = useState<any[]>([]);
@@ -106,6 +108,7 @@ export default function CustomerProfilePage() {
     apiFetch<any[]>(`/api/product-recommendations?customerId=${id}`).then(setRecs).catch(() => {});
     apiFetch<any[]>(`/api/form-instances?customerId=${id}`).then(setForms).catch(() => {});
     apiFetch<any[]>(`/api/care-instances?customerId=${id}`).then(setCareItems).catch(() => {});
+    apiFetch<any[]>(`/api/customer-materials?customerId=${id}`).then(setCustMaterials).catch(() => {});
   }, [id]);
 
   useEffect(() => {
@@ -391,6 +394,33 @@ export default function CustomerProfilePage() {
                       <TD>{r.reason ?? "—"}</TD>
                       <TD>{r.quantity}</TD>
                       <TD className="text-right">{r.price != null ? formatNumber(Number(r.price)) + " ₫" : "—"}</TD>
+                    </TR>
+                  ))
+                )}
+              </TBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === "materials" && (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <THead>
+                <TR><TH>Vật tư</TH><TH className="text-right">Đã cấp</TH><TH className="text-right">Đã dùng</TH><TH className="text-right">Còn lại</TH><TH>Trạng thái</TH></TR>
+              </THead>
+              <TBody>
+                {custMaterials.length === 0 ? (
+                  <TR><TD colSpan={5} className="py-6 text-center text-muted-foreground">Khách chưa có vật tư riêng. Cấp ở menu &quot;Vật tư khách hàng&quot;.</TD></TR>
+                ) : (
+                  custMaterials.map((m) => (
+                    <TR key={m.id}>
+                      <TD className="font-medium">{m.name}</TD>
+                      <TD className="text-right tabular-nums">{Number(m.allocatedQty)} {m.unit}</TD>
+                      <TD className="text-right tabular-nums">{Number(m.usedQty)}</TD>
+                      <TD className="text-right tabular-nums font-medium">{Number(m.remainingQty)}</TD>
+                      <TD><Badge tone={m.status === "ACTIVE" ? "success" : m.status === "USED_UP" ? "muted" : "danger"}>{statusLabel(m.status)}</Badge></TD>
                     </TR>
                   ))
                 )}

@@ -435,6 +435,56 @@ trình). Không cần đổi provider; abstraction rõ ràng.
   này). **[Medium/Low — availability]**
 - Chưa trừ tồn cho `professionalProducts` nhập tay không gắn lô; cron dọn `auth_throttles`. **[Low]**
 
+## Module VẬT TƯ SPA (MAT1–MAT6) — 2 khái niệm nghiệp vụ (đơn giản hóa)
+
+Theo yêu cầu thu hẹp phạm vi: giao diện chỉ dùng **2 khái niệm**, KHÔNG dùng "kho kế toán / kho trung
+tâm / inventory accounting / procurement". Module vật tư spa **tách hoàn toàn** khỏi Kho THNG (phần cứng).
+Migration `9_spa_materials` (additive, 0 DROP; tổng **10 migration**). **61 test pass** (thêm
+`test/spa-materials.test.ts`).
+
+### 1) "Kho vật tư sử dụng" (`UsageMaterial` + `MaterialContainer`)
+Vật tư/sản phẩm chuyên môn dùng trong dịch vụ — theo **lọ/chai/lô (container)**, **dùng chung nhiều
+khách, nhiều buổi**. Container: `initialQty`, `remainingQty`, `unit`, `costSnapshot` (giá vốn cả lọ),
+`openedAt`, `expiryDate`, `status` (IN_USE/LOW/EMPTY/DISPOSED). Material: `expectedPerSession` (định mức),
+`lowThreshold`. UI: `/materials` (dashboard: đang dùng / lọ đang mở / sắp hết / sắp hết hạn / tiêu hao +
+chi phí hôm nay) + danh sách lọ + nút **Dùng** / **Hủy lọ** / **Thêm vật tư** / **Thêm lọ/lô**.
+
+### 2) "Vật tư khách hàng" (`CustomerMaterial`)
+Vật tư **dành riêng 1 khách** — `allocatedQty` (đã cấp), `usedQty` (đã dùng), còn lại = cấp − dùng; dùng
+qua nhiều buổi; **KHÔNG dùng chéo khách**. UI: `/customer-materials` + **tab "Vật tư khách hàng"** trong
+hồ sơ khách.
+
+### Tiêu hao (`MaterialUsage`) — lịch sử chung 2 nguồn
+`src/lib/spa-material-service.ts`: `consumeFromContainer` (trừ `remainingQty`, phân bổ chi phí =
+`quantity × costSnapshot/initialQty`, cập nhật status) và `consumeFromCustomerMaterial` (cộng `usedQty`,
+**chặn dùng chéo khách** — buổi phải thuộc đúng khách sở hữu, chặn vượt số cấp). Cả 2 **khóa dòng
+`SELECT … FOR UPDATE`** trong transaction (chống dùng vượt khi đồng thời), ghi `MaterialUsage`, và cộng
+`session.materialCost` (gán `actualCost` nếu trống). `reverseUsage` để hoàn tác.
+
+### Session Execution — chọn NGUỒN
+`src/components/spa-material-consume.tsx` trong màn **Ghi nhận buổi** (`/treatment-plans/[id]`): chọn
+**nguồn** (Kho vật tư sử dụng | Vật tư khách hàng) → chọn lọ/vật tư (vật tư khách chỉ liệt kê của đúng
+khách) → hiện **còn lại** → nhập số dùng → lưu lịch sử + trừ tồn. Danh sách đã dùng trong buổi hiển thị ngay.
+
+### Báo cáo & dashboard
+`src/lib/materials-report.ts`: dashboard (`/api/materials/dashboard`) + báo cáo `/materials/report`:
+tiêu hao theo **khách/buổi/dịch vụ/công nghệ/protocol/nhân viên**, **định mức vs thực tế**, chi phí (mask
+theo `finance.read`). Sidebar nhóm **"Vật tư"**: Kho vật tư sử dụng · Vật tư khách hàng · Lịch sử sử dụng ·
+Báo cáo vật tư.
+
+### Demo (bắt buộc) — đã seed
+- **JetPeel Solution Demo**: 1 lọ 100ml, giá vốn 2.000.000₫ (20.000₫/ml), định mức 5ml/buổi. Customer A
+  dùng 5ml, Customer B 7ml, A dùng tiếp 6ml → **còn 82ml**; chi phí buổi 100k/140k/120k.
+- **Vật tư khách hàng**: Customer A có 10 đơn vị; buổi 1 dùng 3, buổi 2 dùng 2 → **còn 5**. Khách khác
+  KHÔNG dùng được (chặn ở service, có test).
+
+### RBAC & nợ kỹ thuật
+- Quyền: đọc = `customer.read`; ghi/tiêu hao = `material.write`. Chi phí (`costSnapshot`/`unitCost`/
+  `costAllocated`) **mask theo `finance.read`**.
+- `SessionMaterial`/`MaterialMovement` cũ (module 8, gắn Lot Kho THNG) **giữ nguyên** cho tương thích —
+  UI vật tư spa dùng mô hình mới. Có thể gỡ luồng cũ trong màn buổi ở phase sau nếu muốn thống nhất.
+- Chưa có UI sửa/hủy từng lần tiêu hao trên màn (đã có `reverseUsage` ở service). **[Low]**
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ
