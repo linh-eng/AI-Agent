@@ -8,6 +8,7 @@
 //     version, xuất xứ, bảo hành 2 tầng (THNG + hãng), license, timeline.
 // Chạy: npm run db:seed
 // =============================================================================
+import "dotenv/config"; // nạp .env (để chạy trực tiếp trên Windows/Linux không cần set env)
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/auth";
 import { WAREHOUSE_CATALOG } from "../src/lib/warehouses";

@@ -14,6 +14,7 @@
 //
 // Idempotent: nếu đã có KH-100001 thì bỏ qua (chạy lại không nhân đôi).
 // =============================================================================
+import "dotenv/config"; // nạp .env (Windows/Linux) không cần set env thủ công
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/auth";
 import { consumeFromContainer, consumeFromCustomerMaterial } from "../src/lib/spa-material-service";

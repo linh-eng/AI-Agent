@@ -1,4 +1,7 @@
-# Triển khai Webapp Demo trên MÁY CHỦ NỘI BỘ (LAN)
+# Triển khai Webapp Demo trên MÁY CHỦ NỘI BỘ (LAN) — bản Linux
+
+> 🪟 **Máy chủ Windows 10/11?** Dùng hướng dẫn riêng: **`docs/TRIEN_KHAI_WINDOWS.md`**.
+> Tài liệu dưới đây dành cho máy chủ Linux (Ubuntu/CentOS).
 
 > Mục tiêu: chạy webapp này trên máy chủ `172.168.11.60` để mọi máy trong mạng nội bộ
 > truy cập, **chạy cạnh** 2 webapp sẵn có mà không đụng nhau:
