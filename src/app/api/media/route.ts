@@ -4,8 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, created, handle, fail } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
-import { STORAGE_CONFIG } from "@/lib/config";
-import { storage, newStorageKey, kindFromContentType } from "@/lib/storage";
+import { storage, newStorageKey, kindFromContentType, validateUpload } from "@/lib/storage";
 
 const VALID_KINDS = ["IMAGE", "BEFORE_IMAGE", "AFTER_IMAGE", "VIDEO", "FILE", "SIGNATURE"];
 
@@ -21,20 +20,16 @@ export const POST = handle(async (req) => {
   const blob = file as unknown as File;
   const contentType = blob.type || "application/octet-stream";
   const size = blob.size;
+  const filename = (blob.name || "upload").slice(0, 200);
 
-  if (size <= 0) return fail(400, "Tệp rỗng");
-  if (size > STORAGE_CONFIG.maxBytes) {
-    return fail(413, `Tệp quá lớn (tối đa ${Math.round(STORAGE_CONFIG.maxBytes / 1024 / 1024)}MB)`);
-  }
-  if (!STORAGE_CONFIG.allowedContentTypes.includes(contentType)) {
-    return fail(415, `Loại tệp không hỗ trợ: ${contentType}`);
-  }
+  // Kiểm size + MIME allowlist + chặn đuôi thực thi/script.
+  const err = validateUpload(filename, contentType, size);
+  if (err) return fail(415, err);
 
   const kindRaw = String(form.get("kind") ?? "").toUpperCase();
   const kind = VALID_KINDS.includes(kindRaw) ? kindRaw : kindFromContentType(contentType);
   const customerId = (form.get("customerId") as string) || null;
   const sessionId = (form.get("sessionId") as string) || null;
-  const filename = (blob.name || "upload").slice(0, 200);
 
   // Xác thực tham chiếu tồn tại (tránh gắn media vào id rác).
   if (customerId) {

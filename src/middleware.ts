@@ -2,8 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 import { PORTAL_COOKIE, verifyPortalSession } from "@/lib/portal-auth";
 
-// Đường dẫn công khai (không cần đăng nhập).
-const PUBLIC_PATHS = ["/login", "/api/auth/login"];
+// Đường dẫn công khai (không cần phiên). /api/storage/blob tự xác thực bằng
+// SIGNED TOKEN có hạn (giống S3 presigned) — không dùng phiên.
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/storage/blob"];
 // Cổng khách: tự xác thực bằng phiên PORTAL riêng (không dùng phiên nhân viên).
 const PORTAL_PUBLIC = ["/portal/login", "/api/portal/login", "/api/portal/logout"];
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from "vitest";
-import { storage, newStorageKey, kindFromContentType } from "@/lib/storage";
+import { storage, newStorageKey, kindFromContentType, signBlobToken, verifyBlobToken, validateUpload } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
 
 describe("P3 — lưu trữ media riêng tư", () => {
@@ -28,5 +28,25 @@ describe("P3 — lưu trữ media riêng tư", () => {
     expect(kindFromContentType("image/png")).toBe("IMAGE");
     expect(kindFromContentType("video/mp4")).toBe("VIDEO");
     expect(kindFromContentType("application/pdf")).toBe("FILE");
+  });
+
+  it("signed URL token: hợp lệ, chống giả mạo, chống hết hạn", () => {
+    const key = "2026/01/abc.png";
+    const good = signBlobToken(key, Math.floor(Date.now() / 1000) + 300);
+    expect(verifyBlobToken(good)?.key).toBe(key);
+    // Giả mạo chữ ký -> null
+    expect(verifyBlobToken(good.slice(0, -2) + "xx")).toBeNull();
+    // Hết hạn -> null
+    const expired = signBlobToken(key, Math.floor(Date.now() / 1000) - 10);
+    expect(verifyBlobToken(expired)).toBeNull();
+  });
+
+  it("validateUpload: chặn quá cỡ, MIME lạ, và đuôi thực thi", () => {
+    expect(validateUpload("a.png", "image/png", 1000)).toBeNull(); // OK
+    expect(validateUpload("a.png", "image/png", 999_999_999)).toMatch(/quá lớn/);
+    expect(validateUpload("a.txt", "text/plain", 10)).toMatch(/không hỗ trợ/);
+    // MIME ảnh nhưng đuôi thực thi/script -> chặn
+    expect(validateUpload("evil.svg", "image/png", 10)).toMatch(/bị chặn/);
+    expect(validateUpload("x.exe", "image/png", 10)).toMatch(/bị chặn/);
   });
 });
