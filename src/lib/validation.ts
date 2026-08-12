@@ -3,10 +3,12 @@
 // =============================================================================
 import { z } from "zod";
 
+// Chuỗi tùy chọn: chấp nhận cả chuỗi, null và undefined (form gửi "" hoặc null
+// khi để trống) — chuẩn hóa về null nếu rỗng.
 const optionalString = z
   .string()
   .trim()
-  .optional()
+  .nullish()
   .transform((v) => (v ? v : null));
 
 // ----- Nhóm hàng -----
