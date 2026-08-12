@@ -268,6 +268,115 @@ Chạy: `npm test` (cần `.env.test` trỏ `thng_test`, không chạy trên DB 
   route (Next runtime) chưa có — test hiện ở tầng service/DB + đơn vị.
 - Chưa có rate-limiting cho đăng nhập portal/nhân viên (khuyến nghị trước production).
 
+> Các mục trên (UI chia sẻ media, storage S3, backup, rate-limit, HTTP integration test) **đã được
+> xử lý trong Phase Production Security Hardening (SEC1–SEC8)** ngay dưới đây.
+
+## Phase Production Security Hardening (SEC1–SEC8) — chống brute-force · tách secret · object storage · backup · HTTP tests · media-sharing UI
+
+Giai đoạn siết an ninh trước khi triển khai staging. **Đã xác thực trên PostgreSQL 16 thật**: `tsc` sạch,
+`next lint` 0 lỗi, `next build` OK, **48 test vitest pass** (8 file, gồm test tích hợp HTTP mới), migrate
+deploy + status + seed chạy sạch trên DB **staging trắng** (`thng_staging`).
+
+### Migration thêm
+`8_auth_throttle` (bảng `auth_throttles`). Additive, 0 lệnh DROP. Tổng **9 migration**: `0_init` …
+`8_auth_throttle`. Quy trình deploy/baseline không đổi (xem "Migration DB").
+
+### Kiến trúc xác thực (auth architecture)
+- **Hai phiên TÁCH BIỆT hoàn toàn**, cookie riêng, secret riêng, scope riêng:
+  - **Nhân viên**: cookie `thng_session`, ký bằng `AUTH_SECRET`, payload gồm `userId/email/roles/permissions`.
+    Lib: `src/lib/auth.ts` (ký/verify, edge-safe jose) + `src/lib/session.ts` (`getSession/requireAuth/
+    requirePermission`, dùng `next/headers`).
+  - **Khách (portal)**: cookie `thng_portal`, ký bằng `PORTAL_AUTH_SECRET` (nếu trống → phái sinh
+    `${AUTH_SECRET}::portal`, **luôn khác** secret staff), payload **chỉ** `customerId` + scope `"portal"`.
+    Lib: `src/lib/portal-auth.ts` (edge-safe) + `src/lib/portal-session.ts` (`requirePortal`).
+- **Cô lập phiên (kiểm chứng bằng test):** token staff KHÔNG verify được ở portal và ngược lại (secret khác
+  nhau + kiểm `scope`). Test `http-integration` đặt token chéo vào cookie đối phương → nhận **401**.
+- Mọi route API đều có `require*` trừ: `auth/login`, `auth/logout`, `auth/me` (chỉ trả phiên của chính
+  người gọi), `portal/login`, `portal/logout`, `storage/blob` (ủy quyền bằng **signed token**, không phiên).
+
+### SEC1 — Rate limiting + progressive lockout (`src/lib/rate-limit.ts`)
+- **Lưu state trong DB** (`auth_throttles`) → đúng trên **multi-instance / serverless** (không dùng bộ nhớ
+  tiến trình). Đếm thất bại theo **NHIỀU key song song: theo IP và theo account identifier** (`staff:ip:` /
+  `staff:acct:` / `portal:ip:` / `portal:acct:`).
+- **Khóa TẠM THỜI lũy tiến** theo số lần thất bại trong cửa sổ `WINDOW` (mặc định 15': `LOGIN_THROTTLE_WINDOW_MS`):
+  **5→1 phút, 8→5 phút, 11→15 phút, 15+→60 phút (trần)**. **KHÔNG khóa vĩnh viễn**; reset khi đăng nhập
+  thành công (`recordSuccess`) hoặc hết cửa sổ.
+  - *Lý do ngưỡng:* cho phép người dùng thật gõ nhầm vài lần (≤4 không phạt), chặn dứt điểm dò mật khẩu tự
+    động (mỗi bậc tăng cấp số nhân), trần 60' tránh biến thành DoS khóa tài khoản vĩnh viễn.
+- Áp cho **login nhân viên** và **login cổng khách** (`checkThrottle` TRƯỚC khi so mật khẩu → **429** kèm
+  `retryAfter`). Áp cho identifier **bất kể account tồn tại hay không** → không lộ sự tồn tại.
+- **Phản hồi chung an toàn:** sai mật khẩu và account-không-tồn-tại trả **cùng** thông báo 401
+  ("Email hoặc mật khẩu không đúng"). **Audit** khi bắt đầu khóa (`LOGIN_THROTTLED`) — **không log mật
+  khẩu/bí mật**. Đăng nhập thành công ghi `LOGIN`.
+
+### SEC2 — Tách secret (env, không hard-code)
+- `AUTH_SECRET` (staff) và `PORTAL_AUTH_SECRET` (portal) **độc lập**. Không hard-code secret; đọc từ env.
+  Cảnh báo (console.warn) khi thiếu ở `NODE_ENV=production`. Toàn bộ biến môi trường tài liệu hóa trong
+  **`.env.example`** (không có giá trị secret thật): `DATABASE_URL`, `AUTH_SECRET`, `PORTAL_AUTH_SECRET`,
+  `SESSION_MAX_AGE`, `PORTAL_SESSION_MAX_AGE`, `LOGIN_THROTTLE_WINDOW_MS`, `ALLOW_NEGATIVE_STOCK`,
+  `STORAGE_DRIVER/STORAGE_DIR/STORAGE_MAX_BYTES/STORAGE_SIGNED_URL_TTL`, `S3_*`.
+
+### SEC3 — Object storage + signed URL (`src/lib/storage.ts`, `src/lib/config.ts`)
+- Interface `StorageProvider` {`put/get/delete/getSignedUrl`}. **LocalStorageProvider** (dev; ghi ngoài
+  `public/`, mode 0600, chống path-traversal, signed URL nội bộ `/api/storage/blob?t=<HMAC token>`) và
+  **S3StorageProvider** (`STORAGE_DRIVER=s3`; bucket **private**, **presigned GET** hết hạn ngắn). Đổi driver
+  chỉ qua env — không sửa code gọi.
+- **Không có URL công khai vĩnh viễn** cho media riêng tư. Tải chỉ qua route có kiểm quyền:
+  `/api/media/[id]` + `/api/media/[id]/url` (nhân viên `customer.read`) hoặc `/api/portal/media/[id]` +
+  `.../url` (khách: **phải sở hữu + `sharedWithCustomer=true` + chưa archive**, nếu không → **404**).
+- **Kiểm tra ủy quyền TRƯỚC khi cấp signed URL** (route `/url` chạy `require*`/ownership rồi mới ký). Signed
+  token HMAC (`signBlobToken/verifyBlobToken`, `timingSafeEqual`) có hạn `STORAGE_SIGNED_URL_TTL`.
+- **Khóa object không đoán được** (`newStorageKey` = `yyyy/mm/uuid.ext`). `validateUpload` kiểm **size +
+  MIME allowlist + chặn đuôi thực thi/script** (`.exe .js .svg .php .sh …`) → chặn upload mã thực thi. **Xóa
+  = archive mềm** (`isArchived`), không mồ côi tham chiếu.
+
+### SEC4 — Backup & recovery (`docs/BACKUP.md`)
+- Tài liệu chiến lược sao lưu **PostgreSQL** (pg_dump ngày + PITR/WAL; retention 14 ngày/8 tuần/12 tháng) và
+  **object storage** (S3 versioning + Object Lock + CRR; retention 90 ngày), quy trình khôi phục **đồng bộ
+  cùng mốc thời gian** DB↔blob, RPO ≤15' / RTO ≤2h, kiểm thử restore hằng quý.
+- **Trung thực:** doc ghi rõ **"TÀI LIỆU/KẾ HOẠCH — CHƯA vận hành"**; backup **chưa** được cấu hình chạy
+  thật (đây là blocker hạ tầng, xem "Blocker còn lại").
+
+### SEC5 — HTTP integration test (`test/http-integration.test.ts`, 16 test)
+- Gọi **route handler thật** của Next với `Request` thật, đi qua **toàn bộ** xác thực (cookie phiên) + RBAC
+  + ownership + Prisma trên **Postgres thật**. Lớp mô phỏng **duy nhất** là vận chuyển cookie (jar mock
+  `next/headers`); ký/verify token, phân quyền, DB đều là mã production.
+- Bao phủ: **Auth** (login đúng/sai/khóa 429/portal/cô lập phiên 2 chiều), **Authz** (ẩn danh→401, thiếu
+  quyền→403, không `finance.read`→`cost`=null), **Portal IDOR** (A xem của B→404, id giả→404, item báo giá
+  không lộ `unitCost`), **Media authz** (ẩn danh→401, chéo khách→404, chưa chia sẻ→404, nhân viên theo RBAC).
+
+### SEC6 — UI chia sẻ media (`src/components/session-media-share.tsx`)
+- Nhân viên (quyền `media.write`) bật/tắt **từng ảnh** để hiển thị trên Cổng khách, ngay trong màn **ghi
+  buổi** (`/treatment-plans/[id]` → RecordSessionModal). **Mặc định RIÊNG TƯ** (`sharedWithCustomer=false`);
+  Checkbox **disabled** nếu thiếu quyền. Portal **tôn trọng cờ tức thì** (đọc trực tiếp DB mỗi request).
+- `/api/media/[id]` PATCH ghi **audit** `MEDIA_SHARED`/`MEDIA_UNSHARED` kèm `userId` (ai đổi, khi nào). Media
+  nội bộ vẫn nội bộ **bất kể biết id** (kiểm ở server, không dựa UI ẩn).
+
+### SEC7 — Re-audit an ninh (kết quả)
+- **Server-side enforcement:** mọi authz ở tầng route/service (`require*`, ownership 404, `maskFinance`),
+  không phụ thuộc ẩn UI. Rà `grep`: route portal **không** select `cost/unitCost/margin/ghi chú nội bộ/
+  audit`.
+- **Dependency:** `npm audit` → nâng **Next 14.2.15 → 14.2.35** (vá các CVE nghiêm trọng: DoS qua Server
+  Actions, SSRF qua middleware redirect, cache poisoning, content injection, lộ thông tin dev-server). Giữ
+  trong dòng 14.2.x (không nhảy major phá vỡ).
+
+### Xác thực trước staging (SEC8)
+Chạy sạch: `tsc` (0 lỗi) · `next lint` (0 lỗi, chỉ warning exhaustive-deps) · `next build` (OK) · **48 test**
+(vitest, Postgres `thng_test`) · `prisma migrate deploy` + `migrate status` ("up to date") + `db:seed` trên
+**DB staging trắng `thng_staging`**.
+
+### Blocker / nợ kỹ thuật còn lại (SEC)
+- **Backup CHƯA vận hành** — `docs/BACKUP.md` là kế hoạch; phải cấu hình pg_dump/PITR + S3 versioning/CRR +
+  off-site + alerting trên hạ tầng thật trước khi coi là "đã bật". **(Blocker hạ tầng cho production.)**
+- **Object storage production** — mặc định `STORAGE_DRIVER=local`; production phải đặt `s3` + bucket private
+  + backup. S3 provider có sẵn nhưng chưa chạy end-to-end trên bucket thật trong CI.
+- **Dependency còn lại:** vài CVE của `next`/`postcss` chỉ có bản vá ở **next@16 (major, phá vỡ)** — hoãn
+  nâng major (DoS/HTTP smuggling — mức availability, thấp hơn nhóm bảo mật dữ liệu đã xử lý). Chuỗi công cụ
+  dev (vitest/vite/esbuild/eslint) có CVE **chỉ ảnh hưởng dev server**, không ship production.
+- **SIGNATURE** vẫn lưu dataURL base64 trong JSON phiếu (chưa đẩy blob sang storage).
+- **Rate-limit** dùng DB (đúng đa-instance) nhưng chưa có dọn rác bản ghi hết hạn (khuyến nghị cron
+  `DELETE FROM auth_throttles WHERE locked_until < now() AND updated_at < now() - interval '1 day'`).
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript
