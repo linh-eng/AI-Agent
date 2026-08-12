@@ -13,6 +13,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:sync-rbac": "tsx prisma/sync-rbac.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
