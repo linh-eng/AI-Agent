@@ -96,3 +96,58 @@ DATABASE_URL=postgres://…/thng_restore npx prisma migrate status
 - [ ] Bật S3 versioning + CRR + lifecycle.
 - [ ] Script rà mồ côi DB↔object storage.
 - [ ] Lịch kiểm thử restore hằng quý + alerting.
+
+---
+
+## 6. Hướng dẫn thao tác cho NGƯỜI QUẢN TRỊ (step-by-step)
+
+> Các bước này CẦN quyền trên dashboard provider — không thể bật từ code. Đánh dấu
+> hoàn tất khi thực sự cấu hình xong.
+
+### 6.1. PostgreSQL (managed: Neon / Supabase / RDS)
+1. Bật **Automated backups** (mặc định hằng ngày) trong dashboard.
+2. Bật **PITR** (Point-in-time recovery) nếu gói hỗ trợ → RPO ~vài phút.
+3. Đặt **retention** ≥ 14 ngày (khớp mục 1).
+4. (Khuyến nghị) Thêm **`pg_dump` off-site** định kỳ sang vùng/tài khoản khác, mã hóa:
+   ```bash
+   pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL" \
+     | gpg --encrypt -r ops@thng > thng_$(date +%F).dump.gpg
+   # upload sang bucket backup off-site (khác region với DB)
+   ```
+5. Bật **alert** khi job backup thất bại.
+
+### 6.2. Object storage (R2 / S3)
+1. Bật **Versioning** trên bucket media (khôi phục ghi đè/xóa nhầm).
+2. (AWS) Bật **Object Lock** (governance) + **lifecycle** giữ version 90 ngày.
+3. (DR) Bật **Cross-region replication** hoặc sync định kỳ sang bucket backup.
+4. Xác nhận **Block Public Access** vẫn bật (bucket private).
+
+### Khôi phục khi mất đồng bộ / xóa nhầm
+- **Nhân viên/app xóa nhầm media:** app dùng **xóa mềm** (`MediaAsset.isArchived=true`),
+  blob vẫn còn → chỉ cần đặt lại `isArchived=false`. Nếu blob đã bị xóa vật lý → khôi
+  phục version cũ từ bucket (Versioning).
+- **DB record ↔ object lệch:** chạy script rà mồ côi 2 chiều (mục 5) sau khi restore.
+
+---
+
+## 7. Quy trình KIỂM THỬ restore (chạy định kỳ)
+
+```bash
+# --- PostgreSQL: restore sang DB test rồi kiểm tra app đọc được ---
+createdb thng_restore_test
+pg_restore --no-owner --no-privileges --dbname=thng_restore_test <bản_dump_mới_nhất>
+DATABASE_URL=postgres://…/thng_restore_test npx prisma migrate status   # phải "up to date"
+DATABASE_URL=postgres://…/thng_restore_test node -e "require('@prisma/client');" # smoke
+# Đếm vài bảng chính để xác nhận có dữ liệu:
+psql thng_restore_test -c "SELECT count(*) FROM customers; SELECT count(*) FROM media_assets;"
+
+# --- Object storage: lấy 1 version cũ, xác nhận tải được + authorization vẫn đúng ---
+# 1) Khôi phục/đọc 1 object theo versionId.
+# 2) Gọi /api/media/[id]/url (staff) hoặc /api/portal/media/[id] (khách sở hữu + shared)
+#    -> phải trả signed URL/blob; khách không sở hữu -> 404 (authorization giữ nguyên).
+dropdb thng_restore_test   # dọn sau khi test
+```
+
+Ghi lại **thời gian khôi phục thực tế** để hiệu chỉnh RTO. Nếu thiếu credential/provider,
+đây là **blocker cần người quản trị hạ tầng** thực hiện — KHÔNG coi backup là "đã bật" cho
+tới khi kiểm thử restore thành công.

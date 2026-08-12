@@ -373,9 +373,87 @@ Chạy sạch: `tsc` (0 lỗi) · `next lint` (0 lỗi, chỉ warning exhaustive
 - **Dependency còn lại:** vài CVE của `next`/`postcss` chỉ có bản vá ở **next@16 (major, phá vỡ)** — hoãn
   nâng major (DoS/HTTP smuggling — mức availability, thấp hơn nhóm bảo mật dữ liệu đã xử lý). Chuỗi công cụ
   dev (vitest/vite/esbuild/eslint) có CVE **chỉ ảnh hưởng dev server**, không ship production.
-- **SIGNATURE** vẫn lưu dataURL base64 trong JSON phiếu (chưa đẩy blob sang storage).
 - **Rate-limit** dùng DB (đúng đa-instance) nhưng chưa có dọn rác bản ghi hết hạn (khuyến nghị cron
   `DELETE FROM auth_throttles WHERE locked_until < now() AND updated_at < now() - interval '1 day'`).
+
+## Phase Hạ tầng Staging (INF1–INF6) — env 3 môi trường · object storage · storage hardening · chữ ký · logger · backup vận hành
+
+Giai đoạn đưa hệ thống sang **môi trường Staging gần production**. Tài liệu triển khai:
+`docs/STAGING.md` (deploy + bước provider), `docs/BACKUP.md` (backup/restore vận hành),
+`docs/MONITORING.md` (logging/alert). **Đã xác thực:** tsc sạch · lint 0 lỗi · build OK ·
+**56 test pass** (9 file) · migrate deploy (9 migration) + status + seed sạch trên DB staging trắng.
+
+### Mô hình 3 môi trường (`.env.example`)
+`development` (FS local) · `staging` (S3 private + secret riêng + `staging.<domain>`) ·
+`production` (phase sau). Thêm `APP_URL/NEXT_PUBLIC_APP_URL` (không hard-code domain),
+`APP_ENV`, `LOG_LEVEL`, `SENTRY_DSN`. **Serverless (Vercel): staging/prod BẮT BUỘC
+`STORAGE_DRIVER=s3`** — FS local không bền vững giữa request/instance.
+
+### INF2 — Storage hardening (`src/lib/storage.ts`)
+- **S3 PutObject** thêm `ServerSideEncryption: AES256` (mã hóa at-rest); bucket vẫn **private**
+  (không set ACL public).
+- **`validateUploadBytes` + `sniffContentType`**: xác thực bằng **MAGIC BYTES** — KHÔNG tin
+  MIME/filename browser; MIME khai báo phải **khớp** nội dung thật; chỉ nhận JPEG/PNG/WEBP/GIF/
+  PDF/MP4/QuickTime/HEIC. Route upload media dùng validation này (chống upload exe ngụy trang ảnh).
+
+### INF3 — Chữ ký → storage thật (`src/lib/signature-storage.ts`)
+- `persistInlineSignatures`: khi lưu FormInstance, đẩy `dataURL` base64 (chữ ký/ảnh nhúng) lên
+  storage **riêng tư** (`MediaAsset` kind=SIGNATURE, `sharedWithCustomer=false`), thay bằng
+  `mediaId` — DB chỉ giữ object key + metadata, **không** giữ base64. Idempotent; lỗi upload
+  không làm mất chữ ký (giữ tạm + log). `form-renderer` hiển thị chữ ký đã lưu qua `mediaId`
+  (ảnh riêng tư, route kiểm quyền). **(Thay thế nợ kỹ thuật "SIGNATURE base64" của SEC.)**
+
+### INF4 — Logger/monitoring (`src/lib/logger.ts`)
+- Log JSON có **REDACT tự động**: che khóa nhạy cảm (password/secret/token/cookie/DATABASE_URL/
+  S3 keys/AUTH_SECRET) + pattern trong value (JWT, `Bearer`, `data:…;base64`, query của signed/
+  presigned URL). Cấp độ theo `LOG_LEVEL`. `handle()` 500 dùng logger + trả thông báo chung tiếng
+  Việt ("Đã xảy ra lỗi. Vui lòng thử lại sau."). Sẵn sàng cắm Sentry qua `SENTRY_DSN`.
+
+### INF5 — Tests (`test/staging-hardening.test.ts`, 8 test → tổng 56)
+Bất biến version biểu mẫu/Protocol (áp mẫu → snapshot; sửa mẫu lên V2 KHÔNG đổi bản đã áp) ·
+magic-byte upload (chặn exe ngụy trang, MIME lệch nội dung) · chữ ký → MediaAsset (DB không giữ
+base64, idempotent) · logger redact bí mật.
+
+### INF6 — Docs vận hành
+`docs/STAGING.md` (env, tương thích serverless/Prisma pooling, deploy schema, cookie HTTPS, **các
+bước provider: Postgres/R2-S3/Vercel/DNS/monitoring**, smoke test, danh sách KHÔNG-làm) ·
+`docs/BACKUP.md` bổ sung **hướng dẫn thao tác + quy trình kiểm thử restore** · `docs/MONITORING.md`.
+
+### Rate limiting đa-instance (xác nhận)
+State ở **DB** (`auth_throttles`) → đúng trên serverless/nhiều instance (không dùng memory tiến
+trình). Không cần đổi provider; abstraction rõ ràng.
+
+### Blocker hạ tầng còn lại (CẦN người quản trị — chưa thể bật từ code)
+- **DB provider staging** (Neon/Supabase/RDS): tạo instance + `DATABASE_URL` + bật automated
+  backup/PITR. **[Critical để có staging]**
+- **Object storage** (R2/S3): tạo bucket **private** + versioning + access key + đặt `S3_*`.
+  **[Critical để có staging trên serverless]**
+- **Deploy Vercel + domain `staging.<domain>` + DNS + HTTPS**. **[Critical]**
+- **Backup/restore VẬN HÀNH thật** + kiểm thử restore (DB + object). **[High — trước production]**
+- **Monitoring provider** (Sentry): đặt `SENTRY_DSN` + cài SDK. **[Medium]**
+- **CVE `next`/`postcss`** chỉ vá ở next@16 (major) — **hoãn theo yêu cầu** (không nâng trong phase
+  này). **[Medium/Low — availability]**
+- Chưa trừ tồn cho `professionalProducts` nhập tay không gắn lô; cron dọn `auth_throttles`. **[Low]**
+
+## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
+
+Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ
+tiếng Anh** (không dịch tên model/enum/biến). Áp dụng cho **toàn bộ UI hiện tại và mọi module mới**.
+
+- **KHÔNG hiển thị giá trị enum tiếng Anh trực tiếp ra UI** — luôn qua map nhãn
+  (`src/lib/clinic-labels.ts`, `src/lib/labels.ts`) hoặc **`statusLabel()`** (gộp mọi map + nhãn
+  chung `COMMON_STATUS_LABEL`, lưới an toàn cho status từ nhiều thực thể như timeline khách).
+- **Nhãn tập trung** ở các module labels (không rải chuỗi khó gom) — sidebar/tab/nút/trạng thái/
+  placeholder/loại-trường form đã Việt hóa. Nút: Thêm mới/Lưu/Hủy/Duyệt/Từ chối/Hoàn thành…;
+  trạng thái: Bản nháp/Chờ xử lý/Đang thực hiện/Hoàn thành/Đã hủy/Đã duyệt…
+- **Định dạng vi-VN**: `formatNumber`, **`formatCurrency`** ("2.500.000 ₫"), `formatDate`
+  (dd/MM/yyyy), **`formatDateTime`** (dd/MM/yyyy HH:mm) trong `src/lib/utils.ts`.
+- **Giữ nguyên**: tên brand/sản phẩm/công nghệ/protocol do người dùng nhập, SKU, mã định danh,
+  thuật ngữ chuyên môn (Protocol, DMK, Before/After, ROI, VIP…) — nhưng câu/label xung quanh tiếng Việt.
+- **Kiến trúc i18n** (`src/lib/i18n.ts`): `DEFAULT_LOCALE=vi-VN`, hàm `t()`, chuẩn bị thêm English
+  tương lai **không phải viết lại UI**; chưa bật language switcher trong phase này.
+- **Thông báo lỗi**: hiển thị tiếng Việt dễ hiểu, **không** lộ raw DB/API error (server trả thông
+  báo chung; chi tiết chỉ vào log đã redact).
 
 ## Tech stack
 
