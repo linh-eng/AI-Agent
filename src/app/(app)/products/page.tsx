@@ -7,8 +7,10 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input, Label, Select, Checkbox } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
+import { focusNextOnEnter } from "@/lib/form";
 import { formatNumber } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
@@ -186,7 +188,7 @@ export default function ProductsPage() {
       </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Thêm sản phẩm">
-        <form onSubmit={create} className="space-y-4">
+        <form onSubmit={create} onKeyDown={focusNextOnEnter} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>SKU *</Label>
@@ -204,25 +206,21 @@ export default function ProductsPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Thương hiệu</Label>
-              <Select value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })}>
-                <option value="">— Chọn thương hiệu —</option>
-                {brands.map((b) => (
-                  <option key={b.id} value={b.name}>
-                    {b.name}
-                  </option>
-                ))}
-              </Select>
+              <Combobox
+                value={form.brand}
+                onChange={(v) => setForm({ ...form, brand: v })}
+                placeholder="— Chọn thương hiệu —"
+                items={brands.map((b) => ({ value: b.name, label: b.name }))}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Nhóm hàng</Label>
-              <Select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
-                <option value="">— Chọn nhóm —</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
+              <Combobox
+                value={form.categoryId}
+                onChange={(v) => setForm({ ...form, categoryId: v })}
+                placeholder="— Chọn nhóm —"
+                items={categories.map((c) => ({ value: c.id, label: c.name }))}
+              />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">

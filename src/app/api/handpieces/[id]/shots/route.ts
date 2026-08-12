@@ -22,6 +22,16 @@ export const POST = handle(async (req, ctx) => {
     if (hp.status === "RETIRED") {
       throw new HttpError(400, "Tay cầm đã ngừng dùng, không thể ghi shot");
     }
+    // Chặn ghi vượt định mức shot tối đa (usedShots + shots không được > maxShots).
+    const remaining = hp.maxShots - hp.usedShots;
+    if (input.shots > remaining) {
+      throw new HttpError(
+        400,
+        remaining <= 0
+          ? `Tay cầm đã hết shot (đã dùng ${hp.usedShots}/${hp.maxShots}). Cần thay tay cầm mới.`
+          : `Vượt định mức: chỉ còn ${remaining} shot (đã dùng ${hp.usedShots}/${hp.maxShots}). Không thể ghi ${input.shots} shot.`
+      );
+    }
     const log = await tx.shotLog.create({
       data: {
         handpieceId: hp.id,

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
+import { focusNextOnEnter } from "@/lib/form";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 
@@ -102,7 +103,7 @@ export default function WarehousesPage() {
       </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Thêm kho">
-        <form onSubmit={create} className="space-y-4">
+        <form onSubmit={create} onKeyDown={focusNextOnEnter} className="space-y-4">
           <div className="space-y-1.5">
             <Label>Mã kho *</Label>
             <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />

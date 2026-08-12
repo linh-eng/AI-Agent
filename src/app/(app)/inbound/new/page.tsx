@@ -7,7 +7,9 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { apiFetch } from "@/lib/client";
+import { focusNextOnEnter } from "@/lib/form";
 
 interface Supplier { id: string; name: string; code: string }
 interface Warehouse { id: string; name: string; code: string }
@@ -117,19 +119,18 @@ export default function NewReceiptPage() {
           </Link>
         }
       />
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} onKeyDown={focusNextOnEnter} className="space-y-4">
         <Card>
           <CardContent className="grid gap-4 p-5 sm:grid-cols-3">
             <div className="space-y-1.5">
               <Label>Nhà cung cấp *</Label>
-              <Select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} required>
-                <option value="">— Chọn NCC —</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </Select>
+              <Combobox
+                required
+                value={supplierId}
+                onChange={setSupplierId}
+                placeholder="— Chọn NCC —"
+                items={suppliers.map((s) => ({ value: s.id, label: s.name, keywords: s.code }))}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Kho nhập *</Label>
@@ -165,18 +166,17 @@ export default function NewReceiptPage() {
                     <div className="grid gap-3 sm:grid-cols-12">
                       <div className="space-y-1.5 sm:col-span-4">
                         <Label>Sản phẩm *</Label>
-                        <Select
-                          value={it.productId}
-                          onChange={(e) => updateItem(i, { productId: e.target.value })}
+                        <Combobox
                           required
-                        >
-                          <option value="">— Chọn —</option>
-                          {products.map((pr) => (
-                            <option key={pr.id} value={pr.id}>
-                              {pr.sku} — {pr.name}
-                            </option>
-                          ))}
-                        </Select>
+                          value={it.productId}
+                          onChange={(v) => updateItem(i, { productId: v })}
+                          placeholder="— Chọn —"
+                          items={products.map((pr) => ({
+                            value: pr.id,
+                            label: `${pr.sku} — ${pr.name}`,
+                            keywords: pr.sku,
+                          }))}
+                        />
                       </div>
                       <div className="space-y-1.5 sm:col-span-2">
                         <Label>SL * {p ? `(${p.uom})` : ""}</Label>

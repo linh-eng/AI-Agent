@@ -7,7 +7,9 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { apiFetch } from "@/lib/client";
+import { focusNextOnEnter } from "@/lib/form";
 import { formatNumber } from "@/lib/utils";
 
 interface Warehouse { id: string; name: string }
@@ -160,7 +162,7 @@ export default function EditIssuePage({ params }: { params: { id: string } }) {
           </Link>
         }
       />
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} onKeyDown={focusNextOnEnter} className="space-y-4">
         <Card>
           <CardContent className="grid gap-4 p-5 sm:grid-cols-4">
             <div className="space-y-1.5">
@@ -234,18 +236,17 @@ export default function EditIssuePage({ params }: { params: { id: string } }) {
                   <div key={i} className="grid items-end gap-3 rounded-lg border p-3 sm:grid-cols-12">
                     <div className="space-y-1.5 sm:col-span-6">
                       <Label>Sản phẩm *</Label>
-                      <Select
-                        value={it.productId}
-                        onChange={(e) => updateItem(i, { productId: e.target.value })}
+                      <Combobox
                         required
-                      >
-                        <option value="">— Chọn sản phẩm còn tồn —</option>
-                        {options.map((r) => (
-                          <option key={r.productId} value={r.productId}>
-                            {r.sku} — {r.name} (khả dụng {formatNumber(availableFor(r.productId))} {r.uom})
-                          </option>
-                        ))}
-                      </Select>
+                        value={it.productId}
+                        onChange={(v) => updateItem(i, { productId: v })}
+                        placeholder="— Chọn sản phẩm còn tồn —"
+                        items={options.map((r) => ({
+                          value: r.productId,
+                          label: `${r.sku} — ${r.name} (khả dụng ${formatNumber(availableFor(r.productId))} ${r.uom})`,
+                          keywords: r.sku,
+                        }))}
+                      />
                     </div>
                     <div className="space-y-1.5 sm:col-span-3">
                       <Label>Số lượng * {uom ? `(${uom})` : ""}</Label>

@@ -6,9 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input, Label, Select } from "@/components/ui/input";
+import { Input, Label } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
+import { focusNextOnEnter } from "@/lib/form";
 import { formatNumber } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
@@ -229,7 +231,7 @@ export default function HandpiecesPage() {
 
       {/* Thêm tay cầm */}
       <Modal open={open} onClose={() => setOpen(false)} title="Thêm tay cầm">
-        <form onSubmit={create} className="space-y-4">
+        <form onSubmit={create} onKeyDown={focusNextOnEnter} className="space-y-4">
           <div className="space-y-1.5">
             <Label>Tên tay cầm *</Label>
             <Input
@@ -241,14 +243,12 @@ export default function HandpiecesPage() {
           </div>
           <div className="space-y-1.5">
             <Label>Máy (chọn tài sản)</Label>
-            <Select value={form.assetId} onChange={(e) => setForm({ ...form, assetId: e.target.value })}>
-              <option value="">— Không gắn tài sản cụ thể —</option>
-              {assets.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.code} · {a.product.name}
-                </option>
-              ))}
-            </Select>
+            <Combobox
+              value={form.assetId}
+              onChange={(v) => setForm({ ...form, assetId: v })}
+              placeholder="— Không gắn tài sản cụ thể —"
+              items={assets.map((a) => ({ value: a.id, label: `${a.code} · ${a.product.name}`, keywords: a.code }))}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Hoặc nhập tên máy</Label>
@@ -291,11 +291,18 @@ export default function HandpiecesPage() {
 
       {/* Ghi shot */}
       <Modal open={!!shotFor} onClose={() => setShotFor(null)} title={`Ghi shot — ${shotFor?.name ?? ""}`}>
-        <form onSubmit={recordShot} className="space-y-4">
+        {(() => {
+          const remaining = shotFor ? shotFor.maxShots - shotFor.usedShots : 0;
+          const entered = Number(shotForm.shots) || 0;
+          const over = entered > remaining;
+          const depleted = remaining <= 0;
+          return (
+        <form onSubmit={recordShot} onKeyDown={focusNextOnEnter} className="space-y-4">
           {shotFor && (
-            <p className="text-sm text-muted-foreground">
+            <p className={`text-sm ${depleted ? "text-destructive" : "text-muted-foreground"}`}>
               Đã dùng {formatNumber(shotFor.usedShots)} / {formatNumber(shotFor.maxShots)} shot · còn{" "}
-              {formatNumber(shotFor.maxShots - shotFor.usedShots)} shot.
+              <span className={depleted ? "font-semibold" : ""}>{formatNumber(remaining)}</span> shot.
+              {depleted && " — Đã hết shot, cần thay tay cầm."}
             </p>
           )}
           <div className="grid grid-cols-2 gap-3">
@@ -303,10 +310,20 @@ export default function HandpiecesPage() {
               <Label>Số shot đã bắn *</Label>
               <Input
                 type="number"
+                min="1"
+                max={remaining > 0 ? remaining : undefined}
                 value={shotForm.shots}
                 onChange={(e) => setShotForm({ ...shotForm, shots: e.target.value })}
                 required
+                className={over ? "border-destructive" : ""}
               />
+              {over && (
+                <p className="text-xs text-destructive">
+                  {depleted
+                    ? "Tay cầm đã hết shot."
+                    : `Chỉ còn ${formatNumber(remaining)} shot — không thể ghi ${formatNumber(entered)}.`}
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Ngày thực hiện</Label>
@@ -333,9 +350,13 @@ export default function HandpiecesPage() {
             <Button type="button" variant="outline" onClick={() => setShotFor(null)}>
               Hủy
             </Button>
-            <Button type="submit">Ghi nhận</Button>
+            <Button type="submit" disabled={over || depleted || entered <= 0}>
+              Ghi nhận
+            </Button>
           </div>
         </form>
+          );
+        })()}
       </Modal>
     </div>
   );

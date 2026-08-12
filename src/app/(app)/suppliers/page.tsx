@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
+import { focusNextOnEnter } from "@/lib/form";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 
@@ -80,18 +81,20 @@ export default function SuppliersPage() {
                 <TH>Người liên hệ</TH>
                 <TH>Điện thoại</TH>
                 <TH>Email</TH>
+                <TH>Địa chỉ</TH>
+                <TH>Mã số thuế</TH>
               </TR>
             </THead>
             <TBody>
               {loading ? (
                 <TR>
-                  <TD colSpan={5} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">
                     Đang tải…
                   </TD>
                 </TR>
               ) : rows.length === 0 ? (
                 <TR>
-                  <TD colSpan={5} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">
                     Chưa có nhà cung cấp
                   </TD>
                 </TR>
@@ -103,6 +106,8 @@ export default function SuppliersPage() {
                     <TD className="text-muted-foreground">{r.contactPerson ?? "—"}</TD>
                     <TD className="text-muted-foreground">{r.phone ?? "—"}</TD>
                     <TD className="text-muted-foreground">{r.email ?? "—"}</TD>
+                    <TD className="text-muted-foreground">{r.address ?? "—"}</TD>
+                    <TD className="text-muted-foreground">{r.taxCode ?? "—"}</TD>
                   </TR>
                 ))
               )}
@@ -112,7 +117,7 @@ export default function SuppliersPage() {
       </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Thêm nhà cung cấp">
-        <form onSubmit={create} className="space-y-4">
+        <form onSubmit={create} onKeyDown={focusNextOnEnter} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Mã *</Label>

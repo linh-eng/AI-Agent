@@ -8,14 +8,17 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input, Label, Select } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
+import { focusNextOnEnter } from "@/lib/form";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 
 interface Warehouse { id: string; name: string }
 interface Product { id: string; sku: string; name: string; uom: string }
+interface InvRow { productId: string; onHand: number }
 interface Service {
   id: string;
   code: string;
@@ -44,6 +47,7 @@ export default function ServiceUsagePage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inventory, setInventory] = useState<InvRow[]>([]);
   const [form, setForm] = useState({ serviceId: "", warehouseId: "", sessions: "1", customerName: "", note: "" });
 
   async function load() {
@@ -63,8 +67,20 @@ export default function ServiceUsagePage() {
     });
   }, []);
 
+  // Tồn kho hiện tại của kho đã chọn — để cảnh báo thiếu tồn NGAY khi nhập.
+  useEffect(() => {
+    if (!form.warehouseId) return;
+    apiFetch<InvRow[]>(`/api/inventory?warehouseId=${form.warehouseId}`)
+      .then(setInventory)
+      .catch(() => setInventory([]));
+  }, [form.warehouseId]);
+
   const selected = services.find((s) => s.id === form.serviceId);
   const sessions = Number(form.sessions) || 0;
+  const onHandById = new Map(inventory.map((r) => [r.productId, r.onHand]));
+  // Có dòng nào tiêu hao vượt tồn khả dụng không?
+  const shortage =
+    selected?.items.some((i) => i.quantity * sessions > (onHandById.get(i.productId) ?? 0)) ?? false;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -153,17 +169,16 @@ export default function ServiceUsagePage() {
       </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Ghi nhận thực hiện dịch vụ">
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} onKeyDown={focusNextOnEnter} className="space-y-4">
           <div className="space-y-1.5">
             <Label>Liệu trình *</Label>
-            <Select value={form.serviceId} onChange={(e) => setForm({ ...form, serviceId: e.target.value })} required>
-              <option value="">— Chọn liệu trình —</option>
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.code} — {s.name}
-                </option>
-              ))}
-            </Select>
+            <Combobox
+              required
+              value={form.serviceId}
+              onChange={(v) => setForm({ ...form, serviceId: v })}
+              placeholder="— Chọn liệu trình —"
+              items={services.map((s) => ({ value: s.id, label: `${s.code} — ${s.name}`, keywords: s.code }))}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -197,15 +212,30 @@ export default function ServiceUsagePage() {
                 <p className="text-amber-600">Liệu trình chưa khai báo định mức.</p>
               ) : (
                 <ul className="space-y-0.5">
-                  {selected.items.map((i) => (
-                    <li key={i.productId} className="flex justify-between">
-                      <span>{i.product.name}</span>
-                      <span className="font-medium">
-                        {formatNumber(i.quantity * sessions)} {i.product.uom}
-                      </span>
-                    </li>
-                  ))}
+                  {selected.items.map((i) => {
+                    const need = i.quantity * sessions;
+                    const onHand = onHandById.get(i.productId) ?? 0;
+                    const over = need > onHand;
+                    return (
+                      <li key={i.productId} className="flex justify-between gap-2">
+                        <span>{i.product.name}</span>
+                        <span className="text-right">
+                          <span className={`font-medium ${over ? "text-destructive" : ""}`}>
+                            {formatNumber(need)} {i.product.uom}
+                          </span>
+                          <span className={`ml-2 text-xs ${over ? "text-destructive" : "text-muted-foreground"}`}>
+                            (tồn {formatNumber(onHand)})
+                          </span>
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
+              )}
+              {shortage && (
+                <p className="mt-2 text-sm font-medium text-destructive">
+                  ⚠ Không đủ tồn cho một số vật tư — vui lòng nhập thêm kho hoặc giảm số lượt trước khi ghi nhận.
+                </p>
               )}
             </div>
           )}
@@ -213,7 +243,7 @@ export default function ServiceUsagePage() {
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Hủy</Button>
-            <Button type="submit" disabled={!selected || selected.items.length === 0}>
+            <Button type="submit" disabled={!selected || selected.items.length === 0 || shortage}>
               Ghi nhận & trừ kho
             </Button>
           </div>
