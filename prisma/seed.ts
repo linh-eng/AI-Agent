@@ -850,6 +850,16 @@ async function main() {
     }
   }
 
+  // Cấu hình Thương hiệu mặc định (mục 1) — lưu DB, cấu hình lại ở Cài đặt.
+  await prisma.appSetting.upsert({
+    where: { key: "brand" },
+    update: {},
+    create: {
+      key: "brand",
+      value: { name: "Sophia Care", tagline: "Quản lý khách hàng & vận hành dịch vụ", primaryColor: "#4f7d6e" },
+    },
+  });
+
   console.log("✅ Seed hoàn tất.");
   console.log("   Đăng nhập kho: admin@sophia.com.vn / admin123");
   console.log("   Đăng nhập spa: quanly@sophia.com.vn / quanly123 (Quản lý)");

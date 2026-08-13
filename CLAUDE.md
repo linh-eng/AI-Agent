@@ -524,7 +524,8 @@ Sidebar nhóm **Spa & CRM** thêm **Hóa đơn** + **Thanh toán**; nhóm mới 
 `/invoices` (dashboard công nợ + lọc trạng thái) · `/invoices/[id]` (hạng mục + lịch sử thu + nút **Thu tiền**
 đa lần + **Hủy**) · `/payments` (sổ thu, link hóa đơn) · `/settings` (Thương hiệu: tên/khẩu hiệu/màu/logo, lưu DB).
 Màn **Báo giá đã chốt** thêm nút **Tạo hóa đơn** → nhảy sang hóa đơn. Brand hiển thị (tên/logo) đọc từ DB qua
-`getBrand()` ở layout, fallback `NEXT_PUBLIC_BRAND_NAME`.
+`getBrand()` ở layout, fallback `NEXT_PUBLIC_BRAND_NAME`. **Hồ sơ khách** có tab **Hóa đơn** + **Thanh toán**
+riêng (ngoài Timeline). **Tên phần mềm mặc định = "Sophia Care"** (seed vào `app_settings`; đổi ở Cài đặt).
 
 ### RBAC
 `invoice.read` (gộp vào `CLINIC_READ` — mọi vai trò spa xem được) · `invoice.write` (MANAGER/RECEPTION/CASHIER) ·

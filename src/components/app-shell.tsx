@@ -116,7 +116,7 @@ export function AppShell({
   brand?: { name: string; logoDataUrl?: string };
   children: React.ReactNode;
 }) {
-  const brandName = brand?.name || process.env.NEXT_PUBLIC_BRAND_NAME || "Sophia Wellness";
+  const brandName = brand?.name || process.env.NEXT_PUBLIC_BRAND_NAME || "Sophia Care";
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);

@@ -29,8 +29,11 @@ import {
   CARE_KIND_LABEL,
   CARE_KIND_TONE,
   DELIVERY_CHANNEL_LABEL,
+  INVOICE_STATUS_LABEL,
+  INVOICE_STATUS_TONE,
   statusLabel,
 } from "@/lib/clinic-labels";
+import { formatCurrency } from "@/lib/utils";
 
 interface Customer {
   id: string;
@@ -57,7 +60,7 @@ interface Customer {
   canSeeFinance: boolean;
 }
 
-const TABS = ["timeline", "crm", "bookings", "plans", "assessments", "recommendations", "materials", "forms", "care", "payments"] as const;
+const TABS = ["timeline", "crm", "bookings", "plans", "assessments", "recommendations", "materials", "forms", "care", "invoices", "payments"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   timeline: "Timeline",
@@ -69,6 +72,7 @@ const TAB_LABEL: Record<Tab, string> = {
   materials: "Vật tư khách hàng",
   forms: "Biểu mẫu",
   care: "Hướng dẫn",
+  invoices: "Hóa đơn",
   payments: "Thanh toán",
 };
 
@@ -91,6 +95,7 @@ export default function CustomerProfilePage() {
   const [custMaterials, setCustMaterials] = useState<any[]>([]);
   const [forms, setForms] = useState<any[]>([]);
   const [careItems, setCareItems] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [spaProducts, setSpaProducts] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [careTemplates, setCareTemplates] = useState<any[]>([]);
@@ -108,6 +113,7 @@ export default function CustomerProfilePage() {
     apiFetch<any[]>(`/api/product-recommendations?customerId=${id}`).then(setRecs).catch(() => {});
     apiFetch<any[]>(`/api/form-instances?customerId=${id}`).then(setForms).catch(() => {});
     apiFetch<any[]>(`/api/care-instances?customerId=${id}`).then(setCareItems).catch(() => {});
+    apiFetch<any[]>(`/api/invoices?customerId=${id}`).then(setInvoices).catch(() => {});
     apiFetch<any[]>(`/api/customer-materials?customerId=${id}`).then(setCustMaterials).catch(() => {});
   }, [id]);
 
@@ -475,6 +481,34 @@ export default function CustomerProfilePage() {
                       <TD>{DELIVERY_CHANNEL_LABEL[ci.deliveredVia] ?? ci.deliveredVia}</TD>
                       <TD>{ci.deliveredAt ? formatDate(ci.deliveredAt) : "Chưa"}</TD>
                       <TD>{ci.providedBy ?? "—"}</TD>
+                    </TR>
+                  ))
+                )}
+              </TBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === "invoices" && (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <THead>
+                <TR><TH>Mã HĐ</TH><TH>Ngày</TH><TH className="text-right">Tổng</TH><TH className="text-right">Đã trả</TH><TH className="text-right">Còn thu</TH><TH>Trạng thái</TH></TR>
+              </THead>
+              <TBody>
+                {invoices.length === 0 ? (
+                  <TR><TD colSpan={6} className="py-6 text-center text-muted-foreground">Chưa có hóa đơn. Tạo từ một báo giá đã chốt.</TD></TR>
+                ) : (
+                  invoices.map((iv) => (
+                    <TR key={iv.id}>
+                      <TD className="font-mono"><Link href={`/invoices/${iv.id}`} className="text-primary hover:underline">{iv.code}</Link></TD>
+                      <TD>{formatDate(iv.issuedAt)}</TD>
+                      <TD className="text-right">{formatCurrency(Number(iv.total))}</TD>
+                      <TD className="text-right text-emerald-600">{formatCurrency(Number(iv.paidAmount ?? 0))}</TD>
+                      <TD className="text-right font-medium text-amber-600">{formatCurrency(Number(iv.outstanding ?? 0))}</TD>
+                      <TD><Badge tone={INVOICE_STATUS_TONE[iv.status]}>{INVOICE_STATUS_LABEL[iv.status]}</Badge></TD>
                     </TR>
                   ))
                 )}

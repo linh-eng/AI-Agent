@@ -43,7 +43,7 @@ export default function PortalLoginPage() {
               <Sparkles className="h-5 w-5" />
             </div>
             <h1 className="text-lg font-semibold">Cổng khách hàng</h1>
-            <p className="text-sm text-muted-foreground">{process.env.NEXT_PUBLIC_BRAND_NAME || "Sophia Wellness"}</p>
+            <p className="text-sm text-muted-foreground">{process.env.NEXT_PUBLIC_BRAND_NAME || "Sophia Care"}</p>
           </div>
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">

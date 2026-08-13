@@ -16,7 +16,7 @@ export const BRAND_KEY = "brand";
 
 export function defaultBrand(): BrandSetting {
   return {
-    name: process.env.NEXT_PUBLIC_BRAND_NAME || "Sophia Wellness",
+    name: process.env.NEXT_PUBLIC_BRAND_NAME || "Sophia Care",
     tagline: "Quản lý khách hàng & vận hành dịch vụ",
     primaryColor: "#4f7d6e",
   };
