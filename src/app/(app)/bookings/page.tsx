@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, ChevronLeft, ChevronRight, AlertTriangle, Clock, X, SlidersHorizontal, ChevronDown, Settings2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -48,6 +49,14 @@ const resourceLine = (b: Booking) => [b.technician && `KTV: ${b.technician}`, b.
 const EMPTY_FILTER = { serviceId: "", technician: "", room: "", machine: "", status: "" };
 
 export default function BookingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <BookingsPageInner />
+    </Suspense>
+  );
+}
+
+function BookingsPageInner() {
   const canWrite = useCan(PERMISSIONS.BOOKING_WRITE);
   const canOverride = useCan(PERMISSIONS.BOOKING_OVERRIDE);
   const [view, setView] = useState<View>("day");
@@ -57,6 +66,7 @@ export default function BookingsPage() {
   const [filter, setFilter] = useState({ ...EMPTY_FILTER });
   const [showFilter, setShowFilter] = useState(false);
   const [open, setOpen] = useState(false);
+  const [prefill, setPrefill] = useState<Record<string, string> | null>(null);
   const [resourceMgr, setResourceMgr] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -97,6 +107,22 @@ export default function BookingsPage() {
     apiFetch<Employee[]>("/api/employees?active=1").then(setEmployees).catch(() => {});
     loadResources();
   }, [loadResources]);
+
+  // Prefill từ "Tạo lịch hẹn" ở màn Phác đồ (mục 11): mở sẵn form + điền khách/dịch vụ/phác đồ/buổi.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  useEffect(() => {
+    if (searchParams.get("new") !== "1") return;
+    const pf: Record<string, string> = {};
+    ["customerId", "serviceId", "planId", "stageId", "sessionNumber", "sessionId"].forEach((k) => {
+      const v = searchParams.get(k);
+      if (v) pf[k] = v;
+    });
+    setPrefill(pf);
+    setOpen(true);
+    router.replace("/bookings"); // dọn query để không mở lại khi refresh
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function shift(dir: number) {
     if (view === "day") setAnchor((a) => addDays(a, dir));
@@ -172,7 +198,7 @@ export default function BookingsPage() {
         <MonthView rows={rows} anchor={anchor} onOpenDay={(d) => { setAnchor(d); setView("day"); }} onOpen={setDetailId} />
       )}
 
-      <BookingFormModal open={open} onClose={() => setOpen(false)} customers={customers} services={services} employees={employees} resources={resources} canOverride={canOverride} onSaved={() => { setOpen(false); load(); }} />
+      <BookingFormModal open={open} prefill={prefill} onClose={() => { setOpen(false); setPrefill(null); }} customers={customers} services={services} employees={employees} resources={resources} canOverride={canOverride} onSaved={() => { setOpen(false); setPrefill(null); load(); }} />
       {detailId && <BookingDetailModal id={detailId} onClose={() => setDetailId(null)} canWrite={canWrite} canOverride={canOverride} employees={employees} resources={resources} onChanged={load} />}
       {resourceMgr && <ResourceManagerModal resources={resources} onClose={() => setResourceMgr(false)} onChanged={loadResources} />}
     </div>
@@ -480,9 +506,10 @@ function ConflictBlock({ conflicts, suggestions, canOverride, overrideReason, se
 /* ===================== Create modal ===================== */
 const EMPTY = { customerId: "", serviceId: "", scheduledAt: "", durationMinutes: "", technician: "", master: "", room: "", bed: "", machine: "", planId: "", stageId: "", sessionNumber: "", price: "", deposit: "", note: "" };
 
-function BookingFormModal({ open, onClose, customers, services, employees, resources, canOverride, onSaved }: { open: boolean; onClose: () => void; customers: Customer[]; services: Service[]; employees: Employee[]; resources: Resource[]; canOverride: boolean; onSaved: () => void }) {
+function BookingFormModal({ open, prefill, onClose, customers, services, employees, resources, canOverride, onSaved }: { open: boolean; prefill?: Record<string, string> | null; onClose: () => void; customers: Customer[]; services: Service[]; employees: Employee[]; resources: Resource[]; canOverride: boolean; onSaved: () => void }) {
   const [form, setForm] = useState({ ...EMPTY });
   const [assistants, setAssistants] = useState<string[]>([]);
+  const [linkSessionId, setLinkSessionId] = useState<string | null>(null);
   const opts = useResourceOptions(employees, resources);
   const [error, setError] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<Conflict[] | null>(null);
@@ -493,7 +520,22 @@ function BookingFormModal({ open, onClose, customers, services, employees, resou
   const [plans, setPlans] = useState<any[]>([]);
   const [stages, setStages] = useState<any[]>([]);
   const resetWarn = () => { setConflicts(null); setSuggestions([]); setFloor(null); setOverrideReason(""); };
-  useEffect(() => { if (open) { setForm({ ...EMPTY }); setAssistants([]); setError(null); resetWarn(); setPlans([]); setStages([]); } }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    setAssistants([]); setError(null); resetWarn(); setPlans([]); setStages([]);
+    if (prefill && Object.keys(prefill).length) {
+      // Prefill từ màn Phác đồ (mục 11) — điền sẵn khách/dịch vụ/phác đồ/giai đoạn/buổi.
+      setForm({ ...EMPTY, customerId: prefill.customerId ?? "", serviceId: prefill.serviceId ?? "", planId: prefill.planId ?? "", stageId: prefill.stageId ?? "", sessionNumber: prefill.sessionNumber ?? "" });
+      setLinkSessionId(prefill.sessionId ?? null);
+      if (prefill.customerId) apiFetch<any[]>(`/api/treatment-plans?customerId=${prefill.customerId}`).then(setPlans).catch(() => {});
+      if (prefill.planId) apiFetch<any>(`/api/treatment-plans/${prefill.planId}`).then((p) => setStages(p.stages ?? [])).catch(() => {});
+      const svc = prefill.serviceId ? services.find((s) => s.id === prefill.serviceId) : null;
+      if (svc?.durationMinutes) setForm((f) => ({ ...f, durationMinutes: String(svc.durationMinutes) }));
+    } else {
+      setForm({ ...EMPTY }); setLinkSessionId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const set = (patch: Partial<typeof form>) => { setForm((f) => ({ ...f, ...patch })); setConflicts(null); setSuggestions([]); };
 
@@ -525,6 +567,7 @@ function BookingFormModal({ open, onClose, customers, services, employees, resou
   function buildBody(extra: Record<string, unknown> = {}) {
     const body: any = { ...form, ...extra };
     body.assistants = assistants.length ? assistants : undefined;
+    if (linkSessionId) body.sessionId = linkSessionId; // gắn ngược buổi dự kiến (mục 11–12)
     ["serviceId", "durationMinutes", "technician", "master", "room", "bed", "machine", "planId", "stageId", "sessionNumber", "price", "deposit", "note"].forEach((k) => { if (!body[k]) delete body[k]; });
     if (!body.assistants) delete body.assistants;
     ["durationMinutes", "sessionNumber", "price", "deposit"].forEach((k) => { if (body[k]) body[k] = Number(body[k]); });
@@ -548,6 +591,11 @@ function BookingFormModal({ open, onClose, customers, services, employees, resou
   return (
     <Modal open={open} onClose={onClose} title="Tạo lịch hẹn" className="max-w-2xl">
       <form onSubmit={(e) => { e.preventDefault(); submit({}); }} className="space-y-4">
+        {linkSessionId && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-primary">
+            Đang tạo lịch hẹn cho một <b>buổi trong phác đồ</b> — đã điền sẵn khách/dịch vụ/phác đồ/giai đoạn/buổi. Chỉ cần chọn ngày giờ và nhân sự/tài nguyên.
+          </div>
+        )}
         <div className="space-y-1.5">
           <Label>Khách hàng *</Label>
           <Select value={form.customerId} onChange={(e) => onCustomer(e.target.value)} required>

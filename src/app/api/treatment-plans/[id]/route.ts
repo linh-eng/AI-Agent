@@ -21,9 +21,24 @@ export const GET = handle(async (_req, { params }) => {
           stage: { select: { name: true } },
           technology: { select: { name: true } },
           brandProtocol: { select: { name: true, code: true } },
+          booking: {
+            select: {
+              id: true,
+              scheduledAt: true,
+              status: true,
+              durationMinutes: true,
+              technician: true,
+              master: true,
+              room: true,
+              bed: true,
+              machine: true,
+            },
+          },
+          staff: { select: { id: true, staffName: true, role: true } },
         },
         orderBy: [{ orderIndex: "asc" }, { sessionNumber: "asc" }],
       },
+      versions: { orderBy: { toVersion: "desc" } },
       payments: { orderBy: { paidAt: "desc" } },
     },
   });
@@ -46,7 +61,13 @@ export const PATCH = handle(async (req, { params }) => {
 
   const data: Record<string, unknown> = { ...rest };
 
-  // Tạo version mới: tăng version + ghi changeLog (mục 15 — giữ lịch sử thay đổi)
+  // Đánh dấu thời điểm duyệt khi chuyển sang APPROVED (nếu chưa có)
+  if (rest.status === "APPROVED" && !current.approvedAt) {
+    data.approvedAt = new Date();
+    if (!current.approver && !rest.approver) data.approver = session.name;
+  }
+
+  // Tạo version mới qua đường PATCH (giữ tương thích): tăng version + ghi changeLog + bảng versions
   if (bumpVersion) {
     const log = Array.isArray(current.changeLog) ? (current.changeLog as any[]) : [];
     log.push({
@@ -58,6 +79,14 @@ export const PATCH = handle(async (req, { params }) => {
     });
     data.version = current.version + 1;
     data.changeLog = log as any;
+    data.versions = {
+      create: {
+        fromVersion: current.version,
+        toVersion: current.version + 1,
+        reason: changeReason ?? "(không ghi lý do)",
+        createdBy: changedBy ?? session.name,
+      },
+    } as any;
   }
 
   const plan = await prisma.treatmentPlan.update({ where: { id: params.id }, data });

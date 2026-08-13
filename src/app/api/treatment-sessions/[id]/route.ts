@@ -27,13 +27,15 @@ export const PATCH = handle(async (req, { params }) => {
   await requirePermission(PERMISSIONS.TREATMENT_WRITE);
   const parsed = sessionUpdateSchema.parse(await req.json());
   const data: Record<string, unknown> = { ...parsed };
-  // Tự đóng dấu thời điểm thực hiện khi chuyển sang COMPLETED mà chưa có performedAt
-  if (parsed.status === "COMPLETED" && !parsed.performedAt) {
+  // Tự đóng dấu thời điểm thực hiện + ghim version phác đồ khi chuyển sang COMPLETED (mục 13, 19)
+  if (parsed.status === "COMPLETED") {
     const cur = await prisma.treatmentSession.findUnique({
       where: { id: params.id },
-      select: { performedAt: true },
+      select: { performedAt: true, versionAtExecution: true, plan: { select: { version: true } } },
     });
-    if (!cur?.performedAt) data.performedAt = new Date();
+    if (!parsed.performedAt && !cur?.performedAt) data.performedAt = new Date();
+    // Ghim version thực hiện nếu chưa có — buổi đã hoàn thành thuộc đúng version tại thời điểm đó
+    if (cur?.versionAtExecution == null) data.versionAtExecution = cur?.plan?.version ?? undefined;
   }
   const item = await prisma.treatmentSession.update({ where: { id: params.id }, data });
   return ok(item);

@@ -71,6 +71,13 @@ export const POST = handle(async (req) => {
       preCare: parsed.preCare ?? null,
       postCare: parsed.postCare ?? null,
       note: parsed.note ?? null,
+      // --- KẾ HOẠCH buổi: chốt snapshot dự kiến (mặc định lấy từ dịch vụ/CN/protocol đang chọn) ---
+      plannedServiceId: parsed.plannedServiceId ?? parsed.serviceId ?? null,
+      plannedTechnologyId: parsed.plannedTechnologyId ?? parsed.technologyId ?? null,
+      plannedProtocolId: parsed.plannedProtocolId ?? parsed.brandProtocolId ?? null,
+      plannedStaff: (parsed.plannedStaff as any) ?? undefined,
+      plannedDate: parsed.plannedDate ?? parsed.scheduledAt ?? null,
+      intervalDays: parsed.intervalDays ?? null,
     },
   });
   return created(session);

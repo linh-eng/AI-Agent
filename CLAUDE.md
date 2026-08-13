@@ -988,6 +988,72 @@ DEMO.
 - Vật tư định mức link `spaProductId`/`usageMaterialId` là **soft ref** (chưa auto trừ tồn — tiêu hao chỉ khi
   ghi buổi, đúng nguyên tắc mục 10).
 
+## Phác đồ 4 lớp (v0.13.0) — Phác đồ → Giai đoạn → Buổi dự kiến → Lần thực hiện
+
+Nâng cấp **module Phác đồ** thể hiện rõ 4 lớp và tách **Kế hoạch (dự kiến) vs Thực tế** — không ghi đè dữ
+liệu kế hoạch bằng thực tế. Chỉ đụng module Phác đồ + integration tối thiểu với Lịch hẹn/Lần thực hiện; KHÔNG
+sửa Khách hàng/Dịch vụ/Báo giá/Hóa đơn/Giá sàn đã nghiệm thu. Migration **`J_treatment_plan`** (additive, 0
+DROP; tổng **20 migration**). **158 test pass** (thêm `test/treatment-plan.test.ts` 16).
+
+### Migration & schema (`J_treatment_plan`)
+- Enum: `PlanStatus` +`PENDING_APPROVAL`/`APPROVED`; `SessionStatus` +`SKIPPED`; enum mới `StageStatus`
+  (PENDING/IN_PROGRESS/COMPLETED/CANCELLED) + `FrequencyUnit` (DAY/WEEK/MONTH).
+- `TreatmentPlan` +`plannedStartDate`/`plannedEndDate`/`designer`/`approver`/`approvedAt`.
+- `TreatmentStage` +`status`/`plannedStartDate`/`plannedEndDate`/`plannedSessions`/`frequencyValue`/
+  `frequencyUnit`/`note` (giai đoạn có ngày + tần suất + số buổi + tiến độ).
+- `TreatmentSession` +`plannedServiceId`/`plannedTechnologyId`/`plannedProtocolId`/`plannedStaff`/`plannedDate`/
+  `intervalDays` (KẾ HOẠCH buổi, snapshot không đổi) + `versionAtExecution` (ghim phiên bản lúc thực hiện).
+  Cặp planned/actual cũ (`plannedParams`/`actualParams`, `plannedMaterials`/`actualMaterials`,
+  `plannedCost`/`actualCost`, `scheduledAt`/`performedAt`) **giữ nguyên**; THỰC TẾ ghi vào `serviceId`/
+  `technologyId`/`brandProtocolId`.
+- Model mới `TreatmentPlanVersion` (`treatment_plan_versions`): `fromVersion`/`toVersion`/`reason` (bắt buộc)/
+  `summary`/`note`/`createdBy` — lịch sử phiên bản, KHÔNG ghi đè (vẫn giữ `changeLog` Json để tương thích).
+
+### Backend
+- `src/lib/treatment-plan.ts`: `frequencyLabel`/`frequencyToDays`/`computeStageSessionDates` (tần suất theo
+  ngày/tuần/tháng — KHÔNG hard-code tuần); `computePlanProgress` (giai đoạn hiện tại + tiến độ giai đoạn + tiến
+  độ toàn phác đồ + buổi tiếp theo — tách rõ, không dùng "1/2 buổi" làm tên); `deriveSessionStatus` (derive
+  trạng thái buổi từ Session+Booking: Chưa lên lịch/Đã lên lịch/Khách đã đến/Đang thực hiện/Hoàn thành/Dời
+  lịch/Bỏ qua/Hủy); `comparePlannedActual` (bảng Kế hoạch vs Thực tế + đánh dấu khác biệt).
+- Validation (`clinic-validation.ts`): mở rộng plan/stage/session; thêm `planVersionCreateSchema` (reason
+  required), `stageCreateSchema`/`stageUpdateSchema`, `sessionToBookingSchema`. **Sửa `dateOpt` giữ `undefined`**
+  (không gửi field → Prisma bỏ qua) — tránh bug PATCH một phần vô tình xóa cột ngày.
+- API: `POST/PATCH /api/treatment-plans` (nhận dates/designer/approver + stage đầy đủ; PATCH tự set
+  `approvedAt` khi APPROVED); **`POST /api/treatment-plans/[id]/version`** (lý do bắt buộc → bump version +
+  đóng băng `versionAtExecution` cho buổi đã hoàn thành + ghi `TreatmentPlanVersion`); **`/api/treatment-stages`**
+  (POST) + **`/api/treatment-stages/[id]`** (PATCH) — thêm/sửa giai đoạn (chưa có trước đây); `treatment-sessions`
+  POST/PATCH nhận trường planned + ghim `versionAtExecution` khi COMPLETED. **`/api/bookings` POST nhận
+  `sessionId`** (additive) → gắn ngược `TreatmentSession.bookingId` (tạo lịch hẹn từ buổi, không đổi hành vi
+  Lịch hẹn khi vắng field).
+
+### UI
+- `/treatment-plans` (danh sách): thêm cột **Bắt đầu**/**Phụ trách** + **lọc trạng thái**; form tạo thêm ngày
+  bắt đầu/kết thúc/người thiết kế.
+- `/treatment-plans/[id]`: tái tổ chức thành **4 tab** — **Tổng quan** (KPI: version/trạng thái/ngày/tổng thời
+  gian/giai đoạn hiện tại/tiến độ giai đoạn/tiến độ toàn phác đồ/tổng giá/buổi tiếp theo/người thiết kế·duyệt);
+  **Kế hoạch theo giai đoạn** (card mỗi giai đoạn: ngày–tần suất–tiến độ + danh sách buổi với hành động theo
+  trạng thái: **Tạo lịch hẹn**/**Ghi nhận**/**Xem kết quả**/**Chi tiết**; thêm/sửa giai đoạn); **Timeline**
+  (thanh giai đoạn theo thời gian); **Phiên bản** (V1/V2 + lý do + tóm tắt + người tạo). **Modal chi tiết buổi**
+  hiển thị **Kế hoạch vs Thực tế song song** (đánh dấu "khác KH") + liên kết lịch hẹn. **Giữ nguyên** 3 modal
+  cũ (Thêm buổi/Ghi nhận buổi/Vật tư) + các widget con (chia sẻ media, tiêu hao vật tư, nhân sự buổi, đánh giá).
+- **Tạo lịch hẹn từ buổi** → điều hướng `/bookings?new=1&...&sessionId=` → form Lịch hẹn đã nghiệm thu **prefill**
+  khách/dịch vụ/phác đồ/giai đoạn/buổi (banner nhắc) → lưu xong gắn ngược buổi. Bọc `Suspense` cho `useSearchParams`.
+
+### Nguyên tắc & nợ kỹ thuật (Phác đồ)
+- **Kế hoạch ≠ Thực tế:** ghi nhận thực tế KHÔNG ghi đè trường planned (Prisma bỏ qua field không gửi). Buổi
+  hoàn thành ghim `versionAtExecution` → tạo V2 không kéo buổi lịch sử sang V2 (mục 19).
+- **1 buổi ↔ 1 booking** (gắn `bookingId`); đổi lịch giữ liên kết (module Lịch hẹn xử lý). Trạng thái buổi
+  **derive** từ Booking/Session (không nhân đôi dữ liệu).
+- Chưa: kéo–thả sắp xếp buổi trong tab giai đoạn (bỏ DnD cũ khi gom nhóm — sắp xếp theo `sessionNumber`); "Tổng
+  giá dự kiến" nhập tay (chưa tự tổng từ buổi); clone cấu trúc khi tạo V2 làm thủ công (sửa giai đoạn/buổi tại
+  chỗ, buổi lịch sử đã đóng băng). Booking prefill là điều hướng + query (không nhúng form Lịch hẹn vào màn phác đồ).
+
+### Demo (seed:demo) — TP-100001 "Phác đồ trẻ hóa 8 buổi" (Đỗ Thùy Linh), **V2**
+4 giai đoạn: Chuẩn bị (2 buổi·7 ngày/lần·20–27/08) · Can thiệp (4 buổi·7 ngày/lần·03–24/09) · Phục hồi (1
+buổi·sau 14 ngày·08/10) · Duy trì (1 buổi·sau 1 tháng·08/11). 8 buổi (3 hoàn thành → tiến độ 3/8). **Buổi 3
+minh họa Kế hoạch≠Thực tế**: KH RF·Protocol GLOW·5 ml → TT HIFU·Protocol LIFT·7 ml. **Buổi 4** có lịch hẹn
+BK-100020 (liên kết Buổi↔Booking). **Phiên bản V1→V2** (lý do "kéo dài phục hồi", buổi hoàn thành ghim V1).
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

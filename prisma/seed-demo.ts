@@ -142,6 +142,19 @@ async function main() {
       createdBy: "Phạm Chuyên Viên",
     },
   });
+  // Protocol thứ 2 (đóng vai "Protocol B") để minh họa Kế hoạch vs Thực tế khi buổi đổi protocol.
+  const protoLift = await prisma.brandProtocol.upsert({
+    where: { code: "PROTO-DEMO-LIFT" }, update: {},
+    create: {
+      code: "PROTO-DEMO-LIFT",
+      name: "DEMO — Quy trình nâng cơ HIFU (minh họa)",
+      kind: "INTERNAL", status: "ACTIVE", version: 1,
+      purpose: "DỮ LIỆU DEMO minh họa protocol thay thế khi buổi thực tế khác kế hoạch.",
+      steps: { items: [{ name: "Đánh dấu vùng", durationMinutes: 10 }, { name: "Bắn HIFU theo line", durationMinutes: 40 }, { name: "Làm dịu & dặn dò", durationMinutes: 10 }] },
+      durationMinutes: 60, recommendedFreq: "1 tháng/lần", recommendedCount: 3,
+      createdBy: "Phạm Chuyên Viên",
+    },
+  });
 
   // --- CẤU HÌNH DỊCH VỤ đầy đủ (mục 3): công nghệ/protocol/nhân sự/tài nguyên/vật tư định mức ---
   // Dịch vụ 1 — RF nâng cơ mặt (Công nghệ cao): RF, KTV chính bắt buộc, Máy RF, vật tư định mức.
@@ -242,9 +255,22 @@ async function main() {
   await prisma.assessment.create({ data: { customerId: kDangPD.id, name: "Chảy xệ vùng má - hàm", area: "Má, hàm", severity: "Vừa", description: "Chùng da vùng má, đường hàm chưa gọn", assessedBy: "Phạm Chuyên Viên", indicators: { do_dan_hoi: "trung bình" } } });
   const planLinh = await prisma.treatmentPlan.create({
     data: {
-      code: "TP-100001", customerId: kDangPD.id, name: "Phác đồ nâng cơ 6 buổi", version: 1, status: "ACTIVE",
-      diagnosis: "Lão hóa nhẹ-vừa vùng má/hàm", goals: "Nâng cơ, gọn đường hàm sau 6 buổi", totalPrice: 24_000_000, createdBy: "Phạm Chuyên Viên",
-      stages: { create: [ { name: "Chuẩn bị", orderIndex: 0 }, { name: "Nâng cơ", orderIndex: 1 }, { name: "Duy trì", orderIndex: 2 } ] },
+      code: "TP-100001", customerId: kDangPD.id, name: "Phác đồ trẻ hóa 8 buổi", version: 1, status: "ACTIVE",
+      diagnosis: "Lão hóa nhẹ-vừa vùng má/hàm", goals: "Trẻ hóa, nâng cơ, gọn đường hàm sau 8 buổi",
+      totalPrice: 32_000_000, createdBy: "Phạm Chuyên Viên", designer: "Phạm Chuyên Viên",
+      approver: "Trần Quản Lý", approvedAt: new Date("2026-08-15T02:00:00Z"),
+      plannedStartDate: new Date("2026-08-20"), plannedEndDate: new Date("2026-12-20"),
+      note: "Phác đồ demo minh họa 4 lớp: Phác đồ → Giai đoạn → Buổi dự kiến → Lần thực hiện.",
+      stages: { create: [
+        { name: "Chuẩn bị", orderIndex: 0, description: "Làm sạch sâu, ổn định nền da", status: "IN_PROGRESS",
+          plannedStartDate: new Date("2026-08-20"), plannedEndDate: new Date("2026-08-27"), plannedSessions: 2, frequencyValue: 7, frequencyUnit: "DAY" },
+        { name: "Can thiệp", orderIndex: 1, description: "RF/HIFU nâng cơ chuyên sâu", status: "PENDING",
+          plannedStartDate: new Date("2026-09-03"), plannedEndDate: new Date("2026-09-24"), plannedSessions: 4, frequencyValue: 7, frequencyUnit: "DAY" },
+        { name: "Phục hồi", orderIndex: 2, description: "Phục hồi, cấp ẩm sau can thiệp", status: "PENDING",
+          plannedStartDate: new Date("2026-10-08"), plannedEndDate: new Date("2026-10-08"), plannedSessions: 1, frequencyValue: 14, frequencyUnit: "DAY" },
+        { name: "Duy trì", orderIndex: 3, description: "Duy trì kết quả định kỳ", status: "PENDING",
+          plannedStartDate: new Date("2026-11-08"), plannedEndDate: new Date("2026-11-08"), plannedSessions: 1, frequencyValue: 1, frequencyUnit: "MONTH" },
+      ] },
     },
     include: { stages: { orderBy: { orderIndex: "asc" } } },
   });
@@ -254,6 +280,9 @@ async function main() {
       planId: planLinh.id, stageId: planLinh.stages[0].id, customerId: kDangPD.id, bookingId: bkLinh1.id, serviceId: svcRF.id,
       sessionNumber: 1, name: "RF nâng cơ buổi 1", status: "COMPLETED", scheduledAt: new Date("2026-07-25T07:00:00Z"), performedAt: new Date("2026-07-25T07:15:00Z"),
       performer: "Phạm Chuyên Viên", objective: "RF vùng má", actualParams: { nang_luong: "làm ấm 42°C" }, conditionBefore: "Da chùng nhẹ", conditionAfter: "Săn hơn tức thì", customerFeedback: "Ưng ý", plannedCost: 500_000, actualCost: 480_000, price: 1_800_000, checkedBy: "Trần Quản Lý",
+      // KẾ HOẠCH buổi (khớp thực tế) + ghim version thực hiện = 1
+      plannedServiceId: svcRF.id, plannedTechnologyId: techRF.id, plannedProtocolId: protoDemo.id, technologyId: techRF.id, brandProtocolId: protoDemo.id,
+      plannedDate: new Date("2026-07-25"), plannedMaterials: { text: "Gel RF 5 ml" }, actualMaterials: { text: "Gel RF 5 ml" }, versionAtExecution: 1,
     },
   });
 
@@ -304,12 +333,68 @@ async function main() {
       technicianReport: "Da đáp ứng tốt với RF, không kích ứng. Đề xuất buổi HIFU đúng lịch.", reviewedBy: "Lê Thị CSKH",
     },
   });
+  // Buổi 2 (Chuẩn bị) — hoàn thành, khớp kế hoạch (RF).
   const sLinh2 = await prisma.treatmentSession.create({
     data: {
-      planId: planLinh.id, stageId: planLinh.stages[1].id, customerId: kDangPD.id, serviceId: svcHIFU.id,
-      sessionNumber: 2, name: "HIFU nâng cơ buổi 2", status: "PLANNED", scheduledAt: new Date("2026-08-20T07:00:00Z"),
-      objective: "HIFU đường hàm", plannedParams: { line: 3, do_sau: "4.5mm" }, plannedCost: 1_800_000, price: 6_000_000, preCare: "Không nặn mụn, không rượu bia 24h trước",
+      planId: planLinh.id, stageId: planLinh.stages[0].id, customerId: kDangPD.id, serviceId: svcRF.id,
+      sessionNumber: 2, name: "RF làm sạch nền da buổi 2", status: "COMPLETED",
+      plannedServiceId: svcRF.id, plannedTechnologyId: techRF.id, plannedProtocolId: protoDemo.id, technologyId: techRF.id, brandProtocolId: protoDemo.id,
+      plannedDate: new Date("2026-08-27"), scheduledAt: new Date("2026-08-27T07:00:00Z"), performedAt: new Date("2026-08-27T07:15:00Z"), performer: "Phạm Chuyên Viên",
+      plannedMaterials: { text: "Gel RF 5 ml" }, actualMaterials: { text: "Gel RF 5 ml" }, plannedCost: 500_000, actualCost: 500_000, price: 1_800_000, checkedBy: "Trần Quản Lý", versionAtExecution: 1,
     },
+  });
+  // Buổi 3 (Can thiệp) — MINH HỌA Kế hoạch ≠ Thực tế (mục 14–15):
+  // Kế hoạch: RF · Protocol A (GLOW) · vật tư 5 ml. Thực tế: HIFU · Protocol B (LIFT) · vật tư 7 ml.
+  await prisma.treatmentSession.create({
+    data: {
+      planId: planLinh.id, stageId: planLinh.stages[1].id, customerId: kDangPD.id,
+      sessionNumber: 3, name: "Nâng cơ buổi 3", status: "COMPLETED",
+      // Kế hoạch (snapshot, không đổi):
+      plannedServiceId: svcRF.id, plannedTechnologyId: techRF.id, plannedProtocolId: protoDemo.id,
+      plannedDate: new Date("2026-09-03"), plannedParams: { text: "RF 42°C, 3 line" }, plannedMaterials: { text: "Gel RF 5 ml" }, plannedCost: 500_000,
+      // Thực tế (đổi so với kế hoạch):
+      serviceId: svcHIFU.id, technologyId: techHIFU.id, brandProtocolId: protoLift.id,
+      scheduledAt: new Date("2026-09-03T07:00:00Z"), performedAt: new Date("2026-09-03T07:20:00Z"), performer: "Phạm Chuyên Viên",
+      objective: "Chuyển sang HIFU do da đáp ứng tốt", actualParams: { text: "HIFU 4.5mm, 3 line" }, actualMaterials: { text: "Gel siêu âm 7 ml" }, actualCost: 700_000,
+      conditionBefore: "Đường hàm chưa gọn", conditionAfter: "Gọn hơn rõ", customerFeedback: "Rất hài lòng", price: 6_000_000, checkedBy: "Trần Quản Lý",
+      versionAtExecution: 1,
+    },
+  });
+  // Buổi 4 (Can thiệp) — buổi DỰ KIẾN đã có LỊCH HẸN (mục 12): minh họa liên kết Buổi ↔ Booking.
+  const bkLinh3 = await prisma.booking.create({
+    data: { code: "BK-100020", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: new Date("2026-09-10T07:00:00Z"), durationMinutes: 60, room: "Phòng 2", technician: "Phạm Chuyên Viên", status: "CONFIRMED", confirmedAt: new Date("2026-09-05T02:00:00Z"), price: 1_800_000, createdBy: "Nguyễn Lễ Tân", planId: planLinh.id, stageId: planLinh.stages[1].id, sessionNumber: 4 },
+  });
+  await prisma.treatmentSession.create({
+    data: {
+      planId: planLinh.id, stageId: planLinh.stages[1].id, customerId: kDangPD.id, bookingId: bkLinh3.id, serviceId: svcRF.id,
+      sessionNumber: 4, name: "RF nâng cơ buổi 4", status: "PLANNED", scheduledAt: new Date("2026-09-10T07:00:00Z"),
+      plannedServiceId: svcRF.id, plannedTechnologyId: techRF.id, plannedProtocolId: protoDemo.id,
+      plannedDate: new Date("2026-09-10"), objective: "RF vùng má buổi 4", plannedParams: { text: "RF 42°C" }, plannedMaterials: { text: "Gel RF 5 ml" }, plannedCost: 500_000, price: 1_800_000,
+    },
+  });
+  // Buổi 5–8 dự kiến (chưa lên lịch) — đủ 8 buổi: Chuẩn bị 2 · Can thiệp 4 · Phục hồi 1 · Duy trì 1.
+  for (const [num, stageIdx, plannedDate] of [[5, 1, "2026-09-17"], [6, 1, "2026-09-24"], [7, 2, "2026-10-08"], [8, 3, "2026-11-08"]] as const) {
+    await prisma.treatmentSession.create({
+      data: {
+        planId: planLinh.id, stageId: planLinh.stages[stageIdx].id, customerId: kDangPD.id, serviceId: svcRF.id,
+        sessionNumber: num, name: `Buổi ${num} (dự kiến)`, status: "PLANNED",
+        plannedServiceId: svcRF.id, plannedTechnologyId: techRF.id, plannedProtocolId: protoDemo.id,
+        plannedDate: new Date(plannedDate), plannedMaterials: { text: "Gel RF 5 ml" }, plannedCost: 500_000, price: 1_800_000,
+      },
+    });
+  }
+  // TẠO PHIÊN BẢN V2 (mục 16–19): lý do bắt buộc; buổi đã hoàn thành ghim ở V1 (đã set versionAtExecution=1).
+  await prisma.treatmentPlanVersion.create({
+    data: {
+      planId: planLinh.id, fromVersion: 1, toVersion: 2,
+      reason: "Khách đáp ứng chậm hơn dự kiến, cần kéo dài giai đoạn phục hồi.",
+      summary: "Thêm 1 buổi phục hồi; đổi Protocol buổi can thiệp sang HIFU.",
+      createdBy: "Phạm Chuyên Viên",
+    },
+  });
+  await prisma.treatmentPlan.update({
+    where: { id: planLinh.id },
+    data: { version: 2, changeLog: { items: [{ fromVersion: 1, toVersion: 2, reason: "Khách đáp ứng chậm hơn dự kiến, cần kéo dài giai đoạn phục hồi.", changedBy: "Phạm Chuyên Viên", at: "2026-09-05T02:00:00Z" }] } },
   });
   // Before/After ảnh thật (placeholder) cho buổi 1
   await writeBlob("demo/before-linh.png", PNG_BEFORE);
@@ -393,7 +478,7 @@ async function main() {
   await prisma.booking.create({ data: { code: "BK-100010", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(8), durationMinutes: 60, technician: KTV, room: "Phòng 1", status: "NEW", price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
   await prisma.booking.create({ data: { code: "BK-100011", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(9), durationMinutes: 60, technician: KTV, room: "Phòng 1", status: "CONFIRMED", confirmedAt: day(8), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
   await prisma.booking.create({ data: { code: "BK-100012", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(10), durationMinutes: 60, technician: KTV, room: "Phòng 2", status: "ARRIVED", checkedInAt: day(10), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
-  await prisma.booking.create({ data: { code: "BK-100013", customerId: kDangPD.id, serviceId: svcHIFU.id, scheduledAt: day(11), durationMinutes: 60, technician: KTV, master: "Trần Quản Lý", room: "Phòng 3", machine: "Máy HIFU #1", status: "IN_PROGRESS", startedAt: day(11), price: 6_000_000, createdBy: "Nguyễn Lễ Tân", planId: planLinh.id, stageId: planLinh.stages[1].id, sessionNumber: 3, assistants: ["Đỗ Thu Ngân"] } });
+  await prisma.booking.create({ data: { code: "BK-100013", customerId: kDangPD.id, serviceId: svcHIFU.id, scheduledAt: day(11), durationMinutes: 60, technician: KTV, master: "Trần Quản Lý", room: "Phòng 3", machine: "Máy HIFU #1", status: "IN_PROGRESS", startedAt: day(11), price: 6_000_000, createdBy: "Nguyễn Lễ Tân", planId: planLinh.id, stageId: planLinh.stages[1].id, sessionNumber: 4, assistants: ["Đỗ Thu Ngân"] } });
   await prisma.booking.create({ data: { code: "BK-100014", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(13), durationMinutes: 60, technician: KTV, room: "Phòng 2", status: "COMPLETED", completedAt: day(14), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
   await prisma.booking.create({ data: { code: "BK-100015", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(14), durationMinutes: 60, technician: "Lê Thị CSKH", room: "Phòng 1", status: "CANCELLED", cancelReason: "Khách báo bận đột xuất", cancelledBy: "Nguyễn Lễ Tân", cancelledAt: day(9), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
   await prisma.booking.create({ data: { code: "BK-100016", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(15), durationMinutes: 60, technician: "Lê Thị CSKH", room: "Phòng 2", status: "NO_SHOW", noShowReason: "Không liên lạc được", noShowBy: "Nguyễn Lễ Tân", noShowAt: day(16), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });

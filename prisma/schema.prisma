@@ -958,18 +958,36 @@ enum CrmActivityType {
 
 /// Trạng thái phác đồ khách hàng
 enum PlanStatus {
-  DRAFT // Nháp/thiết kế
+  DRAFT // Bản nháp/thiết kế
+  PENDING_APPROVAL // Chờ duyệt
+  APPROVED // Đã duyệt (chưa bắt đầu)
   ACTIVE // Đang thực hiện
   PAUSED // Tạm dừng
   COMPLETED // Hoàn thành
-  CANCELLED // Dừng giữa chừng
+  CANCELLED // Hủy/Dừng giữa chừng
+}
+
+/// Trạng thái một giai đoạn của phác đồ
+enum StageStatus {
+  PENDING // Chưa bắt đầu
+  IN_PROGRESS // Đang thực hiện
+  COMPLETED // Hoàn thành
+  CANCELLED // Hủy
+}
+
+/// Đơn vị tần suất buổi trong giai đoạn (mỗi X ngày/tuần/tháng)
+enum FrequencyUnit {
+  DAY // ngày
+  WEEK // tuần
+  MONTH // tháng
 }
 
 /// Trạng thái một buổi thực hiện
 enum SessionStatus {
-  PLANNED // Đã lên kế hoạch
+  PLANNED // Đã lên kế hoạch (buổi dự kiến)
   IN_PROGRESS // Đang thực hiện
   COMPLETED // Hoàn thành
+  SKIPPED // Bỏ qua (không thực hiện buổi này)
   CANCELLED // Hủy
 }
 
@@ -1092,33 +1110,33 @@ enum ServiceStatus {
 }
 
 model Service {
-  id              String        @id @default(cuid())
-  code            String        @unique // Mã dịch vụ
-  name            String
-  categoryId      String?
-  description     String?
-  status          ServiceStatus @default(ACTIVE)
-  durationMinutes Int? // Thời lượng thực hiện (mặc định khi tạo Lịch hẹn)
-  machineMinutes  Int? // Thời gian chiếm dụng máy (nếu khác thời lượng)
-  roomMinutes     Int? // Thời gian chiếm dụng phòng/giường (nếu cần)
-  standardPrice   Decimal       @default(0) @db.Decimal(18, 2) // Giá chuẩn
-  expectedCost    Decimal?      @db.Decimal(18, 2) // Giá vốn dự kiến (nhạy cảm)
-  process         String? // Quy trình thực hiện
+  id                   String        @id @default(cuid())
+  code                 String        @unique // Mã dịch vụ
+  name                 String
+  categoryId           String?
+  description          String?
+  status               ServiceStatus @default(ACTIVE)
+  durationMinutes      Int? // Thời lượng thực hiện (mặc định khi tạo Lịch hẹn)
+  machineMinutes       Int? // Thời gian chiếm dụng máy (nếu khác thời lượng)
+  roomMinutes          Int? // Thời gian chiếm dụng phòng/giường (nếu cần)
+  standardPrice        Decimal       @default(0) @db.Decimal(18, 2) // Giá chuẩn
+  expectedCost         Decimal?      @db.Decimal(18, 2) // Giá vốn dự kiến (nhạy cảm)
+  process              String? // Quy trình thực hiện
   // --- Chuyên môn (gợi ý — không ép buộc; soft ref sang thư viện) ---
-  technologyIds       String[] @default([]) // công nghệ liên quan
-  protocolIds         String[] @default([]) // protocol liên quan
-  defaultTechnologyId String?
-  defaultProtocolId   String?
-  staffRequirements   Json? // [{role, quantity, required}] — yêu cầu nhân sự (không gán tên)
+  technologyIds        String[]      @default([]) // công nghệ liên quan
+  protocolIds          String[]      @default([]) // protocol liên quan
+  defaultTechnologyId  String?
+  defaultProtocolId    String?
+  staffRequirements    Json? // [{role, quantity, required}] — yêu cầu nhân sự (không gán tên)
   resourceRequirements Json? // {room:{required,default}, bed:{...}, machine:{...}}
-  isActive        Boolean       @default(true) // = (status == ACTIVE), giữ tương thích lọc cũ
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @default(now()) @updatedAt
+  isActive             Boolean       @default(true) // = (status == ACTIVE), giữ tương thích lọc cũ
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @default(now()) @updatedAt
 
-  category         ServiceCategory?          @relation(fields: [categoryId], references: [id])
-  bookings         Booking[]
-  sessions         TreatmentSession[]
-  priceFloor       ServicePriceFloor?
+  category          ServiceCategory?          @relation(fields: [categoryId], references: [id])
+  bookings          Booking[]
+  sessions          TreatmentSession[]
+  priceFloor        ServicePriceFloor?
   materialStandards ServiceMaterialStandard[]
 
   @@map("services")
@@ -1126,16 +1144,16 @@ model Service {
 
 // Vật tư định mức của một dịch vụ (dùng làm "vật tư dự kiến" khi ghi buổi).
 model ServiceMaterialStandard {
-  id              String   @id @default(cuid())
+  id              String  @id @default(cuid())
   serviceId       String
   name            String
-  quantity        Decimal  @default(1) @db.Decimal(14, 3)
+  quantity        Decimal @default(1) @db.Decimal(14, 3)
   unit            String
   note            String?
-  required        Boolean  @default(false)
+  required        Boolean @default(false)
   spaProductId    String? // liên kết mềm SpaProduct
   usageMaterialId String? // liên kết mềm UsageMaterial (kho vật tư sử dụng)
-  orderIndex      Int      @default(0)
+  orderIndex      Int     @default(0)
 
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
@@ -1147,47 +1165,47 @@ model ServiceMaterialStandard {
 // BOOKING (mục 6) — module trung tâm
 // ----------------------------------------------------------------------------
 model Booking {
-  id              String        @id @default(cuid())
-  code            String        @unique // Mã booking
-  customerId      String
-  serviceId       String?
-  scheduledAt     DateTime // Ngày + giờ
-  durationMinutes Int?
-  branch          String?
-  room            String? // Phòng
-  bed             String? // Giường
-  machine         String? // Máy/thiết bị
-  technician      String? // Kỹ thuật viên (tên)
-  master          String? // Master/chuyên gia phụ trách (tên)
-  assistants      String[]      @default([]) // Nhân sự hỗ trợ (tên)
-  performer       String? // Người thực hiện (tên) — giữ tương thích dữ liệu cũ
-  status          BookingStatus @default(NEW)
-  price           Decimal?      @db.Decimal(18, 2) // Giá tại thời điểm booking (bất biến sau hoàn thành)
-  discount        Decimal?      @db.Decimal(18, 2)
-  deposit         Decimal?      @db.Decimal(18, 2)
-  campaign        String? // Nhãn nguồn campaign (text tự do)
-  campaignId      String? // Attribution tới MarketingCampaign (mục 10)
+  id                String        @id @default(cuid())
+  code              String        @unique // Mã booking
+  customerId        String
+  serviceId         String?
+  scheduledAt       DateTime // Ngày + giờ
+  durationMinutes   Int?
+  branch            String?
+  room              String? // Phòng
+  bed               String? // Giường
+  machine           String? // Máy/thiết bị
+  technician        String? // Kỹ thuật viên (tên)
+  master            String? // Master/chuyên gia phụ trách (tên)
+  assistants        String[]      @default([]) // Nhân sự hỗ trợ (tên)
+  performer         String? // Người thực hiện (tên) — giữ tương thích dữ liệu cũ
+  status            BookingStatus @default(NEW)
+  price             Decimal?      @db.Decimal(18, 2) // Giá tại thời điểm booking (bất biến sau hoàn thành)
+  discount          Decimal?      @db.Decimal(18, 2)
+  deposit           Decimal?      @db.Decimal(18, 2)
+  campaign          String? // Nhãn nguồn campaign (text tự do)
+  campaignId        String? // Attribution tới MarketingCampaign (mục 10)
   // --- Liên kết phác đồ (soft ref — không rebuild phác đồ) ---
-  planId          String? // Phác đồ liên quan
-  stageId         String? // Giai đoạn trong phác đồ
-  sessionNumber   Int? // Buổi số mấy trong phác đồ
+  planId            String? // Phác đồ liên quan
+  stageId           String? // Giai đoạn trong phác đồ
+  sessionNumber     Int? // Buổi số mấy trong phác đồ
   // --- Vòng đời lịch hẹn (đổi/hủy/không đến/override) ---
-  createdBy       String? // Người tạo lịch
-  confirmedAt     DateTime? // thời điểm xác nhận
-  checkedInAt     DateTime? // thời điểm khách đến (check-in)
-  startedAt       DateTime? // thời điểm bắt đầu thực hiện
-  completedAt     DateTime? // thời điểm hoàn thành lịch
-  cancelReason    String?
-  cancelledBy     String?
-  cancelledAt     DateTime?
-  noShowReason    String?
-  noShowBy        String?
-  noShowAt        DateTime?
+  createdBy         String? // Người tạo lịch
+  confirmedAt       DateTime? // thời điểm xác nhận
+  checkedInAt       DateTime? // thời điểm khách đến (check-in)
+  startedAt         DateTime? // thời điểm bắt đầu thực hiện
+  completedAt       DateTime? // thời điểm hoàn thành lịch
+  cancelReason      String?
+  cancelledBy       String?
+  cancelledAt       DateTime?
+  noShowReason      String?
+  noShowBy          String?
+  noShowAt          DateTime?
   rescheduleHistory Json? // [{from,to,oldResources,newResources,by,at,reason}]
-  overrideLog     Json? // [{by,at,reason,conflicts}] — đặt đè cảnh báo trùng lịch
-  note            String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  overrideLog       Json? // [{by,at,reason,conflicts}] — đặt đè cảnh báo trùng lịch
+  note              String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   customer          Customer           @relation(fields: [customerId], references: [id])
   service           Service?           @relation(fields: [serviceId], references: [id])
@@ -1228,25 +1246,33 @@ model Assessment {
 // PHÁC ĐỒ KHÁCH HÀNG (mục 11–16) — Treatment Plan + giai đoạn + buổi
 // ----------------------------------------------------------------------------
 model TreatmentPlan {
-  id         String     @id @default(cuid())
-  code       String     @unique
-  customerId String
-  name       String
-  version    Int        @default(1) // phác đồ có version
-  status     PlanStatus @default(DRAFT)
-  goals      String? // Mục tiêu
-  diagnosis  String? // Tình trạng/vấn đề chính
-  totalPrice Decimal?   @db.Decimal(18, 2)
-  discount   Decimal?   @db.Decimal(18, 2)
-  changeLog  Json? // Lịch sử thay đổi version (ai/khi/nội dung/lý do)
-  createdBy  String?
-  note       String?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id               String     @id @default(cuid())
+  code             String     @unique
+  customerId       String
+  name             String
+  version          Int        @default(1) // phác đồ có version
+  status           PlanStatus @default(DRAFT)
+  goals            String? // Mục tiêu / mong muốn
+  diagnosis        String? // Tình trạng/vấn đề chính
+  totalPrice       Decimal?   @db.Decimal(18, 2)
+  discount         Decimal?   @db.Decimal(18, 2)
+  changeLog        Json? // Lịch sử thay đổi version (ai/khi/nội dung/lý do) — giữ tương thích
+  // --- Kế hoạch thời gian (mục 3) ---
+  plannedStartDate DateTime? // Ngày bắt đầu dự kiến
+  plannedEndDate   DateTime? // Ngày kết thúc dự kiến
+  // --- Người phụ trách (mục 3) ---
+  designer         String? // Người thiết kế phác đồ
+  approver         String? // Người duyệt (nếu có)
+  approvedAt       DateTime? // Thời điểm duyệt
+  createdBy        String?
+  note             String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   customer        Customer                @relation(fields: [customerId], references: [id])
   stages          TreatmentStage[]
   sessions        TreatmentSession[]
+  versions        TreatmentPlanVersion[]
   payments        Payment[]
   tasks           Task[]
   recommendations ProductRecommendation[]
@@ -1258,12 +1284,38 @@ model TreatmentPlan {
   @@map("treatment_plans")
 }
 
-model TreatmentStage {
-  id          String  @id @default(cuid())
+/// Lịch sử phiên bản phác đồ (mục 16–18) — mỗi lần "Tạo version mới" ghi 1 dòng, không ghi đè
+model TreatmentPlanVersion {
+  id          String   @id @default(cuid())
   planId      String
-  name        String // Giai đoạn (Chuẩn bị/Can thiệp/Phục hồi/Duy trì...)
-  orderIndex  Int     @default(0)
-  description String?
+  fromVersion Int? // version trước (null nếu là bản gốc)
+  toVersion   Int // version mới
+  reason      String // Lý do thay đổi (bắt buộc)
+  summary     String? // Tóm tắt thay đổi (vd: "Thêm 1 buổi phục hồi; đổi Protocol buổi 4")
+  note        String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+
+  plan TreatmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, toVersion])
+  @@map("treatment_plan_versions")
+}
+
+model TreatmentStage {
+  id               String         @id @default(cuid())
+  planId           String
+  name             String // Giai đoạn (Chuẩn bị/Can thiệp/Phục hồi/Duy trì...)
+  orderIndex       Int            @default(0)
+  description      String? // Mục tiêu giai đoạn
+  // --- Kế hoạch giai đoạn (mục 5–6) ---
+  status           StageStatus    @default(PENDING)
+  plannedStartDate DateTime? // Ngày bắt đầu dự kiến
+  plannedEndDate   DateTime? // Ngày kết thúc dự kiến
+  plannedSessions  Int? // Số buổi dự kiến
+  frequencyValue   Int? // Tần suất: mỗi X ...
+  frequencyUnit    FrequencyUnit? // ... ngày/tuần/tháng
+  note             String?
 
   plan     TreatmentPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
   sessions TreatmentSession[]
@@ -1303,7 +1355,15 @@ model TreatmentSession {
   price                Decimal?      @db.Decimal(18, 2)
   note                 String?
   checkedBy            String? // Người kiểm tra/phê duyệt
-  // --- Treatment Plan Designer: buổi có thể phối công nghệ + brand protocol ---
+  // --- KẾ HOẠCH riêng cho buổi (mục 8, 14) — KHÔNG bị ghi đè bởi thực tế ---
+  plannedServiceId     String? // Dịch vụ dự kiến
+  plannedTechnologyId  String? // Công nghệ dự kiến
+  plannedProtocolId    String? // Protocol dự kiến
+  plannedStaff         Json? // Vai trò nhân sự dự kiến [{role, quantity}]
+  plannedDate          DateTime? // Ngày dự kiến (kế hoạch — tách khỏi scheduledAt của lịch hẹn)
+  intervalDays         Int? // Khoảng cách với buổi trước (ngày)
+  versionAtExecution   Int? // Ghim version phác đồ tại thời điểm thực hiện (mục 13, 19)
+  // --- Treatment Plan Designer: buổi có thể phối công nghệ + brand protocol (THỰC TẾ khi ghi nhận) ---
   technologyId         String?
   brandProtocolId      String?
   orderIndex           Int           @default(0) // thứ tự buổi (kéo–thả sắp xếp)

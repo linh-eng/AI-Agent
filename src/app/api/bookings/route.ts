@@ -52,7 +52,9 @@ function summarizeConflicts(conflicts: { label: string; value: string; bookingCo
 
 export const POST = handle(async (req) => {
   const session = await requirePermission(PERMISSIONS.BOOKING_WRITE);
-  const { allowConflict, allowBelowFloor, overrideReason, ...parsed } = bookingCreateSchema.parse(await req.json());
+  const { allowConflict, allowBelowFloor, overrideReason, sessionId, ...parsed } = bookingCreateSchema.parse(
+    await req.json(),
+  );
   const code = parsed.code ?? sequentialCode("BK", await prisma.booking.count());
 
   // Tự lấy thời lượng chuẩn từ dịch vụ nếu chưa nhập (mục 5).
@@ -125,6 +127,23 @@ export const POST = handle(async (req) => {
     },
     include: { customer: { select: { fullName: true } }, service: { select: { name: true } } },
   });
+
+  // Gắn ngược buổi dự kiến của phác đồ (mục 11–12): buổi ↔ lịch hẹn, giữ 1 buổi ↔ 1 booking.
+  if (sessionId) {
+    try {
+      await prisma.treatmentSession.update({
+        where: { id: sessionId },
+        data: {
+          bookingId: booking.id,
+          ...(booking.scheduledAt ? { scheduledAt: booking.scheduledAt } : {}),
+          ...(parsed.planId ? { planId: parsed.planId } : {}),
+          ...(parsed.stageId ? { stageId: parsed.stageId } : {}),
+        },
+      });
+    } catch {
+      // buổi không tồn tại hoặc đã gắn booking khác — bỏ qua, không chặn tạo lịch
+    }
+  }
 
   // Timeline khách + audit (mục 27).
   await logBookingActivity(booking.customerId, `Tạo lịch hẹn ${booking.code}${booking.service ? " · " + booking.service.name : ""}`, session.name);

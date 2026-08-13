@@ -32,18 +32,31 @@ export const crmActivityTypeEnum = z.enum([
   "AFTERCARE",
   "OTHER",
 ]);
-export const planStatusEnum = z.enum(["DRAFT", "ACTIVE", "PAUSED", "COMPLETED", "CANCELLED"]);
-export const sessionStatusEnum = z.enum(["PLANNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]);
+export const planStatusEnum = z.enum([
+  "DRAFT",
+  "PENDING_APPROVAL",
+  "APPROVED",
+  "ACTIVE",
+  "PAUSED",
+  "COMPLETED",
+  "CANCELLED",
+]);
+export const stageStatusEnum = z.enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]);
+export const frequencyUnitEnum = z.enum(["DAY", "WEEK", "MONTH"]);
+export const sessionStatusEnum = z.enum(["PLANNED", "IN_PROGRESS", "COMPLETED", "SKIPPED", "CANCELLED"]);
 export const paymentMethodEnum = z.enum(["CASH", "CARD", "TRANSFER", "EWALLET", "OTHER"]);
 export const taskPriorityEnum = z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]);
 export const taskStatusEnum = z.enum(["OPEN", "IN_PROGRESS", "DONE", "CANCELLED"]);
 
 // helper: coerce datetime từ string ISO / date input
+// Giữ `undefined` khi client KHÔNG gửi field (Prisma bỏ qua → không ghi đè),
+// chỉ set `null` khi client gửi null tường minh (xóa giá trị). Tránh bug PATCH
+// một phần vô tình xóa cột ngày không kèm theo.
 const dateOpt = z
   .union([z.string(), z.date()])
   .optional()
   .nullable()
-  .transform((v) => (v ? new Date(v) : null));
+  .transform((v) => (v === undefined ? undefined : v ? new Date(v) : null));
 const dateReq = z.union([z.string(), z.date()]).transform((v) => new Date(v));
 const money = z.coerce.number().nonnegative().optional().nullable();
 // Prisma Json không nhận `null` (chỉ Json/undefined) -> chuyển null thành undefined
@@ -159,6 +172,7 @@ export const bookingCreateSchema = z.object({
   planId: z.string().optional().nullable(),
   stageId: z.string().optional().nullable(),
   sessionNumber: z.coerce.number().int().positive().optional().nullable(),
+  sessionId: z.string().optional().nullable(), // gắn ngược buổi dự kiến (mục 11–12) — không phải cột Booking
   status: bookingStatusEnum.default("NEW"),
   price: money,
   discount: money,
@@ -205,9 +219,17 @@ export const assessmentCreateSchema = z.object({
 
 // ----- Phác đồ + giai đoạn + buổi -----
 export const stageInputSchema = z.object({
+  id: z.string().optional(), // dùng khi cập nhật giai đoạn có sẵn
   name: z.string().min(1),
   orderIndex: z.coerce.number().int().default(0),
-  description: z.string().optional().nullable(),
+  description: z.string().optional().nullable(), // mục tiêu giai đoạn
+  status: stageStatusEnum.optional(),
+  plannedStartDate: dateOpt,
+  plannedEndDate: dateOpt,
+  plannedSessions: z.coerce.number().int().nonnegative().optional().nullable(),
+  frequencyValue: z.coerce.number().int().positive().optional().nullable(),
+  frequencyUnit: frequencyUnitEnum.optional().nullable(),
+  note: z.string().optional().nullable(),
 });
 export const treatmentPlanCreateSchema = z.object({
   code: z.string().min(1).optional(),
@@ -218,6 +240,10 @@ export const treatmentPlanCreateSchema = z.object({
   diagnosis: z.string().optional().nullable(),
   totalPrice: money,
   discount: money,
+  plannedStartDate: dateOpt,
+  plannedEndDate: dateOpt,
+  designer: z.string().optional().nullable(),
+  approver: z.string().optional().nullable(),
   createdBy: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
   stages: z.array(stageInputSchema).default([]),
@@ -229,11 +255,39 @@ export const treatmentPlanUpdateSchema = z.object({
   diagnosis: z.string().optional().nullable(),
   totalPrice: money,
   discount: money,
+  plannedStartDate: dateOpt,
+  plannedEndDate: dateOpt,
+  designer: z.string().optional().nullable(),
+  approver: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
-  // tạo version mới: ghi lý do thay đổi
+  // tạo version mới: ghi lý do thay đổi (giữ tương thích với đường cũ)
   bumpVersion: z.boolean().optional(),
   changeReason: z.string().optional().nullable(),
   changedBy: z.string().optional().nullable(),
+});
+// Tạo version mới (mục 16–17): lý do bắt buộc, tùy chọn clone cấu trúc giai đoạn/buổi tương lai
+export const planVersionCreateSchema = z.object({
+  reason: z.string().min(1, "Nhập lý do thay đổi"),
+  summary: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+  createdBy: z.string().optional().nullable(),
+});
+// Cập nhật 1 giai đoạn (mục 5) — endpoint /api/treatment-stages/[id]
+export const stageUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  orderIndex: z.coerce.number().int().optional(),
+  description: z.string().optional().nullable(),
+  status: stageStatusEnum.optional(),
+  plannedStartDate: dateOpt,
+  plannedEndDate: dateOpt,
+  plannedSessions: z.coerce.number().int().nonnegative().optional().nullable(),
+  frequencyValue: z.coerce.number().int().positive().optional().nullable(),
+  frequencyUnit: frequencyUnitEnum.optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+// Thêm 1 giai đoạn vào phác đồ có sẵn — endpoint POST /api/treatment-stages
+export const stageCreateSchema = stageInputSchema.extend({
+  planId: z.string().min(1),
 });
 
 export const sessionCreateSchema = z.object({
@@ -258,6 +312,13 @@ export const sessionCreateSchema = z.object({
   preCare: z.string().optional().nullable(),
   postCare: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
+  // --- Kế hoạch riêng cho buổi (mục 8, 14) ---
+  plannedServiceId: z.string().optional().nullable(),
+  plannedTechnologyId: z.string().optional().nullable(),
+  plannedProtocolId: z.string().optional().nullable(),
+  plannedStaff: z.any().optional().nullable(),
+  plannedDate: dateOpt,
+  intervalDays: z.coerce.number().int().nonnegative().optional().nullable(),
 });
 export const sessionUpdateSchema = z.object({
   stageId: z.string().optional().nullable(),
@@ -290,6 +351,17 @@ export const sessionUpdateSchema = z.object({
   price: money,
   note: z.string().optional().nullable(),
   checkedBy: z.string().optional().nullable(),
+  // --- Kế hoạch riêng cho buổi (chỉ sửa khi thiết kế kế hoạch, KHÔNG dùng lúc ghi nhận thực tế) ---
+  plannedServiceId: z.string().optional().nullable(),
+  plannedTechnologyId: z.string().optional().nullable(),
+  plannedProtocolId: z.string().optional().nullable(),
+  plannedStaff: z.any().optional().nullable(),
+  plannedDate: dateOpt,
+  intervalDays: z.coerce.number().int().nonnegative().optional().nullable(),
+});
+// Tạo lịch hẹn từ 1 buổi dự kiến (mục 11) — trả về payload prefill cho form Lịch hẹn
+export const sessionToBookingSchema = z.object({
+  bookingId: z.string().min(1), // booking vừa tạo ở module Lịch hẹn → gắn ngược vào buổi
 });
 
 // ----- Thanh toán -----

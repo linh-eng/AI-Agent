@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, formatDate } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import { PLAN_STATUS_LABEL, PLAN_STATUS_TONE } from "@/lib/clinic-labels";
@@ -22,6 +22,8 @@ interface Plan {
   version: number;
   status: string;
   totalPrice?: string | number | null;
+  plannedStartDate?: string | null;
+  designer?: string | null;
   customer: { code: string; fullName: string };
   _count: { sessions: number; stages: number };
 }
@@ -29,6 +31,7 @@ interface Opt { id: string; code: string; fullName: string }
 
 // Giai đoạn gợi ý (mục 7 phần bổ sung): Chuẩn bị → Can thiệp → Phục hồi → Duy trì
 const DEFAULT_STAGES = ["Chuẩn bị", "Can thiệp", "Phục hồi", "Duy trì"];
+const PLAN_STATUSES = ["DRAFT", "PENDING_APPROVAL", "APPROVED", "ACTIVE", "PAUSED", "COMPLETED", "CANCELLED"];
 
 export default function TreatmentPlansPage() {
   const canWrite = useCan(PERMISSIONS.TREATMENT_WRITE);
@@ -37,7 +40,8 @@ export default function TreatmentPlansPage() {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customers, setCustomers] = useState<Opt[]>([]);
-  const [form, setForm] = useState({ customerId: "", name: "", diagnosis: "", goals: "", totalPrice: "" });
+  const [statusFilter, setStatusFilter] = useState("");
+  const [form, setForm] = useState({ customerId: "", name: "", diagnosis: "", goals: "", totalPrice: "", plannedStartDate: "", plannedEndDate: "", designer: "" });
   const [stages, setStages] = useState<string[]>([...DEFAULT_STAGES]);
 
   async function load() {
@@ -45,6 +49,8 @@ export default function TreatmentPlansPage() {
     try { setRows(await apiFetch<Plan[]>("/api/treatment-plans")); } finally { setLoading(false); }
   }
   useEffect(() => { load(); apiFetch<Opt[]>("/api/customers").then(setCustomers).catch(() => {}); }, []);
+
+  const shown = statusFilter ? rows.filter((r) => r.status === statusFilter) : rows;
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -56,11 +62,14 @@ export default function TreatmentPlansPage() {
         diagnosis: form.diagnosis || undefined,
         goals: form.goals || undefined,
         totalPrice: form.totalPrice ? Number(form.totalPrice) : undefined,
+        plannedStartDate: form.plannedStartDate || undefined,
+        plannedEndDate: form.plannedEndDate || undefined,
+        designer: form.designer || undefined,
         stages: stages.filter(Boolean).map((name, i) => ({ name, orderIndex: i })),
       };
       await apiFetch("/api/treatment-plans", { method: "POST", body: JSON.stringify(body) });
       setOpen(false);
-      setForm({ customerId: "", name: "", diagnosis: "", goals: "", totalPrice: "" });
+      setForm({ customerId: "", name: "", diagnosis: "", goals: "", totalPrice: "", plannedStartDate: "", plannedEndDate: "", designer: "" });
       setStages([...DEFAULT_STAGES]);
       load();
     } catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); }
@@ -73,26 +82,35 @@ export default function TreatmentPlansPage() {
         description="Treatment Plan riêng cho từng khách — nhiều giai đoạn, nhiều buổi, có version."
         action={canWrite && <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Tạo phác đồ</Button>}
       />
+      <div className="mb-3 flex items-center gap-2">
+        <Label className="text-sm text-muted-foreground">Trạng thái:</Label>
+        <Select className="h-8 w-44" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="">— Tất cả —</option>
+          {PLAN_STATUSES.map((s) => <option key={s} value={s}>{PLAN_STATUS_LABEL[s]}</option>)}
+        </Select>
+      </div>
       <Card>
         <CardContent className="p-0">
           <Table>
             <THead>
-              <TR><TH>Mã</TH><TH>Tên</TH><TH>Khách hàng</TH><TH>Ver</TH><TH>Giai đoạn</TH><TH>Buổi</TH><TH className="text-right">Giá</TH><TH>Trạng thái</TH></TR>
+              <TR><TH>Mã</TH><TH>Tên</TH><TH>Khách hàng</TH><TH>Ver</TH><TH>Bắt đầu</TH><TH>Giai đoạn</TH><TH>Buổi</TH><TH>Phụ trách</TH><TH className="text-right">Giá</TH><TH>Trạng thái</TH></TR>
             </THead>
             <TBody>
               {loading ? (
-                <TR><TD colSpan={8} className="py-8 text-center text-muted-foreground">Đang tải...</TD></TR>
-              ) : rows.length === 0 ? (
-                <TR><TD colSpan={8} className="py-8 text-center text-muted-foreground">Chưa có phác đồ</TD></TR>
+                <TR><TD colSpan={10} className="py-8 text-center text-muted-foreground">Đang tải...</TD></TR>
+              ) : shown.length === 0 ? (
+                <TR><TD colSpan={10} className="py-8 text-center text-muted-foreground">Chưa có phác đồ</TD></TR>
               ) : (
-                rows.map((p) => (
+                shown.map((p) => (
                   <TR key={p.id}>
                     <TD className="font-mono font-medium"><Link href={`/treatment-plans/${p.id}`} className="text-primary hover:underline">{p.code}</Link></TD>
                     <TD><Link href={`/treatment-plans/${p.id}`} className="hover:underline">{p.name}</Link></TD>
                     <TD>{p.customer.fullName}</TD>
                     <TD>v{p.version}</TD>
+                    <TD>{p.plannedStartDate ? formatDate(p.plannedStartDate) : "—"}</TD>
                     <TD>{p._count.stages}</TD>
                     <TD>{p._count.sessions}</TD>
+                    <TD>{p.designer ?? "—"}</TD>
                     <TD className="text-right">{p.totalPrice ? formatNumber(Number(p.totalPrice)) + " ₫" : "—"}</TD>
                     <TD><Badge tone={PLAN_STATUS_TONE[p.status]}>{PLAN_STATUS_LABEL[p.status]}</Badge></TD>
                   </TR>
@@ -114,8 +132,15 @@ export default function TreatmentPlansPage() {
           </div>
           <div className="space-y-1.5"><Label>Tên phác đồ *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
           <div className="space-y-1.5"><Label>Tình trạng / vấn đề chính</Label><Input value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label>Mục tiêu</Label><Input value={form.goals} onChange={(e) => setForm({ ...form, goals: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label>Tổng giá dự kiến (₫)</Label><Input type="number" value={form.totalPrice} onChange={(e) => setForm({ ...form, totalPrice: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>Mục tiêu / mong muốn</Label><Input value={form.goals} onChange={(e) => setForm({ ...form, goals: e.target.value })} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5"><Label>Ngày bắt đầu dự kiến</Label><Input type="date" value={form.plannedStartDate} onChange={(e) => setForm({ ...form, plannedStartDate: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Ngày kết thúc dự kiến</Label><Input type="date" value={form.plannedEndDate} onChange={(e) => setForm({ ...form, plannedEndDate: e.target.value })} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5"><Label>Tổng giá dự kiến (₫)</Label><Input type="number" value={form.totalPrice} onChange={(e) => setForm({ ...form, totalPrice: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Người thiết kế</Label><Input value={form.designer} onChange={(e) => setForm({ ...form, designer: e.target.value })} placeholder="Mặc định = người tạo" /></div>
+          </div>
           <div className="space-y-1.5">
             <Label>Giai đoạn</Label>
             {stages.map((s, i) => (

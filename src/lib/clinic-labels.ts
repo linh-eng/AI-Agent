@@ -49,32 +49,67 @@ export const CRM_TYPE_LABEL: Record<string, string> = {
 };
 
 export const PLAN_STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Nháp",
+  DRAFT: "Bản nháp",
+  PENDING_APPROVAL: "Chờ duyệt",
+  APPROVED: "Đã duyệt",
   ACTIVE: "Đang thực hiện",
   PAUSED: "Tạm dừng",
   COMPLETED: "Hoàn thành",
-  CANCELLED: "Đã dừng",
+  CANCELLED: "Hủy",
 };
 
 export const PLAN_STATUS_TONE: Record<string, Tone> = {
   DRAFT: "muted",
+  PENDING_APPROVAL: "warning",
+  APPROVED: "default",
   ACTIVE: "success",
   PAUSED: "warning",
   COMPLETED: "default",
   CANCELLED: "danger",
 };
 
-export const SESSION_STATUS_LABEL: Record<string, string> = {
-  PLANNED: "Dự kiến",
+export const STAGE_STATUS_LABEL: Record<string, string> = {
+  PENDING: "Chưa bắt đầu",
   IN_PROGRESS: "Đang thực hiện",
   COMPLETED: "Hoàn thành",
   CANCELLED: "Hủy",
 };
 
-export const SESSION_STATUS_TONE: Record<string, Tone> = {
-  PLANNED: "muted",
+export const STAGE_STATUS_TONE: Record<string, Tone> = {
+  PENDING: "muted",
   IN_PROGRESS: "warning",
   COMPLETED: "success",
+  CANCELLED: "danger",
+};
+
+// Nhãn tần suất — đơn vị (mục 6)
+export const FREQUENCY_UNIT_LABEL: Record<string, string> = {
+  DAY: "ngày",
+  WEEK: "tuần",
+  MONTH: "tháng",
+};
+
+// Trạng thái buổi dự kiến (mục 10) — có thể derive từ Booking/Session, đây là nhãn hiển thị.
+// Ngoài 5 giá trị enum SessionStatus, còn có các nhãn derive: SCHEDULED/ARRIVED/RESCHEDULED.
+export const SESSION_STATUS_LABEL: Record<string, string> = {
+  PLANNED: "Chưa lên lịch",
+  SCHEDULED: "Đã lên lịch",
+  ARRIVED: "Khách đã đến",
+  IN_PROGRESS: "Đang thực hiện",
+  COMPLETED: "Hoàn thành",
+  RESCHEDULED: "Dời lịch",
+  SKIPPED: "Bỏ qua",
+  CANCELLED: "Hủy",
+};
+
+export const SESSION_STATUS_TONE: Record<string, Tone> = {
+  PLANNED: "muted",
+  SCHEDULED: "default",
+  ARRIVED: "default",
+  IN_PROGRESS: "warning",
+  COMPLETED: "success",
+  RESCHEDULED: "warning",
+  SKIPPED: "muted",
   CANCELLED: "danger",
 };
 
@@ -256,6 +291,7 @@ export function statusLabel(value?: string | null): string {
   return (
     BOOKING_STATUS_LABEL[value] ??
     PLAN_STATUS_LABEL[value] ??
+    STAGE_STATUS_LABEL[value] ??
     SESSION_STATUS_LABEL[value] ??
     TASK_STATUS_LABEL[value] ??
     LIBRARY_STATUS_LABEL[value] ??

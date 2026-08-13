@@ -34,12 +34,20 @@ export const POST = handle(async (req) => {
       ...planData,
       code,
       createdBy: parsed.createdBy ?? session.name,
+      designer: parsed.designer ?? session.name,
       stages: stages.length
         ? {
             create: stages.map((s, i) => ({
               name: s.name,
               orderIndex: s.orderIndex ?? i,
               description: s.description ?? null,
+              status: s.status ?? undefined,
+              plannedStartDate: s.plannedStartDate ?? null,
+              plannedEndDate: s.plannedEndDate ?? null,
+              plannedSessions: s.plannedSessions ?? null,
+              frequencyValue: s.frequencyValue ?? null,
+              frequencyUnit: s.frequencyUnit ?? null,
+              note: s.note ?? null,
             })),
           }
         : undefined,
