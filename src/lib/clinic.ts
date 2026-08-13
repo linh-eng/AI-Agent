@@ -124,7 +124,7 @@ export async function buildCustomerTimeline(customerId: string): Promise<Timelin
       prisma.treatmentPlan.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
       prisma.treatmentSession.findMany({
         where: { customerId },
-        include: { staff: { orderBy: { createdAt: "asc" } } },
+        include: { staff: { orderBy: { createdAt: "asc" } }, review: true },
         orderBy: { createdAt: "desc" },
       }),
       prisma.payment.findMany({ where: { customerId }, orderBy: { paidAt: "desc" } }),
@@ -186,7 +186,11 @@ export async function buildCustomerTimeline(customerId: string): Promise<Timelin
     const staffLine = (s.staff ?? [])
       .map((st) => `${st.staffName} (${SESSION_STAFF_ROLE_VN[st.role] ?? st.role})`)
       .join(", ");
-    const detail = [s.customerFeedback ?? s.objective ?? undefined, staffLine ? `Nhân sự: ${staffLine}` : undefined]
+    const rv = s.review;
+    const reviewLine = rv && (rv.satisfactionScore || rv.technicianScore)
+      ? `Đánh giá: hài lòng ${rv.satisfactionScore ?? "—"}/5${rv.technicianScore ? `, KTV ${rv.technicianScore}/5` : ""}`
+      : undefined;
+    const detail = [s.customerFeedback ?? s.objective ?? undefined, staffLine ? `Nhân sự: ${staffLine}` : undefined, reviewLine]
       .filter(Boolean)
       .join(" · ");
     events.push({

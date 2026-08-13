@@ -254,6 +254,15 @@ async function main() {
   // Phân công buổi RF #1: KTV chính + Master kiểm tra (tổng phí 700k).
   await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvKTV.id, staffName: nvKTV.fullName, role: "PRIMARY", fee: 200_000 } });
   await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvMaster.id, staffName: nvMaster.fullName, role: "CHECKER", fee: 500_000 } });
+
+  // --- Đánh giá sau buổi (mục 36–37) ---
+  await prisma.sessionReview.create({
+    data: {
+      sessionId: sLinh1.id, customerId: kDangPD.id, satisfactionScore: 5, technicianScore: 5, technicianName: "Phạm Chuyên Viên",
+      comment: "Rất hài lòng, da săn chắc rõ.", wouldReturn: true,
+      technicianReport: "Da đáp ứng tốt với RF, không kích ứng. Đề xuất buổi HIFU đúng lịch.", reviewedBy: "Lê Thị CSKH",
+    },
+  });
   const sLinh2 = await prisma.treatmentSession.create({
     data: {
       planId: planLinh.id, stageId: planLinh.stages[1].id, customerId: kDangPD.id, serviceId: svcHIFU.id,

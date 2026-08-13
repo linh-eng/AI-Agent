@@ -1269,6 +1269,7 @@ model TreatmentSession {
   materialUsages MaterialUsage[]
   mediaAssets    MediaAsset[]
   staff          SessionStaff[]
+  review         SessionReview?
 
   @@index([planId, sessionNumber])
   @@index([customerId])
@@ -2348,4 +2349,28 @@ model FollowUpStep {
 
   @@index([templateId])
   @@map("followup_steps")
+}
+
+// =============================================================================
+// ĐÁNH GIÁ SAU BUỔI (mục 36–37) — Khách chấm điểm hài lòng + đánh giá kỹ thuật
+// viên; kèm BÁO CÁO của kỹ thuật viên sau buổi. 1 đánh giá / buổi (upsert).
+// =============================================================================
+model SessionReview {
+  id                String   @id @default(cuid())
+  sessionId         String   @unique
+  customerId        String
+  satisfactionScore Int? // điểm hài lòng chung (1–5)
+  technicianScore   Int? // điểm đánh giá kỹ thuật viên (1–5)
+  technicianName    String? // KTV được đánh giá (snapshot tên)
+  comment           String? // nhận xét của khách
+  wouldReturn       Boolean? // khách sẽ quay lại?
+  technicianReport  String? // báo cáo của KTV sau buổi (nội bộ)
+  reviewedBy        String? // người ghi nhận
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  session TreatmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("session_reviews")
 }

@@ -16,6 +16,7 @@ import { MediaUpload } from "@/components/media-upload";
 import { SessionMediaShare } from "@/components/session-media-share";
 import { SpaMaterialConsume } from "@/components/spa-material-consume";
 import { SessionStaff } from "@/components/session-staff";
+import { SessionReview } from "@/components/session-review";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import {
@@ -521,6 +522,13 @@ function RecordSessionModal({ session, onClose, onSubmit, error, canFinance, can
             <Label>Nhân sự thực hiện buổi</Label>
             <p className="text-[11px] text-muted-foreground">Phân công đa vai trò (chính/hỗ trợ/master/kiểm tra/tư vấn) kèm phí. Nhân sự & phí lưu theo buổi, thể hiện trong hồ sơ khách.</p>
             <SessionStaff sessionId={session.id} canWrite={canWrite} />
+          </div>
+        )}
+        {session.id && (
+          <div className="space-y-1.5">
+            <Label>Đánh giá & báo cáo sau buổi</Label>
+            <p className="text-[11px] text-muted-foreground">Khách chấm hài lòng + đánh giá kỹ thuật viên; kèm báo cáo chuyên môn của KTV. Lưu độc lập với nút Lưu chính.</p>
+            <SessionReview sessionId={session.id} canWrite={canWrite} defaultTechnician={session.performer ?? ""} />
           </div>
         )}
         <div className="space-y-1.5"><Label>Phản hồi của khách</Label><Input value={f.customerFeedback} onChange={(e) => setF({ ...f, customerFeedback: e.target.value })} /></div>

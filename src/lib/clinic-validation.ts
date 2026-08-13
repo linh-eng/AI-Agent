@@ -307,6 +307,17 @@ export const sessionStaffCreateSchema = z.object({
   note: z.string().optional().nullable(),
 });
 
+// ----- Đánh giá sau buổi (mục 36–37) -----
+export const sessionReviewUpsertSchema = z.object({
+  sessionId: z.string().min(1),
+  satisfactionScore: z.coerce.number().int().min(1).max(5).optional().nullable(),
+  technicianScore: z.coerce.number().int().min(1).max(5).optional().nullable(),
+  technicianName: z.string().optional().nullable(),
+  comment: z.string().optional().nullable(),
+  wouldReturn: z.boolean().optional().nullable(),
+  technicianReport: z.string().optional().nullable(),
+});
+
 // ----- CSKH follow-up (mục 31–35) -----
 export const deliveryChannelEnum = z.enum(["IN_PERSON", "PORTAL", "EMAIL", "ZALO", "WHATSAPP", "SMS"]);
 export const followUpTriggerEnum = z.enum(["AFTER_SERVICE", "AFTER_SESSION", "BIRTHDAY", "MANUAL"]);

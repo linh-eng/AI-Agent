@@ -708,6 +708,48 @@ mừng sinh nhật (BIRTHDAY). 2 khách có sinh nhật gần (KH-100002 20/08, 
 Tự động kích hoạt quy trình khi hoàn thành buổi/dịch vụ (hiện áp thủ công); gửi tin thật qua Zalo/SMS/Email
 (hiện tạo việc để nhân viên chủ động liên hệ); chương trình loyalty/tích điểm; báo cáo hiệu quả follow-up.
 
+## Đánh giá sau buổi & Before/After (mục 36–37, 8)
+
+Phase sau MASTER PROMPT, ưu tiên #5. **Đã xác thực PostgreSQL 16 thật**: tsc sạch · lint 0 lỗi · build OK ·
+**88 test pass** (thêm `test/review.test.ts`, 3 test) · migrate deploy (16 migration) + seed + seed:demo sạch.
+
+### Migration — `F_session_review`
+`session_reviews` (1-1 với TreatmentSession, `sessionId` unique). Additive, **0 lệnh DROP**. Tổng **16
+migration**: `0_init` … `E_followup` → `F_session_review`.
+
+### Dữ liệu & service — `src/lib/review.ts`
+`SessionReview`: `satisfactionScore` (1–5, hài lòng chung) · `technicianScore` (1–5, chấm KTV) ·
+`technicianName` · `comment` (nhận xét khách) · `wouldReturn` · `technicianReport` (báo cáo KTV, nội bộ) ·
+`reviewedBy`. **1 đánh giá / buổi (upsert)**. `reviewSummary()` → điểm hài lòng/KTV TB, tỷ lệ quay lại, điểm
+theo từng KTV (mục 37). `beforeAfterGroups(filter)` → gom `MediaAsset` kind BEFORE_IMAGE/AFTER_IMAGE **theo
+buổi** (kèm khách/dịch vụ/KTV/ngày), lọc theo khách/dịch vụ/khoảng ngày (mục 8).
+
+### API
+`/api/session-reviews` (GET `?sessionId` trả 1 bản / `?customerId` trả list; POST upsert cần `treatment.write`)
+· `/api/session-reviews/summary` (tổng hợp đánh giá) · `/api/before-after` (nhóm ảnh trước–sau, lọc; cần
+`customer.read`). Ảnh phục vụ qua `/api/media/[id]` (đã có, kiểm quyền).
+
+### UI
+- **Ghi nhận buổi** (`/treatment-plans/[id]`) thêm mục **"Đánh giá & báo cáo sau buổi"**
+  (`components/session-review.tsx`): sao hài lòng + sao KTV + tên KTV + nhận xét + "sẽ quay lại" + **báo cáo
+  KTV**; lưu độc lập (upsert).
+- Sidebar **Spa & CRM → Before/After & Đánh giá** (`/before-after`): thẻ tổng hợp (số đánh giá, hài lòng TB,
+  điểm KTV TB, tỷ lệ quay lại) + **đánh giá theo KTV** + **bộ lọc** (khách/dịch vụ/ngày) + lưới **cặp
+  Trước–Sau theo buổi** (bấm ảnh phóng to so sánh).
+- **Timeline khách** ghi điểm đánh giá vào sự kiện buổi ("Đánh giá: hài lòng 5/5, KTV 5/5").
+
+### RBAC
+Đọc đánh giá/summary = `treatment.read`; ghi = `treatment.write`. Xem Before/After = `customer.read` (ảnh vẫn
+qua route kiểm quyền, không public). Báo cáo KTV là nội bộ (không lộ qua Cổng khách).
+
+### Demo
+Buổi RF #1 (KH-100004): đánh giá hài lòng 5/5, KTV 5/5, "sẽ quay lại", báo cáo KTV; kèm 2 ảnh Before/After đã
+seed (đã chia sẻ cho khách). Trang `/before-after` hiển thị cặp ảnh + tổng hợp điểm.
+
+### Còn lại (phase sau)
+Khách tự đánh giá qua **Cổng khách** (hiện nhân viên ghi hộ); nhãn/mốc thời gian trên ảnh; so sánh trượt
+(slider) trước–sau; báo cáo hiệu suất KTV theo kỳ; gắn KTV được đánh giá từ danh sách nhân sự (hiện nhập tên).
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

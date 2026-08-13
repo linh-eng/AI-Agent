@@ -38,6 +38,7 @@ import {
   Wallet,
   Settings,
   MessageCircleHeart,
+  Images,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
@@ -55,6 +56,7 @@ const NAV_GROUPS = [
       { href: "/bookings", label: "Booking", icon: CalendarDays },
       { href: "/services", label: "Dịch vụ", icon: Sparkles },
       { href: "/treatment-plans", label: "Phác đồ", icon: HeartPulse },
+      { href: "/before-after", label: "Before/After & Đánh giá", icon: Images },
       { href: "/proposals", label: "Báo giá", icon: FileSpreadsheet },
       { href: "/invoices", label: "Hóa đơn", icon: Receipt },
       { href: "/payments", label: "Thanh toán", icon: Wallet },
