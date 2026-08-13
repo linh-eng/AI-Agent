@@ -98,9 +98,9 @@ async function main() {
     where: { code: "DV-HIFU-01" }, update: {},
     create: { code: "DV-HIFU-01", name: "Nâng cơ HIFU", categoryId: catLaser.id, durationMinutes: 60, standardPrice: 6_000_000, expectedCost: 1_800_000 },
   });
-  await prisma.service.upsert({
-    where: { code: "DV-PEEL-01" }, update: {},
-    create: { code: "DV-PEEL-01", name: "Peel da sinh học", categoryId: catFacial.id, durationMinutes: 40, standardPrice: 900_000, expectedCost: 300_000 },
+  const svcFacial = await prisma.service.upsert({
+    where: { code: "DV-FACIAL-01" }, update: {},
+    create: { code: "DV-FACIAL-01", name: "Facial làm sạch sâu", categoryId: catFacial.id, durationMinutes: 60, standardPrice: 900_000, expectedCost: 300_000 },
   });
 
   const spKlappSerum = await prisma.spaProduct.upsert({
@@ -117,7 +117,7 @@ async function main() {
   });
 
   // --- Protocol DEMO (nội bộ, nhiều bước, có VERSION) — MINH HỌA ---
-  await prisma.brandProtocol.upsert({
+  const protoDemo = await prisma.brandProtocol.upsert({
     where: { code: "PROTO-DEMO-GLOW" }, update: {},
     create: {
       code: "PROTO-DEMO-GLOW",
@@ -140,6 +140,47 @@ async function main() {
       recommendedCount: 8,
       changeLog: { items: [{ version: 2, note: "DEMO: thêm bước điện di Vitamin C", at: "2026-08-01" }] },
       createdBy: "Phạm Chuyên Viên",
+    },
+  });
+
+  // --- CẤU HÌNH DỊCH VỤ đầy đủ (mục 3): công nghệ/protocol/nhân sự/tài nguyên/vật tư định mức ---
+  // Dịch vụ 1 — RF nâng cơ mặt (Công nghệ cao): RF, KTV chính bắt buộc, Máy RF, vật tư định mức.
+  await prisma.service.update({
+    where: { id: svcRF.id },
+    data: {
+      status: "ACTIVE", machineMinutes: 45, technologyIds: [techRF.id], defaultTechnologyId: techRF.id,
+      protocolIds: [protoDemo.id], defaultProtocolId: protoDemo.id,
+      staffRequirements: [{ role: "Kỹ thuật viên", quantity: 1, required: true }],
+      resourceRequirements: { room: { required: true, default: "Phòng 2" }, machine: { required: true, default: "Máy RF #1" }, bed: { required: false, default: "" } },
+      materialStandards: { deleteMany: {}, create: [{ name: "Gel dẫn RF", quantity: 1, unit: "lần", required: true, orderIndex: 0 }] },
+    },
+  });
+  // Dịch vụ 2 — Nâng cơ HIFU: HIFU, KTV chính + Master bắt buộc + Hỗ trợ tùy chọn, Máy HIFU, vật tư.
+  await prisma.service.update({
+    where: { id: svcHIFU.id },
+    data: {
+      status: "ACTIVE", machineMinutes: 60, technologyIds: [techHIFU.id], defaultTechnologyId: techHIFU.id,
+      protocolIds: [protoDemo.id], defaultProtocolId: protoDemo.id,
+      staffRequirements: [
+        { role: "Kỹ thuật viên", quantity: 1, required: true },
+        { role: "Master", quantity: 1, required: true },
+        { role: "Tư vấn", quantity: 1, required: false },
+      ],
+      resourceRequirements: { room: { required: true, default: "Phòng 3" }, machine: { required: true, default: "Máy HIFU #1" }, bed: { required: false, default: "" } },
+      materialStandards: { deleteMany: {}, create: [{ name: "Gel siêu âm HIFU", quantity: 2, unit: "tuýp", required: true, orderIndex: 0 }] },
+    },
+  });
+  // Dịch vụ 3 — Facial làm sạch sâu (Chăm sóc da mặt): KHÔNG bắt buộc máy, KTV chính, protocol, sản phẩm.
+  await prisma.service.update({
+    where: { id: svcFacial.id },
+    data: {
+      status: "ACTIVE", protocolIds: [protoDemo.id], defaultProtocolId: protoDemo.id,
+      staffRequirements: [{ role: "Kỹ thuật viên", quantity: 1, required: true }],
+      resourceRequirements: { room: { required: true, default: "Phòng 1" }, machine: { required: false, default: "" }, bed: { required: false, default: "" } },
+      materialStandards: { deleteMany: {}, create: [
+        { name: "Klapp Hydra Mask", quantity: 1, unit: "lần", required: true, spaProductId: spKlappMask.id, orderIndex: 0 },
+        { name: "Gel rửa mặt dịu nhẹ", quantity: 1, unit: "lần", required: false, spaProductId: spCleanser.id, orderIndex: 1 },
+      ] },
     },
   });
 

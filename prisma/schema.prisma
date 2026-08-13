@@ -1075,33 +1075,72 @@ model CrmActivity {
 // DỊCH VỤ (mục 7) + nhóm dịch vụ
 // ----------------------------------------------------------------------------
 model ServiceCategory {
-  id       String    @id @default(cuid())
-  code     String    @unique
-  name     String
-  services Service[]
+  id          String    @id @default(cuid())
+  code        String    @unique
+  name        String
+  description String?
+  isActive    Boolean   @default(true)
+  services    Service[]
 
   @@map("service_categories")
 }
 
+enum ServiceStatus {
+  ACTIVE // Hoạt động
+  PAUSED // Tạm ngưng
+  ARCHIVED // Lưu trữ
+}
+
 model Service {
-  id              String   @id @default(cuid())
-  code            String   @unique // Mã dịch vụ
+  id              String        @id @default(cuid())
+  code            String        @unique // Mã dịch vụ
   name            String
   categoryId      String?
   description     String?
-  durationMinutes Int? // Thời gian thực hiện
-  standardPrice   Decimal  @default(0) @db.Decimal(18, 2) // Giá chuẩn
-  expectedCost    Decimal? @db.Decimal(18, 2) // Giá vốn dự kiến (nhạy cảm)
+  status          ServiceStatus @default(ACTIVE)
+  durationMinutes Int? // Thời lượng thực hiện (mặc định khi tạo Lịch hẹn)
+  machineMinutes  Int? // Thời gian chiếm dụng máy (nếu khác thời lượng)
+  roomMinutes     Int? // Thời gian chiếm dụng phòng/giường (nếu cần)
+  standardPrice   Decimal       @default(0) @db.Decimal(18, 2) // Giá chuẩn
+  expectedCost    Decimal?      @db.Decimal(18, 2) // Giá vốn dự kiến (nhạy cảm)
   process         String? // Quy trình thực hiện
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
+  // --- Chuyên môn (gợi ý — không ép buộc; soft ref sang thư viện) ---
+  technologyIds       String[] @default([]) // công nghệ liên quan
+  protocolIds         String[] @default([]) // protocol liên quan
+  defaultTechnologyId String?
+  defaultProtocolId   String?
+  staffRequirements   Json? // [{role, quantity, required}] — yêu cầu nhân sự (không gán tên)
+  resourceRequirements Json? // {room:{required,default}, bed:{...}, machine:{...}}
+  isActive        Boolean       @default(true) // = (status == ACTIVE), giữ tương thích lọc cũ
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
 
-  category   ServiceCategory?   @relation(fields: [categoryId], references: [id])
-  bookings   Booking[]
-  sessions   TreatmentSession[]
-  priceFloor ServicePriceFloor?
+  category         ServiceCategory?          @relation(fields: [categoryId], references: [id])
+  bookings         Booking[]
+  sessions         TreatmentSession[]
+  priceFloor       ServicePriceFloor?
+  materialStandards ServiceMaterialStandard[]
 
   @@map("services")
+}
+
+// Vật tư định mức của một dịch vụ (dùng làm "vật tư dự kiến" khi ghi buổi).
+model ServiceMaterialStandard {
+  id              String   @id @default(cuid())
+  serviceId       String
+  name            String
+  quantity        Decimal  @default(1) @db.Decimal(14, 3)
+  unit            String
+  note            String?
+  required        Boolean  @default(false)
+  spaProductId    String? // liên kết mềm SpaProduct
+  usageMaterialId String? // liên kết mềm UsageMaterial (kho vật tư sử dụng)
+  orderIndex      Int      @default(0)
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId])
+  @@map("service_material_standards")
 }
 
 // ----------------------------------------------------------------------------

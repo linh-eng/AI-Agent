@@ -91,19 +91,53 @@ export const crmActivityCreateSchema = z.object({
 
 // ----- Dịch vụ -----
 export const serviceCategoryCreateSchema = z.object({
-  code: z.string().min(1),
+  code: z.string().min(1).optional(), // tự sinh nếu bỏ trống (tạo nhanh trong form)
   name: z.string().min(1),
+  description: z.string().optional().nullable(),
+  isActive: z.boolean().default(true),
 });
+export const serviceCategoryUpdateSchema = serviceCategoryCreateSchema.partial().omit({ code: true });
+
+export const serviceStatusEnum = z.enum(["ACTIVE", "PAUSED", "ARCHIVED"]);
+const staffRequirementSchema = z.array(
+  z.object({ role: z.string().min(1), quantity: z.coerce.number().int().min(0).default(1), required: z.boolean().default(false) })
+);
+const resourceReqOne = z.object({ required: z.boolean().default(false), default: z.string().optional().nullable() });
+const resourceRequirementSchema = z.object({
+  room: resourceReqOne.optional(),
+  bed: resourceReqOne.optional(),
+  machine: resourceReqOne.optional(),
+});
+export const serviceMaterialStandardSchema = z.array(
+  z.object({
+    name: z.string().min(1),
+    quantity: z.coerce.number().nonnegative().default(1),
+    unit: z.string().min(1),
+    note: z.string().optional().nullable(),
+    required: z.boolean().default(false),
+    spaProductId: z.string().optional().nullable(),
+    usageMaterialId: z.string().optional().nullable(),
+  })
+);
 export const serviceCreateSchema = z.object({
   code: z.string().min(1).optional(),
   name: z.string().min(1, "Bắt buộc"),
   categoryId: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
+  status: serviceStatusEnum.default("ACTIVE"),
   durationMinutes: z.coerce.number().int().positive().optional().nullable(),
+  machineMinutes: z.coerce.number().int().positive().optional().nullable(),
+  roomMinutes: z.coerce.number().int().positive().optional().nullable(),
   standardPrice: z.coerce.number().nonnegative().default(0),
   expectedCost: money,
   process: z.string().optional().nullable(),
-  isActive: z.boolean().default(true),
+  technologyIds: z.array(z.string()).optional(),
+  protocolIds: z.array(z.string()).optional(),
+  defaultTechnologyId: z.string().optional().nullable(),
+  defaultProtocolId: z.string().optional().nullable(),
+  staffRequirements: staffRequirementSchema.optional(),
+  resourceRequirements: resourceRequirementSchema.optional(),
+  materials: serviceMaterialStandardSchema.optional(),
 });
 export const serviceUpdateSchema = serviceCreateSchema.partial().omit({ code: true });
 

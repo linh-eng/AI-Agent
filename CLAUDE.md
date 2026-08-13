@@ -931,6 +931,63 @@ giường→phòng, `isActive`; additive, 0 DROP; **tổng 18 migration**). **11
   (Mới/Đã xác nhận/Khách đã đến/Đang thực hiện/Hoàn thành/Hủy/Không đến/đã đổi lịch) để View Ngày & công suất
   có dữ liệu. Test thêm: đổi lịch thiếu lý do → 422; tạo tài nguyên + giường gắn phòng.
 
+## Dịch vụ & Nhóm dịch vụ (v0.12.0) — dữ liệu nền cho Lịch hẹn/Phác đồ
+
+Nâng cấp **module Dịch vụ** thành dữ liệu nền (KHÔNG đụng Khách hàng/Lịch hẹn đã nghiệm thu; không refactor
+module khác). Migration **`I_service_config`** (additive, 0 DROP; tổng **19 migration**). **126 test pass**
+(thêm `test/service-http.test.ts` 7).
+
+### Schema (I_service_config)
+- `service_categories` thêm `description`, `isActive`.
+- `services` thêm: `status` (enum **ServiceStatus** ACTIVE/PAUSED/ARCHIVED; `isActive` = status==ACTIVE, giữ
+  tương thích lọc cũ), `machineMinutes`, `roomMinutes`, `technologyIds[]`, `protocolIds[]`,
+  `defaultTechnologyId`, `defaultProtocolId`, `staffRequirements` (Json `[{role,quantity,required}]`),
+  `resourceRequirements` (Json `{room/bed/machine:{required,default}}`), `updatedAt`. Công nghệ/protocol là
+  **soft ref** (id) — không rebuild thư viện.
+- Model mới `ServiceMaterialStandard` (vật tư định mức: name/quantity/unit/note/required/spaProductId?/
+  usageMaterialId?/orderIndex; cascade theo service).
+
+### Backend
+- `src/lib/service.ts`: `splitServiceInput` (tách materials + đồng bộ isActive theo status),
+  `materialCreateRows`, `enrichServiceDetail` (giải TÊN công nghệ/protocol từ id + tóm tắt giá sàn qua
+  `computeFloor`).
+- API: `/api/service-categories` (POST **tạo nhanh**, mã tự sinh NDV nếu bỏ trống; +`[id]` PATCH sửa/trạng
+  thái) · `/api/services` GET (lọc `q`/`categoryId`/`status`/`technology`; kèm `floorPrice` cho `finance.read`,
+  đếm CN/VT) · POST (nested materials, status→isActive) · `/api/services/[id]` GET (chi tiết + tên CN/protocol
+  + `floorSummary`) · PATCH (thay toàn bộ materials trong transaction; audit `PRICE_CHANGE`; **KHÔNG đổi
+  Booking/Session lịch sử** — mục 20).
+- Giá vốn/giá sàn **mask theo `finance.read`**.
+
+### UI — `/services`
+- Danh sách: Mã/Tên(+đếm CN·VT)/Nhóm/Thời lượng/Giá chuẩn/**Giá vốn**/**Giá sàn** (2 cột sau chỉ `finance.read`)/
+  Trạng thái. Tìm + **Bộ lọc** (nhóm/trạng thái/công nghệ). Bấm dòng → **modal chi tiết** (đủ cấu hình).
+- **Form 5 khối** A. Thông tin cơ bản (Mã tự sinh · Tên · Nhóm search-select + **“+ Tạo nhóm mới”** inline →
+  tự chọn nhóm vừa tạo · Mô tả · Trạng thái) · B. Thời gian & tài nguyên (thời lượng/thời gian máy/phòng +
+  phòng/giường/máy: bắt buộc? + mặc định từ danh mục tài nguyên) · C. Chuyên môn (công nghệ **multi** + mặc
+  định · protocol **multi** + mặc định · **nhân sự yêu cầu**: vai trò/số lượng/bắt buộc, thêm dòng) ·
+  D. Vật tư định mức (thêm dòng: tên/SL/ĐVT/ghi chú/bắt buộc, gợi ý từ sản phẩm) · E. Giá & chi phí (giá chuẩn·
+  giá vốn + **tóm tắt giá sàn** read-only + link **Xem/Thiết lập giá sàn**).
+- Component nội bộ `SearchSelect`/`MultiPick` (không đụng component khác).
+
+### Tích hợp (chỉ tối thiểu, không đổi engine khác)
+- Lịch hẹn: chọn dịch vụ → tự lấy `durationMinutes` (đã có từ mục 2). Tài nguyên mặc định của dịch vụ là dữ
+  liệu chuẩn bị (Booking chưa auto-điền để không ghi đè lựa chọn nhân viên — nợ kỹ thuật ghi rõ).
+- Phác đồ/Session: dịch vụ mang sẵn công nghệ/protocol/vật tư định mức để **gợi ý** (không ép; dữ liệu buổi vẫn
+  lưu riêng, đổi master không đổi lịch sử — chuẩn bị cho mục 4).
+
+### Demo (seed:demo) — 3 dịch vụ đầy đủ cấu hình
+RF nâng cơ mặt (DV-RF-01: RF · KTV bắt buộc · Máy RF #1/Phòng 2 · Gel dẫn RF · giá sàn 1.610.000) · Nâng cơ
+HIFU (DV-HIFU-01: HIFU · KTV+Master bắt buộc+Tư vấn tùy chọn · Máy HIFU #1/Phòng 3 · Gel siêu âm) · Facial làm
+sạch sâu (DV-FACIAL-01: Chăm sóc da mặt · KTV · KHÔNG bắt buộc máy · mặt nạ + gel rửa). Tất cả gắn protocol
+DEMO.
+
+### Nợ kỹ thuật (Dịch vụ)
+- Tài nguyên mặc định của dịch vụ **chưa** tự điền vào form Lịch hẹn (tránh ghi đè; để phase sau).
+- Chi phí dự kiến hiện là **snapshot ước tính** (giá vốn nhập tay) + giá sàn từ module Giá sàn; chưa tự tổng
+  từ vật tư/nhân sự/máy (kiến trúc đã tách sẵn để tính tự động sau).
+- Vật tư định mức link `spaProductId`/`usageMaterialId` là **soft ref** (chưa auto trừ tồn — tiêu hao chỉ khi
+  ghi buổi, đúng nguyên tắc mục 10).
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ
