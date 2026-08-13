@@ -31,7 +31,7 @@ interface Summary {
   nextBooking: { id: string; code: string; scheduledAt: string; serviceName: string | null; technician: string | null; status: string } | null;
   nextFollowUp: { id: string; title: string; dueDate: string | null; assignee: string | null } | null;
   pendingCareTasks: number;
-  activePlan: { id: string; code: string; name: string; version: number; status: string; totalSessions: number; doneSessions: number; nextSessionAt: string | null } | null;
+  activePlan: { id: string; code: string; name: string; version: number; status: string; totalSessions: number; doneSessions: number; nextSessionAt: string | null; currentStage: string | null } | null;
   lastSession: { id: string; at: string | null; serviceName: string | null; technician: string | null; planName: string | null } | null;
   lastService: string | null; lastTechnician: string | null;
   lastReview: { at: string; satisfactionScore: number | null; technicianScore: number | null } | null;
@@ -192,7 +192,7 @@ export default function CustomerProfilePage() {
 
       {/* ---------- KPI ROW ---------- */}
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Kpi icon={Activity} label="Tổng lần thực hiện" value={String(s.totalSessions)} sub={`${s.totalBookings} booking`} />
+        <KpiTwo icon={Activity} label="Lịch sử dịch vụ" lines={[["Lần thực hiện", String(s.totalSessions)], ["Booking", String(s.totalBookings)]]} />
         <Kpi icon={TrendingUp} label="Tổng giá trị" value={formatCurrency(c.financials.totalBilled)} />
         <Kpi icon={Wallet} label="Đã thanh toán" value={formatCurrency(c.financials.totalPaid)} tone="emerald" />
         <Kpi icon={Wallet} label="Công nợ" value={formatCurrency(c.financials.debt)} tone={c.financials.debt > 0 ? "red" : "emerald"} />
@@ -248,6 +248,23 @@ export default function CustomerProfilePage() {
 /* ====================== Header / KPI bits ====================== */
 function HeaderField({ icon: Icon, value }: { icon: any; value: string }) {
   return <span className="inline-flex items-center gap-1"><Icon className="h-3.5 w-3.5 text-muted-foreground" /> {value}</span>;
+}
+function KpiTwo({ icon: Icon, label, lines }: { icon: any; label: string; lines: [string, string][] }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Icon className="h-3.5 w-3.5" /> {label}</div>
+        <div className="mt-1.5 space-y-0.5">
+          {lines.map(([k, v]) => (
+            <div key={k} className="flex items-baseline justify-between gap-2">
+              <span className="text-xs text-muted-foreground">{k}</span>
+              <span className="text-lg font-semibold tabular-nums">{v}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 function Kpi({ icon: Icon, label, value, sub, tone }: { icon: any; label: string; value: string; sub?: string; tone?: "emerald" | "red" }) {
   const valueColor = tone === "emerald" ? "text-emerald-600" : tone === "red" ? "text-red-600" : "";
@@ -344,7 +361,9 @@ function OverviewTab({ c, recs, beforeAfter, onOpenImage, onGoTab }: { c: Custom
         <Row label="Tình trạng khách" value={c.isActive === false ? "Đã lưu trữ" : "Đang hoạt động"} />
         <Row label="Mục tiêu / mong muốn" value={c.goals ?? "—"} />
         <Row label="Phác đồ đang thực hiện" value={s.activePlan ? `${s.activePlan.name} (v${s.activePlan.version})` : "—"} />
-        <Row label="Giai đoạn hiện tại" value={s.activePlan ? `${s.activePlan.doneSessions}/${s.activePlan.totalSessions} buổi · ${PLAN_STATUS_LABEL[s.activePlan.status] ?? s.activePlan.status}` : "—"} />
+        <Row label="Giai đoạn hiện tại" value={s.activePlan?.currentStage ?? "—"} />
+        <Row label="Tiến độ" value={s.activePlan ? `${s.activePlan.doneSessions}/${s.activePlan.totalSessions} buổi` : "—"} />
+        <Row label="Trạng thái" value={s.activePlan ? (PLAN_STATUS_LABEL[s.activePlan.status] ?? s.activePlan.status) : "—"} />
       </Panel>
 
       <Panel title="Hành động tiếp theo">

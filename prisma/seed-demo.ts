@@ -313,7 +313,6 @@ async function main() {
       data: { templateId: skinForm.id, templateVersion: skinForm.version, schemaSnapshot: skinForm.schema as any, customerId: kDangPD.id, planId: planLinh.id, name: "Phiếu đánh giá da – Đỗ Thùy Linh", status: "COMPLETED", completedBy: "Phạm Chuyên Viên", completedAt: new Date("2026-07-25T07:00:00Z"), createdBy: "Phạm Chuyên Viên" },
     });
   }
-  await prisma.payment.create({ data: { customerId: kDangPD.id, planId: planLinh.id, amount: 8_000_000, method: "TRANSFER", receivedBy: "Đỗ Thu Ngân", note: "Đặt cọc phác đồ nâng cơ", paidAt: new Date("2026-07-25T09:00:00Z") } });
   await prisma.crmActivity.create({ data: { customerId: kDangPD.id, type: "CALL", content: "Nhắc lịch HIFU buổi 2, khách xác nhận.", result: "Xác nhận", performedBy: "Lê Thị CSKH", occurredAt: new Date("2026-08-10T03:00:00Z"), nextAction: "Chuẩn bị phòng HIFU", followUpDate: new Date("2026-08-19T02:00:00Z"), followUpOwner: "Lê Thị CSKH" } });
   // Báo giá 3 phương án — ĐÃ CHỐT phương án "Khuyến nghị" → tạo HÓA ĐƠN → thu một phần.
   const proposalLinh = await prisma.treatmentProposal.create({
@@ -344,8 +343,11 @@ async function main() {
       items: { create: chosen.items.map((it, i) => ({ name: it.name, quantity: it.quantity ?? 1, unitPrice: Number(it.unitPrice ?? 0), amount: Number(it.unitPrice ?? 0) * (it.quantity ?? 1), note: it.isHomeCare ? "Sản phẩm tại nhà" : null, orderIndex: i })) },
     },
   });
-  // Thu 5.000.000 vào hóa đơn → còn phải thu 6.900.000 (công nợ tính theo HÓA ĐƠN).
-  await prisma.payment.create({ data: { customerId: kDangPD.id, invoiceId: invLinh.id, amount: 5_000_000, method: "TRANSFER", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đợt 1 hóa đơn nâng cơ", paidAt: new Date("2026-08-01T03:00:00Z") } });
+  // Thu 2 đợt vào hóa đơn (tổng 8.000.000 ≤ tổng phải thu 11.900.000) → còn phải
+  // thu 3.900.000. Mọi khoản thu đều gắn hóa đơn nên "Đã thanh toán" luôn ≤ "Tổng
+  // phải thu" (không có tiền dư trộn vào).
+  await prisma.payment.create({ data: { customerId: kDangPD.id, invoiceId: invLinh.id, amount: 5_000_000, method: "TRANSFER", receivedBy: "Đỗ Thu Ngân", note: "Đặt cọc hóa đơn nâng cơ (đợt 1)", paidAt: new Date("2026-08-01T03:00:00Z") } });
+  await prisma.payment.create({ data: { customerId: kDangPD.id, invoiceId: invLinh.id, amount: 3_000_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đợt 2 hóa đơn nâng cơ", paidAt: new Date("2026-08-08T03:00:00Z") } });
   await prisma.customerPortalAccount.upsert({
     where: { customerId: kDangPD.id }, update: {},
     create: { customerId: kDangPD.id, email: "linh.do@example.com", passwordHash: await hashPassword("khach123") },

@@ -533,7 +533,8 @@ riêng (ngoài Timeline). **Tên phần mềm mặc định = "Sophia Care"** (s
 
 ### Demo (seed:demo)
 PROP-100001 (KH-100004) **ĐÃ CHỐT** phương án Khuyến nghị (11.900.000₫) → **HD-000001** (PARTIAL) → thu
-5.000.000₫ → **còn phải thu 6.900.000₫**. KH-100001 có `legacyId=MYSPA-8842`, `legacySource=MySpa`, `dob`.
+2 đợt 5.000.000₫ + 3.000.000₫ (đều gắn hóa đơn) → **đã trả 8.000.000₫ ≤ tổng phải thu, còn phải thu
+3.900.000₫** (không có tiền dư). KH-100001 có `legacyId=MYSPA-8842`, `legacySource=MySpa`, `dob`.
 
 ### Còn lại / để phase sau (MASTER PROMPT phần chưa làm trong slice này) — **báo cáo trung thực**
 Booking (kỹ thuật viên/master/phòng/giường/máy + lịch Ngày/Tuần/Tháng + phát hiện trùng lịch); HR đa vai trò +

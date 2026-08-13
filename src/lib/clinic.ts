@@ -269,7 +269,7 @@ export interface CustomerSummary {
   nextBooking: { id: string; code: string; scheduledAt: string; serviceName: string | null; technician: string | null; status: string } | null;
   nextFollowUp: { id: string; title: string; dueDate: string | null; assignee: string | null } | null;
   pendingCareTasks: number; // số việc CSKH đang chờ
-  activePlan: { id: string; code: string; name: string; version: number; status: string; totalSessions: number; doneSessions: number; nextSessionAt: string | null } | null;
+  activePlan: { id: string; code: string; name: string; version: number; status: string; totalSessions: number; doneSessions: number; nextSessionAt: string | null; currentStage: string | null } | null;
   lastSession: { id: string; at: string | null; serviceName: string | null; technician: string | null; planName: string | null } | null;
   lastService: string | null;
   lastTechnician: string | null;
@@ -301,7 +301,8 @@ export async function customerSummary(customerId: string): Promise<CustomerSumma
         where: { customerId, status: { in: ["ACTIVE", "PAUSED"] } },
         include: {
           _count: { select: { sessions: true } },
-          sessions: { select: { id: true, status: true, scheduledAt: true, sessionNumber: true }, orderBy: { sessionNumber: "asc" } },
+          stages: { select: { id: true, name: true, orderIndex: true }, orderBy: { orderIndex: "asc" } },
+          sessions: { select: { id: true, status: true, scheduledAt: true, sessionNumber: true, stageId: true }, orderBy: { sessionNumber: "asc" } },
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -332,6 +333,18 @@ export async function customerSummary(customerId: string): Promise<CustomerSumma
   if (plan) {
     const doneSessions = plan.sessions.filter((s) => s.status === "COMPLETED").length;
     const upcoming = plan.sessions.find((s) => s.status !== "COMPLETED" && s.status !== "CANCELLED" && s.scheduledAt);
+    // Giai đoạn hiện tại = giai đoạn của buổi kế chưa xong; nếu đã xong hết thì lấy
+    // giai đoạn của buổi cuối; fallback giai đoạn đầu tiên của phác đồ. KHÔNG dùng
+    // số buổi làm tên giai đoạn.
+    const stageIdOfCurrent =
+      plan.sessions.find((s) => s.status !== "COMPLETED" && s.status !== "CANCELLED")?.stageId ??
+      [...plan.sessions].reverse().find((s) => s.status === "COMPLETED")?.stageId ??
+      plan.stages[0]?.id ??
+      null;
+    const currentStage =
+      (stageIdOfCurrent ? plan.stages.find((st) => st.id === stageIdOfCurrent)?.name : null) ??
+      plan.stages[0]?.name ??
+      null;
     activePlan = {
       id: plan.id,
       code: plan.code,
@@ -341,6 +354,7 @@ export async function customerSummary(customerId: string): Promise<CustomerSumma
       totalSessions: plan._count.sessions,
       doneSessions,
       nextSessionAt: upcoming?.scheduledAt ? upcoming.scheduledAt.toISOString() : null,
+      currentStage,
     };
   }
 
