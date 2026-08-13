@@ -115,7 +115,16 @@ export default function ServicesPage() {
             ) : rows.map((s) => (
               <TR key={s.id} className="cursor-pointer hover:bg-muted/40" onClick={() => setDetailId(s.id)}>
                 <TD className="font-mono font-medium">{s.code}</TD>
-                <TD className="font-medium">{s.name}{(s.technologyCount || s.materialCount) ? <span className="ml-1 text-xs text-muted-foreground">· {s.technologyCount || 0} CN · {s.materialCount || 0} VT</span> : null}</TD>
+                <TD className="font-medium">
+                  {s.name}
+                  {(() => {
+                    const parts = [
+                      s.technologyCount ? `${s.technologyCount} công nghệ` : null,
+                      s.materialCount ? `${s.materialCount} vật tư` : null,
+                    ].filter(Boolean);
+                    return parts.length ? <span className="ml-1 text-xs text-muted-foreground">· {parts.join(" · ")}</span> : null;
+                  })()}
+                </TD>
                 <TD>{s.category?.name ?? "—"}</TD>
                 <TD className="text-right">{s.durationMinutes ? `${s.durationMinutes}′` : "—"}</TD>
                 <TD className="text-right">{formatNumber(Number(s.standardPrice))} ₫</TD>
