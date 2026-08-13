@@ -27,6 +27,7 @@ import {
   Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version";
 import { apiFetch } from "@/lib/client";
 import type { SessionPayload } from "@/lib/auth";
 import { ROLE_LABELS, PERMISSIONS, type RoleCode } from "@/lib/rbac";
@@ -122,7 +123,7 @@ export function AppShell({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 transform border-r bg-card transition-transform lg:static lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-64 transform flex-col border-r bg-card transition-transform lg:static lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -142,7 +143,7 @@ export function AppShell({
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Quản lý kho</div>
           </div>
         </div>
-        <nav className="space-y-4 p-3">
+        <nav className="flex-1 space-y-4 overflow-y-auto p-3">
           {NAV.map((group) => {
             const items = group.items.filter((it: any) => canSee(it.perm));
             if (items.length === 0) return null;
@@ -178,6 +179,9 @@ export function AppShell({
             );
           })}
         </nav>
+        <div className="border-t px-4 py-2 text-[11px] text-muted-foreground">
+          Phiên bản {APP_VERSION}
+        </div>
       </aside>
 
       {open && (

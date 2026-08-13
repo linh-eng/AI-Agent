@@ -6,6 +6,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles } from "lucide-react";
 import { apiFetch } from "@/lib/client";
+import { APP_VERSION } from "@/lib/version";
 
 function LoginForm() {
   const router = useRouter();
@@ -88,6 +89,7 @@ function LoginForm() {
               {loading ? "Đang đăng nhập..." : "Đăng nhập"}
             </Button>
           </form>
+          <p className="mt-4 text-center text-[11px] text-muted-foreground">Phiên bản {APP_VERSION}</p>
         </CardContent>
       </Card>
     </div>
