@@ -129,7 +129,7 @@ netsh advfirewall firewall add rule name="Spa Demo 9500" dir=in action=allow pro
 ## 7. Kiểm tra
 - Trên máy chủ: mở http://localhost:9500 → thấy trang đăng nhập.
 - Từ máy khác trong LAN: http://172.168.11.60:9500
-- Đăng nhập: **quanly@thng.com.vn / quanly123** (nhân viên). Cổng khách `/portal`:
+- Đăng nhập: **quanly@sophia.com.vn / quanly123** (nhân viên). Cổng khách `/portal`:
   **linh.do@example.com / khach123**.
 
 ---

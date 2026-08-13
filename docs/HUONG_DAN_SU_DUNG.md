@@ -23,14 +23,14 @@ Mật khẩu theo quy tắc `<vai trò>123`. Đây là tài khoản mẫu để 
 
 | Vai trò | Email | Mật khẩu | Quyền chính |
 |---|---|---|---|
-| Quản lý Spa (MANAGER) | quanly@thng.com.vn | quanly123 | Xem toàn bộ + duyệt, gần như mọi thao tác |
-| Lễ tân (RECEPTION) | letan@thng.com.vn | letan123 | Tạo khách, đặt lịch, thu tiền |
-| CSKH (CUSTOMER_CARE) | cskh@thng.com.vn | cskh123 | Nhật ký chăm sóc, follow-up, công việc |
-| Chuyên viên (SPECIALIST) | chuyenvien@thng.com.vn | chuyenvien123 | Đánh giá, thiết kế phác đồ, thực hiện buổi |
-| Thu ngân/Kế toán (CASHIER) | thungan@thng.com.vn | thungan123 | Thanh toán, công nợ, dữ liệu tài chính |
-| Marketing (MARKETING) | marketing@thng.com.vn | marketing123 | Chiến dịch, nguồn khách, ROI |
-| Ban Giám đốc (BOD) | bod@thng.com.vn | bod123 | Duyệt cấp cao, xem báo cáo |
-| Admin (ADMIN) | admin@thng.com.vn | admin123 | Toàn quyền (cả kho lẫn spa) |
+| Quản lý Spa (MANAGER) | quanly@sophia.com.vn | quanly123 | Xem toàn bộ + duyệt, gần như mọi thao tác |
+| Lễ tân (RECEPTION) | letan@sophia.com.vn | letan123 | Tạo khách, đặt lịch, thu tiền |
+| CSKH (CUSTOMER_CARE) | cskh@sophia.com.vn | cskh123 | Nhật ký chăm sóc, follow-up, công việc |
+| Chuyên viên (SPECIALIST) | chuyenvien@sophia.com.vn | chuyenvien123 | Đánh giá, thiết kế phác đồ, thực hiện buổi |
+| Thu ngân/Kế toán (CASHIER) | thungan@sophia.com.vn | thungan123 | Thanh toán, công nợ, dữ liệu tài chính |
+| Marketing (MARKETING) | marketing@sophia.com.vn | marketing123 | Chiến dịch, nguồn khách, ROI |
+| Ban Giám đốc (BOD) | bod@sophia.com.vn | bod123 | Duyệt cấp cao, xem báo cáo |
+| Admin (ADMIN) | admin@sophia.com.vn | admin123 | Toàn quyền (cả kho lẫn spa) |
 
 **Các vai trò thiên về Kho THNG:** muahang@ (Mua hàng), ketoan@ (Kế toán kho), thukho@ (Thủ kho),
 kythuat@ (Kỹ thuật), qc@ (QC), kinhdoanh@ (Kinh doanh), baohanh@ (Bảo hành) — mật khẩu cùng quy tắc.

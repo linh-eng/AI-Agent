@@ -33,4 +33,4 @@ Write-Host "[OK] Xong. Khoi dong app:" -ForegroundColor Green
 Write-Host "     npm run start:lan"
 Write-Host "   Hoac chay nen bang pm2:  pm2 start npm --name spa-demo -- run start:lan ; pm2 save"
 Write-Host "   Roi mo:  http://172.168.11.60:9500  (nhan vien)  |  /portal  (khach)"
-Write-Host "   Dang nhap thu: quanly@thng.com.vn / quanly123"
+Write-Host "   Dang nhap thu: quanly@sophia.com.vn / quanly123"

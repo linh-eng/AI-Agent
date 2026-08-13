@@ -56,22 +56,22 @@ async function main() {
 
   // --- 3. Users (mật khẩu chung: <role>123) ---
   const users: Array<{ email: string; name: string; role: RoleCode; password: string }> = [
-    { email: "admin@thng.com.vn", name: "Quản trị hệ thống", role: ROLES.ADMIN, password: "admin123" },
-    { email: "bod@thng.com.vn", name: "Ban Giám đốc", role: ROLES.BOD, password: "bod123" },
-    { email: "muahang@thng.com.vn", name: "Nguyễn Văn Mua", role: ROLES.PURCHASING, password: "muahang123" },
-    { email: "ketoan@thng.com.vn", name: "Trần Thị Kế Toán", role: ROLES.WH_ACCOUNTANT, password: "ketoan123" },
-    { email: "thukho@thng.com.vn", name: "Lê Văn Thủ Kho", role: ROLES.WAREHOUSE_KEEPER, password: "thukho123" },
-    { email: "kythuat@thng.com.vn", name: "Phạm Kỹ Thuật", role: ROLES.TECH, password: "kythuat123" },
-    { email: "qc@thng.com.vn", name: "Hoàng QC", role: ROLES.QC, password: "qc123" },
-    { email: "kinhdoanh@thng.com.vn", name: "Đỗ Kinh Doanh", role: ROLES.SALES, password: "kinhdoanh123" },
-    { email: "baohanh@thng.com.vn", name: "Vũ Bảo Hành", role: ROLES.WARRANTY, password: "baohanh123" },
+    { email: "admin@sophia.com.vn", name: "Quản trị hệ thống", role: ROLES.ADMIN, password: "admin123" },
+    { email: "bod@sophia.com.vn", name: "Ban Giám đốc", role: ROLES.BOD, password: "bod123" },
+    { email: "muahang@sophia.com.vn", name: "Nguyễn Văn Mua", role: ROLES.PURCHASING, password: "muahang123" },
+    { email: "ketoan@sophia.com.vn", name: "Trần Thị Kế Toán", role: ROLES.WH_ACCOUNTANT, password: "ketoan123" },
+    { email: "thukho@sophia.com.vn", name: "Lê Văn Thủ Kho", role: ROLES.WAREHOUSE_KEEPER, password: "thukho123" },
+    { email: "kythuat@sophia.com.vn", name: "Phạm Kỹ Thuật", role: ROLES.TECH, password: "kythuat123" },
+    { email: "qc@sophia.com.vn", name: "Hoàng QC", role: ROLES.QC, password: "qc123" },
+    { email: "kinhdoanh@sophia.com.vn", name: "Đỗ Kinh Doanh", role: ROLES.SALES, password: "kinhdoanh123" },
+    { email: "baohanh@sophia.com.vn", name: "Vũ Bảo Hành", role: ROLES.WARRANTY, password: "baohanh123" },
     // --- Module Spa / Thẩm mỹ ---
-    { email: "quanly@thng.com.vn", name: "Trần Quản Lý", role: ROLES.MANAGER, password: "quanly123" },
-    { email: "letan@thng.com.vn", name: "Nguyễn Lễ Tân", role: ROLES.RECEPTION, password: "letan123" },
-    { email: "cskh@thng.com.vn", name: "Lê Thị CSKH", role: ROLES.CUSTOMER_CARE, password: "cskh123" },
-    { email: "chuyenvien@thng.com.vn", name: "Phạm Chuyên Viên", role: ROLES.SPECIALIST, password: "chuyenvien123" },
-    { email: "thungan@thng.com.vn", name: "Đỗ Thu Ngân", role: ROLES.CASHIER, password: "thungan123" },
-    { email: "marketing@thng.com.vn", name: "Vũ Marketing", role: ROLES.MARKETING, password: "marketing123" },
+    { email: "quanly@sophia.com.vn", name: "Trần Quản Lý", role: ROLES.MANAGER, password: "quanly123" },
+    { email: "letan@sophia.com.vn", name: "Nguyễn Lễ Tân", role: ROLES.RECEPTION, password: "letan123" },
+    { email: "cskh@sophia.com.vn", name: "Lê Thị CSKH", role: ROLES.CUSTOMER_CARE, password: "cskh123" },
+    { email: "chuyenvien@sophia.com.vn", name: "Phạm Chuyên Viên", role: ROLES.SPECIALIST, password: "chuyenvien123" },
+    { email: "thungan@sophia.com.vn", name: "Đỗ Thu Ngân", role: ROLES.CASHIER, password: "thungan123" },
+    { email: "marketing@sophia.com.vn", name: "Vũ Marketing", role: ROLES.MARKETING, password: "marketing123" },
   ];
   for (const u of users) {
     const user = await prisma.user.upsert({
@@ -851,8 +851,8 @@ async function main() {
   }
 
   console.log("✅ Seed hoàn tất.");
-  console.log("   Đăng nhập kho: admin@thng.com.vn / admin123");
-  console.log("   Đăng nhập spa: quanly@thng.com.vn / quanly123 (Quản lý)");
+  console.log("   Đăng nhập kho: admin@sophia.com.vn / admin123");
+  console.log("   Đăng nhập spa: quanly@sophia.com.vn / quanly123 (Quản lý)");
   console.log("   Máy lắp ráp mẫu: WS-PRO-2026-0001 (as-built BOM v1, BH 2 tầng)");
   console.log("   Khách spa mẫu: KH-000001 Nguyễn Thị An (phác đồ TP-000001)");
   console.log("   Thư viện: brand DMK, công nghệ Laser Pico, protocol DMK Enzyme Brightening,");

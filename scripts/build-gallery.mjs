@@ -106,7 +106,7 @@ footer{max-width:1120px;margin:0 auto;padding:0 24px 56px;color:var(--muted);fon
 <header>
   <div class="eyebrow">Bản demo · Nghiệm thu giao diện</div>
   <h1>Giao diện phần mềm quản lý Spa THNG</h1>
-  <p class="lede">Ảnh chụp thực tế từ hệ thống đang chạy với dữ liệu demo tiếng Việt. Bấm vào mỗi ảnh để phóng to. Tài khoản thử: <strong>quanly@thng.com.vn / quanly123</strong> (nhân viên) · <strong>linh.do@example.com / khach123</strong> (cổng khách).</p>
+  <p class="lede">Ảnh chụp thực tế từ hệ thống đang chạy với dữ liệu demo tiếng Việt. Bấm vào mỗi ảnh để phóng to. Tài khoản thử: <strong>quanly@sophia.com.vn / quanly123</strong> (nhân viên) · <strong>linh.do@example.com / khach123</strong> (cổng khách).</p>
   <span class="badge">${GROUPS.reduce((n,[,x])=>n+x.length,0)} màn hình · giao diện tiếng Việt</span>
 </header>
 <main>${cards}</main>

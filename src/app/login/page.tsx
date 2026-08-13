@@ -10,7 +10,7 @@ import { apiFetch } from "@/lib/client";
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const [email, setEmail] = useState("quanly@thng.com.vn");
+  const [email, setEmail] = useState("quanly@sophia.com.vn");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -72,7 +72,7 @@ function LoginForm() {
             </Button>
           </form>
           <p className="mt-4 text-center text-xs text-muted-foreground">
-            Tài khoản demo: <span className="font-medium">quanly@thng.com.vn</span> / mật khẩu{" "}
+            Tài khoản demo: <span className="font-medium">quanly@sophia.com.vn</span> / mật khẩu{" "}
             <span className="font-medium">quanly123</span>
           </p>
         </CardContent>

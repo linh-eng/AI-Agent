@@ -8,7 +8,7 @@ const b = await chromium.launch({ executablePath: EXE, args: ["--no-sandbox"] })
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, locale: "vi-VN" });
 const p = await ctx.newPage();
 await p.goto(BASE + "/login", { waitUntil: "networkidle" });
-await p.fill('input[type="email"]', "quanly@thng.com.vn");
+await p.fill('input[type="email"]', "quanly@sophia.com.vn");
 await p.fill('input[type="password"]', "quanly123");
 await p.click('button[type="submit"]');
 await p.waitForTimeout(2500);

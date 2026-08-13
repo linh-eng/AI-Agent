@@ -120,7 +120,7 @@ sudo firewall-cmd --permanent --add-port=9500/tcp && sudo firewall-cmd --reload
 ## 7. Kiểm tra
 - Trên chính máy chủ: `curl -I http://localhost:9500/login` → `HTTP/1.1 200`.
 - Từ máy khác trong LAN: mở trình duyệt **http://172.168.11.60:9500**.
-- Đăng nhập thử: `quanly@thng.com.vn` / `quanly123` (Quản lý). Cổng khách: `/portal` với
+- Đăng nhập thử: `quanly@sophia.com.vn` / `quanly123` (Quản lý). Cổng khách: `/portal` với
   `linh.do@example.com` / `khach123`.
 
 ---

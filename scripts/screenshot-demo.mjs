@@ -7,7 +7,7 @@ const BASE = "http://localhost:3000";
 const OUT = process.argv[2] || "/tmp/shots";
 fs.mkdirSync(OUT, { recursive: true });
 
-const STAFF = { email: "quanly@thng.com.vn", password: "quanly123" };
+const STAFF = { email: "quanly@sophia.com.vn", password: "quanly123" };
 const PORTAL = { email: "linh.do@example.com", password: "khach123" };
 
 // (đường dẫn, tên file, mô tả)
