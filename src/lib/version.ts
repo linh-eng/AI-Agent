@@ -3,9 +3,9 @@
 // Khi phát hành bản mới: tăng APP_VERSION + đổi ngày + mô tả ngắn, rồi build lại.
 // (Giữ đồng bộ với "version" trong package.json.)
 // =============================================================================
-export const APP_VERSION = "0.9.1";
+export const APP_VERSION = "0.9.2";
 export const APP_RELEASE_DATE = "2026-08-13";
-export const APP_RELEASE_NAME = "Quản trị người dùng: thêm XÓA tài khoản; sửa lỗi quyền không cập nhật sau khi update (quyền lấy từ mã nguồn — đăng nhập lại là có)";
+export const APP_RELEASE_NAME = "Sửa triệt để lỗi quyền: tính lại quyền từ vai trò ở MỖI request — admin chỉnh sửa được ngay (Cài đặt/Thương hiệu, Nhân sự...) KHÔNG cần đăng nhập lại";
 
 /** Chuỗi hiển thị gọn: v0.2.0 · 13/08/2026 */
 export function versionLabel(): string {

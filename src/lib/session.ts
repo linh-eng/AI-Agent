@@ -4,13 +4,36 @@
 // =============================================================================
 import { cookies } from "next/headers";
 import { SESSION_COOKIE, verifySession, type SessionPayload } from "./auth";
-import type { PermissionCode } from "./rbac";
+import { ROLE_PERMISSIONS, type PermissionCode, type RoleCode } from "./rbac";
+
+/**
+ * Tính lại quyền TỪ VAI TRÒ (mã nguồn = nguồn sự thật) ở MỖI request.
+ *
+ * Lý do: JWT phiên nhúng sẵn `permissions` lúc đăng nhập. Khi cập nhật code
+ * (thêm quyền mới cho vai trò), token cũ vẫn giữ danh sách quyền cũ → người dùng
+ * đang đăng nhập KHÔNG thấy quyền mới cho tới khi đăng xuất/đăng nhập lại.
+ * Bằng cách suy quyền lại từ `roles` (không đổi) qua `ROLE_PERMISSIONS`, quyền
+ * luôn khớp code ngay lập tức — không cần đăng nhập lại. Vẫn hợp nhất (union)
+ * với quyền trong token để giữ quyền cấp riêng cho vai trò lạ (không có trong code).
+ */
+function recomputePermissions(session: SessionPayload): SessionPayload {
+  const permSet = new Set<string>();
+  for (const code of session.roles ?? []) {
+    const fromCode = ROLE_PERMISSIONS[code as RoleCode];
+    if (fromCode) fromCode.forEach((p) => permSet.add(p));
+  }
+  // Hợp nhất quyền có sẵn trong token (fallback cho vai trò không nằm trong code).
+  (session.permissions ?? []).forEach((p) => permSet.add(p));
+  return { ...session, permissions: Array.from(permSet) };
+}
 
 /** Lấy phiên hiện tại (null nếu chưa đăng nhập / token hỏng). */
 export async function getSession(): Promise<SessionPayload | null> {
   const token = cookies().get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  return verifySession(token);
+  const session = await verifySession(token);
+  if (!session) return null;
+  return recomputePermissions(session);
 }
 
 /** Lỗi có kèm HTTP status để route handler trả về đúng mã. */
