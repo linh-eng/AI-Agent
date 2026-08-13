@@ -1,42 +1,82 @@
+// Sinh HƯỚNG DẪN SỬ DỤNG (Word .docx) CÓ HÌNH ẢNH cho Sophia Care.
+// Dùng: node scripts/build-guide-docx.cjs <out.docx> <thu-muc-anh>
 const {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
   Table, TableRow, TableCell, WidthType, ShadingType, BorderStyle,
-  LevelFormat, PageBreak, TableOfContents, PositionalTab, PositionalTabAlignment, PositionalTabLeader,
+  LevelFormat, PageBreak, TableOfContents, ImageRun,
 } = require("docx");
 const fs = require("fs");
+const path = require("path");
 
-const BRAND = "Sophia Wellness";
+const OUT = process.argv[2] || "docs/Huong-dan-su-dung-Sophia-Care.docx";
+const SHOTS = process.argv[3] || "/tmp/guide-shots";
+
+const BRAND = "Sophia Care";
 const ACCENT = "4F7D6E";
 const INK = "242019";
 const MUTED = "6B6459";
 
+// Phiên bản đọc từ src/lib/version.ts
+let VERSION = "";
+try {
+  const v = fs.readFileSync("src/lib/version.ts", "utf8");
+  const ver = v.match(/APP_VERSION\s*=\s*"([^"]+)"/)?.[1];
+  const date = v.match(/APP_RELEASE_DATE\s*=\s*"([^"]+)"/)?.[1];
+  if (ver) VERSION = `v${ver}` + (date ? ` · ${date.split("-").reverse().join("/")}` : "");
+} catch {}
+
 // ---- helpers ----
 const H1 = (t) => new Paragraph({ text: t, heading: HeadingLevel.HEADING_1, spacing: { before: 320, after: 120 } });
 const H2 = (t) => new Paragraph({ text: t, heading: HeadingLevel.HEADING_2, spacing: { before: 220, after: 80 } });
-const P = (t, opts = {}) => new Paragraph({ spacing: { after: 100 }, children: [new TextRun({ text: t, size: 22, color: INK, ...opts })] });
+const P = (t, opts = {}) => new Paragraph({ spacing: { after: 100 }, children: parseBold(t, opts) });
 const NOTE = (t) => new Paragraph({
   spacing: { before: 60, after: 120 }, indent: { left: 200 },
   border: { left: { style: BorderStyle.SINGLE, size: 18, color: ACCENT, space: 12 } },
   children: [new TextRun({ text: t, size: 20, color: MUTED, italics: true })],
 });
-const bullet = (t, sub) => new Paragraph({
-  numbering: { reference: sub ? "b2" : "b1", level: 0 },
-  spacing: { after: 40 },
-  children: parseBold(t),
-});
-const step = (n, t) => new Paragraph({
-  numbering: { reference: "steps", level: 0 }, spacing: { after: 40 },
-  children: parseBold(t),
-});
-// parse **bold** inside text
-function parseBold(t) {
+const bullet = (t, sub) => new Paragraph({ numbering: { reference: sub ? "b2" : "b1", level: 0 }, spacing: { after: 40 }, children: parseBold(t) });
+const step = (t) => new Paragraph({ numbering: { reference: "steps", level: 0 }, spacing: { after: 40 }, children: parseBold(t) });
+const spacer = () => new Paragraph({ text: "", spacing: { after: 60 } });
+
+function parseBold(t, base = {}) {
   const out = [];
-  const parts = String(t).split(/(\*\*[^*]+\*\*)/g);
-  for (const seg of parts) {
+  for (const seg of String(t).split(/(\*\*[^*]+\*\*)/g)) {
     if (!seg) continue;
-    if (seg.startsWith("**") && seg.endsWith("**")) out.push(new TextRun({ text: seg.slice(2, -2), bold: true, size: 22, color: INK }));
-    else out.push(new TextRun({ text: seg, size: 22, color: INK }));
+    if (seg.startsWith("**") && seg.endsWith("**")) out.push(new TextRun({ text: seg.slice(2, -2), bold: true, size: 22, color: INK, ...base }));
+    else out.push(new TextRun({ text: seg, size: 22, color: INK, ...base }));
   }
+  return out;
+}
+
+// Đọc kích thước PNG (IHDR).
+function pngSize(buf) {
+  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+}
+
+// Chèn ảnh (khớp bề rộng trang, giới hạn chiều cao 1 trang) + chú thích.
+function img(file, caption) {
+  const p = path.join(SHOTS, file);
+  if (!fs.existsSync(p)) return [P(`[Thiếu ảnh: ${file}]`, { color: MUTED, italics: true })];
+  const buf = fs.readFileSync(p);
+  const { w, h } = pngSize(buf);
+  const MAXW = 600, MAXH = 760;
+  let W = MAXW, H = Math.round((MAXW * h) / w);
+  if (H > MAXH) { H = MAXH; W = Math.round((MAXH * w) / h); }
+  const out = [
+    new Paragraph({
+      alignment: AlignmentType.CENTER, spacing: { before: 80, after: 20 },
+      border: {
+        top: { style: BorderStyle.SINGLE, size: 4, color: "DCD6CC", space: 4 },
+        bottom: { style: BorderStyle.SINGLE, size: 4, color: "DCD6CC", space: 4 },
+        left: { style: BorderStyle.SINGLE, size: 4, color: "DCD6CC", space: 4 },
+        right: { style: BorderStyle.SINGLE, size: 4, color: "DCD6CC", space: 4 },
+      },
+      children: [new ImageRun({ data: buf, transformation: { width: W, height: H } })],
+    }),
+  ];
+  if (caption) out.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 160 },
+    children: [new TextRun({ text: "▲ " + caption, italics: true, size: 18, color: MUTED })] }));
+  else out.push(spacer());
   return out;
 }
 
@@ -62,216 +102,186 @@ function table(headers, rows, widths) {
   return new Table({ columnWidths: widths, width: { size: total, type: WidthType.DXA }, rows: [headerRow, ...bodyRows] });
 }
 
-const spacer = () => new Paragraph({ text: "", spacing: { after: 60 } });
-
 // ---- content ----
 const children = [];
 
 // Cover
-children.push(new Paragraph({ spacing: { before: 2600, after: 0 }, alignment: AlignmentType.CENTER,
-  children: [new TextRun({ text: BRAND, bold: true, size: 64, color: ACCENT })] }));
-children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 },
-  children: [new TextRun({ text: "PHẦN MỀM QUẢN LÝ SPA & KHÁCH HÀNG", size: 26, color: INK })] }));
-children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 40 },
-  children: [new TextRun({ text: "HƯỚNG DẪN SỬ DỤNG", bold: true, size: 40, color: INK })] }));
-children.push(new Paragraph({ alignment: AlignmentType.CENTER,
-  children: [new TextRun({ text: "Dành cho nhân viên · Phiên bản demo nội bộ", size: 20, italics: true, color: MUTED })] }));
+children.push(new Paragraph({ spacing: { before: 2400, after: 0 }, alignment: AlignmentType.CENTER, children: [new TextRun({ text: BRAND, bold: true, size: 64, color: ACCENT })] }));
+children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [new TextRun({ text: "PHẦN MỀM QUẢN LÝ SPA & KHÁCH HÀNG", size: 26, color: INK })] }));
+children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 40 }, children: [new TextRun({ text: "HƯỚNG DẪN SỬ DỤNG (CÓ HÌNH ẢNH)", bold: true, size: 40, color: INK })] }));
+children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Dành cho nhân viên${VERSION ? " · Phiên bản " + VERSION : ""}`, size: 20, italics: true, color: MUTED })] }));
 children.push(new Paragraph({ children: [new PageBreak()] }));
 
 // TOC
 children.push(new Paragraph({ text: "Mục lục", heading: HeadingLevel.HEADING_1, spacing: { after: 120 } }));
-children.push(new TableOfContents("Mục lục", { hyperlink: true, headingStyleRange: "1-2" }));
+children.push(new TableOfContents("Mục lục", { hyperlink: true, headingStyleRange: "1-1" }));
+children.push(NOTE("Sau khi mở file trong Word: bấm chuột phải vào Mục lục → “Update Field” → “Update entire table” để hiện đúng số trang."));
 children.push(new Paragraph({ children: [new PageBreak()] }));
 
-// 1. Giới thiệu & đăng nhập
+// 1. Đăng nhập
 children.push(H1("1. Giới thiệu & Đăng nhập"));
-children.push(P(`${BRAND} là phần mềm quản lý toàn bộ hành trình khách hàng của spa/thẩm mỹ: từ Marketing → Khách hàng → Chăm sóc → Đánh giá → Phác đồ → Báo giá → Booking → Thực hiện buổi → Vật tư → Thanh toán → Theo dõi sau dịch vụ. Toàn bộ giao diện bằng tiếng Việt.`));
-children.push(H2("Mở phần mềm"));
-children.push(step(1, "Mở trình duyệt (Chrome/Edge), vào địa chỉ: **http://172.168.11.60:9500**"));
-children.push(step(2, "Nhập **Email** và **Mật khẩu** rồi bấm **Đăng nhập**."));
-children.push(step(3, "Vào thẳng màn hình **Tổng quan** của spa."));
-children.push(NOTE("Nếu báo “Quá nhiều lần thử” — đó là cơ chế chống dò mật khẩu; chờ 1–2 phút rồi đăng nhập lại đúng thông tin."));
+children.push(P(`**${BRAND}** quản lý toàn bộ hành trình khách hàng của spa/thẩm mỹ: Marketing → Khách hàng → Chăm sóc (CSKH) → Đánh giá → Phác đồ → Báo giá → Hóa đơn → Booking → Thực hiện buổi → Vật tư → Thanh toán → Theo dõi sau dịch vụ. Toàn bộ giao diện tiếng Việt.`));
+children.push(H2("Cách mở & đăng nhập"));
+children.push(step("Mở trình duyệt (Chrome/Edge), vào địa chỉ máy chủ: **http://172.168.11.60:9500**"));
+children.push(step("Nhập **Email** và **Mật khẩu** → bấm **Đăng nhập** → vào màn **Tổng quan**."));
+children.push(...img("00-dang-nhap.png", "Màn hình đăng nhập"));
 children.push(H2("Tài khoản demo (mật khẩu = <vai trò>123)"));
-children.push(table(
-  ["Vai trò", "Email đăng nhập", "Mật khẩu"],
-  [
-    ["Quản lý", "quanly@sophia.com.vn", "quanly123"],
-    ["Lễ tân", "letan@sophia.com.vn", "letan123"],
-    ["Chăm sóc KH (CSKH)", "cskh@sophia.com.vn", "cskh123"],
-    ["Chuyên viên", "chuyenvien@sophia.com.vn", "chuyenvien123"],
-    ["Thu ngân", "thungan@sophia.com.vn", "thungan123"],
-    ["Marketing", "marketing@sophia.com.vn", "marketing123"],
-    ["Quản trị (Admin)", "admin@sophia.com.vn", "admin123"],
-  ],
-  [2600, 4200, 2000]
-));
+children.push(table(["Vai trò", "Email đăng nhập", "Mật khẩu"], [
+  ["Quản lý", "quanly@sophia.com.vn", "quanly123"],
+  ["Lễ tân", "letan@sophia.com.vn", "letan123"],
+  ["Chăm sóc KH (CSKH)", "cskh@sophia.com.vn", "cskh123"],
+  ["Chuyên viên", "chuyenvien@sophia.com.vn", "chuyenvien123"],
+  ["Thu ngân", "thungan@sophia.com.vn", "thungan123"],
+  ["Marketing", "marketing@sophia.com.vn", "marketing123"],
+  ["Quản trị (Admin)", "admin@sophia.com.vn", "admin123"],
+], [2600, 4200, 2000]));
 children.push(NOTE("Nên đổi mật khẩu mặc định trước khi dùng thật. Mỗi vai trò chỉ thấy/làm được phần việc của mình (xem mục Phân quyền)."));
 
 // 2. Tổng quan
 children.push(H1("2. Màn hình Tổng quan"));
-children.push(P("Menu: **Tổng quan**. Hiển thị nhanh tình hình hoạt động trong tháng:"));
-children.push(bullet("**Booking hôm nay / sắp tới** — số lịch hẹn."));
-children.push(bullet("**Khách mới trong tháng**, **Phác đồ đang chạy**, **Công việc quá hạn**."));
-children.push(bullet("**Doanh thu / Chi phí / Lợi nhuận** (chỉ vai trò có quyền tài chính mới thấy số tiền)."));
-children.push(P("Dùng màn này để nắm nhanh mỗi sáng: còn việc gì quá hạn, có bao nhiêu lịch hẹn, doanh thu ra sao."));
+children.push(P("Menu **Tổng quan** — nắm nhanh tình hình trong tháng: booking hôm nay/sắp tới, khách mới, phác đồ đang chạy, công việc quá hạn, và **Doanh thu / Chi phí / Lợi nhuận** (chỉ vai trò có quyền tài chính mới thấy số tiền)."));
+children.push(...img("01-tong-quan.png", "Tổng quan hoạt động spa"));
 
 // 3. Khách hàng
-children.push(H1("3. Quản lý Khách hàng"));
-children.push(P("Menu: **Khách hàng**. Đây là trung tâm của mọi việc — mỗi khách có 1 hồ sơ chứa toàn bộ lịch sử."));
-children.push(H2("Tạo khách hàng mới"));
-children.push(step(1, "Bấm **Thêm mới** (góc trên phải)."));
-children.push(step(2, "Nhập **Họ tên, Giới tính, SĐT, Email, Nguồn khách** (Facebook, giới thiệu…), **Nhóm** (Thường/VIP), **Người phụ trách**, **Mong muốn/mục tiêu**."));
-children.push(step(3, "Bấm **Lưu** → khách xuất hiện trong danh sách, có mã tự động (VD KH-000123)."));
-children.push(H2("Hồ sơ khách hàng (bấm vào tên khách)"));
-children.push(P("Phía trên hiển thị thông tin + **Tổng giá trị / Đã thanh toán / Công nợ**. Bên dưới là các tab:"));
-children.push(bullet("**Timeline** — toàn bộ hành trình (đánh giá, phác đồ, báo giá, buổi, CSKH, thanh toán…)."));
-children.push(bullet("**Nhật ký CSKH** — lịch sử chăm sóc (xem mục 4)."));
-children.push(bullet("**Booking, Phác đồ, Đánh giá** — các bản ghi của khách."));
-children.push(bullet("**Sản phẩm đề xuất** — sản phẩm khuyên dùng (Thiết yếu/Khuyến nghị/Tùy chọn)."));
-children.push(bullet("**Vật tư khách hàng** — vật tư dành riêng cho khách này (xem mục 10)."));
-children.push(bullet("**Biểu mẫu, Hướng dẫn, Thanh toán** — phiếu đã điền, dặn dò, lịch sử thu tiền."));
-children.push(P("Các nút nhanh trên hồ sơ: **Nhật ký CSKH, Thanh toán, Đánh giá, Đề xuất SP, Áp biểu mẫu, Gửi hướng dẫn, Cổng khách**."));
+children.push(H1("3. Quản lý Khách hàng (hồ sơ 360°)"));
+children.push(P("Menu **Khách hàng** — trung tâm của mọi việc. Mỗi khách có 1 hồ sơ chứa toàn bộ lịch sử."));
+children.push(...img("02-khach-hang.png", "Danh sách khách hàng"));
+children.push(H2("Thêm / sửa khách"));
+children.push(step("Bấm **Thêm khách hàng** → nhập họ tên (bắt buộc), điện thoại, email, **ngày sinh**, giới tính, nguồn, nhóm…"));
+children.push(step("Bấm vào tên khách để mở **hồ sơ**."));
+children.push(H2("Hồ sơ khách — các tab"));
+children.push(bullet("**Tổng quan / Timeline**: toàn bộ hành trình (CSKH, booking, phác đồ, đánh giá, hóa đơn, thanh toán…) + công nợ."));
+children.push(bullet("**Nhật ký CSKH, Booking, Phác đồ, Đánh giá, Sản phẩm đề xuất, Vật tư khách hàng, Biểu mẫu, Hướng dẫn, Hóa đơn, Thanh toán**."));
+children.push(...img("03-ho-so-khach.png", "Hồ sơ khách hàng: Timeline + công nợ + các tab"));
 
-// 4. CSKH
-children.push(H1("4. Nhật ký Chăm sóc khách hàng (CSKH)"));
-children.push(P("Menu: **Khách hàng → hồ sơ → tab Nhật ký CSKH**, hoặc nút **Nhật ký CSKH**."));
-children.push(step(1, "Bấm **Nhật ký CSKH** → chọn **loại** (Gọi điện, Tư vấn, Nhắn tin, Phản hồi, Khiếu nại, Nhắc lịch…)."));
-children.push(step(2, "Nhập **nội dung** và **kết quả**. Nếu cần theo dõi tiếp: điền **Ngày follow-up** + **Người phụ trách**."));
-children.push(step(3, "Bấm **Lưu**. Khi có ngày follow-up, hệ thống tự tạo **Công việc** để nhắc (xem menu Công việc)."));
-children.push(NOTE("Mỗi lần chăm sóc là một bản ghi độc lập, không ghi đè — giữ đủ lịch sử."));
+// 4. Booking
+children.push(H1("4. Booking & Lịch hẹn"));
+children.push(P("Menu **Booking**. Xem theo **Danh sách / Ngày / Tuần / Tháng**; tạo lịch gắn **Kỹ thuật viên, Master, Phòng, Giường, Máy**."));
+children.push(H2("Tạo booking"));
+children.push(step("Bấm **Tạo booking** → chọn khách, dịch vụ, thời gian, thời lượng."));
+children.push(step("Nhập tài nguyên (KTV/master/phòng/giường/máy). Bấm **Lưu**."));
+children.push(step("Nếu **trùng lịch** (cùng KTV/phòng… trùng giờ) → hiện **cảnh báo vàng**; có thể **Vẫn đặt (bỏ qua cảnh báo)** khi cần."));
+children.push(...img("04-booking-lich-thang.png", "Lịch Tháng — chip giờ + tên khách mỗi ngày"));
+children.push(...img("04b-booking-lich-tuan.png", "Lịch Tuần — 7 cột ngày"));
 
-// 5. Booking
-children.push(H1("5. Booking / Lịch hẹn"));
-children.push(P("Menu: **Booking**."));
-children.push(step(1, "Bấm **Thêm mới** → chọn **khách hàng, dịch vụ, ngày giờ, phòng, người thực hiện**."));
-children.push(step(2, "Giá dịch vụ tự điền theo bảng giá; bấm **Lưu**."));
-children.push(step(3, "Đổi **trạng thái** trực tiếp trong danh sách: Mới → Đã xác nhận → Khách đã đến → Đang thực hiện → Hoàn thành (hoặc Hủy/Không đến)."));
-children.push(NOTE("Booking hoàn thành sẽ gắn với buổi thực hiện trong phác đồ. Quản lý lịch hẹn hiện làm ngay trong danh sách Booking."));
+// 5. Phác đồ & ghi buổi
+children.push(H1("5. Phác đồ & Ghi nhận buổi"));
+children.push(P("Menu **Phác đồ**. Mỗi phác đồ gồm nhiều **giai đoạn** và **buổi**; có version (V1/V2…)."));
+children.push(...img("14-phac-do-ds.png", "Danh sách phác đồ"));
+children.push(H2("Ghi nhận một buổi"));
+children.push(step("Mở phác đồ → dòng buổi → bấm **Ghi nhận**."));
+children.push(step("Nhập thông số/tình trạng trước–sau, **tải ảnh Before/After**."));
+children.push(step("**Vật tư sử dụng trong buổi**: chọn nguồn (Kho vật tư sử dụng / Vật tư khách hàng) → nhập số dùng."));
+children.push(step("**Nhân sự thực hiện buổi**: chọn nhân viên → vai trò (chính/hỗ trợ/master/kiểm tra/tư vấn) → phí."));
+children.push(step("**Đánh giá & báo cáo sau buổi**: sao hài lòng + sao KTV + nhận xét + báo cáo KTV."));
+children.push(...img("14b-phac-do-chi-tiet.png", "Chi tiết phác đồ + các thao tác ghi buổi"));
 
-// 6. Dịch vụ
-children.push(H1("6. Dịch vụ"));
-children.push(P("Menu: **Dịch vụ**. Danh mục dịch vụ dùng chung cho báo giá, booking, phác đồ."));
-children.push(step(1, "Bấm **Thêm dịch vụ** → nhập **tên, nhóm, thời lượng, giá chuẩn, giá vốn dự kiến**."));
-children.push(step(2, "Bấm **Lưu**. Có thể tạo **Nhóm dịch vụ** để phân loại."));
+// 6. Tài chính
+children.push(H1("6. Báo giá → Hóa đơn → Thanh toán → Công nợ"));
+children.push(P("Đây là luồng tài chính chính. **Menu Báo giá**: lập nhiều phương án cho khách chọn."));
+children.push(...img("05-bao-gia-ds.png", "Danh sách báo giá"));
+children.push(H2("Chốt báo giá & tạo hóa đơn"));
+children.push(step("Mở báo giá → thiết kế các phương án (Thiết yếu/Khuyến nghị/Cao cấp) → **Gửi khách**."));
+children.push(step("Khi khách đồng ý: bấm **Khách chốt** → chọn phương án + giá thống nhất (đông cứng snapshot)."));
+children.push(step("Bấm **Tạo hóa đơn** → chuyển sang màn hóa đơn."));
+children.push(...img("05b-bao-gia-chi-tiet.png", "Báo giá nhiều phương án (đã chốt) + nút Tạo hóa đơn"));
+children.push(H2("Hóa đơn & thu tiền"));
+children.push(P("Menu **Hóa đơn**: theo dõi **Tổng / Đã trả / Còn phải thu** và trạng thái (Chưa TT / Trả một phần / Đã TT)."));
+children.push(...img("06-hoa-don-ds.png", "Danh sách hóa đơn + tổng công nợ"));
+children.push(step("Mở hóa đơn → bấm **Thu tiền** → nhập số tiền + hình thức (một hóa đơn thu **nhiều lần**)."));
+children.push(step("Hệ thống tự cập nhật trạng thái & công nợ. **Không thu vượt** số còn phải thu."));
+children.push(...img("06b-hoa-don-chi-tiet.png", "Chi tiết hóa đơn: hạng mục + lịch sử thu + nút Thu tiền"));
+children.push(H2("Sổ thanh toán"));
+children.push(P("Menu **Thanh toán**: toàn bộ lượt thu, gắn với hóa đơn."));
+children.push(...img("07-thanh-toan.png", "Sổ thanh toán"));
+children.push(NOTE("Công nợ khách được tính TỪ HÓA ĐƠN. Giá vốn/lợi nhuận chỉ vai trò có quyền tài chính mới thấy."));
 
-// 7. Thư viện Spa
-children.push(H1("7. Thư viện Spa"));
-children.push(P("Nhóm menu **Thư viện Spa** gồm: Brand, Công nghệ, Protocol, Sản phẩm, Biểu mẫu, Hướng dẫn chăm sóc. Đây là “kho kiến thức” tái sử dụng khi thiết kế phác đồ/buổi."));
-children.push(H2("Brand (Thương hiệu)"));
-children.push(P("Menu **Brand**: quản lý thương hiệu (DMK, Dermalogica, Klapp…). Bấm **Thêm mới** để thêm brand."));
-children.push(H2("Công nghệ"));
-children.push(P("Menu **Công nghệ**: máy/công nghệ (Laser, RF, HIFU…) kèm chỉ định, chống chỉ định, thông số. Bấm **Thêm mới**."));
-children.push(H2("Protocol (Quy trình chuyên môn)"));
-children.push(P("Menu **Protocol**: quy trình nhiều bước, có **phiên bản (version)**. Mở 1 protocol để thêm **bước thực hiện**, gắn **công nghệ**, **sản phẩm**."));
-children.push(NOTE("Protocol có version: khi sửa lên bản mới, các buổi đã áp bản cũ vẫn giữ nguyên nội dung cũ (không bị đổi theo)."));
-children.push(H2("Sản phẩm"));
-children.push(P("Menu **Sản phẩm**: danh mục sản phẩm theo brand (chuyên nghiệp/bán về nhà), có giá bán và giá vốn (giá vốn chỉ vai trò tài chính thấy)."));
-children.push(H2("Biểu mẫu"));
-children.push(P("Menu **Biểu mẫu**: thiết kế phiếu (đánh giá da, tư vấn…) bằng công cụ **kéo–thả**, hỗ trợ nhiều loại trường (văn bản, số, ngày, ảnh, chữ ký, bảng…) và **logic hiển thị có điều kiện**. Áp biểu mẫu cho khách/buổi để điền."));
-children.push(H2("Hướng dẫn chăm sóc"));
-children.push(P("Menu **Hướng dẫn chăm sóc**: thư viện dặn dò **trước** và **sau** dịch vụ. Khi gửi cho khách sẽ tạo bản riêng (cá nhân hóa được, không đổi mẫu gốc)."));
+// 7. Giá sàn
+children.push(H1("7. Giá sàn (chi phí → giá sàn)"));
+children.push(P("Menu **Giá sàn** (cần quyền tài chính). Khai báo 6 khoản chi phí (nhân sự/vận hành/khấu hao/vật tư/phòng/khác) + biên tối thiểu → hệ thống tính **giá sàn**."));
+children.push(step("Bấm **Khai báo** ở dịch vụ → nhập chi phí + biên % → xem trước giá sàn → **Lưu**."));
+children.push(step("Khi tạo booking **giá thấp hơn giá sàn** → bị chặn; người có **quyền duyệt** mới **Duyệt bán dưới sàn**."));
+children.push(...img("08-gia-san.png", "Bảng giá sàn theo dịch vụ"));
 
-// 8. Phác đồ
-children.push(H1("8. Phác đồ điều trị"));
-children.push(P("Menu: **Phác đồ**. Đây là kế hoạch điều trị nhiều buổi cho một khách."));
-children.push(H2("Tạo phác đồ"));
-children.push(step(1, "Vào **Phác đồ → Thêm mới** (hoặc từ hồ sơ khách) → chọn khách, đặt tên, chẩn đoán, mục tiêu, tổng giá dự kiến."));
-children.push(step(2, "Thêm **giai đoạn** (Chuẩn bị / Can thiệp / Duy trì…)."));
-children.push(H2("Thêm buổi thực hiện"));
-children.push(step(1, "Mở phác đồ → **Thêm buổi** → đặt tên buổi, chọn dịch vụ/công nghệ/protocol, mục tiêu, dặn dò trước."));
-children.push(step(2, "Kéo–thả để **sắp xếp thứ tự** các buổi."));
-children.push(H2("Ghi nhận buổi (khi thực hiện xong)"));
-children.push(P("Mở phác đồ → tại buổi cần ghi, bấm **Ghi nhận buổi**. Trong màn này nhập:"));
-children.push(bullet("**Thông số** trước/sau (độ ẩm, độ đàn hồi…), **tình trạng** trước/sau."));
-children.push(bullet("**Ảnh Trước & Sau** — bấm tải ảnh lên. Muốn khách xem được trên Cổng khách thì bật ô **“Khách thấy”** ở từng ảnh (mặc định ảnh là riêng tư)."));
-children.push(bullet("**Vật tư sử dụng** — chọn nguồn và số lượng (xem mục 10)."));
-children.push(bullet("**Phản hồi của khách, dặn dò sau, chi phí thực tế, ghi chú** → bấm **Lưu**."));
+// 8. Nhân sự
+children.push(H1("8. Nhân sự (đa vai trò + phí buổi)"));
+children.push(P("Menu **Hệ thống → Nhân sự**. Mỗi nhân viên giữ **nhiều vai trò** (KTV/Master/CSKH/Sales/Quản lý…) và có **phí mặc định** mỗi buổi."));
+children.push(step("Bấm **Thêm nhân sự** → nhập tên, liên hệ, chọn **nhiều vai trò** bằng chip, phí mặc định."));
+children.push(step("Phân công nhân sự cho từng buổi ở màn **Ghi nhận buổi** (mục 5)."));
+children.push(...img("09-nhan-su.png", "Danh sách nhân sự — vai trò dạng chip + phí"));
 
-// 9. Báo giá
-children.push(H1("9. Báo giá (Proposal)"));
-children.push(P("Menu: **Báo giá**. Cho phép đưa **nhiều phương án** để khách cân nhắc."));
-children.push(step(1, "Bấm **Thêm mới** → chọn khách, đặt tiêu đề."));
-children.push(step(2, "Tạo các phương án: **Cơ bản / Khuyến nghị / Chuyên sâu** — mỗi phương án thêm các **hạng mục** (dịch vụ, sản phẩm), số buổi, chiết khấu. Tổng tiền tự tính."));
-children.push(step(3, "Gửi khách. Khi khách đồng ý, bấm **Khách chốt** → phương án được **đông cứng** (giá giữ nguyên dù sau này đổi bảng giá)."));
+// 9. CSKH follow-up
+children.push(H1("9. CSKH · Follow-up & Sinh nhật"));
+children.push(P("Menu **CSKH · Follow-up**. Tạo **quy trình chăm sóc nhiều bước** (mốc ngày + kênh + kịch bản + checklist), áp cho khách để **sinh việc theo lịch**."));
+children.push(step("Tạo quy trình → thêm các bước (sau N ngày, kênh Zalo/SMS…, việc, kịch bản, checklist)."));
+children.push(step("Bấm **Áp** → chọn khách + mốc bắt đầu → hệ thống tạo các việc follow-up (hiện ở **Công việc** & timeline khách)."));
+children.push(step("Thẻ **Sinh nhật 30 ngày tới**: bấm **Chúc mừng** để áp nhanh quy trình sinh nhật."));
+children.push(...img("10-cskh-followup.png", "CSKH: sinh nhật sắp tới + quy trình follow-up"));
 
-// 10. Vật tư
-children.push(H1("10. Vật tư (2 khái niệm)"));
-children.push(P("Nhóm menu **Vật tư**. Chỉ dùng **2 khái niệm** đơn giản:"));
-children.push(H2("A. Kho vật tư sử dụng"));
-children.push(P("Menu **Kho vật tư sử dụng**: vật tư/dung dịch chuyên môn theo **lọ/chai/lô**, **dùng chung nhiều khách, nhiều buổi**."));
-children.push(bullet("Trên cùng có các thẻ: **Đang sử dụng / Lọ đang mở / Sắp hết / Sắp hết hạn / Tiêu hao hôm nay / Chi phí hôm nay**."));
-children.push(bullet("Bấm **Thêm vật tư** (khai báo tên + đơn vị + định mức/buổi), rồi **Thêm lọ/lô** (số lượng ban đầu, giá vốn cả lọ, ngày mở, hạn dùng)."));
-children.push(bullet("Mỗi lọ hiển thị **Còn / Ban đầu** và trạng thái. Bấm **Dùng** để ghi nhận tiêu hao; **Hủy lọ** khi bỏ."));
-children.push(NOTE("Ví dụ: 1 lọ JetPeel 100ml. Khách A dùng 5ml, khách B 7ml, A dùng tiếp 6ml → còn 82ml; hệ thống tự tính chi phí từng buổi."));
-children.push(H2("B. Vật tư khách hàng"));
-children.push(P("Menu **Vật tư khách hàng**: vật tư **dành riêng 1 khách**, **không dùng cho khách khác**, dùng qua nhiều buổi."));
-children.push(bullet("Bấm **Cấp vật tư cho khách** → chọn khách, tên vật tư, đơn vị, số lượng cấp."));
-children.push(bullet("Cột **Đã cấp / Đã dùng / Còn lại** cập nhật tự động. Cũng xem được trong **hồ sơ khách → tab Vật tư khách hàng**."));
-children.push(H2("Ghi nhận tiêu hao trong buổi"));
-children.push(step(1, "Trong màn **Ghi nhận buổi** (mục 8), tại phần **Vật tư sử dụng**: chọn **Nguồn** = *Kho vật tư sử dụng* hoặc *Vật tư khách hàng*."));
-children.push(step(2, "Chọn lọ/vật tư → xem **số còn lại** → nhập **số lượng dùng** → bấm **Ghi nhận**."));
-children.push(step(3, "Tồn giảm ngay, chi phí cộng vào buổi. Danh sách đã dùng hiển thị ngay bên dưới."));
-children.push(H2("Lịch sử & Báo cáo vật tư"));
-children.push(bullet("**Lịch sử sử dụng** — mọi lần tiêu hao theo buổi/khách/nhân viên."));
-children.push(bullet("**Báo cáo vật tư** — tiêu hao theo khách/buổi/dịch vụ/công nghệ/nhân viên + **định mức vs thực tế** + chi phí."));
+// 10. Before/After & đánh giá
+children.push(H1("10. Before/After & Đánh giá"));
+children.push(P("Menu **Before/After & Đánh giá**. Thư viện ảnh trước–sau theo buổi (lọc theo khách/dịch vụ/ngày, bấm ảnh để phóng to so sánh) + tổng hợp **điểm hài lòng, điểm KTV, tỷ lệ quay lại**."));
+children.push(...img("11-before-after.png", "Tổng hợp đánh giá + lưới ảnh Trước–Sau"));
+children.push(NOTE("Ảnh khách là RIÊNG TƯ; chỉ ảnh được bật “Khách thấy” mới hiển thị trên Cổng khách."));
 
-// 11. Thanh toán
-children.push(H1("11. Thanh toán & Công nợ"));
-children.push(P("Menu: **Khách hàng → hồ sơ → nút Thanh toán** (hoặc tab Thanh toán)."));
-children.push(step(1, "Bấm **Thanh toán** → nhập **số tiền, hình thức** (Tiền mặt/Chuyển khoản/Thẻ/Ví), người thu, ghi chú."));
-children.push(step(2, "Bấm **Lưu**. Hồ sơ khách tự cập nhật **Đã thanh toán** và **Công nợ**."));
-children.push(NOTE("Dữ liệu tài chính (giá vốn, chi phí, lợi nhuận) chỉ vai trò có quyền tài chính (Thu ngân/Quản lý/Admin) mới xem được."));
+// 11. Dịch vụ & thư viện
+children.push(H1("11. Dịch vụ & Thư viện Spa"));
+children.push(P("Menu **Dịch vụ** (giá chuẩn, thời lượng) và nhóm **Thư viện Spa** (Brand, Công nghệ, Protocol, Sản phẩm, Biểu mẫu, Hướng dẫn chăm sóc)."));
+children.push(...img("13-dich-vu.png", "Danh mục dịch vụ"));
 
-// 12. Marketing
-children.push(H1("12. Marketing"));
-children.push(P("Menu: **Marketing**."));
-children.push(bullet("Tạo **Chiến dịch** (kênh, ngân sách, chi phí)."));
-children.push(bullet("Quản lý **Lead** (khách tiềm năng): Mới → Đã liên hệ → Đã đặt lịch → Chuyển đổi/Mất. Có thể **chuyển lead thành khách hàng**."));
-children.push(bullet("Xem **hiệu quả**: số lead/khách/booking/doanh thu, tỷ lệ chuyển đổi, ROI."));
+// 12. Import
+children.push(H1("12. Nhập khách hàng (Import MySpa/CSV)"));
+children.push(P("Menu **Hệ thống → Nhập khách hàng**. Nhập danh sách khách từ file CSV/MySpa theo 4 bước, **không ghi đè** khách đã có."));
+children.push(step("**Dán CSV** hoặc **Tải file .csv** (có nút **Dùng mẫu**)."));
+children.push(step("**Ghép cột** nguồn → trường chuẩn (hệ thống tự đoán). Bắt buộc cột **Họ tên**."));
+children.push(step("**Kiểm tra & xem trước**: mỗi dòng gắn trạng thái **Thêm mới / Trùng / Lỗi** + lý do."));
+children.push(step("Bấm **Nhập** → báo cáo: đã tạo / bỏ qua trùng / lỗi + danh sách mã KH."));
+children.push(...img("12-import-khach.png", "Nhập khách hàng: ghép cột + kiểm tra trùng"));
+children.push(NOTE("Khách trùng (theo SĐT hoặc mã cũ) KHÔNG bị ghi đè — dữ liệu cũ giữ nguyên."));
 
-// 13. Cổng khách
-children.push(H1("13. Cổng khách hàng"));
-children.push(P("Địa chỉ riêng cho khách: **http://172.168.11.60:9500/portal**. Khách đăng nhập bằng tài khoản riêng (email + mật khẩu do spa cấp)."));
-children.push(P("Khách chỉ thấy **dữ liệu của chính mình**: báo giá, phác đồ, sản phẩm đề xuất, ảnh Trước/Sau **đã được chia sẻ**. Khách **không** thấy giá vốn, ghi chú nội bộ hay dữ liệu khách khác."));
-children.push(NOTE("Muốn khách xem ảnh Trước/Sau: trong màn Ghi nhận buổi, bật ô “Khách thấy” ở ảnh tương ứng."));
+// 13. Cài đặt & thương hiệu
+children.push(H1("13. Cài đặt & Thương hiệu"));
+children.push(P("Menu **Hệ thống → Cài đặt**. Đổi **tên phần mềm, khẩu hiệu, màu nhấn, logo** (áp cho toàn hệ thống). Xem **phiên bản** phần mềm ở cuối trang và ở chân menu trái."));
+children.push(...img("15-cai-dat.png", "Cài đặt thương hiệu + phiên bản phần mềm"));
 
 // 14. Phân quyền
-children.push(H1("14. Phân quyền (vai trò)"));
-children.push(P("Mỗi tài khoản gắn 1 vai trò, quyết định thấy/làm được gì:"));
-children.push(table(
-  ["Vai trò", "Làm được gì"],
-  [
-    ["Quản lý", "Gần như toàn quyền nghiệp vụ spa + duyệt + xem tài chính"],
-    ["Lễ tân", "Tạo khách, đặt lịch (booking), thu tiền cơ bản"],
-    ["CSKH", "Nhật ký chăm sóc, follow-up, công việc"],
-    ["Chuyên viên", "Đánh giá, thiết kế phác đồ/protocol, thực hiện & ghi nhận buổi, vật tư"],
-    ["Thu ngân", "Thanh toán, công nợ, xem dữ liệu tài chính"],
-    ["Marketing", "Chiến dịch, lead, ROI"],
-    ["Admin", "Toàn quyền hệ thống"],
-  ],
-  [2600, 6200]
-));
-children.push(NOTE("Tạo tài khoản / đổi vai trò hiện do người quản trị làm ở tầng dữ liệu. Liên hệ bộ phận kỹ thuật khi cần thêm nhân viên."));
+children.push(H1("14. Phân quyền theo vai trò"));
+children.push(P("Mỗi vai trò chỉ thấy/làm phần việc của mình; **dữ liệu tài chính** (giá vốn, lợi nhuận, chi phí, phí nhân sự, giá sàn) chỉ vai trò có quyền tài chính mới xem."));
+children.push(table(["Vai trò", "Làm được gì (tóm tắt)"], [
+  ["Quản lý", "Toàn bộ nghiệp vụ spa + tài chính + duyệt (giá sàn, bán dưới sàn…)"],
+  ["Lễ tân", "Khách, booking, thu tiền, chốt báo giá, hóa đơn, nhân sự"],
+  ["CSKH", "Nhật ký chăm sóc, follow-up, công việc (không xem tài chính)"],
+  ["Chuyên viên", "Ghi buổi, đánh giá, phác đồ/protocol, đề xuất, vật tư"],
+  ["Thu ngân", "Thanh toán, công nợ, hóa đơn, bảng giá, giá sàn (tài chính)"],
+  ["Marketing", "Chiến dịch, nguồn khách, catalog sản phẩm, ROI"],
+  ["Admin", "Toàn quyền hệ thống"],
+], [2600, 6200]));
 
-// 15. Mẹo & xử lý sự cố
-children.push(H1("15. Mẹo & Xử lý sự cố thường gặp"));
-children.push(bullet("**Đăng nhập báo “Quá nhiều lần thử”**: do nhập sai nhiều lần (chống dò mật khẩu). Chờ 1–2 phút rồi nhập đúng; nếu gấp, nhờ kỹ thuật xóa khóa."));
-children.push(bullet("**Quên mật khẩu**: nhờ người quản trị đặt lại."));
-children.push(bullet("**Ảnh khách không thấy trên Cổng khách**: kiểm tra đã bật ô “Khách thấy” ở ảnh chưa."));
+// 15. Cập nhật không mất dữ liệu
+children.push(H1("15. Cập nhật phần mềm (không mất dữ liệu)"));
+children.push(step("**Sao lưu** database (khuyến nghị): pg_dump ra file .sql."));
+children.push(step("**Giải nén** bản mới đè lên thư mục app — **giữ nguyên file .env** (bản zip không kèm .env)."));
+children.push(step("Bấm đúp **windows\\update-windows.bat** (tự cập nhật thư viện + áp migration additive + build)."));
+children.push(step("Chạy **start-windows.bat** để khởi động lại. Vào **Cài đặt → Phiên bản** kiểm tra."));
+children.push(NOTE("Cập nhật chỉ THÊM bảng/cột (không xóa dữ liệu). KHÔNG chạy db:seed khi cập nhật — seed chỉ dành cho cài mới. Chi tiết ở docs/CAP-NHAT.md."));
+
+// 16. Mẹo & sự cố
+children.push(H1("16. Mẹo & Xử lý sự cố thường gặp"));
+children.push(bullet("**“Quá nhiều lần thử”**: do nhập sai nhiều lần (chống dò mật khẩu). Chờ 1–2 phút rồi nhập đúng."));
 children.push(bullet("**Không thấy số tiền/giá vốn**: do vai trò không có quyền tài chính — đúng thiết kế."));
-children.push(bullet("**Số liệu tháng bằng 0**: do chưa có giao dịch phát sinh trong tháng hiện tại."));
+children.push(bullet("**Ảnh khách không hiện trên Cổng khách**: kiểm tra đã bật ô “Khách thấy” chưa."));
+children.push(bullet("**Số liệu tháng = 0**: chưa có giao dịch phát sinh trong tháng hiện tại."));
+children.push(bullet("**Trùng lịch / dưới giá sàn**: là cảnh báo có chủ đích; cần vai trò có quyền để bỏ qua/duyệt."));
 children.push(spacer());
 children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 240 },
-  children: [new TextRun({ text: `— Hết —  ${BRAND} · Hướng dẫn sử dụng`, italics: true, size: 18, color: MUTED })] }));
+  children: [new TextRun({ text: `— Hết —  ${BRAND} · Hướng dẫn sử dụng${VERSION ? " · " + VERSION : ""}`, italics: true, size: 18, color: MUTED })] }));
 
 // ---- document ----
 const doc = new Document({
   creator: BRAND,
   title: `${BRAND} — Hướng dẫn sử dụng`,
   styles: {
-    default: {
-      document: { run: { font: "Calibri", size: 22, color: INK } },
-    },
+    default: { document: { run: { font: "Calibri", size: 22, color: INK } } },
     paragraphStyles: [
       { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true,
         run: { size: 30, bold: true, color: ACCENT, font: "Calibri" },
@@ -289,13 +299,10 @@ const doc = new Document({
       { reference: "steps", levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 220 } } } }] },
     ],
   },
-  sections: [{
-    properties: { page: { margin: { top: 1100, bottom: 1100, left: 1100, right: 1100 } } },
-    children,
-  }],
+  sections: [{ properties: { page: { margin: { top: 1100, bottom: 1100, left: 1100, right: 1100 } } }, children }],
 });
 
 Packer.toBuffer(doc).then((buf) => {
-  fs.writeFileSync(process.argv[2], buf);
-  console.log("wrote", process.argv[2], (buf.length / 1024).toFixed(0) + "KB");
+  fs.writeFileSync(OUT, buf);
+  console.log("wrote", OUT, (buf.length / 1024).toFixed(0) + "KB");
 });
