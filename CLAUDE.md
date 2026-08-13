@@ -783,6 +783,27 @@ KHÔNG bị ghi đè.
 Import lịch sử giao dịch/phác đồ/ảnh (hiện chỉ hồ sơ khách); chế độ "cập nhật khách trùng" (hiện chỉ bỏ qua);
 tải file Excel `.xlsx` trực tiếp (hiện CSV); lưu lịch sử các lần import.
 
+## Quản trị người dùng (Admin) — tài khoản đăng nhập + gán vai trò
+
+Module quản trị tài khoản đăng nhập (khác **Nhân sự** — Nhân sự là danh mục nhân viên; đây là tài khoản
+User + Role để đăng nhập & phân quyền). **Không có migration mới** (dùng `User`/`Role`/`UserRole` sẵn có).
+Xác thực: tsc sạch · lint 0 lỗi · build OK · **95 test pass** (thêm `test/users.test.ts`, 3 test).
+
+### RBAC
+Dùng quyền `user.manage` **đã có sẵn** (chỉ `ADMIN` có, qua `ALL_PERMISSIONS`). Mọi route/trang gated bằng
+`requirePermission(USER_MANAGE)`; trang UI báo "chỉ Admin" nếu thiếu quyền; mục sidebar **ẩn** với vai trò
+không có quyền (lọc theo `session.permissions` trong `app-shell`).
+
+### API
+`/api/users` (GET list — **KHÔNG trả passwordHash**; POST tạo: email unique, băm mật khẩu bcrypt, gán vai
+trò theo `roleCodes` hợp lệ) · `/api/users/[id]` (GET; PATCH đổi tên/vai trò [thay toàn bộ user_roles]/
+đặt lại mật khẩu/khóa-mở; **chặn tự khóa chính mình**). Validation: `userCreateSchema`/`userUpdateSchema`.
+
+### UI — `/users` (Hệ thống → Quản trị người dùng)
+Danh sách (tên/email/**vai trò chip**/ngày tạo/trạng thái) + **Thêm/Sửa** (email, họ tên, mật khẩu/đặt lại,
+chọn **nhiều vai trò** ADMIN/BOD/MANAGER/RECEPTION/CUSTOMER_CARE/SPECIALIST/CASHIER/MARKETING, khóa/mở).
+Bump **v0.9.0**.
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

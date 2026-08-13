@@ -91,6 +91,7 @@ const NAV_GROUPS = [
   {
     title: "Hệ thống",
     items: [
+      { href: "/users", label: "Quản trị người dùng", icon: ShieldCheck, perm: "user.manage" },
       { href: "/employees", label: "Nhân sự", icon: Users },
       { href: "/import-customers", label: "Nhập khách hàng", icon: Upload },
       { href: "/settings", label: "Cài đặt", icon: Settings },
@@ -170,7 +171,7 @@ export function AppShell({
               <div className="px-3 pb-1 pt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
                 {group.title}
               </div>
-              {group.items.map((item) => {
+              {group.items.filter((item) => !(item as any).perm || session.permissions.includes((item as any).perm)).map((item) => {
                 const active =
                   pathname === item.href || pathname.startsWith(item.href + "/");
                 const Icon = item.icon;

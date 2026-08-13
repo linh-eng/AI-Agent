@@ -3,9 +3,9 @@
 // Khi phát hành bản mới: tăng APP_VERSION + đổi ngày + mô tả ngắn, rồi build lại.
 // (Giữ đồng bộ với "version" trong package.json.)
 // =============================================================================
-export const APP_VERSION = "0.8.0";
+export const APP_VERSION = "0.9.0";
 export const APP_RELEASE_DATE = "2026-08-13";
-export const APP_RELEASE_NAME = "Import khách hàng (MySpa/CSV): xem trước → ghép cột → kiểm tra & phát hiện trùng → nhập + báo cáo";
+export const APP_RELEASE_NAME = "Quản trị người dùng: tạo tài khoản đăng nhập, gán vai trò, đặt lại mật khẩu, khóa/mở (chỉ Admin)";
 
 /** Chuỗi hiển thị gọn: v0.2.0 · 13/08/2026 */
 export function versionLabel(): string {

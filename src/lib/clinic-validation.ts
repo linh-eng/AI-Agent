@@ -307,6 +307,21 @@ export const sessionStaffCreateSchema = z.object({
   note: z.string().optional().nullable(),
 });
 
+// ----- Quản trị người dùng (đăng nhập + vai trò) -----
+export const userCreateSchema = z.object({
+  email: z.string().email("Email không hợp lệ"),
+  name: z.string().min(1, "Nhập họ tên"),
+  password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
+  roleCodes: z.array(z.string()).default([]),
+  isActive: z.boolean().optional(),
+});
+export const userUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự").optional().or(z.literal("")),
+  roleCodes: z.array(z.string()).optional(),
+  isActive: z.boolean().optional(),
+});
+
 // ----- Import khách hàng (mục 41) -----
 export const importCustomerRowSchema = z.object({
   fullName: z.string().optional().nullable(),

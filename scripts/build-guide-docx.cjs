@@ -244,8 +244,17 @@ children.push(H1("13. Cài đặt & Thương hiệu"));
 children.push(P("Menu **Hệ thống → Cài đặt**. Đổi **tên phần mềm, khẩu hiệu, màu nhấn, logo** (áp cho toàn hệ thống). Xem **phiên bản** phần mềm ở cuối trang và ở chân menu trái."));
 children.push(...img("15-cai-dat.png", "Cài đặt thương hiệu + phiên bản phần mềm"));
 
-// 14. Phân quyền
-children.push(H1("14. Phân quyền theo vai trò"));
+// 14. Quản trị người dùng
+children.push(H1("14. Quản trị người dùng (tài khoản đăng nhập)"));
+children.push(P("Menu **Hệ thống → Quản trị người dùng** (**chỉ tài khoản Admin** thấy menu này). Tạo tài khoản đăng nhập cho nhân viên, gán vai trò, đặt lại mật khẩu, khóa/mở."));
+children.push(step("Bấm **Thêm người dùng** → nhập **email đăng nhập**, họ tên, **mật khẩu**, chọn **một hoặc nhiều vai trò**."));
+children.push(step("Bấm biểu tượng bút chì để **sửa**: đổi tên, **đổi vai trò**, **đặt lại mật khẩu** (bỏ trống nếu giữ nguyên), **khóa/mở** tài khoản."));
+children.push(step("Tài khoản bị khóa sẽ không đăng nhập được. (Không thể tự khóa chính tài khoản đang dùng.)"));
+children.push(...img("16-quan-tri-nguoi-dung.png", "Quản trị người dùng: danh sách tài khoản + vai trò"));
+children.push(NOTE("“Quản trị người dùng” là tài khoản ĐĂNG NHẬP (email + mật khẩu + vai trò). Khác với “Nhân sự” — danh mục nhân viên để phân công buổi/tính phí. Một người có thể vừa là nhân sự, vừa có tài khoản đăng nhập."));
+
+// 15. Phân quyền
+children.push(H1("15. Phân quyền theo vai trò"));
 children.push(P("Mỗi vai trò chỉ thấy/làm phần việc của mình; **dữ liệu tài chính** (giá vốn, lợi nhuận, chi phí, phí nhân sự, giá sàn) chỉ vai trò có quyền tài chính mới xem."));
 children.push(table(["Vai trò", "Làm được gì (tóm tắt)"], [
   ["Quản lý", "Toàn bộ nghiệp vụ spa + tài chính + duyệt (giá sàn, bán dưới sàn…)"],
@@ -258,7 +267,7 @@ children.push(table(["Vai trò", "Làm được gì (tóm tắt)"], [
 ], [2600, 6200]));
 
 // 15. Cập nhật không mất dữ liệu
-children.push(H1("15. Cập nhật phần mềm (không mất dữ liệu)"));
+children.push(H1("16. Cập nhật phần mềm (không mất dữ liệu)"));
 children.push(step("**Sao lưu** database (khuyến nghị): pg_dump ra file .sql."));
 children.push(step("**Giải nén** bản mới đè lên thư mục app — **giữ nguyên file .env** (bản zip không kèm .env)."));
 children.push(step("Bấm đúp **windows\\update-windows.bat** (tự cập nhật thư viện + áp migration additive + build)."));
@@ -266,7 +275,7 @@ children.push(step("Chạy **start-windows.bat** để khởi động lại. Và
 children.push(NOTE("Cập nhật chỉ THÊM bảng/cột (không xóa dữ liệu). KHÔNG chạy db:seed khi cập nhật — seed chỉ dành cho cài mới. Chi tiết ở docs/CAP-NHAT.md."));
 
 // 16. Mẹo & sự cố
-children.push(H1("16. Mẹo & Xử lý sự cố thường gặp"));
+children.push(H1("17. Mẹo & Xử lý sự cố thường gặp"));
 children.push(bullet("**“Quá nhiều lần thử”**: do nhập sai nhiều lần (chống dò mật khẩu). Chờ 1–2 phút rồi nhập đúng."));
 children.push(bullet("**Không thấy số tiền/giá vốn**: do vai trò không có quyền tài chính — đúng thiết kế."));
 children.push(bullet("**Ảnh khách không hiện trên Cổng khách**: kiểm tra đã bật ô “Khách thấy” chưa."));
