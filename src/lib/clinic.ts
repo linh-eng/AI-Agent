@@ -43,7 +43,11 @@ export interface CustomerFinancials {
  *  - debt: chênh lệch (>= 0).
  */
 export async function customerFinancials(customerId: string): Promise<CustomerFinancials> {
-  const [plans, bookings, payments] = await Promise.all([
+  const [invoices, plans, bookings, payments] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { customerId, status: { not: "CANCELLED" } },
+      select: { total: true },
+    }),
     prisma.treatmentPlan.findMany({
       where: { customerId, status: { not: "CANCELLED" } },
       select: { totalPrice: true, discount: true },
@@ -55,13 +59,16 @@ export async function customerFinancials(customerId: string): Promise<CustomerFi
     prisma.payment.findMany({ where: { customerId }, select: { amount: true } }),
   ]);
 
-  const planBilled = plans.reduce(
-    (s, p) => s + num(p.totalPrice) - num(p.discount),
-    0
-  );
-  // Nếu có phác đồ, coi phác đồ là nguồn doanh thu chính; booking lẻ cộng thêm.
-  const bookingBilled = bookings.reduce((s, b) => s + num(b.price) - num(b.discount), 0);
-  const totalBilled = planBilled + (plans.length === 0 ? bookingBilled : 0);
+  // Công nợ tính TỪ HÓA ĐƠN (mục 18). Nếu khách chưa có hóa đơn nào, fallback về
+  // phác đồ/booking để giữ tương thích dữ liệu cũ.
+  let totalBilled: number;
+  if (invoices.length > 0) {
+    totalBilled = invoices.reduce((s, i) => s + num(i.total), 0);
+  } else {
+    const planBilled = plans.reduce((s, p) => s + num(p.totalPrice) - num(p.discount), 0);
+    const bookingBilled = bookings.reduce((s, b) => s + num(b.price) - num(b.discount), 0);
+    totalBilled = planBilled + (plans.length === 0 ? bookingBilled : 0);
+  }
   const totalPaid = payments.reduce((s, p) => s + num(p.amount), 0);
   return {
     totalPaid,
@@ -85,6 +92,7 @@ export interface TimelineEvent {
     | "plan"
     | "session"
     | "payment"
+    | "invoice"
     | "proposal"
     | "care"
     | "recommendation";
@@ -99,7 +107,7 @@ export interface TimelineEvent {
  * sắp xếp giảm dần theo thời gian.
  */
 export async function buildCustomerTimeline(customerId: string): Promise<TimelineEvent[]> {
-  const [activities, bookings, assessments, plans, sessions, payments, proposals, cares, recs] =
+  const [activities, bookings, assessments, plans, sessions, payments, invoices, proposals, cares, recs] =
     await Promise.all([
       prisma.crmActivity.findMany({ where: { customerId }, orderBy: { occurredAt: "desc" } }),
       prisma.booking.findMany({
@@ -111,6 +119,7 @@ export async function buildCustomerTimeline(customerId: string): Promise<Timelin
       prisma.treatmentPlan.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
       prisma.treatmentSession.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
       prisma.payment.findMany({ where: { customerId }, orderBy: { paidAt: "desc" } }),
+      prisma.invoice.findMany({ where: { customerId }, orderBy: { issuedAt: "desc" } }),
       prisma.treatmentProposal.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
       prisma.careInstructionInstance.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
       prisma.productRecommendation.findMany({
@@ -181,6 +190,16 @@ export async function buildCustomerTimeline(customerId: string): Promise<Timelin
       title: `Thanh toán ${new Intl.NumberFormat("vi-VN").format(num(p.amount))} ₫`,
       detail: p.note ?? undefined,
       status: p.method,
+    });
+  }
+  for (const inv of invoices) {
+    events.push({
+      id: `inv-${inv.id}`,
+      at: inv.issuedAt.toISOString(),
+      kind: "invoice",
+      title: `Hóa đơn ${inv.code} · ${new Intl.NumberFormat("vi-VN").format(num(inv.total))} ₫`,
+      status: inv.status,
+      href: `/invoices/${inv.id}`,
     });
   }
   for (const pr of proposals) {

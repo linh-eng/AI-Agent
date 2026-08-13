@@ -485,6 +485,64 @@ Báo cáo vật tư.
   UI vật tư spa dùng mô hình mới. Có thể gỡ luồng cũ trong màn buổi ở phase sau nếu muốn thống nhất.
 - Chưa có UI sửa/hủy từng lần tiêu hao trên màn (đã có `reverseUsage` ở service). **[Low]**
 
+## Lõi tài chính hợp nhất (mục 14–18) — Báo giá → Chốt → HÓA ĐƠN → Thanh toán → Công nợ
+
+Bổ sung theo MASTER PROMPT (slice trọng tâm phần này). **Đã xác thực trên PostgreSQL 16 thật**: tsc sạch ·
+lint 0 lỗi · build OK · **68 test pass** (thêm `test/invoice.test.ts`, 7 test) · migrate deploy (11 migration)
++ seed + seed:demo chạy sạch trên DB trắng.
+
+### Migration thêm — `A_invoices` (KHÔNG phải `10_`)
+Prisma sắp xếp migration theo **tên thư mục (lexicographic)**; chữ số < chữ hoa nên `10_...` sẽ chạy TRƯỚC
+`1_...` (sai thứ tự, làm hỏng fresh deploy). Vì các migration cũ đã dùng tiền tố 1 chữ số `0..9` (đã áp trên
+máy người dùng — không thể đổi tên), migration thứ 10 đặt tên **`A_invoices`** để đảm bảo sắp **sau cùng**.
+Các migration sau tiếp tục dùng tiền tố chữ (`B_`, `C_`…). Additive, **0 lệnh DROP**. Tổng **11 migration**:
+`0_init` … `9_spa_materials` → `A_invoices`.
+
+### Dữ liệu (schema.prisma)
+- `Invoice` (`invoices`): `code` (HD-xxxxxx), `customerId`, `proposalId?` (báo giá nguồn), `planId?`,
+  `status` (`InvoiceStatus`: UNPAID/PARTIAL/PAID/CANCELLED), `subtotal/discount/total` (snapshot), `dueDate?`,
+  `note`, `createdBy`. `InvoiceItem` (`invoice_items`): snapshot `name/quantity/unitPrice/amount`.
+- `Payment` thêm `invoiceId?` (+relation) — thanh toán gắn hóa đơn; **1 hóa đơn nhiều lần trả** (append-only).
+- `Customer` thêm `legacyId?` + `legacySource?` (đối chiếu **import MySpa** sau này) + `@@index([legacyId])`.
+- `AppSetting` (`app_settings`): `key` → `value(JSON)` — cấu hình **Thương hiệu** lưu DB (mục 1).
+
+### Service — `src/lib/invoice.ts`
+`createInvoiceFromProposal` (chỉ từ báo giá **ACCEPTED**, dựng hạng mục từ `acceptedSnapshot`, tổng =
+`agreedPrice`; **idempotent** — báo giá đã có hóa đơn chưa hủy thì trả lại, không tạo trùng) ·
+`recomputeInvoiceStatus` (suy UNPAID/PARTIAL/PAID theo tổng đã trả; bỏ qua CANCELLED) · `invoicePaidAmount` ·
+`customerInvoiceFinancials` (công nợ **TỪ HÓA ĐƠN**). `clinic.ts::customerFinancials` ưu tiên hóa đơn, fallback
+phác đồ/booking khi khách chưa có hóa đơn (tương thích dữ liệu cũ). Timeline khách thêm sự kiện `invoice`.
+
+### API
+`/api/invoices` (GET list + kèm paidAmount/outstanding; POST tạo từ `proposalId` hoặc thủ công `customerId`+items)
+· `/api/invoices/[id]` (GET chi tiết + payments + outstanding; PATCH hủy — **chặn hủy khi đã có thanh toán**) ·
+`/api/payments` nâng cấp: nhận `invoiceId`, **chặn thu vượt công nợ còn lại**, tự `recomputeInvoiceStatus` ·
+`/api/settings/brand` (GET mọi user đã đăng nhập; PUT cần `setting.write`).
+
+### UI
+Sidebar nhóm **Spa & CRM** thêm **Hóa đơn** + **Thanh toán**; nhóm mới **Hệ thống → Cài đặt**.
+`/invoices` (dashboard công nợ + lọc trạng thái) · `/invoices/[id]` (hạng mục + lịch sử thu + nút **Thu tiền**
+đa lần + **Hủy**) · `/payments` (sổ thu, link hóa đơn) · `/settings` (Thương hiệu: tên/khẩu hiệu/màu/logo, lưu DB).
+Màn **Báo giá đã chốt** thêm nút **Tạo hóa đơn** → nhảy sang hóa đơn. Brand hiển thị (tên/logo) đọc từ DB qua
+`getBrand()` ở layout, fallback `NEXT_PUBLIC_BRAND_NAME`.
+
+### RBAC
+`invoice.read` (gộp vào `CLINIC_READ` — mọi vai trò spa xem được) · `invoice.write` (MANAGER/RECEPTION/CASHIER) ·
+`setting.write` (MANAGER). Giá vốn hạng mục vẫn **mask theo `finance.read`** ở tầng báo giá.
+
+### Demo (seed:demo)
+PROP-100001 (KH-100004) **ĐÃ CHỐT** phương án Khuyến nghị (11.900.000₫) → **HD-000001** (PARTIAL) → thu
+5.000.000₫ → **còn phải thu 6.900.000₫**. KH-100001 có `legacyId=MYSPA-8842`, `legacySource=MySpa`, `dob`.
+
+### Còn lại / để phase sau (MASTER PROMPT phần chưa làm trong slice này) — **báo cáo trung thực**
+Booking (kỹ thuật viên/master/phòng/giường/máy + lịch Ngày/Tuần/Tháng + phát hiện trùng lịch); HR đa vai trò +
+vai trò nhân sự theo buổi kèm fee; giá sàn (bảng chi phí + cảnh báo/duyệt khi bán dưới sàn); CSKH nâng cao
+(workflow follow-up có mẫu/checklist/kịch bản/kênh, chương trình CSKH sinh nhật/loyalty); đánh giá khách &
+báo cáo kỹ thuật viên sau buổi; **import MySpa** (preview/mapping/validate/trùng lặp) — mới đặt nền `legacyId`;
+tab **Hóa đơn/Thanh toán** riêng trong hồ sơ khách (hiện đã hiện trong Timeline + lọc `/invoices?customerId=`);
+báo cáo A–O mở rộng. Đã sửa **bug hiển thị loại phương án** ở mức nhãn (map `PROPOSAL_KIND_LABEL` dùng chung
+edit/view); cho phép **đổi tên phương án** (ô tên tự do trong màn báo giá).
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

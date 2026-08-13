@@ -1019,6 +1019,8 @@ model Customer {
   goals        String? // Mong muốn/mục tiêu tổng quát của khách
   note         String?
   customFields Json? // Custom Fields do doanh nghiệp tự thêm
+  legacyId     String? // ID gốc từ hệ thống cũ (MySpa...) để đối chiếu khi import
+  legacySource String? // Nguồn dữ liệu cũ (vd "MySpa")
   isActive     Boolean   @default(true) // soft delete
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -1037,10 +1039,12 @@ model Customer {
   mediaAssets       MediaAsset[]
   customerMaterials CustomerMaterial[]
   portalAccount     CustomerPortalAccount?
+  invoices          Invoice[]
   marketingCampaign MarketingCampaign?        @relation(fields: [campaignId], references: [id])
 
   @@index([phone])
   @@index([campaignId])
+  @@index([legacyId])
   @@map("customers")
 }
 
@@ -1185,6 +1189,7 @@ model TreatmentPlan {
   recommendations ProductRecommendation[]
   formInstances   FormInstance[]
   proposals       TreatmentProposal[]
+  invoices        Invoice[]
 
   @@index([customerId])
   @@map("treatment_plans")
@@ -1272,6 +1277,7 @@ model Payment {
   customerId String
   planId     String?
   bookingId  String?
+  invoiceId  String? // Thanh toán gắn với hóa đơn (mục 18) — 1 hóa đơn nhiều lần trả
   amount     Decimal       @db.Decimal(18, 2)
   method     PaymentMethod @default(CASH)
   paidAt     DateTime      @default(now())
@@ -1282,8 +1288,10 @@ model Payment {
   customer Customer       @relation(fields: [customerId], references: [id])
   plan     TreatmentPlan? @relation(fields: [planId], references: [id])
   booking  Booking?       @relation(fields: [bookingId], references: [id])
+  invoice  Invoice?       @relation(fields: [invoiceId], references: [id])
 
   @@index([customerId, paidAt])
+  @@index([invoiceId])
   @@map("payments")
 }
 
@@ -1639,6 +1647,7 @@ model TreatmentProposal {
   customer Customer                  @relation(fields: [customerId], references: [id])
   plan     TreatmentPlan?            @relation(fields: [planId], references: [id])
   options  TreatmentProposalOption[]
+  invoices Invoice[]
 
   @@index([customerId])
   @@map("treatment_proposals")
@@ -2138,4 +2147,75 @@ model MaterialUsage {
   @@index([customerMaterialId])
   @@index([occurredAt])
   @@map("material_usages")
+}
+
+// =============================================================================
+// HÓA ĐƠN & THANH TOÁN (mục 14–18) — Báo giá → Khách chốt → HÓA ĐƠN → Thanh toán
+// → Công nợ. Công nợ tính từ HÓA ĐƠN (không phải báo giá). 1 hóa đơn = nhiều lần trả.
+// =============================================================================
+
+enum InvoiceStatus {
+  UNPAID // chưa thanh toán
+  PARTIAL // đã trả một phần
+  PAID // đã thanh toán đủ
+  CANCELLED // đã hủy (không tính công nợ)
+}
+
+model Invoice {
+  id         String        @id @default(cuid())
+  code       String        @unique // HĐ-xxxxxx
+  customerId String
+  proposalId String? // báo giá nguồn (khi tạo từ báo giá đã chốt)
+  planId     String?
+  status     InvoiceStatus @default(UNPAID)
+  issuedAt   DateTime      @default(now())
+  dueDate    DateTime?
+  subtotal   Decimal       @default(0) @db.Decimal(18, 2) // tổng hạng mục trước chiết khấu
+  discount   Decimal       @default(0) @db.Decimal(18, 2)
+  total      Decimal       @default(0) @db.Decimal(18, 2) // phải thu = subtotal - discount
+  note       String?
+  createdBy  String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  customer Customer           @relation(fields: [customerId], references: [id])
+  proposal TreatmentProposal? @relation(fields: [proposalId], references: [id])
+  plan     TreatmentPlan?     @relation(fields: [planId], references: [id])
+  items    InvoiceItem[]
+  payments Payment[]
+
+  @@index([customerId])
+  @@index([proposalId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id         String  @id @default(cuid())
+  invoiceId  String
+  name       String // snapshot tên hạng mục
+  quantity   Int     @default(1)
+  unitPrice  Decimal @default(0) @db.Decimal(18, 2)
+  amount     Decimal @default(0) @db.Decimal(18, 2) // = quantity * unitPrice (snapshot)
+  note       String?
+  orderIndex Int     @default(0)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
+
+// =============================================================================
+// CÀI ĐẶT ỨNG DỤNG (mục 1) — cấu hình Thương hiệu/logo lưu DB, KHÔNG hard-code
+// rải rác trong mã nguồn. key -> value(JSON).
+// =============================================================================
+
+model AppSetting {
+  key       String   @id // vd "brand"
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@map("app_settings")
 }

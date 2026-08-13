@@ -176,7 +176,7 @@ async function main() {
   // --- Khách hàng ở nhiều trạng thái ---
   // 1) MỚI
   const kMoi = await prisma.customer.create({
-    data: { code: "KH-100001", fullName: "Lê Minh Anh", gender: "FEMALE", phone: "0900100001", source: "Zalo", group: "Thường", assignedTo: "Lê Thị CSKH", campaignId: campTiktok.id },
+    data: { code: "KH-100001", fullName: "Lê Minh Anh", gender: "FEMALE", phone: "0900100001", source: "Zalo", group: "Thường", assignedTo: "Lê Thị CSKH", campaignId: campTiktok.id, dob: new Date("1994-03-18"), legacyId: "MYSPA-8842", legacySource: "MySpa" },
   });
   await prisma.crmActivity.create({ data: { customerId: kMoi.id, type: "INTERNAL_NOTE", content: "Khách mới để lại số qua TikTok, chưa tư vấn.", performedBy: "Lê Thị CSKH", occurredAt: new Date("2026-08-05T02:00:00Z") } });
 
@@ -244,17 +244,37 @@ async function main() {
   });
   await prisma.payment.create({ data: { customerId: kDangPD.id, planId: planLinh.id, amount: 8_000_000, method: "TRANSFER", receivedBy: "Đỗ Thu Ngân", note: "Đặt cọc phác đồ nâng cơ", paidAt: new Date("2026-07-25T09:00:00Z") } });
   await prisma.crmActivity.create({ data: { customerId: kDangPD.id, type: "CALL", content: "Nhắc lịch HIFU buổi 2, khách xác nhận.", result: "Xác nhận", performedBy: "Lê Thị CSKH", occurredAt: new Date("2026-08-10T03:00:00Z"), nextAction: "Chuẩn bị phòng HIFU", followUpDate: new Date("2026-08-19T02:00:00Z"), followUpOwner: "Lê Thị CSKH" } });
-  // Báo giá 3 phương án
-  await prisma.treatmentProposal.create({
+  // Báo giá 3 phương án — ĐÃ CHỐT phương án "Khuyến nghị" → tạo HÓA ĐƠN → thu một phần.
+  const proposalLinh = await prisma.treatmentProposal.create({
     data: {
-      code: "PROP-100001", customerId: kDangPD.id, title: "Phương án nâng cơ 2026", status: "SENT", createdBy: "Phạm Chuyên Viên",
+      code: "PROP-100001", customerId: kDangPD.id, title: "Phương án nâng cơ 2026", status: "ACCEPTED", createdBy: "Phạm Chuyên Viên",
       options: { create: [
         { kind: "ESSENTIAL", name: "Cơ bản", orderIndex: 0, sessions: 4, totalPrice: 7_200_000, items: { create: [ { itemType: "SERVICE", name: "RF nâng cơ mặt", quantity: 4, unitPrice: 1_800_000, unitCost: 500_000, orderIndex: 0 } ] } },
-        { kind: "RECOMMENDED", name: "Khuyến nghị", orderIndex: 1, sessions: 6, totalPrice: 12_600_000, discount: 400_000, items: { create: [ { itemType: "SERVICE", name: "RF nâng cơ mặt", quantity: 6, unitPrice: 1_800_000, unitCost: 500_000, orderIndex: 0 }, { itemType: "PRODUCT", name: "Klapp Vitamin C Serum", quantity: 1, unitPrice: 1_500_000, unitCost: 520_000, isHomeCare: true, orderIndex: 1 } ] } },
+        { kind: "RECOMMENDED", name: "Khuyến nghị", orderIndex: 1, sessions: 6, totalPrice: 11_900_000, discount: 400_000, items: { create: [ { itemType: "SERVICE", name: "RF nâng cơ mặt", quantity: 6, unitPrice: 1_800_000, unitCost: 500_000, orderIndex: 0 }, { itemType: "PRODUCT", name: "Klapp Vitamin C Serum", quantity: 1, unitPrice: 1_500_000, unitCost: 520_000, isHomeCare: true, orderIndex: 1 } ] } },
         { kind: "PREMIUM", name: "Chuyên sâu", orderIndex: 2, sessions: 6, totalPrice: 37_500_000, discount: 1_500_000, items: { create: [ { itemType: "SERVICE", name: "Nâng cơ HIFU", quantity: 6, unitPrice: 6_000_000, unitCost: 1_800_000, orderIndex: 0 }, { itemType: "PRODUCT", name: "Klapp Vitamin C Serum", quantity: 1, unitPrice: 1_500_000, unitCost: 520_000, isHomeCare: true, orderIndex: 1 } ] } },
       ] },
     },
+    include: { options: { include: { items: { orderBy: { orderIndex: "asc" } } } } },
   });
+  const chosen = proposalLinh.options.find((o) => o.kind === "RECOMMENDED")!;
+  const agreedLinh = 11_900_000;
+  await prisma.treatmentProposal.update({
+    where: { id: proposalLinh.id },
+    data: {
+      acceptedOptionId: chosen.id, acceptedAt: new Date("2026-08-01T02:00:00Z"), acceptedBy: "Đỗ Thùy Linh", agreedPrice: agreedLinh,
+      acceptedSnapshot: { optionId: chosen.id, kind: chosen.kind, name: chosen.name, discount: 400_000, computedTotal: agreedLinh, items: chosen.items.map((it) => ({ itemType: it.itemType, name: it.name, quantity: it.quantity, unitPrice: it.unitPrice, isHomeCare: it.isHomeCare })) },
+    },
+  });
+  // Hóa đơn từ báo giá đã chốt (subtotal 12,300,000 − chiết khấu 400,000 = 11,900,000).
+  const invLinh = await prisma.invoice.create({
+    data: {
+      code: "HD-000001", customerId: kDangPD.id, proposalId: proposalLinh.id, planId: planLinh.id, status: "PARTIAL",
+      subtotal: 12_300_000, discount: 400_000, total: agreedLinh, createdBy: "Đỗ Thu Ngân",
+      items: { create: chosen.items.map((it, i) => ({ name: it.name, quantity: it.quantity ?? 1, unitPrice: Number(it.unitPrice ?? 0), amount: Number(it.unitPrice ?? 0) * (it.quantity ?? 1), note: it.isHomeCare ? "Sản phẩm tại nhà" : null, orderIndex: i })) },
+    },
+  });
+  // Thu 5.000.000 vào hóa đơn → còn phải thu 6.900.000 (công nợ tính theo HÓA ĐƠN).
+  await prisma.payment.create({ data: { customerId: kDangPD.id, invoiceId: invLinh.id, amount: 5_000_000, method: "TRANSFER", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đợt 1 hóa đơn nâng cơ", paidAt: new Date("2026-08-01T03:00:00Z") } });
   await prisma.customerPortalAccount.upsert({
     where: { customerId: kDangPD.id }, update: {},
     create: { customerId: kDangPD.id, email: "linh.do@example.com", passwordHash: await hashPassword("khach123") },

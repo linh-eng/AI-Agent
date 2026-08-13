@@ -33,6 +33,8 @@ export default function ProposalDetailPage() {
   const canWrite = useCan(PERMISSIONS.PROPOSAL_WRITE);
   const canAccept = useCan(PERMISSIONS.PROPOSAL_ACCEPT);
   const canFinance = useCan(PERMISSIONS.FINANCE_READ);
+  const canInvoice = useCan(PERMISSIONS.INVOICE_WRITE);
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
 
   const [p, setP] = useState<any>(null);
   const [options, setOptions] = useState<any[]>([]);
@@ -96,6 +98,13 @@ export default function ProposalDetailPage() {
     try { await apiFetch(`/api/proposals/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }); load(); }
     catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); }
   }
+  async function createInvoice() {
+    setCreatingInvoice(true); setError(null);
+    try {
+      const inv = await apiFetch<{ id: string }>("/api/invoices", { method: "POST", body: JSON.stringify({ proposalId: id }) });
+      window.location.href = `/invoices/${inv.id}`;
+    } catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); setCreatingInvoice(false); }
+  }
 
   if (loading) return <p className="text-muted-foreground">Đang tải...</p>;
   if (!p) return <p className="text-destructive">Không tìm thấy báo giá.</p>;
@@ -128,6 +137,14 @@ export default function ProposalDetailPage() {
               {p.acceptedBy ? ` · bởi ${p.acceptedBy}` : ""}{p.acceptedAt ? ` · ${formatDate(p.acceptedAt)}` : ""}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">Snapshot đã đông cứng — thay đổi bảng giá/catalog về sau không ảnh hưởng báo giá này.</p>
+            {canInvoice && (
+              <div className="mt-3">
+                <Button size="sm" onClick={createInvoice} disabled={creatingInvoice}>
+                  {creatingInvoice ? "Đang tạo..." : "Tạo hóa đơn"}
+                </Button>
+                <span className="ml-2 text-xs text-muted-foreground">Chuyển sang hóa đơn để thu tiền & theo dõi công nợ.</span>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

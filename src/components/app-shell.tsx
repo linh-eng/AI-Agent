@@ -34,6 +34,9 @@ import {
   BookOpen,
   Tag,
   Megaphone,
+  Receipt,
+  Wallet,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
@@ -51,6 +54,8 @@ const NAV_GROUPS = [
       { href: "/services", label: "Dịch vụ", icon: Sparkles },
       { href: "/treatment-plans", label: "Phác đồ", icon: HeartPulse },
       { href: "/proposals", label: "Báo giá", icon: FileSpreadsheet },
+      { href: "/invoices", label: "Hóa đơn", icon: Receipt },
+      { href: "/payments", label: "Thanh toán", icon: Wallet },
       { href: "/pricing", label: "Bảng giá", icon: Tag },
       { href: "/marketing", label: "Marketing", icon: Megaphone },
       { href: "/tasks", label: "Công việc / Follow-up", icon: ListTodo },
@@ -77,6 +82,10 @@ const NAV_GROUPS = [
     ],
   },
   {
+    title: "Hệ thống",
+    items: [{ href: "/settings", label: "Cài đặt", icon: Settings }],
+  },
+  {
     title: "Kho THNG",
     items: [
       { href: "/dashboard", label: "Tổng quan kho", icon: Gauge },
@@ -100,11 +109,14 @@ const NAV_GROUPS = [
 
 export function AppShell({
   session,
+  brand,
   children,
 }: {
   session: SessionPayload;
+  brand?: { name: string; logoDataUrl?: string };
   children: React.ReactNode;
 }) {
+  const brandName = brand?.name || process.env.NEXT_PUBLIC_BRAND_NAME || "Sophia Wellness";
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -129,10 +141,15 @@ export function AppShell({
         )}
       >
         <div className="flex h-14 items-center gap-2 border-b px-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Sparkles className="h-4 w-4" />
-          </div>
-          <span className="font-semibold">{process.env.NEXT_PUBLIC_BRAND_NAME || "Sophia Wellness"}</span>
+          {brand?.logoDataUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={brand.logoDataUrl} alt={brandName} className="h-8 w-8 rounded-lg object-contain" />
+          ) : (
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Sparkles className="h-4 w-4" />
+            </div>
+          )}
+          <span className="font-semibold">{brandName}</span>
         </div>
         <nav className="max-h-[calc(100vh-3.5rem)] space-y-4 overflow-y-auto p-3">
           {NAV_GROUPS.filter(

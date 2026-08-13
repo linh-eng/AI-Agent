@@ -70,6 +70,8 @@ export const customerCreateSchema = z.object({
   goals: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
   customFields: jsonOpt,
+  legacyId: z.string().max(120).optional().nullable(), // đối chiếu import từ hệ thống cũ
+  legacySource: z.string().max(60).optional().nullable(),
 });
 export const customerUpdateSchema = customerCreateSchema.partial().omit({ code: true });
 
@@ -236,10 +238,42 @@ export const paymentCreateSchema = z.object({
   customerId: z.string().min(1),
   planId: z.string().optional().nullable(),
   bookingId: z.string().optional().nullable(),
+  invoiceId: z.string().optional().nullable(),
   amount: z.coerce.number().positive("Số tiền phải > 0"),
   method: paymentMethodEnum.default("CASH"),
   paidAt: dateOpt,
   receivedBy: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+
+// ----- Hóa đơn (mục 14–18) -----
+export const invoiceStatusEnum = z.enum(["UNPAID", "PARTIAL", "PAID", "CANCELLED"]);
+
+export const invoiceItemInputSchema = z.object({
+  name: z.string().min(1, "Nhập tên hạng mục"),
+  quantity: z.coerce.number().int().positive().default(1),
+  unitPrice: z.coerce.number().min(0).default(0),
+  note: z.string().optional().nullable(),
+});
+
+// Tạo hóa đơn: hoặc từ báo giá đã chốt (proposalId), hoặc lập thủ công (items).
+export const invoiceCreateSchema = z
+  .object({
+    customerId: z.string().optional().nullable(),
+    proposalId: z.string().optional().nullable(),
+    planId: z.string().optional().nullable(),
+    items: z.array(invoiceItemInputSchema).optional(),
+    discount: z.coerce.number().min(0).default(0),
+    dueDate: dateOpt,
+    note: z.string().optional().nullable(),
+  })
+  .refine((v) => v.proposalId || (v.customerId && v.items && v.items.length > 0), {
+    message: "Cần proposalId (từ báo giá) hoặc customerId kèm hạng mục",
+  });
+
+export const invoiceUpdateSchema = z.object({
+  status: invoiceStatusEnum.optional(), // dùng để hủy (CANCELLED)
+  dueDate: dateOpt,
   note: z.string().optional().nullable(),
 });
 

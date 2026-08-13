@@ -114,6 +114,7 @@ export const TIMELINE_KIND_LABEL: Record<string, string> = {
   plan: "Phác đồ",
   session: "Buổi",
   payment: "Thanh toán",
+  invoice: "Hóa đơn",
   proposal: "Báo giá",
   care: "Hướng dẫn",
   recommendation: "Đề xuất SP",
@@ -126,6 +127,7 @@ export const TIMELINE_KIND_TONE: Record<string, Tone> = {
   plan: "success",
   session: "default",
   payment: "success",
+  invoice: "warning",
   proposal: "warning",
   care: "muted",
   recommendation: "default",
@@ -178,6 +180,12 @@ export const PROPOSAL_KIND_LABEL: Record<string, string> = {
 };
 export const PROPOSAL_ITEM_TYPE_LABEL: Record<string, string> = {
   SERVICE: "Dịch vụ", TECHNOLOGY: "Công nghệ", BRAND_PROTOCOL: "Protocol", PRODUCT: "Sản phẩm", CUSTOM: "Khác",
+};
+export const INVOICE_STATUS_LABEL: Record<string, string> = {
+  UNPAID: "Chưa thanh toán", PARTIAL: "Trả một phần", PAID: "Đã thanh toán", CANCELLED: "Đã hủy",
+};
+export const INVOICE_STATUS_TONE: Record<string, Tone> = {
+  UNPAID: "warning", PARTIAL: "default", PAID: "success", CANCELLED: "muted",
 };
 export const CARE_KIND_LABEL: Record<string, string> = {
   PRE_CARE: "Trước dịch vụ", POST_CARE: "Sau dịch vụ", GENERAL: "Chung", FOLLOW_UP: "Theo dõi",
@@ -237,6 +245,7 @@ export function statusLabel(value?: string | null): string {
     TASK_STATUS_LABEL[value] ??
     LIBRARY_STATUS_LABEL[value] ??
     PROPOSAL_STATUS_LABEL[value] ??
+    INVOICE_STATUS_LABEL[value] ??
     LEAD_STATUS_LABEL[value] ??
     RECOMMENDATION_PRIORITY_LABEL[value] ??
     PAYMENT_METHOD_LABEL[value] ??
