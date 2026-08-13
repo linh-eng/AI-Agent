@@ -6,6 +6,7 @@ import { requirePermission, getSession } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { sessionUpdateSchema } from "@/lib/clinic-validation";
 import { canSeeFinance, maskFinance } from "@/lib/clinic";
+import { deriveStageStatus } from "@/lib/treatment-plan";
 
 export const GET = handle(async (_req, { params }) => {
   await requirePermission(PERMISSIONS.TREATMENT_READ);
@@ -38,5 +39,24 @@ export const PATCH = handle(async (req, { params }) => {
     if (cur?.versionAtExecution == null) data.versionAtExecution = cur?.plan?.version ?? undefined;
   }
   const item = await prisma.treatmentSession.update({ where: { id: params.id }, data });
+
+  // Tự cập nhật trạng thái GIAI ĐOẠN khi buổi đổi trạng thái (mục 2 — xử lý khi đủ buổi):
+  // đủ buổi hoàn thành → COMPLETED; có buổi hoàn thành → IN_PROGRESS. Tôn trọng CANCELLED thủ công.
+  if (item.stageId) {
+    try {
+      const stage = await prisma.treatmentStage.findUnique({
+        where: { id: item.stageId },
+        select: { status: true, plannedSessions: true, sessions: { select: { status: true, performedAt: true } } },
+      });
+      if (stage) {
+        const derived = deriveStageStatus(stage, stage.sessions);
+        if (derived !== stage.status) {
+          await prisma.treatmentStage.update({ where: { id: item.stageId }, data: { status: derived as any } });
+        }
+      }
+    } catch {
+      // không chặn ghi nhận buổi nếu cập nhật trạng thái giai đoạn lỗi
+    }
+  }
   return ok(item);
 });

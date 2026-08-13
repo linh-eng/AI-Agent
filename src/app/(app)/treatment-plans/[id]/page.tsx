@@ -31,6 +31,8 @@ import {
 import {
   computePlanProgress,
   deriveSessionStatus,
+  deriveStageStatus,
+  isSessionDateInStage,
   frequencyLabel,
   comparePlannedActual,
   isSessionDone,
@@ -215,7 +217,7 @@ export default function TreatmentPlanDetailPage() {
         )}
         <span className="text-muted-foreground">Tiến độ:</span>
         <b>{progress.overallProgress.done}/{progress.overallProgress.total} buổi</b>
-        {progress.currentStage && <span className="text-muted-foreground">· Giai đoạn hiện tại: <b className="text-foreground">{progress.currentStage.name}</b>{progress.stageProgress && ` (${progress.stageProgress.done}/${progress.stageProgress.total})`}</span>}
+        {progress.currentStage && <span className="text-muted-foreground">· Giai đoạn hiện tại: <b className="text-foreground">{progress.currentStage.name}</b></span>}
       </div>
 
       {/* Tabs */}
@@ -450,6 +452,8 @@ function StageCard({ stage, sessions, canWrite, nameOf, onEdit, onAddSession, on
   const dateRange = stage.plannedStartDate || stage.plannedEndDate
     ? `${stage.plannedStartDate ? formatDate(stage.plannedStartDate) : "?"} – ${stage.plannedEndDate ? formatDate(stage.plannedEndDate) : "?"}`
     : null;
+  // Trạng thái giai đoạn tự suy khi đủ buổi (mục 2); chỉ hiện cho giai đoạn thật (có id).
+  const derivedStatus: string | null = stage.id ? deriveStageStatus(stage, sessions) : null;
   return (
     <Card>
       <CardContent className="p-0">
@@ -457,7 +461,7 @@ function StageCard({ stage, sessions, canWrite, nameOf, onEdit, onAddSession, on
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold">{stage.name}</span>
-              {stage.status && <Badge tone={STAGE_STATUS_TONE[stage.status]}>{STAGE_STATUS_LABEL[stage.status]}</Badge>}
+              {derivedStatus && <Badge tone={STAGE_STATUS_TONE[derivedStatus]}>{STAGE_STATUS_LABEL[derivedStatus]}</Badge>}
             </div>
             <div className="mt-0.5 text-xs text-muted-foreground">
               {dateRange && <span>{dateRange}</span>}
@@ -506,7 +510,7 @@ function StageCard({ stage, sessions, canWrite, nameOf, onEdit, onAddSession, on
                           <Button size="sm" variant="outline" onClick={() => onCreateBooking(s)}>Tạo lịch hẹn</Button>
                         )}
                         {canWrite && (
-                          <Button size="sm" variant="outline" onClick={() => onRecord(s)}>Ghi nhận</Button>
+                          <Button size="sm" variant="outline" onClick={() => onRecord(s)}>{done ? "Sửa ghi nhận" : "Ghi nhận"}</Button>
                         )}
                       </div>
                     </TD>
@@ -652,7 +656,7 @@ function SessionDetailModal({ session: s, canWrite, nameOf, onClose, onRecord, o
         <div className="flex flex-wrap justify-end gap-2 border-t pt-3">
           <Button variant="ghost" size="sm" onClick={() => onForms(s)}>Phiếu</Button>
           <Button variant="ghost" size="sm" onClick={() => onMaterials(s)}>Vật tư</Button>
-          {canWrite && <Button size="sm" onClick={() => onRecord(s)}>Ghi nhận lần thực hiện</Button>}
+          {canWrite && <Button size="sm" onClick={() => onRecord(s)}>{isSessionDone(s) ? "Sửa ghi nhận" : "Ghi nhận lần thực hiện"}</Button>}
           <Button variant="outline" size="sm" onClick={onClose}>Đóng</Button>
         </div>
       </div>
@@ -743,12 +747,17 @@ function AddSessionModal({ open, onClose, onSubmit, error, stages, services, tec
   const empty = { sessionNumber: nextNumber, name: "", stageId: "", serviceId: "", technologyId: "", brandProtocolId: "", objective: "", plannedDate: "", intervalDays: "", plannedCost: "", price: "", preCare: "", postCare: "", professionalProductsText: "" };
   const [f, setF] = useState<any>(empty);
   const [steps, setSteps] = useState<string[]>([]);
-  useEffect(() => { setF((p: any) => ({ ...p, sessionNumber: nextNumber, stageId: defaultStageId ?? "" })); }, [nextNumber, open, defaultStageId]);
+  const [allowOutside, setAllowOutside] = useState(false);
+  useEffect(() => { setF((p: any) => ({ ...p, sessionNumber: nextNumber, stageId: defaultStageId ?? "" })); setAllowOutside(false); }, [nextNumber, open, defaultStageId]);
+  // Kiểm tra ngày buổi có nằm trong khoảng thời gian của giai đoạn (mục 3).
+  const selStage = stages.find((s: any) => s.id === f.stageId) ?? null;
+  const outOfRange = isSessionDateInStage(f.plannedDate, selStage) === false;
   return (
     <Modal open={open} onClose={onClose} title="Thêm buổi dự kiến" className="max-w-2xl">
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if (outOfRange && !allowOutside) return; // chặn cho tới khi xác nhận
           const b: any = { ...f, sessionNumber: Number(f.sessionNumber) };
           ["stageId", "serviceId", "technologyId", "brandProtocolId", "name", "objective", "plannedDate", "preCare", "postCare"].forEach((k) => { if (!b[k]) delete b[k]; });
           b.plannedCost = f.plannedCost ? Number(f.plannedCost) : undefined;
@@ -813,12 +822,18 @@ function AddSessionModal({ open, onClose, onSubmit, error, stages, services, tec
           <div className="space-y-1.5"><Label>Chi phí dự kiến</Label><Input type="number" value={f.plannedCost} onChange={(e) => setF({ ...f, plannedCost: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Giá dự kiến</Label><Input type="number" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></div>
         </div>
+        {outOfRange && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <div>⚠ Ngày dự kiến <b>{f.plannedDate ? formatDate(f.plannedDate) : ""}</b> nằm <b>ngoài khoảng</b> giai đoạn &quot;{selStage?.name}&quot; ({selStage?.plannedStartDate ? formatDate(selStage.plannedStartDate) : "?"} – {selStage?.plannedEndDate ? formatDate(selStage.plannedEndDate) : "?"}).</div>
+            <label className="mt-1 flex items-center gap-1.5"><Checkbox checked={allowOutside} onChange={(e) => setAllowOutside(e.target.checked)} /> Vẫn lưu dù ngoài khoảng giai đoạn</label>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5"><Label>Dặn dò trước</Label><Input value={f.preCare} onChange={(e) => setF({ ...f, preCare: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Dặn dò sau</Label><Input value={f.postCare} onChange={(e) => setF({ ...f, postCare: e.target.value })} /></div>
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Hủy</Button><Button type="submit">Lưu</Button></div>
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Hủy</Button><Button type="submit" disabled={outOfRange && !allowOutside}>Lưu</Button></div>
       </form>
     </Modal>
   );

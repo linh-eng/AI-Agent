@@ -24,6 +24,8 @@ import {
   computeStageSessionDates,
   computePlanProgress,
   deriveSessionStatus,
+  deriveStageStatus,
+  isSessionDateInStage,
   isSessionDone,
   comparePlannedActual,
 } from "@/lib/treatment-plan";
@@ -120,6 +122,34 @@ describe("Phác đồ — derive trạng thái buổi (mục 10)", () => {
   });
   it("buổi bỏ qua → Bỏ qua", () => {
     expect(deriveSessionStatus({ status: "SKIPPED" }, null)).toBe("SKIPPED");
+  });
+});
+
+describe("Phác đồ — trạng thái giai đoạn tự suy (mục 2 chỉnh)", () => {
+  it("đủ buổi hoàn thành → COMPLETED", () => {
+    expect(deriveStageStatus({ plannedSessions: 2 }, [{ status: "COMPLETED" }, { status: "COMPLETED" }])).toBe("COMPLETED");
+  });
+  it("có buổi hoàn thành nhưng chưa đủ → IN_PROGRESS", () => {
+    expect(deriveStageStatus({ plannedSessions: 2 }, [{ status: "COMPLETED" }, { status: "PLANNED" }])).toBe("IN_PROGRESS");
+  });
+  it("chưa buổi nào → giữ trạng thái đã lưu (PENDING)", () => {
+    expect(deriveStageStatus({ status: "PENDING", plannedSessions: 2 }, [{ status: "PLANNED" }])).toBe("PENDING");
+  });
+  it("tôn trọng CANCELLED thủ công", () => {
+    expect(deriveStageStatus({ status: "CANCELLED", plannedSessions: 2 }, [{ status: "COMPLETED" }, { status: "COMPLETED" }])).toBe("CANCELLED");
+  });
+});
+
+describe("Phác đồ — ngày buổi trong khoảng giai đoạn (mục 3 chỉnh)", () => {
+  const stage = { plannedStartDate: "2026-09-03", plannedEndDate: "2026-09-24" };
+  it("trong khoảng → true", () => { expect(isSessionDateInStage("2026-09-10", stage)).toBe(true); });
+  it("ngoài khoảng → false", () => { expect(isSessionDateInStage("2026-10-01", stage)).toBe(false); });
+  it("biên đầu/cuối tính trong khoảng", () => {
+    expect(isSessionDateInStage("2026-09-03", stage)).toBe(true);
+    expect(isSessionDateInStage("2026-09-24", stage)).toBe(true);
+  });
+  it("thiếu dữ liệu ngày giai đoạn → null (không kiểm)", () => {
+    expect(isSessionDateInStage("2026-09-10", { plannedStartDate: null, plannedEndDate: null })).toBeNull();
   });
 });
 
@@ -255,5 +285,23 @@ describe("Phác đồ — HTTP: version, kế hoạch-vs-thực tế, liên kế
     expect(after?.bookingId).toBe(bk.id);
     expect(after?.sessionNumber).toBe(1);
     expect(after?.versionAtExecution).toBe(1);
+  });
+
+  it("hoàn thành đủ buổi → giai đoạn tự chuyển COMPLETED (mục 2 chỉnh)", async () => {
+    const c = await makeCustomer();
+    const plan = await prisma.treatmentPlan.create({
+      data: { code: uniq("TP"), customerId: c.id, name: "PĐ", stages: { create: [{ name: "Chuẩn bị", orderIndex: 0, plannedSessions: 1 }] } },
+      include: { stages: true },
+    });
+    const s = await prisma.treatmentSession.create({
+      data: { planId: plan.id, stageId: plan.stages[0].id, customerId: c.id, sessionNumber: 1, status: "PLANNED" },
+    });
+    // Trước khi ghi nhận: giai đoạn PENDING
+    expect((await prisma.treatmentStage.findUnique({ where: { id: plan.stages[0].id } }))?.status).toBe("PENDING");
+    auth(token);
+    const res = await sessionPatch(req(`http://t/api/treatment-sessions/${s.id}`, "PATCH", { status: "COMPLETED" }), s.id);
+    expect(res.status).toBe(200);
+    // Sau khi hoàn thành đủ buổi: giai đoạn COMPLETED
+    expect((await prisma.treatmentStage.findUnique({ where: { id: plan.stages[0].id } }))?.status).toBe("COMPLETED");
   });
 });

@@ -1048,6 +1048,16 @@ DROP; tổng **20 migration**). **158 test pass** (thêm `test/treatment-plan.te
   giá dự kiến" nhập tay (chưa tự tổng từ buổi); clone cấu trúc khi tạo V2 làm thủ công (sửa giai đoạn/buổi tại
   chỗ, buổi lịch sử đã đóng băng). Booking prefill là điều hướng + query (không nhúng form Lịch hẹn vào màn phác đồ).
 
+### Chỉnh trước nghiệm thu (4 điểm)
+- **Bỏ `(x/y)` sau tên giai đoạn** ở thanh nhanh (đã có ô "Tiến độ giai đoạn" riêng ở Tổng quan).
+- **Trạng thái giai đoạn tự suy `deriveStageStatus`**: đủ buổi hoàn thành → **Hoàn thành**; có buổi hoàn thành →
+  **Đang thực hiện**; tôn trọng **Hủy** thủ công. UI derive tức thì; session PATCH còn **tự cập nhật** cột
+  `stage.status` khi ghi nhận buổi (có test).
+- **Cảnh báo/chặn ngày buổi ngoài khoảng giai đoạn** (`isSessionDateInStage`): banner vàng + checkbox "Vẫn lưu
+  dù ngoài khoảng" — nút Lưu **khóa** cho tới khi xác nhận.
+- **Buổi đã hoàn thành**: action đổi từ "Ghi nhận" → **Xem kết quả** (mở chi tiết) + **Sửa ghi nhận** (theo
+  `treatment.write`); modal chi tiết cũng đổi nhãn "Ghi nhận lần thực hiện" → "Sửa ghi nhận".
+
 ### Demo (seed:demo) — TP-100001 "Phác đồ trẻ hóa 8 buổi" (Đỗ Thùy Linh), **V2**
 4 giai đoạn: Chuẩn bị (2 buổi·7 ngày/lần·20–27/08) · Can thiệp (4 buổi·7 ngày/lần·03–24/09) · Phục hồi (1
 buổi·sau 14 ngày·08/10) · Duy trì (1 buổi·sau 1 tháng·08/11). 8 buổi (3 hoàn thành → tiến độ 3/8). **Buổi 3

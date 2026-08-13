@@ -89,6 +89,38 @@ export function isSessionDone(session: { status?: string | null; performedAt?: D
   return session.status === "COMPLETED" || !!session.performedAt;
 }
 
+/**
+ * Suy trạng thái HIỂN THỊ của giai đoạn từ số buổi đã hoàn thành (mục 2 — xử lý khi đủ buổi):
+ * - CANCELLED nếu đã đánh dấu hủy thủ công (tôn trọng).
+ * - COMPLETED khi có buổi, tất cả buổi đã tạo đều hoàn thành, và đạt số buổi kế hoạch.
+ * - IN_PROGRESS khi có ≥1 buổi hoàn thành nhưng chưa xong hết.
+ * - còn lại: theo trạng thái đã lưu (mặc định PENDING).
+ */
+export function deriveStageStatus(
+  stage: { status?: string | null; plannedSessions?: number | null },
+  stageSessions: { status?: string | null; performedAt?: Date | string | null }[],
+): string {
+  if (stage.status === "CANCELLED") return "CANCELLED";
+  const total = stageSessions.length;
+  const done = stageSessions.filter(isSessionDone).length;
+  const target = stage.plannedSessions ?? total;
+  if (total > 0 && done === total && (target === 0 || done >= target)) return "COMPLETED";
+  if (done > 0) return "IN_PROGRESS";
+  return stage.status ?? "PENDING";
+}
+
+/** Ngày buổi có nằm trong khoảng [bắt đầu, kết thúc] của giai đoạn không? null nếu không đủ dữ liệu để kiểm. */
+export function isSessionDateInStage(
+  date: Date | string | null | undefined,
+  stage: { plannedStartDate?: Date | string | null; plannedEndDate?: Date | string | null } | null | undefined,
+): boolean | null {
+  if (!date || !stage || (!stage.plannedStartDate && !stage.plannedEndDate)) return null;
+  const d = new Date(date).setHours(12, 0, 0, 0);
+  const s = stage.plannedStartDate ? new Date(stage.plannedStartDate).setHours(0, 0, 0, 0) : -Infinity;
+  const e = stage.plannedEndDate ? new Date(stage.plannedEndDate).setHours(23, 59, 59, 999) : Infinity;
+  return d >= s && d <= e;
+}
+
 // ---------------------------------------------------------------------------
 // Tiến độ phác đồ (mục 7) — tách rõ giai đoạn hiện tại / tiến độ giai đoạn /
 // tiến độ toàn phác đồ / buổi tiếp theo.
