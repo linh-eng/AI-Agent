@@ -750,6 +750,39 @@ seed (đã chia sẻ cho khách). Trang `/before-after` hiển thị cặp ảnh
 Khách tự đánh giá qua **Cổng khách** (hiện nhân viên ghi hộ); nhãn/mốc thời gian trên ảnh; so sánh trượt
 (slider) trước–sau; báo cáo hiệu suất KTV theo kỳ; gắn KTV được đánh giá từ danh sách nhân sự (hiện nhập tên).
 
+## Import khách hàng (mục 41) — MySpa/CSV: preview → mapping → validate → trùng → báo cáo
+
+Phase sau MASTER PROMPT, ưu tiên #6 (mục cuối lộ trình). **Đã xác thực PostgreSQL 16 thật**: tsc sạch · lint
+0 lỗi · build OK · **92 test pass** (thêm `test/import-customers.test.ts`, 4 test). **KHÔNG có migration mới** —
+dùng nền `Customer.legacyId`/`legacySource` (`@@index([legacyId])`) đã đặt từ phase Hóa đơn. Tổng vẫn **16
+migration**.
+
+### Kiến trúc — tổng quát, KHÔNG đoán schema nguồn
+Phía UI map cột nguồn → trường chuẩn rồi gửi các dòng đã map; server không phụ thuộc cột MySpa cụ thể.
+`src/lib/import-customers.ts`:
+- `analyzeImportRows(rows, legacySource)` (**dry-run**): validate từng dòng (bắt buộc họ tên; email regex;
+  ngày sinh `dd/MM/yyyy`|`yyyy-MM-dd`; giới tính "Nam/Nữ/Male/Female" → MALE/FEMALE/OTHER) → **phát hiện
+  trùng** với khách đã có (theo **SĐT**, hoặc **legacyId + legacySource**) và **trùng trong lô**. Trả
+  `{index, status: NEW|DUPLICATE|ERROR, errors, matchedBy, normalized}`.
+- `commitImport(rows, legacySource)`: **chỉ tạo dòng NEW** (bỏ qua trùng & lỗi), sinh mã KH tuần tự an toàn
+  trong transaction (base = count, +i), gán `legacyId`+`legacySource`. Trả **báo cáo**
+  `{total, created, skippedDuplicate, errorRows, createdCodes}`. **Không ghi đè khách đã có.**
+
+### API
+`POST /api/imports/customers/preview` (phân tích dry-run) · `POST /api/imports/customers/commit` (ghi + báo
+cáo). Cả hai cần `customer.write`. Giới hạn 5000 dòng/lần.
+
+### UI — `/import-customers` (Hệ thống → Nhập khách hàng)
+4 bước: **(1)** dán CSV hoặc tải `.csv` (parser tự viết, hỗ trợ ngoặc kép/phẩy trong ô) + nút **Dùng mẫu**;
+**(2)** **ghép cột** nguồn → 10 trường chuẩn (**auto-map** theo tên cột VN/EN) + nhập `legacySource` (mặc
+định MySpa); **(3)** **Kiểm tra & xem trước**: bảng từng dòng + trạng thái (Thêm mới/Trùng/Lỗi) + lý do +
+số đếm; **(4)** **Nhập** → báo cáo (đã tạo/bỏ qua trùng/lỗi + danh sách mã KH). Cảnh báo rõ: khách trùng
+KHÔNG bị ghi đè.
+
+### Còn lại (phase sau)
+Import lịch sử giao dịch/phác đồ/ảnh (hiện chỉ hồ sơ khách); chế độ "cập nhật khách trùng" (hiện chỉ bỏ qua);
+tải file Excel `.xlsx` trực tiếp (hiện CSV); lưu lịch sử các lần import.
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

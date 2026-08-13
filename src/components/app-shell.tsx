@@ -39,6 +39,7 @@ import {
   Settings,
   MessageCircleHeart,
   Images,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
@@ -91,6 +92,7 @@ const NAV_GROUPS = [
     title: "Hệ thống",
     items: [
       { href: "/employees", label: "Nhân sự", icon: Users },
+      { href: "/import-customers", label: "Nhập khách hàng", icon: Upload },
       { href: "/settings", label: "Cài đặt", icon: Settings },
     ],
   },

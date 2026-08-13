@@ -307,6 +307,24 @@ export const sessionStaffCreateSchema = z.object({
   note: z.string().optional().nullable(),
 });
 
+// ----- Import khách hàng (mục 41) -----
+export const importCustomerRowSchema = z.object({
+  fullName: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  dob: z.string().optional().nullable(),
+  gender: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  source: z.string().optional().nullable(),
+  group: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+  legacyId: z.string().optional().nullable(),
+});
+export const importCustomersSchema = z.object({
+  legacySource: z.string().max(60).default("MySpa"),
+  rows: z.array(importCustomerRowSchema).min(1, "Không có dòng nào").max(5000, "Tối đa 5000 dòng/lần"),
+});
+
 // ----- Đánh giá sau buổi (mục 36–37) -----
 export const sessionReviewUpsertSchema = z.object({
   sessionId: z.string().min(1),
