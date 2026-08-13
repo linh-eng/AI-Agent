@@ -8,6 +8,7 @@ import { Input, Label } from "@/components/ui/input";
 import { apiFetch } from "@/lib/client";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
+import { APP_VERSION, APP_RELEASE_DATE, APP_RELEASE_NAME } from "@/lib/version";
 
 interface Brand { name: string; tagline?: string; primaryColor?: string; logoDataUrl?: string }
 
@@ -89,6 +90,19 @@ export default function SettingsPage() {
           {error && <p className="text-sm text-destructive">{error}</p>}
           {msg && <p className="text-sm text-emerald-600">{msg}</p>}
           {canWrite && <div className="flex justify-end"><Button onClick={save} disabled={saving || !brand.name}><Save className="h-4 w-4" /> {saving ? "Đang lưu..." : "Lưu cấu hình"}</Button></div>}
+        </CardContent>
+      </Card>
+
+      {/* Phiên bản phần mềm */}
+      <Card className="mt-4">
+        <CardContent className="p-5">
+          <div className="text-sm font-medium">Phiên bản phần mềm</div>
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+            <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">v{APP_VERSION}</span>
+            <span className="text-muted-foreground">Phát hành: {(() => { const [y, m, d] = APP_RELEASE_DATE.split("-"); return `${d}/${m}/${y}`; })()}</span>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">{APP_RELEASE_NAME}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Cập nhật không mất dữ liệu: giải nén bản mới đè lên (giữ nguyên <code>.env</code>) rồi chạy <code>update-windows.bat</code>.</p>
         </CardContent>
       </Card>
     </div>

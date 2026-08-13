@@ -43,6 +43,7 @@ import { apiFetch } from "@/lib/client";
 import type { SessionPayload } from "@/lib/auth";
 import { ROLE_LABELS, type RoleCode } from "@/lib/rbac";
 import { SessionProvider } from "@/components/session-provider";
+import { versionLabel } from "@/lib/version";
 
 const NAV_GROUPS = [
   {
@@ -182,6 +183,10 @@ export function AppShell({
               })}
             </div>
           ))}
+          {/* Phiên bản — tiện theo dõi khi cập nhật */}
+          <div className="px-3 pt-2 text-center text-[11px] text-muted-foreground/60">
+            {versionLabel()}
+          </div>
         </nav>
       </aside>
 
