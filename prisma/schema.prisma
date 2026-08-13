@@ -127,6 +127,11 @@ model Category {
   code      String    @unique
   name      String
   note      String?
+  // Hạn dùng tối đa sau khi mở nắp (PAO) tính theo tháng — vd Serum 6, Kem/Mặt nạ 12.
+  // HSD thực tế = min(HSD trên bao bì, ngày mở nắp + openMaxMonths).
+  openMaxMonths   Int?     @map("open_max_months")
+  // Cảnh báo tồn lâu mà CHƯA mở nắp: số tháng kể từ ngày mua.
+  storeWarnMonths Int?     @map("store_warn_months")
   createdAt DateTime  @default(now()) @map("created_at")
   products  Product[]
 

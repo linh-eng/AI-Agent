@@ -27,6 +27,15 @@ export const categoryCreateSchema = z.object({
   code: z.string().trim().min(1, "Bắt buộc").max(30),
   name: z.string().trim().min(1, "Bắt buộc").max(120),
   note: optionalString,
+  openMaxMonths: z.number().int().positive().max(120).nullable().optional(),
+  storeWarnMonths: z.number().int().positive().max(120).nullable().optional(),
+});
+
+export const categoryUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  note: optionalString,
+  openMaxMonths: z.number().int().positive().max(120).nullable().optional(),
+  storeWarnMonths: z.number().int().positive().max(120).nullable().optional(),
 });
 
 // ----- Thương hiệu -----

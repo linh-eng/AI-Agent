@@ -204,6 +204,48 @@ export interface ShotAlert {
   isDepleted: boolean;
 }
 
+export interface UnopenedAlert {
+  productId: string;
+  sku: string;
+  name: string;
+  category: string | null;
+  purchaseDate: string;
+  monthsStored: number;
+  warnMonths: number;
+}
+
+/**
+ * Sản phẩm đã mua quá lâu mà CHƯA mở nắp (theo ngưỡng storeWarnMonths của nhóm).
+ * Nhắc dùng/kiểm tra trước khi để quá lâu ảnh hưởng chất lượng.
+ */
+export async function getUnopenedStaleAlerts(): Promise<UnopenedAlert[]> {
+  const products = await prisma.product.findMany({
+    where: { purchaseDate: { not: null }, openedDate: null, isActive: true },
+    include: { category: true },
+    orderBy: { purchaseDate: "asc" },
+  });
+  const now = new Date();
+  const out: UnopenedAlert[] = [];
+  for (const p of products) {
+    const warn = p.category?.storeWarnMonths;
+    if (!warn || !p.purchaseDate) continue;
+    const limit = new Date(p.purchaseDate);
+    limit.setMonth(limit.getMonth() + warn);
+    if (limit > now) continue; // chưa tới ngưỡng
+    const monthsStored = Math.floor((now.getTime() - p.purchaseDate.getTime()) / (30 * MS_PER_DAY));
+    out.push({
+      productId: p.id,
+      sku: p.sku,
+      name: p.name,
+      category: p.category?.name ?? null,
+      purchaseDate: p.purchaseDate.toISOString(),
+      monthsStored,
+      warnMonths: warn,
+    });
+  }
+  return out;
+}
+
 /** Tay cầm sắp/đã hết định mức shot (còn lại <= warnShots). */
 export async function getShotAlerts(): Promise<ShotAlert[]> {
   const hps = await prisma.handpiece.findMany({

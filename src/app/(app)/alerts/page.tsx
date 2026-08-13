@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CalendarClock, TrendingDown, ShieldCheck, Zap } from "lucide-react";
+import { CalendarClock, TrendingDown, ShieldCheck, Zap, Archive } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -48,12 +48,22 @@ interface ShotAlert {
   remaining: number;
   isDepleted: boolean;
 }
+interface UnopenedAlert {
+  productId: string;
+  sku: string;
+  name: string;
+  category: string | null;
+  purchaseDate: string;
+  monthsStored: number;
+  warnMonths: number;
+}
 
 export default function AlertsPage() {
   const [expiry, setExpiry] = useState<ExpiryAlert[]>([]);
   const [lowStock, setLowStock] = useState<LowStock[]>([]);
   const [warranty, setWarranty] = useState<WarrantyAlert[]>([]);
   const [shots, setShots] = useState<ShotAlert[]>([]);
+  const [unopened, setUnopened] = useState<UnopenedAlert[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -62,12 +72,14 @@ export default function AlertsPage() {
       lowStock: LowStock[];
       warranty: WarrantyAlert[];
       shots: ShotAlert[];
+      unopened: UnopenedAlert[];
     }>("/api/alerts")
       .then((d) => {
         setExpiry(d.expiry);
         setLowStock(d.lowStock);
         setWarranty(d.warranty ?? []);
         setShots(d.shots ?? []);
+        setUnopened(d.unopened ?? []);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -76,7 +88,7 @@ export default function AlertsPage() {
     <div>
       <PageHeader
         title="Cảnh báo"
-        description="Lô sắp/đã hết hạn, sản phẩm dưới định mức tồn, thiết bị sắp hết bảo hành và tay cầm sắp hết shot."
+        description="Lô sắp/đã hết hạn, sản phẩm dưới định mức tồn, hàng tồn lâu chưa mở nắp, thiết bị sắp hết bảo hành và tay cầm sắp hết shot."
       />
 
       {/* HSD */}
@@ -181,6 +193,57 @@ export default function AlertsPage() {
                     <TD className="text-right">
                       <Badge tone="warning">
                         +{formatNumber(Math.max(0, a.minStock - a.onHand))} {a.uom}
+                      </Badge>
+                    </TD>
+                  </TR>
+                ))
+              )}
+            </TBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Tồn lâu chưa mở nắp */}
+      <Card className="mb-6">
+        <CardContent className="p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Archive className="h-5 w-5 text-amber-600" />
+            <h3 className="font-semibold">Tồn lâu chưa mở nắp</h3>
+            <Badge tone={unopened.length ? "warning" : "success"}>{unopened.length} sản phẩm</Badge>
+          </div>
+          <Table>
+            <THead>
+              <TR>
+                <TH>SKU</TH>
+                <TH>Sản phẩm</TH>
+                <TH>Nhóm</TH>
+                <TH>Ngày mua</TH>
+                <TH className="text-right">Đã tồn</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {loading ? (
+                <TR>
+                  <TD colSpan={5} className="py-6 text-center text-muted-foreground">
+                    Đang tải…
+                  </TD>
+                </TR>
+              ) : unopened.length === 0 ? (
+                <TR>
+                  <TD colSpan={5} className="py-6 text-center text-muted-foreground">
+                    Không có hàng tồn lâu chưa mở 🎉
+                  </TD>
+                </TR>
+              ) : (
+                unopened.map((u) => (
+                  <TR key={u.productId}>
+                    <TD className="font-mono text-xs">{u.sku}</TD>
+                    <TD className="font-medium">{u.name}</TD>
+                    <TD className="text-muted-foreground">{u.category ?? "—"}</TD>
+                    <TD>{formatDate(u.purchaseDate)}</TD>
+                    <TD className="text-right">
+                      <Badge tone="warning">
+                        ~{u.monthsStored} tháng (ngưỡng {u.warnMonths})
                       </Badge>
                     </TD>
                   </TR>

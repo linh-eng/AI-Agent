@@ -47,7 +47,9 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
   và `cost` (giá vốn vật tư tiêu hao theo lô đã xuất); báo cáo doanh thu–giá vốn–lợi nhuận theo kỳ.
 - **Tồn kho realtime:** tồn theo sản phẩm (gộp lô), lọc theo kho, HSD gần nhất, giá trị tồn theo giá vốn.
 - **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng theo `expiryAlertDays`, mặc định 60 ngày), sản phẩm dưới định mức
-  (`onHand <= minStock`), và **thiết bị sắp/đã hết bảo hành**.
+  (`onHand <= minStock`), **hàng tồn lâu chưa mở nắp** (theo `Category.storeWarnMonths`), và **thiết bị
+  sắp/đã hết bảo hành**. **HSD sau mở nắp (PAO):** cấu hình `Category.openMaxMonths` theo nhóm (vd Serum 6
+  tháng, Kem/Mặt nạ 12 tháng); HSD thực tế = min(HSD bao bì, ngày mở nắp + PAO).
 - **Báo cáo N-X-T (Phase 2):** tồn đầu – nhập – xuất – tồn cuối theo kỳ + kho, tính từ `StockMovement`;
   xuất **CSV** (UTF-8 BOM) phía client.
 - **Quản trị người dùng:** trang `/users` (quyền `user.manage`) — tạo tài khoản, phân vai trò, khoá/mở,

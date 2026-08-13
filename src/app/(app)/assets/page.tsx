@@ -8,6 +8,8 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input, Label, Select } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
+import { focusNextOnEnter } from "@/lib/form";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { formatDate } from "@/lib/utils";
@@ -220,19 +222,18 @@ export default function AssetsPage() {
       </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? `Sửa tài sản ${editing.code}` : "Thêm tài sản"} className="max-w-2xl">
-        <form onSubmit={save} className="space-y-4">
+        <form onSubmit={save} onKeyDown={focusNextOnEnter} className="space-y-4">
           {!editing && (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Thiết bị *</Label>
-                <Select value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} required>
-                  <option value="">— Chọn sản phẩm —</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.sku} — {p.name}
-                    </option>
-                  ))}
-                </Select>
+                <Combobox
+                  required
+                  value={form.productId}
+                  onChange={(v) => setForm({ ...form, productId: v })}
+                  placeholder="— Chọn sản phẩm —"
+                  items={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.name}`, keywords: p.sku }))}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Mã tài sản</Label>
@@ -284,12 +285,12 @@ export default function AssetsPage() {
           {!editing && (
             <div className="space-y-1.5">
               <Label>Nhà cung cấp</Label>
-              <Select value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
-                <option value="">— Chọn NCC —</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </Select>
+              <Combobox
+                value={form.supplierId}
+                onChange={(v) => setForm({ ...form, supplierId: v })}
+                placeholder="— Chọn NCC —"
+                items={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+              />
             </div>
           )}
           {error && <p className="text-sm text-destructive">{error}</p>}

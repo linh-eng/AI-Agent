@@ -6,14 +6,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input, Label, Select, Checkbox } from "@/components/ui/input";
+import { Input, Label, Checkbox } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
+import { focusNextOnEnter } from "@/lib/form";
 import { formatNumber } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 
 interface Product { id: string; sku: string; name: string; uom: string }
+interface InvRow { productId: string; onHand: number }
 interface SvItem { productId: string; quantity: number; product?: Product }
 interface Service {
   id: string;
@@ -30,6 +33,7 @@ export default function ServicesPage() {
   const canWrite = useCan(PERMISSIONS.SERVICE_WRITE);
   const [rows, setRows] = useState<Service[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [inventory, setInventory] = useState<InvRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
@@ -48,7 +52,11 @@ export default function ServicesPage() {
   useEffect(() => {
     load();
     apiFetch<Product[]>("/api/products").then(setProducts).catch(() => {});
+    // Tồn tổng (mọi kho) để cảnh báo ngay khi định mức vượt tồn hiện có.
+    apiFetch<InvRow[]>("/api/inventory").then(setInventory).catch(() => {});
   }, []);
+
+  const onHandById = new Map(inventory.map((r) => [r.productId, r.onHand]));
 
   function openCreate() {
     setEditing(null);
@@ -172,7 +180,7 @@ export default function ServicesPage() {
       </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? "Sửa liệu trình" : "Thêm liệu trình"} className="max-w-2xl">
-        <form onSubmit={save} className="space-y-4">
+        <form onSubmit={save} onKeyDown={focusNextOnEnter} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Mã *</Label>
@@ -224,17 +232,26 @@ export default function ServicesPage() {
               </Button>
             </div>
             <div className="space-y-2">
-              {items.map((it, i) => (
-                <div key={i} className="grid grid-cols-12 items-center gap-2">
+              {items.map((it, i) => {
+                const onHand = it.productId ? onHandById.get(it.productId) ?? 0 : null;
+                const qty = Number(it.quantity) || 0;
+                const over = onHand != null && qty > onHand;
+                const uom = products.find((p) => p.id === it.productId)?.uom ?? "";
+                return (
+                <div key={i} className="grid grid-cols-12 items-start gap-2">
                   <div className="col-span-8">
-                    <Select value={it.productId} onChange={(e) => setItems((p) => p.map((x, idx) => (idx === i ? { ...x, productId: e.target.value } : x)))}>
-                      <option value="">— Chọn vật tư —</option>
-                      {products.map((pr) => (
-                        <option key={pr.id} value={pr.id}>
-                          {pr.sku} — {pr.name}
-                        </option>
-                      ))}
-                    </Select>
+                    <Combobox
+                      value={it.productId}
+                      onChange={(v) => setItems((p) => p.map((x, idx) => (idx === i ? { ...x, productId: v } : x)))}
+                      placeholder="— Chọn vật tư —"
+                      items={products.map((pr) => ({ value: pr.id, label: `${pr.sku} — ${pr.name}`, keywords: pr.sku }))}
+                    />
+                    {onHand != null && (
+                      <p className={`mt-1 text-xs ${over ? "text-destructive" : "text-muted-foreground"}`}>
+                        Tồn hiện có: {formatNumber(onHand)} {uom}
+                        {over && " — định mức đang vượt tồn"}
+                      </p>
+                    )}
                   </div>
                   <div className="col-span-3">
                     <Input
@@ -244,6 +261,7 @@ export default function ServicesPage() {
                       placeholder="Định mức"
                       value={it.quantity}
                       onChange={(e) => setItems((p) => p.map((x, idx) => (idx === i ? { ...x, quantity: e.target.value } : x)))}
+                      className={over ? "border-destructive" : ""}
                     />
                   </div>
                   <div className="col-span-1 flex justify-end">
@@ -258,7 +276,8 @@ export default function ServicesPage() {
                     </Button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

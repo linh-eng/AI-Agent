@@ -2,6 +2,7 @@
 import * as React from "react";
 import { ChevronsUpDown, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { focusNextField } from "@/lib/form";
 
 export interface ComboItem {
   value: string;
@@ -42,6 +43,7 @@ export function Combobox({
   const [active, setActive] = React.useState(0);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
 
   const selected = items.find((i) => i.value === value) ?? null;
 
@@ -72,6 +74,8 @@ export function Combobox({
   function pick(v: string) {
     onChange(v);
     setOpen(false);
+    // Sau khi chọn xong, tự chuyển sang ô kế tiếp cho mượt (giống Enter chuyển ô).
+    if (triggerRef.current) focusNextField(triggerRef.current);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -107,7 +111,9 @@ export function Combobox({
         />
       )}
       <button
+        ref={triggerRef}
         type="button"
+        data-nav
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className={cn(

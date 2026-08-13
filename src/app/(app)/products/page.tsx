@@ -20,6 +20,8 @@ type Mode = "LOT" | "QUANTITY";
 interface Category {
   id: string;
   name: string;
+  openMaxMonths?: number | null;
+  storeWarnMonths?: number | null;
 }
 interface Brand {
   id: string;
@@ -37,18 +39,53 @@ interface Row {
   isTester?: boolean;
   uom: string;
   minStock?: number | null;
+  purchaseDate?: string | null;
+  openedDate?: string | null;
   expiryDate?: string | null;
   expiryAlertDays?: number | null;
 }
 
-// Số ngày còn lại tới HSD (âm = đã quá hạn). null nếu chưa nhập HSD.
-function daysToExpiry(iso?: string | null): number | null {
+function parseISO(iso?: string | null): Date | null {
   if (!iso) return null;
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return null;
+  return isNaN(d.getTime()) ? null : d;
+}
+function addMonths(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setMonth(r.getMonth() + n);
+  return r;
+}
+function daysBetween(target: Date): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+}
+
+/**
+ * HSD thực tế của sản phẩm = ngày sớm hơn giữa HSD trên bao bì và (ngày mở nắp +
+ * hạn dùng sau mở của nhóm). Trả về ngày hiệu lực + có bị giới hạn bởi PAO không.
+ */
+function effectiveExpiry(r: Row): { date: Date | null; byOpen: boolean } {
+  const pkg = parseISO(r.expiryDate);
+  const opened = parseISO(r.openedDate);
+  const pao = r.category?.openMaxMonths ?? null;
+  const postOpen = opened && pao ? addMonths(opened, pao) : null;
+  if (pkg && postOpen) return postOpen < pkg ? { date: postOpen, byOpen: true } : { date: pkg, byOpen: false };
+  if (postOpen) return { date: postOpen, byOpen: true };
+  return { date: pkg, byOpen: false };
+}
+
+// Đã mua quá lâu mà chưa mở nắp (theo ngưỡng của nhóm)? Trả số tháng nếu có cảnh báo.
+function storedTooLong(r: Row): number | null {
+  const warn = r.category?.storeWarnMonths ?? null;
+  const purchase = parseISO(r.purchaseDate);
+  if (!warn || !purchase || r.openedDate) return null;
+  const limit = addMonths(purchase, warn);
+  if (daysBetween(limit) <= 0) {
+    const months = Math.floor((Date.now() - purchase.getTime()) / (30 * 86_400_000));
+    return months;
+  }
+  return null;
 }
 
 const EMPTY = {
@@ -200,13 +237,35 @@ export default function ProductsPage() {
                     <TD className="text-right">{p.minStock != null ? formatNumber(p.minStock) : "—"}</TD>
                     <TD>
                       {(() => {
-                        const days = daysToExpiry(p.expiryDate);
-                        if (days == null) return <span className="text-muted-foreground">—</span>;
-                        const threshold = p.expiryAlertDays ?? 60;
-                        if (days < 0) return <Badge tone="danger">Đã hết hạn</Badge>;
-                        if (days <= threshold)
-                          return <Badge tone="warning">Còn {formatNumber(days)} ngày</Badge>;
-                        return <span className="text-muted-foreground">Còn {formatNumber(days)} ngày</span>;
+                        const stored = storedTooLong(p);
+                        const { date, byOpen } = effectiveExpiry(p);
+                        const badges: React.ReactNode[] = [];
+                        if (date) {
+                          const days = daysBetween(date);
+                          const threshold = p.expiryAlertDays ?? 60;
+                          const title = byOpen ? "Hạn sau mở nắp" : "HSD bao bì";
+                          if (days < 0) badges.push(<Badge key="e" tone="danger">Đã hết hạn</Badge>);
+                          else if (days <= threshold)
+                            badges.push(
+                              <Badge key="e" tone="warning" title={title}>
+                                Còn {formatNumber(days)} ngày{byOpen ? " (sau mở)" : ""}
+                              </Badge>
+                            );
+                          else
+                            badges.push(
+                              <span key="e" className="text-muted-foreground" title={title}>
+                                Còn {formatNumber(days)} ngày{byOpen ? " (sau mở)" : ""}
+                              </span>
+                            );
+                        }
+                        if (stored != null)
+                          badges.push(
+                            <Badge key="s" tone="warning" title="Đã mua lâu mà chưa mở nắp">
+                              Tồn ~{stored} tháng chưa mở
+                            </Badge>
+                          );
+                        if (badges.length === 0) return <span className="text-muted-foreground">—</span>;
+                        return <div className="flex flex-wrap gap-1">{badges}</div>;
                       })()}
                     </TD>
                   </TR>
