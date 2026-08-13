@@ -302,9 +302,34 @@ async function main() {
   await prisma.task.create({
     data: { title: "Gọi hỏi thăm sau RF buổi 1", customerId: kDangPD.id, assignee: "Lê Thị CSKH", dueDate: new Date("2026-08-19T02:00:00Z"), priority: "NORMAL", status: "OPEN", channel: "ZALO", createdBy: "Lê Thị CSKH" },
   });
-  // --- Booking SẮP TỚI (HIFU buổi 2) để hiển thị "Booking tiếp theo" ---
+  // --- Lịch hẹn SẮP TỚI (HIFU buổi 2) — LIÊN KẾT PHÁC ĐỒ (Case 7) ---
   await prisma.booking.create({
-    data: { code: "BK-100004", customerId: kDangPD.id, serviceId: svcHIFU.id, scheduledAt: new Date("2026-08-20T07:00:00Z"), durationMinutes: 60, room: "Phòng 3", bed: "Giường B", machine: "Máy HIFU #1", technician: "Phạm Chuyên Viên", master: "Trần Quản Lý", performer: "Phạm Chuyên Viên", status: "CONFIRMED", price: 6_000_000 },
+    data: {
+      code: "BK-100004", customerId: kDangPD.id, serviceId: svcHIFU.id, scheduledAt: new Date("2026-08-20T07:00:00Z"), durationMinutes: 60,
+      room: "Phòng 3", bed: "Giường B", machine: "Máy HIFU #1", technician: "Phạm Chuyên Viên", master: "Trần Quản Lý", performer: "Phạm Chuyên Viên",
+      status: "CONFIRMED", confirmedAt: new Date("2026-08-15T02:00:00Z"), price: 6_000_000, createdBy: "Nguyễn Lễ Tân",
+      planId: planLinh.id, stageId: planLinh.stages[1].id, sessionNumber: 2, assistants: ["Đỗ Thu Ngân"],
+    },
+  });
+  // --- Lịch hẹn ĐÃ ĐỔI LỊCH (Case 5) — có lịch sử đổi lịch ---
+  await prisma.booking.create({
+    data: {
+      code: "BK-100005", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: new Date("2026-08-22T09:00:00Z"), durationMinutes: 60,
+      room: "Phòng 2", technician: "Phạm Chuyên Viên", status: "CONFIRMED", price: 1_800_000, createdBy: "Nguyễn Lễ Tân",
+      rescheduleHistory: [
+        { from: "2026-08-22T07:00:00.000Z", to: "2026-08-22T09:00:00.000Z", oldResources: "KTV Phạm Chuyên Viên, Phòng 2", newResources: "KTV Phạm Chuyên Viên, Phòng 2", by: "Nguyễn Lễ Tân", at: "2026-08-16T03:00:00.000Z", reason: "Khách bận buổi sáng sớm" },
+      ],
+    },
+  });
+  // --- Lịch hẹn ĐẶT ĐÈ trùng lịch có LÝ DO (Case 6) — chỉ người có quyền mới đè ---
+  await prisma.booking.create({
+    data: {
+      code: "BK-100006", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: new Date("2026-08-20T07:30:00Z"), durationMinutes: 60,
+      technician: "Phạm Chuyên Viên", room: "Phòng 1", status: "CONFIRMED", price: 1_800_000, createdBy: "Trần Quản Lý",
+      overrideLog: [
+        { by: "Trần Quản Lý", at: "2026-08-17T04:00:00.000Z", reason: "Khách VIP yêu cầu đúng khung giờ", conflicts: ['Kỹ thuật viên "Phạm Chuyên Viên" (BK-100004)'] },
+      ],
+    },
   });
   // --- Biểu mẫu đã áp cho khách (snapshot schema, không đổi mẫu gốc) ---
   const skinForm = await prisma.formTemplate.findUnique({ where: { code: "FORM-SKIN-ASSESS" } });

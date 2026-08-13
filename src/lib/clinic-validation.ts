@@ -120,7 +120,11 @@ export const bookingCreateSchema = z.object({
   machine: z.string().optional().nullable(),
   technician: z.string().optional().nullable(),
   master: z.string().optional().nullable(),
+  assistants: z.array(z.string()).optional(),
   performer: z.string().optional().nullable(),
+  planId: z.string().optional().nullable(),
+  stageId: z.string().optional().nullable(),
+  sessionNumber: z.coerce.number().int().positive().optional().nullable(),
   status: bookingStatusEnum.default("NEW"),
   price: money,
   discount: money,
@@ -128,12 +132,27 @@ export const bookingCreateSchema = z.object({
   campaign: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
   allowConflict: z.boolean().optional(), // cho phép đặt dù trùng lịch (không lưu DB)
+  overrideReason: z.string().optional().nullable(), // lý do đặt đè khi trùng (bắt buộc khi allowConflict)
   allowBelowFloor: z.boolean().optional(), // cho phép bán dưới giá sàn (cần quyền override)
 });
 export const bookingUpdateSchema = bookingCreateSchema.partial().omit({ code: true });
 export const bookingStatusUpdateSchema = z.object({
   status: bookingStatusEnum,
   note: z.string().optional().nullable(),
+  reason: z.string().optional().nullable(), // lý do (hủy / không đến)
+});
+// Đổi lịch — giữ lịch cũ, ghi lịch sử.
+export const bookingRescheduleSchema = z.object({
+  scheduledAt: dateReq,
+  durationMinutes: z.coerce.number().int().positive().optional().nullable(),
+  technician: z.string().optional().nullable(),
+  master: z.string().optional().nullable(),
+  room: z.string().optional().nullable(),
+  bed: z.string().optional().nullable(),
+  machine: z.string().optional().nullable(),
+  reason: z.string().optional().nullable(),
+  allowConflict: z.boolean().optional(),
+  overrideReason: z.string().optional().nullable(),
 });
 
 // ----- Đánh giá tình trạng -----

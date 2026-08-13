@@ -866,6 +866,55 @@ Có dob/nguồn/phụ trách/phác đồ/booking (quá khứ COMPLETED + **sắp
 Before-After/đề xuất SP/**vật tư khách hàng**/nhật ký CSKH/**follow-up task**/**hướng dẫn đã gửi**/**biểu mẫu áp
 sẵn**/báo giá đã chốt/hóa đơn HD-000001 (trả một phần)/thanh toán.
 
+## Lịch hẹn nâng cao (v0.11.0) — vận hành: thời lượng, xung đột, override, đổi/hủy, phác đồ, công suất
+
+Nâng cấp **module Booking/Lịch hẹn** thành công cụ vận hành (KHÔNG đụng engine khác). Migration
+**`G_booking_enhance`** (additive, 0 DROP; tổng **17 migration**). **116 test pass** (thêm
+`test/booking-http.test.ts` 10 + mở rộng `test/booking.test.ts` → 11).
+
+### Migration & schema
+`bookings` thêm (soft ref, không rebuild phác đồ): `planId/stageId/sessionNumber`, `assistants String[]`,
+`createdBy`, mốc vòng đời `confirmedAt/checkedInAt/startedAt/completedAt`, hủy `cancelReason/cancelledBy/
+cancelledAt`, không đến `noShowReason/noShowBy/noShowAt`, `rescheduleHistory Json` (lịch sử đổi lịch),
+`overrideLog Json` (đặt đè trùng lịch).
+
+### Backend
+- **RBAC:** thêm `booking.override` (MANAGER/BOD/ADMIN). RECEPTION có `booking.write` nhưng KHÔNG override
+  → chỉ được đổi giờ/tài nguyên, không đặt đè.
+- **`src/lib/booking.ts`:** `detectBookingConflicts` (đã có, theo khoảng [start,end) + từng tài nguyên KTV/
+  master/phòng/giường/máy) + **`suggestAlternativeSlots`** (quét cửa sổ 8h–20h, bước 30′, tối đa vài ngày,
+  in-memory; KHÔNG gợi ý nếu KTV/master `isActive=false`) + `logBookingActivity` (ghi Timeline khách).
+- **API:** `POST /api/bookings` (tự lấy thời lượng từ dịch vụ; 409 kèm `conflicts`+`suggestions`+`canOverride`;
+  đặt đè cần `booking.override` **+ lý do bắt buộc** → ghi `overrideLog`+audit `BOOKING_OVERRIDE`+timeline) ·
+  `PATCH /api/bookings/[id]` (sửa + override gating; khóa khi COMPLETED) · `GET /api/bookings/[id]` (kèm tên
+  phác đồ/giai đoạn) · `PATCH /api/bookings/[id]/status` (xác nhận/đến/bắt đầu/hoàn thành/**hủy**/**không đến**
+  — ghi mốc thời gian + lý do + audit + timeline) · **`POST /api/bookings/[id]/reschedule`** (giữ lịch cũ, ghi
+  `rescheduleHistory`, override gating, timeline) · **`GET /api/bookings/suggest-slots`** · `GET /api/bookings`
+  lọc server-side thêm `technician/serviceId/room/machine`.
+
+### UI — `/bookings` (Lịch hẹn)
+- Việt hóa toàn bộ ("Tạo lịch hẹn", "Chi tiết lịch hẹn"...). 4 chế độ **Danh sách/Ngày/Tuần/Tháng** + Hôm nay/‹/›
+  + **Bộ lọc** (dịch vụ/KTV/phòng/máy/trạng thái, server-side). Chip lịch hiển thị **khung giờ bắt đầu–kết thúc**.
+- **Form tạo lịch:** chọn dịch vụ → **tự điền thời lượng chuẩn** + hiện **giờ kết thúc dự kiến**; nhân sự hỗ trợ;
+  **liên kết phác đồ** (chọn khách → nạp phác đồ → giai đoạn → buổi số); cảnh báo trùng **cụ thể từng tài nguyên**
+  + **gợi ý khung giờ** (bấm để chọn) + ô **lý do đặt đè** (chỉ hiện với người có quyền) / khóa với người không quyền.
+- **Chi tiết lịch (modal):** Khách/Dịch vụ+Phác đồ+Buổi/Thời gian (giờ bắt đầu–kết thúc, thời lượng)/Nhân sự+Tài
+  nguyên/Ghi chú/Lịch sử đổi lịch/Đặt đè. **Quick actions theo trạng thái:** Xác nhận · Khách đã đến · Bắt đầu ·
+  Hoàn thành · Đổi lịch · Không đến · Hủy · (COMPLETED) Ghi nhận lần thực hiện · Mở hồ sơ khách.
+- **View Ngày** thêm dải **công suất**: Tổng lịch hôm nay / KTV đang bận / KTV còn trống / Máy đang dùng / Phòng
+  đang dùng. View Tháng bấm ngày → mở View Ngày.
+- **Sidebar:** đổi nhãn Booking→**Lịch hẹn**, Before/After & Đánh giá→**Hình ảnh & Đánh giá**, Brand→**Thương hiệu**,
+  CSKH · Follow-up→**Chăm sóc khách hàng** (chỉ nhãn, không đổi route/DB).
+
+### Nguyên tắc & nợ kỹ thuật (Lịch hẹn)
+- **Booking ≠ Session:** hoàn thành lịch KHÔNG tự đánh dấu buổi hoàn thành; nút "Ghi nhận lần thực hiện" mở trang
+  phác đồ để ghi buổi thực tế (2 record độc lập).
+- Timeline khách ghi sự kiện quan trọng (tạo/đổi/hủy/không đến/chuyển trạng thái) qua CrmActivity — KHÔNG đổi cấu
+  trúc Hồ sơ khách đã nghiệm thu.
+- Danh mục Phòng/Máy/Giường vẫn nhập tay (chưa có bảng tài nguyên riêng); lịch làm việc/nghỉ phép nhân sự chưa có
+  (conflict checker đã sẵn cấu trúc để bổ sung; hiện chỉ bỏ qua nhân sự `isActive=false` khi gợi ý slot). Nhãn
+  "Booking tiếp theo" trong Hồ sơ khách 360° giữ nguyên (không đổi cấu trúc mục đã nghiệm thu).
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

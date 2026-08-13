@@ -80,6 +80,7 @@ export const PERMISSIONS = {
   SERVICE_WRITE: "service.write",
   BOOKING_READ: "booking.read",
   BOOKING_WRITE: "booking.write",
+  BOOKING_OVERRIDE: "booking.override", // đặt lịch dù trùng tài nguyên (cần lý do + audit)
   TREATMENT_READ: "treatment.read", // xem phác đồ + buổi
   TREATMENT_WRITE: "treatment.write", // thiết kế phác đồ, ghi buổi, đánh giá
   PAYMENT_READ: "payment.read",
@@ -165,6 +166,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.FINANCE_READ,
     PERMISSIONS.PROTOCOL_APPROVE,
     PERMISSIONS.PRICEFLOOR_OVERRIDE,
+    PERMISSIONS.BOOKING_OVERRIDE,
     PERMISSIONS.MARKETING_READ,
   ],
 
@@ -211,6 +213,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.CRM_WRITE,
     PERMISSIONS.SERVICE_WRITE,
     PERMISSIONS.BOOKING_WRITE,
+    PERMISSIONS.BOOKING_OVERRIDE,
     PERMISSIONS.TREATMENT_WRITE,
     PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.PAYMENT_WRITE,

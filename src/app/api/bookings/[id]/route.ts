@@ -5,50 +5,70 @@ import { ok, handle, fail } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { bookingUpdateSchema } from "@/lib/clinic-validation";
-import { detectBookingConflicts } from "@/lib/booking";
+import { detectBookingConflicts, suggestAlternativeSlots } from "@/lib/booking";
+import { auditLog } from "@/lib/clinic";
 
 export const GET = handle(async (_req, { params }) => {
   await requirePermission(PERMISSIONS.BOOKING_READ);
   const booking = await prisma.booking.findUnique({
     where: { id: params.id },
     include: {
-      customer: { select: { code: true, fullName: true, phone: true } },
+      customer: { select: { id: true, code: true, fullName: true, phone: true } },
       service: true,
       payments: true,
-      session: true,
+      session: { select: { id: true, sessionNumber: true, status: true } },
     },
   });
-  if (!booking) return fail(404, "Không tìm thấy booking");
-  return ok(booking);
+  if (!booking) return fail(404, "Không tìm thấy lịch hẹn");
+
+  // Giải tên phác đồ / giai đoạn (soft ref, không dùng quan hệ Prisma).
+  let plan: { id: string; code: string; name: string } | null = null;
+  let stage: { id: string; name: string } | null = null;
+  if (booking.planId) {
+    plan = await prisma.treatmentPlan.findUnique({ where: { id: booking.planId }, select: { id: true, code: true, name: true } });
+  }
+  if (booking.stageId) {
+    stage = await prisma.treatmentStage.findUnique({ where: { id: booking.stageId }, select: { id: true, name: true } });
+  }
+  return ok({ ...booking, plan, stage });
 });
 
 export const PATCH = handle(async (req, { params }) => {
-  await requirePermission(PERMISSIONS.BOOKING_WRITE);
-  // Booking đã hoàn thành: khóa dữ liệu lịch sử (mục 30) — chỉ cho ghi chú.
+  const session = await requirePermission(PERMISSIONS.BOOKING_WRITE);
   const current = await prisma.booking.findUnique({ where: { id: params.id } });
-  if (!current) return fail(404, "Không tìm thấy booking");
-  const { allowConflict, ...parsed } = bookingUpdateSchema.parse(await req.json());
+  if (!current) return fail(404, "Không tìm thấy lịch hẹn");
+  const { allowConflict, overrideReason, allowBelowFloor, ...rest } = bookingUpdateSchema.parse(await req.json());
+  const data: Record<string, unknown> = { ...rest };
+
+  // Lịch đã HOÀN THÀNH: khóa dữ liệu lịch sử (chỉ cho sửa ghi chú).
   if (current.status === "COMPLETED") {
-    const allowed = { note: parsed.note };
-    const booking = await prisma.booking.update({ where: { id: params.id }, data: allowed });
+    const booking = await prisma.booking.update({ where: { id: params.id }, data: { note: rest.note } });
     return ok(booking);
   }
 
-  // Kiểm tra trùng lịch khi đổi giờ/tài nguyên (bỏ qua chính booking này).
-  if (!allowConflict) {
-    const conflicts = await detectBookingConflicts({
-      scheduledAt: parsed.scheduledAt ?? current.scheduledAt,
-      durationMinutes: parsed.durationMinutes ?? current.durationMinutes,
-      technician: parsed.technician ?? current.technician,
-      master: parsed.master ?? current.master,
-      room: parsed.room ?? current.room,
-      bed: parsed.bed ?? current.bed,
-      machine: parsed.machine ?? current.machine,
-      excludeId: params.id,
-    });
-    if (conflicts.length > 0) return fail(409, "Trùng lịch tài nguyên", { conflicts });
+  const next = {
+    scheduledAt: rest.scheduledAt ?? current.scheduledAt,
+    durationMinutes: rest.durationMinutes ?? current.durationMinutes,
+    technician: rest.technician ?? current.technician,
+    master: rest.master ?? current.master,
+    room: rest.room ?? current.room,
+    bed: rest.bed ?? current.bed,
+    machine: rest.machine ?? current.machine,
+  };
+  const conflicts = await detectBookingConflicts({ ...next, excludeId: params.id });
+  if (conflicts.length > 0) {
+    const canOverride = session.permissions.includes(PERMISSIONS.BOOKING_OVERRIDE);
+    if (!allowConflict) {
+      const suggestions = await suggestAlternativeSlots({ ...next, excludeId: params.id, limit: 5 });
+      return fail(409, "Trùng lịch tài nguyên", { conflicts, suggestions, canOverride });
+    }
+    if (!canOverride) return fail(403, "Bạn không có quyền đặt đè lịch trùng — vui lòng đổi giờ/tài nguyên.", { conflicts });
+    if (!overrideReason || !overrideReason.trim()) return fail(400, "Cần nhập lý do khi đặt đè lịch trùng.", { conflicts });
+    const log = Array.isArray(current.overrideLog) ? current.overrideLog : [];
+    data.overrideLog = [...log, { by: session.name, at: new Date().toISOString(), reason: overrideReason.trim(), conflicts: conflicts.map((c) => `${c.label} "${c.value}" (${c.bookingCode})`) }];
+    await auditLog({ userId: session.userId, action: "BOOKING_OVERRIDE", entityType: "Booking", entityId: params.id, changes: { reason: overrideReason } });
   }
 
-  const booking = await prisma.booking.update({ where: { id: params.id }, data: parsed });
+  const booking = await prisma.booking.update({ where: { id: params.id }, data });
   return ok(booking);
 });

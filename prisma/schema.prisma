@@ -1120,6 +1120,7 @@ model Booking {
   machine         String? // Máy/thiết bị
   technician      String? // Kỹ thuật viên (tên)
   master          String? // Master/chuyên gia phụ trách (tên)
+  assistants      String[]      @default([]) // Nhân sự hỗ trợ (tên)
   performer       String? // Người thực hiện (tên) — giữ tương thích dữ liệu cũ
   status          BookingStatus @default(NEW)
   price           Decimal?      @db.Decimal(18, 2) // Giá tại thời điểm booking (bất biến sau hoàn thành)
@@ -1127,6 +1128,24 @@ model Booking {
   deposit         Decimal?      @db.Decimal(18, 2)
   campaign        String? // Nhãn nguồn campaign (text tự do)
   campaignId      String? // Attribution tới MarketingCampaign (mục 10)
+  // --- Liên kết phác đồ (soft ref — không rebuild phác đồ) ---
+  planId          String? // Phác đồ liên quan
+  stageId         String? // Giai đoạn trong phác đồ
+  sessionNumber   Int? // Buổi số mấy trong phác đồ
+  // --- Vòng đời lịch hẹn (đổi/hủy/không đến/override) ---
+  createdBy       String? // Người tạo lịch
+  confirmedAt     DateTime? // thời điểm xác nhận
+  checkedInAt     DateTime? // thời điểm khách đến (check-in)
+  startedAt       DateTime? // thời điểm bắt đầu thực hiện
+  completedAt     DateTime? // thời điểm hoàn thành lịch
+  cancelReason    String?
+  cancelledBy     String?
+  cancelledAt     DateTime?
+  noShowReason    String?
+  noShowBy        String?
+  noShowAt        DateTime?
+  rescheduleHistory Json? // [{from,to,oldResources,newResources,by,at,reason}]
+  overrideLog     Json? // [{by,at,reason,conflicts}] — đặt đè cảnh báo trùng lịch
   note            String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { resetDb, uniq, makeCustomer } from "./helpers";
-import { detectBookingConflicts } from "@/lib/booking";
+import { detectBookingConflicts, suggestAlternativeSlots, DEFAULT_DURATION_MIN } from "@/lib/booking";
 
 async function booking(customerId: string, at: string, over: any = {}) {
   return prisma.booking.create({
@@ -66,5 +66,49 @@ describe("Booking — phát hiện trùng lịch tài nguyên (mục 19–21)", 
     await booking(c.id, "2026-09-01T09:00:00Z");
     const conflicts = await detectBookingConflicts({ scheduledAt: new Date("2026-09-01T09:30:00Z"), durationMinutes: 60 });
     expect(conflicts.length).toBe(0);
+  });
+
+  it("trùng master / giường / máy đều được phát hiện", async () => {
+    const c = await makeCustomer();
+    await booking(c.id, "2026-09-01T09:00:00Z", { master: "Master X", bed: "G1", machine: "HIFU 01" });
+    const conflicts = await detectBookingConflicts({
+      scheduledAt: new Date("2026-09-01T09:30:00Z"), durationMinutes: 60, master: "Master X", bed: "G1", machine: "HIFU 01",
+    });
+    const fields = conflicts.map((c) => c.field).sort();
+    expect(fields).toEqual(["bed", "machine", "master"]);
+  });
+
+  it("không nhập thời lượng → dùng mặc định 60′ để xét giao nhau", async () => {
+    const c = await makeCustomer();
+    await booking(c.id, "2026-09-01T09:00:00Z", { technician: "Ngọc", durationMinutes: null });
+    const conflicts = await detectBookingConflicts({ scheduledAt: new Date("2026-09-01T09:59:00Z"), technician: "Ngọc" });
+    expect(DEFAULT_DURATION_MIN).toBe(60);
+    expect(conflicts.length).toBe(1); // 09:00–10:00 giao 09:59–10:59
+  });
+});
+
+describe("Lịch hẹn — gợi ý khung giờ thay thế (mục 12, 24)", () => {
+  beforeEach(async () => { await resetDb(); });
+
+  it("KTV bận 09:00–10:00 → gợi ý slot trống đầu tiên là 10:00", async () => {
+    const c = await makeCustomer();
+    const base = new Date(2099, 8, 1, 9, 0, 0); // 09:00 giờ máy chủ
+    await prisma.booking.create({ data: { code: uniq("BK"), customerId: c.id, scheduledAt: base, durationMinutes: 60, status: "CONFIRMED", technician: "Ngọc" } });
+    const slots = await suggestAlternativeSlots({ scheduledAt: base, durationMinutes: 60, technician: "Ngọc", limit: 3 });
+    expect(slots.length).toBeGreaterThan(0);
+    expect(new Date(slots[0].scheduledAt).getHours()).toBe(10);
+  });
+
+  it("KTV được đánh dấu NGƯNG HOẠT ĐỘNG → không gợi ý slot nào", async () => {
+    await prisma.employee.create({ data: { code: uniq("NV"), fullName: "Nghỉ Việc", isActive: false } });
+    const base = new Date(2099, 8, 1, 9, 0, 0);
+    const slots = await suggestAlternativeSlots({ scheduledAt: base, durationMinutes: 60, technician: "Nghỉ Việc" });
+    expect(slots.length).toBe(0);
+  });
+
+  it("không chọn tài nguyên → không gợi ý (mọi giờ đều trống, vô nghĩa)", async () => {
+    const base = new Date(2099, 8, 1, 9, 0, 0);
+    const slots = await suggestAlternativeSlots({ scheduledAt: base, durationMinutes: 60 });
+    expect(slots).toEqual([]);
   });
 });
