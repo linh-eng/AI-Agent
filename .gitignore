@@ -39,3 +39,7 @@ next-env.d.ts
 # Private uploaded media (blobs)
 /var/uploads/
 var/uploads/
+
+# Build artifacts ZIP (bản cập nhật gửi người dùng — không commit)
+scratch-*.zip
+sophia-care-*.zip
