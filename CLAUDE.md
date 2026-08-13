@@ -49,7 +49,7 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
 - **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng theo `expiryAlertDays`, mặc định 60 ngày), sản phẩm dưới định mức
   (`onHand <= minStock`), **hàng tồn lâu chưa mở nắp** (theo `Category.storeWarnMonths`), và **thiết bị
   sắp/đã hết bảo hành**. **HSD sau mở nắp (PAO):** cấu hình `Category.openMaxMonths` theo nhóm (vd Serum 6
-  tháng, Kem/Mặt nạ 12 tháng); HSD thực tế = min(HSD bao bì, ngày mở nắp + PAO).
+  tháng, Kem/Mặt nạ 12 tháng); sau khi mở nắp HSD thực tế = ngày mở nắp + PAO (chưa mở thì dùng HSD bao bì).
 - **Báo cáo N-X-T (Phase 2):** tồn đầu – nhập – xuất – tồn cuối theo kỳ + kho, tính từ `StockMovement`;
   xuất **CSV** (UTF-8 BOM) phía client.
 - **Quản trị người dùng:** trang `/users` (quyền `user.manage`) — tạo tài khoản, phân vai trò, khoá/mở,

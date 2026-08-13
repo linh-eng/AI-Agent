@@ -192,8 +192,8 @@ export default function CategoriesPage() {
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            HSD thực tế = ngày sớm hơn giữa “HSD trên bao bì” và “ngày mở nắp + hạn sau mở”. Cảnh báo tồn chưa mở:
-            nhắc khi sản phẩm đã mua quá số tháng này mà vẫn chưa mở nắp.
+            Sau khi mở nắp: HSD thực tế = ngày mở nắp + hạn dùng sau mở (số tháng ở trên). Khi chưa mở nắp thì
+            dùng HSD trên bao bì. Cảnh báo tồn chưa mở: nhắc khi sản phẩm đã mua quá số tháng này mà vẫn chưa mở nắp.
           </p>
           <div className="space-y-1.5">
             <Label>Ghi chú</Label>

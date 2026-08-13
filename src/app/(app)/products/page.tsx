@@ -62,17 +62,15 @@ function daysBetween(target: Date): number {
 }
 
 /**
- * HSD thực tế của sản phẩm = ngày sớm hơn giữa HSD trên bao bì và (ngày mở nắp +
- * hạn dùng sau mở của nhóm). Trả về ngày hiệu lực + có bị giới hạn bởi PAO không.
+ * HSD thực tế của sản phẩm:
+ *  - Đã mở nắp + nhóm có cấu hình hạn sau mở (PAO): HSD = ngày mở nắp + hạn sau mở.
+ *  - Chưa mở nắp (hoặc nhóm chưa cấu hình PAO): dùng HSD trên bao bì.
  */
 function effectiveExpiry(r: Row): { date: Date | null; byOpen: boolean } {
-  const pkg = parseISO(r.expiryDate);
   const opened = parseISO(r.openedDate);
   const pao = r.category?.openMaxMonths ?? null;
-  const postOpen = opened && pao ? addMonths(opened, pao) : null;
-  if (pkg && postOpen) return postOpen < pkg ? { date: postOpen, byOpen: true } : { date: pkg, byOpen: false };
-  if (postOpen) return { date: postOpen, byOpen: true };
-  return { date: pkg, byOpen: false };
+  if (opened && pao) return { date: addMonths(opened, pao), byOpen: true };
+  return { date: parseISO(r.expiryDate), byOpen: false };
 }
 
 // Đã mua quá lâu mà chưa mở nắp (theo ngưỡng của nhóm)? Trả số tháng nếu có cảnh báo.
