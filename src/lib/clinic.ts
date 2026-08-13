@@ -82,6 +82,11 @@ function num(v: unknown): number {
   return typeof v === "number" ? v : Number(v);
 }
 
+// Nhãn vai trò nhân sự buổi (dùng cho timeline khách).
+const SESSION_STAFF_ROLE_VN: Record<string, string> = {
+  PRIMARY: "Chính", ASSISTANT: "Hỗ trợ", MASTER: "Master", CHECKER: "Kiểm tra", CONSULTANT: "Tư vấn",
+};
+
 export interface TimelineEvent {
   id: string;
   at: string; // ISO
@@ -117,7 +122,11 @@ export async function buildCustomerTimeline(customerId: string): Promise<Timelin
       }),
       prisma.assessment.findMany({ where: { customerId }, orderBy: { assessedAt: "desc" } }),
       prisma.treatmentPlan.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
-      prisma.treatmentSession.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
+      prisma.treatmentSession.findMany({
+        where: { customerId },
+        include: { staff: { orderBy: { createdAt: "asc" } } },
+        orderBy: { createdAt: "desc" },
+      }),
       prisma.payment.findMany({ where: { customerId }, orderBy: { paidAt: "desc" } }),
       prisma.invoice.findMany({ where: { customerId }, orderBy: { issuedAt: "desc" } }),
       prisma.treatmentProposal.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
@@ -173,12 +182,19 @@ export async function buildCustomerTimeline(customerId: string): Promise<Timelin
   }
   for (const s of sessions) {
     const when = s.performedAt ?? s.scheduledAt ?? s.createdAt;
+    // Ghi nhân sự thực hiện (chính/master...) vào timeline khách (mục 24).
+    const staffLine = (s.staff ?? [])
+      .map((st) => `${st.staffName} (${SESSION_STAFF_ROLE_VN[st.role] ?? st.role})`)
+      .join(", ");
+    const detail = [s.customerFeedback ?? s.objective ?? undefined, staffLine ? `Nhân sự: ${staffLine}` : undefined]
+      .filter(Boolean)
+      .join(" · ");
     events.push({
       id: `se-${s.id}`,
       at: when.toISOString(),
       kind: "session",
       title: `Buổi ${s.sessionNumber}${s.name ? " · " + s.name : ""}`,
-      detail: s.customerFeedback ?? s.objective ?? undefined,
+      detail: detail || undefined,
       status: s.status,
     });
   }

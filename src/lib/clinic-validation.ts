@@ -282,6 +282,30 @@ export const invoiceUpdateSchema = z.object({
   note: z.string().optional().nullable(),
 });
 
+// ----- Nhân sự (mục 22–24) -----
+export const sessionStaffRoleEnum = z.enum(["PRIMARY", "ASSISTANT", "MASTER", "CHECKER", "CONSULTANT"]);
+
+export const employeeCreateSchema = z.object({
+  code: z.string().min(1).max(30).optional(), // tự sinh nếu bỏ trống
+  fullName: z.string().min(1, "Bắt buộc họ tên"),
+  phone: z.string().max(30).optional().nullable(),
+  email: z.string().email().optional().nullable().or(z.literal("")),
+  roles: z.array(z.string()).default([]), // đa vai trò
+  defaultFee: z.coerce.number().min(0).optional().nullable(),
+  note: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+export const employeeUpdateSchema = employeeCreateSchema.partial().omit({ code: true });
+
+export const sessionStaffCreateSchema = z.object({
+  sessionId: z.string().min(1),
+  employeeId: z.string().optional().nullable(),
+  staffName: z.string().min(1, "Chọn/nhập nhân sự"),
+  role: sessionStaffRoleEnum.default("PRIMARY"),
+  fee: z.coerce.number().min(0).optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+
 // ----- Task -----
 export const taskCreateSchema = z.object({
   title: z.string().min(1, "Nhập nội dung"),

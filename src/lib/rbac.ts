@@ -87,6 +87,8 @@ export const PERMISSIONS = {
   INVOICE_READ: "invoice.read", // xem hóa đơn & công nợ
   INVOICE_WRITE: "invoice.write", // tạo/hủy hóa đơn (mục 18)
   SETTING_WRITE: "setting.write", // cấu hình hệ thống (Thương hiệu, mục 1)
+  HR_READ: "hr.read", // xem danh sách nhân sự (mục 22)
+  HR_WRITE: "hr.write", // thêm/sửa nhân sự + gán nhân sự buổi kèm phí
   TASK_WRITE: "task.write",
   CAMPAIGN_WRITE: "campaign.write",
   /// Dữ liệu tài chính nhạy cảm: giá vốn, chi phí, lợi nhuận (mục 24)
@@ -138,6 +140,7 @@ const CLINIC_READ: PermissionCode[] = [
   PERMISSIONS.PROPOSAL_READ,
   PERMISSIONS.PRICE_READ,
   PERMISSIONS.INVOICE_READ,
+  PERMISSIONS.HR_READ,
 ];
 
 /**
@@ -209,6 +212,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PAYMENT_WRITE,
     PERMISSIONS.INVOICE_WRITE,
     PERMISSIONS.SETTING_WRITE,
+    PERMISSIONS.HR_WRITE,
     PERMISSIONS.TASK_WRITE,
     PERMISSIONS.CAMPAIGN_WRITE,
     PERMISSIONS.FINANCE_READ,
@@ -238,6 +242,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.PAYMENT_WRITE,
     PERMISSIONS.INVOICE_WRITE,
+    PERMISSIONS.HR_WRITE,
     PERMISSIONS.TASK_WRITE,
     PERMISSIONS.PROPOSAL_ACCEPT,
     PERMISSIONS.CARE_WRITE,

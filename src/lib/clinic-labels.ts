@@ -187,6 +187,17 @@ export const INVOICE_STATUS_LABEL: Record<string, string> = {
 export const INVOICE_STATUS_TONE: Record<string, Tone> = {
   UNPAID: "warning", PARTIAL: "default", PAID: "success", CANCELLED: "muted",
 };
+// Vai trò công việc của nhân sự (đa vai trò) — danh mục gợi ý (mục 22).
+export const EMPLOYEE_ROLE_OPTIONS = [
+  "Kỹ thuật viên", "Master", "CSKH", "Sales", "Quản lý", "Lễ tân", "Tư vấn", "Bác sĩ",
+];
+// Vai trò trong buổi (mục 24).
+export const SESSION_STAFF_ROLE_LABEL: Record<string, string> = {
+  PRIMARY: "Chính", ASSISTANT: "Hỗ trợ", MASTER: "Master", CHECKER: "Kiểm tra", CONSULTANT: "Tư vấn",
+};
+export const SESSION_STAFF_ROLE_TONE: Record<string, Tone> = {
+  PRIMARY: "default", ASSISTANT: "muted", MASTER: "success", CHECKER: "warning", CONSULTANT: "muted",
+};
 export const CARE_KIND_LABEL: Record<string, string> = {
   PRE_CARE: "Trước dịch vụ", POST_CARE: "Sau dịch vụ", GENERAL: "Chung", FOLLOW_UP: "Theo dõi",
 };
@@ -246,6 +257,7 @@ export function statusLabel(value?: string | null): string {
     LIBRARY_STATUS_LABEL[value] ??
     PROPOSAL_STATUS_LABEL[value] ??
     INVOICE_STATUS_LABEL[value] ??
+    SESSION_STAFF_ROLE_LABEL[value] ??
     LEAD_STATUS_LABEL[value] ??
     RECOMMENDATION_PRIORITY_LABEL[value] ??
     PAYMENT_METHOD_LABEL[value] ??

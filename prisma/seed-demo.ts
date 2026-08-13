@@ -215,6 +215,15 @@ async function main() {
       performer: "Phạm Chuyên Viên", objective: "RF vùng má", actualParams: { nang_luong: "làm ấm 42°C" }, conditionBefore: "Da chùng nhẹ", conditionAfter: "Săn hơn tức thì", customerFeedback: "Ưng ý", plannedCost: 500_000, actualCost: 480_000, price: 1_800_000, checkedBy: "Trần Quản Lý",
     },
   });
+
+  // --- Nhân sự (mục 22–24): đa vai trò + phân công buổi kèm phí ---
+  const nvKTV = await prisma.employee.create({ data: { code: "NV-000001", fullName: "Phạm Chuyên Viên", phone: "0911000001", roles: ["Kỹ thuật viên", "Tư vấn"], defaultFee: 200_000 } });
+  const nvMaster = await prisma.employee.create({ data: { code: "NV-000002", fullName: "Trần Quản Lý", phone: "0911000002", roles: ["Master", "Quản lý", "Kiểm tra"], defaultFee: 500_000 } });
+  await prisma.employee.create({ data: { code: "NV-000003", fullName: "Lê Thị CSKH", phone: "0911000003", roles: ["CSKH", "Lễ tân"], defaultFee: 100_000 } });
+  await prisma.employee.create({ data: { code: "NV-000004", fullName: "Đỗ Thu Ngân", phone: "0911000004", roles: ["Sales", "Lễ tân"], defaultFee: 100_000 } });
+  // Phân công buổi RF #1: KTV chính + Master kiểm tra (tổng phí 700k).
+  await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvKTV.id, staffName: nvKTV.fullName, role: "PRIMARY", fee: 200_000 } });
+  await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvMaster.id, staffName: nvMaster.fullName, role: "CHECKER", fee: 500_000 } });
   const sLinh2 = await prisma.treatmentSession.create({
     data: {
       planId: planLinh.id, stageId: planLinh.stages[1].id, customerId: kDangPD.id, serviceId: svcHIFU.id,

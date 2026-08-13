@@ -1267,6 +1267,7 @@ model TreatmentSession {
   materials      SessionMaterial[]
   materialUsages MaterialUsage[]
   mediaAssets    MediaAsset[]
+  staff          SessionStaff[]
 
   @@index([planId, sessionNumber])
   @@index([customerId])
@@ -2222,4 +2223,56 @@ model AppSetting {
   updatedBy String?
 
   @@map("app_settings")
+}
+
+// =============================================================================
+// NHÂN SỰ (mục 22–24) — 1 người NHIỀU vai trò; vai trò theo BUỔI kèm phí (fee).
+// Nhân sự là thực thể riêng (khác User đăng nhập). Tác nhân buổi lưu FK Employee
+// + snapshot tên để giữ lịch sử khi nhân sự đổi tên/nghỉ.
+// =============================================================================
+
+// Vai trò của nhân sự trong MỘT buổi thực hiện.
+enum SessionStaffRole {
+  PRIMARY // Kỹ thuật viên chính
+  ASSISTANT // Hỗ trợ
+  MASTER // Master/chuyên gia
+  CHECKER // Kiểm tra/nghiệm thu
+  CONSULTANT // Tư vấn/CSKH
+}
+
+model Employee {
+  id         String   @id @default(cuid())
+  code       String   @unique // NV-xxxxxx
+  fullName   String
+  phone      String?
+  email      String?
+  roles      String[] @default([]) // vai trò công việc (đa vai trò): Kỹ thuật viên/Master/CSKH/Sales/Quản lý/Lễ tân...
+  defaultFee Decimal? @db.Decimal(18, 2) // phí mặc định mỗi buổi (nhạy cảm — mask theo finance.read)
+  note       String?
+  isActive   Boolean  @default(true) // soft delete
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sessionAssignments SessionStaff[]
+
+  @@index([isActive])
+  @@map("employees")
+}
+
+model SessionStaff {
+  id         String           @id @default(cuid())
+  sessionId  String
+  employeeId String?
+  staffName  String // snapshot tên tại thời điểm gán
+  role       SessionStaffRole @default(PRIMARY)
+  fee        Decimal?         @db.Decimal(18, 2) // phí cho vai trò này ở buổi này (nhạy cảm)
+  note       String?
+  createdAt  DateTime         @default(now())
+
+  session  TreatmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  employee Employee?        @relation(fields: [employeeId], references: [id])
+
+  @@index([sessionId])
+  @@index([employeeId])
+  @@map("session_staff")
 }

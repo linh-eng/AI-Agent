@@ -84,7 +84,10 @@ const NAV_GROUPS = [
   },
   {
     title: "Hệ thống",
-    items: [{ href: "/settings", label: "Cài đặt", icon: Settings }],
+    items: [
+      { href: "/employees", label: "Nhân sự", icon: Users },
+      { href: "/settings", label: "Cài đặt", icon: Settings },
+    ],
   },
   {
     title: "Kho THNG",

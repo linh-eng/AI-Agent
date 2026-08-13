@@ -15,6 +15,7 @@ import { formatDate, formatNumber } from "@/lib/utils";
 import { MediaUpload } from "@/components/media-upload";
 import { SessionMediaShare } from "@/components/session-media-share";
 import { SpaMaterialConsume } from "@/components/spa-material-consume";
+import { SessionStaff } from "@/components/session-staff";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import {
@@ -333,6 +334,7 @@ export default function TreatmentPlanDetailPage() {
           canFinance={p.canSeeFinance}
           canShare={canMedia}
           canMaterial={canMaterial}
+          canWrite={canWrite}
           error={error}
           onClose={() => setRecord(null)}
           onSubmit={async (body: any) => {
@@ -435,7 +437,7 @@ function AddSessionModal({ open, onClose, onSubmit, error, stages, services, tec
   );
 }
 
-function RecordSessionModal({ session, onClose, onSubmit, error, canFinance, canShare, canMaterial }: any) {
+function RecordSessionModal({ session, onClose, onSubmit, error, canFinance, canShare, canMaterial, canWrite }: any) {
   const [f, setF] = useState<any>({
     status: session.status,
     performer: session.performer ?? "",
@@ -512,6 +514,13 @@ function RecordSessionModal({ session, onClose, onSubmit, error, canFinance, can
             <Label>Vật tư sử dụng trong buổi</Label>
             <p className="text-[11px] text-muted-foreground">Chọn nguồn (Kho vật tư sử dụng hoặc Vật tư khách hàng) → chọn lọ/vật tư → nhập số lượng thực dùng. Hệ thống trừ tồn còn lại và cộng chi phí buổi.</p>
             <SpaMaterialConsume sessionId={session.id} customerId={session.customerId} canWrite={canMaterial} />
+          </div>
+        )}
+        {session.id && (
+          <div className="space-y-1.5">
+            <Label>Nhân sự thực hiện buổi</Label>
+            <p className="text-[11px] text-muted-foreground">Phân công đa vai trò (chính/hỗ trợ/master/kiểm tra/tư vấn) kèm phí. Nhân sự & phí lưu theo buổi, thể hiện trong hồ sơ khách.</p>
+            <SessionStaff sessionId={session.id} canWrite={canWrite} />
           </div>
         )}
         <div className="space-y-1.5"><Label>Phản hồi của khách</Label><Input value={f.customerFeedback} onChange={(e) => setF({ ...f, customerFeedback: e.target.value })} /></div>

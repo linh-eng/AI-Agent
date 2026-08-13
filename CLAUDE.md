@@ -581,6 +581,48 @@ Kéo–thả đổi giờ trên lịch; lưới giờ (time-grid) dạng cột t
 Booking ↔ TreatmentSession (buổi thực hiện). Danh mục tài nguyên (KTV/phòng/máy) hiện nhập tay (chưa có bảng
 danh mục riêng) — sẽ chuẩn hóa khi làm HR (#2) & danh mục phòng/thiết bị.
 
+## Nhân sự (mục 22–24) — Đa vai trò + phân công buổi kèm phí
+
+Phase sau MASTER PROMPT, ưu tiên #2. **Đã xác thực PostgreSQL 16 thật**: tsc sạch · lint 0 lỗi · build OK ·
+**78 test pass** (thêm `test/hr.test.ts`, 4 test) · migrate deploy (13 migration) + seed + seed:demo sạch.
+
+### Migration — `C_hr`
+`employees` (nhân sự) + `session_staff` (phân công buổi) + enum `SessionStaffRole`. Additive, **0 lệnh DROP**.
+Tổng **13 migration**: `0_init` … `B_booking_resources` → `C_hr`.
+
+### Dữ liệu
+- `Employee` (`employees`): `code` NV-xxxxxx, `fullName`, `phone`, `email`, `roles String[]` (**đa vai trò**:
+  Kỹ thuật viên/Master/CSKH/Sales/Quản lý/Lễ tân/Tư vấn/Bác sĩ), `defaultFee` (nhạy cảm — mask theo
+  `finance.read`), `isActive` (soft delete). Nhân sự là thực thể riêng, **khác User đăng nhập**.
+- `SessionStaff` (`session_staff`): `sessionId`, `employeeId?`, `staffName` (snapshot), `role`
+  (`SessionStaffRole`: PRIMARY/ASSISTANT/MASTER/CHECKER/CONSULTANT = chính/hỗ trợ/master/kiểm tra/tư vấn),
+  `fee` (nhạy cảm). Xóa buổi → cascade xóa phân công (nhân sự vẫn còn).
+
+### API
+`/api/employees` (GET list `?active=1&role=`, mask `defaultFee`; POST) · `/api/employees/[id]` (GET/PATCH,
+soft delete qua `isActive`). `/api/session-staff` (GET `?sessionId` trả `{staff, totalFee, canSeeFinance}`
+— tổng phí chỉ khi có `finance.read`; POST gán, tự lấy `defaultFee` của nhân sự nếu bỏ trống phí) ·
+`/api/session-staff/[id]` (DELETE). Gán/xóa nhân sự buổi gated bằng `treatment.write` (người ghi buổi).
+
+### RBAC
+`hr.read` (gộp vào `CLINIC_READ` — mọi vai trò xem được để chọn khi ghi buổi) · `hr.write` (MANAGER/RECEPTION
+— quản lý danh mục nhân sự). Phí (`defaultFee`, `fee`) **mask theo `finance.read`** ở cả list & tổng phí buổi.
+
+### UI
+Sidebar nhóm **Hệ thống → Nhân sự** (`/employees`): danh sách (mã/tên/**vai trò dạng chip**/liên hệ/phí mặc
+định [mask]/trạng thái) + thêm/sửa (chọn **nhiều vai trò** bằng chip toggle, soft delete). Màn **Ghi nhận buổi**
+(`/treatment-plans/[id]`) thêm mục **"Nhân sự thực hiện buổi"** (`components/session-staff.tsx`): chọn nhân
+viên → vai trò → phí → thêm; hiện danh sách + **tổng phí** (nếu có quyền tài chính). **Timeline khách** ghi
+nhân sự buổi ("Nhân sự: Tên (Chính), Tên (Kiểm tra)").
+
+### Demo
+4 nhân sự NV-000001..004 (đa vai trò). Buổi RF #1 của KH-100004 phân công: Phạm Chuyên Viên (Chính, 200k) +
+Trần Quản Lý (Kiểm tra, 500k) → tổng phí 700k.
+
+### Còn lại (phase sau)
+Danh mục tài nguyên booking (phòng/máy) liên kết nhân sự; báo cáo hiệu suất/thù lao theo nhân sự; phí nhân sự
+cộng vào giá sàn (làm ở #3 Giá sàn); chấm công/lịch làm việc. Nhân sự chưa liên kết `User` đăng nhập (tách biệt).
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

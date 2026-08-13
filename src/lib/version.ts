@@ -3,9 +3,9 @@
 // Khi phát hành bản mới: tăng APP_VERSION + đổi ngày + mô tả ngắn, rồi build lại.
 // (Giữ đồng bộ với "version" trong package.json.)
 // =============================================================================
-export const APP_VERSION = "0.3.0";
+export const APP_VERSION = "0.4.0";
 export const APP_RELEASE_DATE = "2026-08-13";
-export const APP_RELEASE_NAME = "Booking: tài nguyên (KTV/master/phòng/giường/máy) + lịch Ngày/Tuần/Tháng + cảnh báo trùng lịch";
+export const APP_RELEASE_NAME = "Nhân sự đa vai trò + phân công buổi kèm phí (theo vai trò chính/hỗ trợ/master/kiểm tra/tư vấn)";
 
 /** Chuỗi hiển thị gọn: v0.2.0 · 13/08/2026 */
 export function versionLabel(): string {
