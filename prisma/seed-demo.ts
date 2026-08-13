@@ -192,7 +192,7 @@ async function main() {
   const kBooking = await prisma.customer.create({
     data: { code: "KH-100003", fullName: "Phạm Gia Hân", gender: "FEMALE", phone: "0900100003", source: "Facebook", group: "Thường", assignedTo: "Nguyễn Lễ Tân" },
   });
-  await prisma.booking.create({ data: { code: "BK-100001", customerId: kBooking.id, serviceId: svcRF.id, scheduledAt: new Date("2026-08-18T07:00:00Z"), durationMinutes: 45, room: "Phòng 2", performer: "Phạm Chuyên Viên", status: "CONFIRMED", price: 1_800_000 } });
+  await prisma.booking.create({ data: { code: "BK-100001", customerId: kBooking.id, serviceId: svcRF.id, scheduledAt: new Date("2026-08-18T07:00:00Z"), durationMinutes: 45, room: "Phòng 2", bed: "Giường A", machine: "Máy RF #1", technician: "Phạm Chuyên Viên", master: "Trần Quản Lý", performer: "Phạm Chuyên Viên", status: "CONFIRMED", price: 1_800_000 } });
 
   // 4) ĐANG THỰC HIỆN PHÁC ĐỒ (đầy đủ) — có portal
   const kDangPD = await prisma.customer.create({
@@ -309,7 +309,7 @@ async function main() {
     data: { code: "KH-100007", fullName: "Bùi Tuấn Kiệt", gender: "MALE", phone: "0900100007", source: "Google", group: "Thường", assignedTo: "Nguyễn Lễ Tân", goals: "Trị sẹo rỗ" },
   });
   await prisma.assessment.create({ data: { customerId: kNam.id, name: "Sẹo rỗ hai bên má", area: "Má", severity: "Vừa", description: "Sẹo box/rolling nông", assessedBy: "Phạm Chuyên Viên" } });
-  await prisma.booking.create({ data: { code: "BK-100003", customerId: kNam.id, serviceId: svcRF.id, scheduledAt: new Date("2026-08-21T08:00:00Z"), durationMinutes: 45, room: "Phòng 3", performer: "Phạm Chuyên Viên", status: "NEW", price: 1_800_000 } });
+  await prisma.booking.create({ data: { code: "BK-100003", customerId: kNam.id, serviceId: svcRF.id, scheduledAt: new Date("2026-08-21T08:00:00Z"), durationMinutes: 45, room: "Phòng 3", machine: "Máy RF #2", technician: "Phạm Chuyên Viên", performer: "Phạm Chuyên Viên", status: "NEW", price: 1_800_000 } });
 
   // ==========================================================================
   // DEMO VẬT TƯ — 2 trường hợp bắt buộc.

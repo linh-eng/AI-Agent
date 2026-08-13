@@ -1114,8 +1114,12 @@ model Booking {
   scheduledAt     DateTime // Ngày + giờ
   durationMinutes Int?
   branch          String?
-  room            String?
-  performer       String? // Người thực hiện (tên)
+  room            String? // Phòng
+  bed             String? // Giường
+  machine         String? // Máy/thiết bị
+  technician      String? // Kỹ thuật viên (tên)
+  master          String? // Master/chuyên gia phụ trách (tên)
+  performer       String? // Người thực hiện (tên) — giữ tương thích dữ liệu cũ
   status          BookingStatus @default(NEW)
   price           Decimal?      @db.Decimal(18, 2) // Giá tại thời điểm booking (bất biến sau hoàn thành)
   discount        Decimal?      @db.Decimal(18, 2)

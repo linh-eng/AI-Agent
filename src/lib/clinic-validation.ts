@@ -116,6 +116,10 @@ export const bookingCreateSchema = z.object({
   durationMinutes: z.coerce.number().int().positive().optional().nullable(),
   branch: z.string().optional().nullable(),
   room: z.string().optional().nullable(),
+  bed: z.string().optional().nullable(),
+  machine: z.string().optional().nullable(),
+  technician: z.string().optional().nullable(),
+  master: z.string().optional().nullable(),
   performer: z.string().optional().nullable(),
   status: bookingStatusEnum.default("NEW"),
   price: money,
@@ -123,6 +127,7 @@ export const bookingCreateSchema = z.object({
   deposit: money,
   campaign: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
+  allowConflict: z.boolean().optional(), // cho phép đặt dù trùng lịch (không lưu DB)
 });
 export const bookingUpdateSchema = bookingCreateSchema.partial().omit({ code: true });
 export const bookingStatusUpdateSchema = z.object({

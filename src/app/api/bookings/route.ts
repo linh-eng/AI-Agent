@@ -1,12 +1,13 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
-import { ok, created, handle } from "@/lib/api";
+import { ok, created, handle, fail } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { bookingCreateSchema } from "@/lib/clinic-validation";
 import { sequentialCode } from "@/lib/clinic";
 import { resolvePrice } from "@/lib/pricing";
+import { detectBookingConflicts } from "@/lib/booking";
 
 export const GET = handle(async (req) => {
   await requirePermission(PERMISSIONS.BOOKING_READ);
@@ -41,8 +42,23 @@ export const GET = handle(async (req) => {
 
 export const POST = handle(async (req) => {
   await requirePermission(PERMISSIONS.BOOKING_WRITE);
-  const parsed = bookingCreateSchema.parse(await req.json());
+  const { allowConflict, ...parsed } = bookingCreateSchema.parse(await req.json());
   const code = parsed.code ?? sequentialCode("BK", await prisma.booking.count());
+
+  // Phát hiện trùng lịch tài nguyên (KTV/master/phòng/giường/máy). Cảnh báo → chặn
+  // trừ khi người dùng xác nhận "vẫn đặt" (allowConflict).
+  if (!allowConflict) {
+    const conflicts = await detectBookingConflicts({
+      scheduledAt: parsed.scheduledAt,
+      durationMinutes: parsed.durationMinutes,
+      technician: parsed.technician,
+      master: parsed.master,
+      room: parsed.room,
+      bed: parsed.bed,
+      machine: parsed.machine,
+    });
+    if (conflicts.length > 0) return fail(409, "Trùng lịch tài nguyên", { conflicts });
+  }
 
   // Chốt giá tại thời điểm booking (snapshot bất biến). Ưu tiên bảng giá có hiệu
   // lực (Price Management), fallback giá chuẩn của dịch vụ.

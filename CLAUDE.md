@@ -544,6 +544,43 @@ tab **Hóa đơn/Thanh toán** riêng trong hồ sơ khách (hiện đã hiện 
 báo cáo A–O mở rộng. Đã sửa **bug hiển thị loại phương án** ở mức nhãn (map `PROPOSAL_KIND_LABEL` dùng chung
 edit/view); cho phép **đổi tên phương án** (ô tên tự do trong màn báo giá).
 
+## Booking nâng cao (mục 19–21) — Tài nguyên + Lịch + Cảnh báo trùng lịch
+
+Phase sau MASTER PROMPT, ưu tiên #1. **Đã xác thực PostgreSQL 16 thật**: tsc sạch · lint 0 lỗi · build OK ·
+**74 test pass** (thêm `test/booking.test.ts`, 6 test) · migrate deploy (12 migration) + seed + seed:demo sạch.
+
+### Migration — `B_booking_resources`
+Thêm cột `bed`, `machine`, `master`, `technician` vào `bookings` (String, theo quy ước "tác nhân = tên").
+Additive, **0 lệnh DROP**. Tổng **12 migration**: `0_init` … `A_invoices` → `B_booking_resources`.
+(Migration thứ 11+ tiếp tục tiền tố chữ `B_`, `C_`… để sắp đúng thứ tự — xem mục `A_invoices`.)
+
+### Phát hiện trùng lịch — `src/lib/booking.ts`
+`detectBookingConflicts({scheduledAt, durationMinutes, technician, master, room, bed, machine, excludeId})`:
+2 booking trùng khi **cùng một giá trị tài nguyên** (khác rỗng, so sánh không phân biệt hoa/thường) **VÀ**
+khoảng `[bắt đầu, kết thúc)` **giao nhau** (nửa mở — liền kề KHÔNG tính trùng). Thời lượng mặc định **60′**.
+Chỉ xét booking còn "giữ chỗ" (`ACTIVE_STATUSES` = NEW/PENDING/CONFIRMED/ARRIVED/IN_PROGRESS/RESCHEDULED);
+bỏ qua HỦY/KHÔNG ĐẾN/HOÀN THÀNH. `excludeId` bỏ qua chính booking đang sửa.
+
+### API
+`POST /api/bookings` và `PATCH /api/bookings/[id]`: nhận thêm resource + cờ `allowConflict` (không lưu DB).
+Nếu có trùng và chưa `allowConflict` → **409** kèm `details.conflicts` (danh sách trùng). Có `allowConflict=true`
+mới ghi. GET nhận `from`/`to` (đã có sẵn) để nạp theo khoảng cho lịch.
+
+### UI — `/bookings`
+4 chế độ xem: **Danh sách · Ngày · Tuần · Tháng** (điều hướng ‹ › + "Hôm nay"). Tuần = 7 cột ngày; Tháng =
+lưới 6×7 (chip giờ+khách, "+N nữa"); Ngày = danh sách theo giờ. Form tạo booking có ô **Kỹ thuật viên,
+Master, Phòng, Giường, Máy, Thời lượng**; khi trùng lịch hiện **banner cảnh báo vàng** liệt kê tài nguyên
+nào bận (booking nào, giờ nào) + nút **"Vẫn đặt (bỏ qua cảnh báo)"** để ghi đè. Chip lịch hiển thị tài nguyên.
+
+### Demo
+BK-100001 (KTV Phạm Chuyên Viên, Phòng 2, Giường A, Máy RF #1, master Trần Quản Lý), BK-100003 (Phòng 3,
+Máy RF #2). Thử tạo booking cùng KTV/phòng trùng giờ để thấy cảnh báo.
+
+### Còn lại trong Booking (phase sau)
+Kéo–thả đổi giờ trên lịch; lưới giờ (time-grid) dạng cột thời gian; lọc lịch theo KTV/phòng; đồng bộ
+Booking ↔ TreatmentSession (buổi thực hiện). Danh mục tài nguyên (KTV/phòng/máy) hiện nhập tay (chưa có bảng
+danh mục riêng) — sẽ chuẩn hóa khi làm HR (#2) & danh mục phòng/thiết bị.
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ
