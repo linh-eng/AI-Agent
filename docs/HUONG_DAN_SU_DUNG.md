@@ -1,4 +1,4 @@
-# HƯỚNG DẪN SỬ DỤNG — THNG Suite (Spa / Thẩm mỹ + Kho)
+# HƯỚNG DẪN SỬ DỤNG — Sophia Wellness (Spa / Thẩm mỹ)
 
 Tài liệu này dành cho **người dùng thực tế** (lễ tân, chuyên viên, CSKH, thu ngân, quản lý, marketing…),
 không cần kiến thức lập trình. Hệ thống gồm hai mảng dùng chung một tài khoản đăng nhập:
