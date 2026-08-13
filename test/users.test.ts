@@ -43,4 +43,23 @@ describe("Quản trị người dùng", () => {
     expect(ROLE_PERMISSIONS.MANAGER).not.toContain("user.manage");
     expect(ROLE_PERMISSIONS.RECEPTION).not.toContain("user.manage");
   });
+
+  it("nguồn quyền theo MÃ NGUỒN: Admin có đủ quyền module mới (hr/pricefloor/followup)", () => {
+    // Login lấy quyền từ ROLE_PERMISSIONS (code) nên cập nhật code là có ngay,
+    // không phụ thuộc RolePermission cũ trong DB.
+    for (const perm of ["hr.write", "pricefloor.write", "pricefloor.override", "followup.write", "user.manage", "finance.read"]) {
+      expect(ROLE_PERMISSIONS.ADMIN).toContain(perm);
+    }
+    expect(ROLE_PERMISSIONS.MANAGER).toContain("hr.write"); // Quản lý cũng thêm được nhân sự
+  });
+
+  it("xóa user: cascade user_roles, và audit_logs.userId set null (không chặn FK)", async () => {
+    const r = await ensureRole(ROLES.RECEPTION);
+    const u = await prisma.user.create({ data: { email: `del_${uniq("d")}@s.com`, name: "Xóa", passwordHash: await hashPassword("x123456"), roles: { create: [{ roleId: r.id }] } } });
+    await prisma.auditLog.create({ data: { userId: u.id, action: "LOGIN", entityType: "User", entityId: u.id } });
+    await prisma.user.delete({ where: { id: u.id } });
+    expect(await prisma.userRole.count({ where: { userId: u.id } })).toBe(0);
+    const logs = await prisma.auditLog.findMany({ where: { entityId: u.id } });
+    expect(logs.every((l) => l.userId === null)).toBe(true); // FK set null, không lỗi
+  });
 });

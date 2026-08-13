@@ -142,6 +142,7 @@ body += p("Menu **Hệ thống → Quản trị người dùng** (**chỉ Admin*
 body += steps([
   "Bấm **Thêm người dùng** → nhập **email đăng nhập**, họ tên, **mật khẩu**, chọn **một hoặc nhiều vai trò**.",
   "Bấm bút chì để **sửa**: đổi tên, đổi vai trò, **đặt lại mật khẩu** (bỏ trống nếu giữ nguyên), **khóa/mở**.",
+  "Bấm **thùng rác** để **xóa** tài khoản (VD dọn tài khoản trùng). Không xóa được chính mình và không xóa Admin cuối cùng.",
 ]);
 body += img("16-quan-tri-nguoi-dung.png", "Quản trị người dùng: danh sách tài khoản + vai trò");
 body += note("“Quản trị người dùng” = tài khoản ĐĂNG NHẬP. Khác “Nhân sự” = danh mục nhân viên để phân công buổi/tính phí.");

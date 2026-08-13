@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword, signSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
 import { ok, fail, handle } from "@/lib/api";
 import { checkThrottle, recordFailure, recordSuccess, getClientIp } from "@/lib/rate-limit";
+import { ROLE_PERMISSIONS, type RoleCode } from "@/lib/rbac";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -45,11 +46,16 @@ export const POST = handle(async (req) => {
   await recordSuccess(keys);
 
   const roles = user.roles.map((ur) => ur.role.code);
-  const permissions = Array.from(
-    new Set(
-      user.roles.flatMap((ur) => ur.role.permissions.map((rp) => rp.permission.code))
-    )
-  );
+  // Quyền theo vai trò lấy từ MÃ NGUỒN (src/lib/rbac.ts) — nguồn sự thật — để khi
+  // cập nhật code (thêm quyền mới) người dùng có ngay sau khi đăng nhập lại, KHÔNG
+  // cần seed lại DB. Vai trò lạ (không có trong code) thì fallback quyền lưu ở DB.
+  const permSet = new Set<string>();
+  for (const ur of user.roles) {
+    const fromCode = ROLE_PERMISSIONS[ur.role.code as RoleCode];
+    if (fromCode) fromCode.forEach((p) => permSet.add(p));
+    else ur.role.permissions.forEach((rp) => permSet.add(rp.permission.code));
+  }
+  const permissions = Array.from(permSet);
 
   const token = await signSession({
     userId: user.id,

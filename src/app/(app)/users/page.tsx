@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, KeyRound } from "lucide-react";
+import { Plus, Pencil, KeyRound, Trash2 } from "lucide-react";
+import { useSession } from "@/components/session-provider";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -19,11 +20,13 @@ interface Role { code: string; name: string }
 interface User { id: string; email: string; name: string; isActive: boolean; createdAt: string; roles: Role[] }
 
 export default function UsersPage() {
+  const me = useSession();
   const [rows, setRows] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [creating, setCreating] = useState(false);
   const [edit, setEdit] = useState<User | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true); setForbidden(false);
@@ -32,6 +35,13 @@ export default function UsersPage() {
     finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  async function remove(u: User) {
+    if (!confirm(`Xóa tài khoản "${u.name}" (${u.email})? Không thể hoàn tác.`)) return;
+    setError(null);
+    try { await apiFetch(`/api/users/${u.id}`, { method: "DELETE" }); load(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Lỗi"); }
+  }
 
   if (forbidden) return (
     <div>
@@ -47,6 +57,7 @@ export default function UsersPage() {
         description="Tạo tài khoản đăng nhập, gán vai trò, đặt lại mật khẩu, khóa/mở tài khoản."
         action={<Button onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Thêm người dùng</Button>}
       />
+      {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -65,7 +76,12 @@ export default function UsersPage() {
                   <TD><div className="flex flex-wrap gap-1">{u.roles.length ? u.roles.map((r) => <Badge key={r.code} tone="muted">{ROLE_LABELS[r.code as keyof typeof ROLE_LABELS] ?? r.name}</Badge>) : <span className="text-muted-foreground">—</span>}</div></TD>
                   <TD>{formatDate(u.createdAt)}</TD>
                   <TD>{u.isActive ? <Badge tone="success">Hoạt động</Badge> : <Badge tone="muted">Đã khóa</Badge>}</TD>
-                  <TD><Button size="icon" variant="ghost" onClick={() => setEdit(u)}><Pencil className="h-4 w-4" /></Button></TD>
+                  <TD>
+                    <div className="flex justify-end gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => setEdit(u)}><Pencil className="h-4 w-4" /></Button>
+                      {u.id !== me.userId && <Button size="icon" variant="ghost" onClick={() => remove(u)} title="Xóa tài khoản"><Trash2 className="h-4 w-4 text-destructive" /></Button>}
+                    </div>
+                  </TD>
                 </TR>
               ))}
             </TBody>

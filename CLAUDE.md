@@ -800,9 +800,17 @@ trò theo `roleCodes` hợp lệ) · `/api/users/[id]` (GET; PATCH đổi tên/v
 đặt lại mật khẩu/khóa-mở; **chặn tự khóa chính mình**). Validation: `userCreateSchema`/`userUpdateSchema`.
 
 ### UI — `/users` (Hệ thống → Quản trị người dùng)
-Danh sách (tên/email/**vai trò chip**/ngày tạo/trạng thái) + **Thêm/Sửa** (email, họ tên, mật khẩu/đặt lại,
+Danh sách (tên/email/**vai trò chip**/ngày tạo/trạng thái) + **Thêm/Sửa/Xóa** (email, họ tên, mật khẩu/đặt lại,
 chọn **nhiều vai trò** ADMIN/BOD/MANAGER/RECEPTION/CUSTOMER_CARE/SPECIALIST/CASHIER/MARKETING, khóa/mở).
-Bump **v0.9.0**.
+`DELETE /api/users/[id]` — **chặn tự xóa mình + xóa Admin cuối cùng**; `audit_logs.userId` là quan hệ tùy chọn
+→ tự set null khi xóa (không lỗi FK). Bump **v0.9.1**.
+
+### FIX QUYỀN — quyền lấy từ MÃ NGUỒN (không cần seed lại)
+**Vấn đề:** login trước đây suy quyền từ **RolePermission trong DB**; sau khi cập nhật code (thêm quyền mới như
+`hr.write`, `pricefloor.*`, `followup.write`) mà chưa `db:seed` lại thì DB thiếu quyền → dù là Admin cũng KHÔNG
+thấy nút (vd "Thêm nhân sự"). **Sửa:** `api/auth/login` nay lấy quyền từ `ROLE_PERMISSIONS[roleCode]` (mã nguồn =
+nguồn sự thật), fallback DB cho vai trò lạ → cập nhật code là có quyền ngay **sau khi đăng nhập lại** (không cần
+seed). Người dùng đang đăng nhập cần **đăng xuất & đăng nhập lại** để nhận quyền mới (JWT nạp lúc login).
 
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 

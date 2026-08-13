@@ -249,6 +249,7 @@ children.push(H1("14. Quản trị người dùng (tài khoản đăng nhập)")
 children.push(P("Menu **Hệ thống → Quản trị người dùng** (**chỉ tài khoản Admin** thấy menu này). Tạo tài khoản đăng nhập cho nhân viên, gán vai trò, đặt lại mật khẩu, khóa/mở."));
 children.push(step("Bấm **Thêm người dùng** → nhập **email đăng nhập**, họ tên, **mật khẩu**, chọn **một hoặc nhiều vai trò**."));
 children.push(step("Bấm biểu tượng bút chì để **sửa**: đổi tên, **đổi vai trò**, **đặt lại mật khẩu** (bỏ trống nếu giữ nguyên), **khóa/mở** tài khoản."));
+children.push(step("Bấm biểu tượng **thùng rác** để **xóa** tài khoản (VD dọn tài khoản trùng). Không xóa được chính mình và không xóa được Admin cuối cùng."));
 children.push(step("Tài khoản bị khóa sẽ không đăng nhập được. (Không thể tự khóa chính tài khoản đang dùng.)"));
 children.push(...img("16-quan-tri-nguoi-dung.png", "Quản trị người dùng: danh sách tài khoản + vai trò"));
 children.push(NOTE("“Quản trị người dùng” là tài khoản ĐĂNG NHẬP (email + mật khẩu + vai trò). Khác với “Nhân sự” — danh mục nhân viên để phân công buổi/tính phí. Một người có thể vừa là nhân sự, vừa có tài khoản đăng nhập."));

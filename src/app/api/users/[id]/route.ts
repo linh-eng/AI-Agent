@@ -5,6 +5,7 @@ import { ok, handle, fail } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS, ROLES } from "@/lib/rbac";
 import { userUpdateSchema } from "@/lib/clinic-validation";
+// (ROLES đã import ở trên — dùng cho VALID_ROLE_CODES và chặn xóa Admin cuối)
 import { hashPassword } from "@/lib/auth";
 import { auditLog } from "@/lib/clinic";
 
@@ -53,4 +54,36 @@ export const PATCH = handle(async (req, { params }) => {
     changes: { isActive: user.isActive, resetPassword: !!parsed.password, roles: parsed.roleCodes },
   });
   return ok({ id: user.id, email: user.email, name: user.name, isActive: user.isActive });
+});
+
+// Xóa vĩnh viễn một tài khoản. Chặn tự xóa chính mình và xóa Admin cuối cùng.
+export const DELETE = handle(async (_req, { params }) => {
+  const session = await requirePermission(PERMISSIONS.USER_MANAGE);
+  if (params.id === session.userId) return fail(409, "Không thể xóa chính tài khoản đang đăng nhập");
+
+  const target = await prisma.user.findUnique({
+    where: { id: params.id },
+    include: { roles: { include: { role: { select: { code: true } } } } },
+  });
+  if (!target) return fail(404, "Không tìm thấy người dùng");
+
+  // Không cho xóa Admin cuối cùng (tránh khóa mất quyền quản trị).
+  const isAdmin = target.roles.some((r) => r.role.code === ROLES.ADMIN);
+  if (isAdmin) {
+    const admins = await prisma.user.count({
+      where: { isActive: true, roles: { some: { role: { code: ROLES.ADMIN } } } },
+    });
+    if (admins <= 1) return fail(409, "Không thể xóa tài khoản Admin cuối cùng");
+  }
+
+  // Nhật ký đăng nhập (audit_logs.userId) là quan hệ tùy chọn → tự set null khi xóa.
+  await prisma.user.delete({ where: { id: params.id } });
+  await auditLog({
+    userId: session.userId,
+    action: "USER_DELETED",
+    entityType: "User",
+    entityId: params.id,
+    changes: { email: target.email },
+  });
+  return ok({ id: params.id });
 });
