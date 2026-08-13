@@ -268,12 +268,14 @@ function BookingFormModal({ open, onClose, customers, services, onSaved }: { ope
   const [form, setForm] = useState({ ...EMPTY });
   const [error, setError] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<Conflict[] | null>(null);
+  const [floor, setFloor] = useState<any | null>(null);
   const [saving, setSaving] = useState(false);
-  useEffect(() => { if (open) { setForm({ ...EMPTY }); setError(null); setConflicts(null); } }, [open]);
+  const resetWarn = () => { setConflicts(null); setFloor(null); };
+  useEffect(() => { if (open) { setForm({ ...EMPTY }); setError(null); resetWarn(); } }, [open]);
 
-  async function submit(allowConflict: boolean) {
+  async function submit(opts: { allowConflict?: boolean; allowBelowFloor?: boolean } = {}) {
     setSaving(true); setError(null);
-    const body: any = { ...form, allowConflict };
+    const body: any = { ...form, allowConflict: opts.allowConflict, allowBelowFloor: opts.allowBelowFloor };
     ["serviceId", "durationMinutes", "technician", "master", "room", "bed", "machine", "price", "deposit", "note"].forEach((k) => { if (!body[k]) delete body[k]; });
     if (body.durationMinutes) body.durationMinutes = Number(body.durationMinutes);
     if (body.price) body.price = Number(body.price);
@@ -282,6 +284,7 @@ function BookingFormModal({ open, onClose, customers, services, onSaved }: { ope
       const res = await fetch("/api/bookings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const json = await res.json().catch(() => ({}));
       if (res.status === 409 && json?.details?.conflicts) { setConflicts(json.details.conflicts); setSaving(false); return; }
+      if (res.status === 409 && json?.details?.priceFloor) { setFloor(json.details.priceFloor); setConflicts(null); setSaving(false); return; }
       if (!res.ok) throw new Error(json?.error ?? "Lỗi");
       onSaved();
     } catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); }
@@ -290,7 +293,7 @@ function BookingFormModal({ open, onClose, customers, services, onSaved }: { ope
 
   return (
     <Modal open={open} onClose={onClose} title="Tạo booking">
-      <form onSubmit={(e) => { e.preventDefault(); submit(false); }} className="space-y-4">
+      <form onSubmit={(e) => { e.preventDefault(); submit({}); }} className="space-y-4">
         <div className="space-y-1.5">
           <Label>Khách hàng *</Label>
           <Select value={form.customerId} onChange={(e) => { setForm({ ...form, customerId: e.target.value }); setConflicts(null); }} required>
@@ -299,7 +302,7 @@ function BookingFormModal({ open, onClose, customers, services, onSaved }: { ope
           </Select>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5"><Label>Dịch vụ</Label><Select value={form.serviceId} onChange={(e) => setForm({ ...form, serviceId: e.target.value })}><option value="">—</option>{services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></div>
+          <div className="space-y-1.5"><Label>Dịch vụ</Label><Select value={form.serviceId} onChange={(e) => { setForm({ ...form, serviceId: e.target.value }); resetWarn(); }}><option value="">—</option>{services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></div>
           <div className="space-y-1.5"><Label>Thời gian *</Label><Input type="datetime-local" value={form.scheduledAt} onChange={(e) => { setForm({ ...form, scheduledAt: e.target.value }); setConflicts(null); }} required /></div>
         </div>
         <div className="grid grid-cols-3 gap-3">
@@ -313,7 +316,7 @@ function BookingFormModal({ open, onClose, customers, services, onSaved }: { ope
           <div className="space-y-1.5"><Label>Máy</Label><Input value={form.machine} onChange={(e) => { setForm({ ...form, machine: e.target.value }); setConflicts(null); }} /></div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5"><Label>Giá (bỏ trống = giá dịch vụ)</Label><Input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>Giá (bỏ trống = giá dịch vụ)</Label><Input type="number" value={form.price} onChange={(e) => { setForm({ ...form, price: e.target.value }); resetWarn(); }} /></div>
           <div className="space-y-1.5"><Label>Tiền cọc</Label><Input type="number" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} /></div>
         </div>
         <div className="space-y-1.5"><Label>Ghi chú</Label><Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
@@ -328,12 +331,25 @@ function BookingFormModal({ open, onClose, customers, services, onSaved }: { ope
             </ul>
           </div>
         )}
+        {floor && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
+            <div className="flex items-center gap-2 font-medium text-destructive"><AlertTriangle className="h-4 w-4" /> Giá dưới giá sàn</div>
+            <p className="mt-1 text-xs">Giá sàn dịch vụ là <b>{formatNumber(Number(floor.floorPrice))} ₫</b> (chi phí {formatNumber(Number(floor.totalCost))} ₫). Giá đang đặt thấp hơn {formatNumber(Number(floor.shortfall))} ₫.</p>
+            <p className="mt-1 text-xs text-muted-foreground">{floor.reason}</p>
+          </div>
+        )}
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose}>Hủy</Button>
-          {conflicts && conflicts.length > 0
-            ? <Button type="button" variant="destructive" disabled={saving} onClick={() => submit(true)}>Vẫn đặt (bỏ qua cảnh báo)</Button>
-            : <Button type="submit" disabled={saving}>{saving ? "Đang lưu..." : "Lưu"}</Button>}
+          {conflicts && conflicts.length > 0 ? (
+            <Button type="button" variant="destructive" disabled={saving} onClick={() => submit({ allowConflict: true })}>Vẫn đặt (bỏ qua cảnh báo)</Button>
+          ) : floor ? (
+            floor.canOverride
+              ? <Button type="button" variant="destructive" disabled={saving} onClick={() => submit({ allowBelowFloor: true })}>Duyệt bán dưới sàn & lưu</Button>
+              : <Button type="button" disabled>Cần người có quyền duyệt</Button>
+          ) : (
+            <Button type="submit" disabled={saving}>{saving ? "Đang lưu..." : "Lưu"}</Button>
+          )}
         </div>
       </form>
     </Modal>

@@ -58,6 +58,7 @@ const NAV_GROUPS = [
       { href: "/invoices", label: "Hóa đơn", icon: Receipt },
       { href: "/payments", label: "Thanh toán", icon: Wallet },
       { href: "/pricing", label: "Bảng giá", icon: Tag },
+      { href: "/price-floor", label: "Giá sàn", icon: Gauge },
       { href: "/marketing", label: "Marketing", icon: Megaphone },
       { href: "/tasks", label: "Công việc / Follow-up", icon: ListTodo },
     ],

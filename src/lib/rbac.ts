@@ -89,6 +89,8 @@ export const PERMISSIONS = {
   SETTING_WRITE: "setting.write", // cấu hình hệ thống (Thương hiệu, mục 1)
   HR_READ: "hr.read", // xem danh sách nhân sự (mục 22)
   HR_WRITE: "hr.write", // thêm/sửa nhân sự + gán nhân sự buổi kèm phí
+  PRICEFLOOR_WRITE: "pricefloor.write", // khai báo cấu trúc chi phí + giá sàn (mục 25)
+  PRICEFLOOR_OVERRIDE: "pricefloor.override", // duyệt bán DƯỚI giá sàn (mục 26)
   TASK_WRITE: "task.write",
   CAMPAIGN_WRITE: "campaign.write",
   /// Dữ liệu tài chính nhạy cảm: giá vốn, chi phí, lợi nhuận (mục 24)
@@ -161,6 +163,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.FINANCE_READ,
     PERMISSIONS.PROTOCOL_APPROVE,
+    PERMISSIONS.PRICEFLOOR_OVERRIDE,
     PERMISSIONS.MARKETING_READ,
   ],
 
@@ -213,6 +216,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.INVOICE_WRITE,
     PERMISSIONS.SETTING_WRITE,
     PERMISSIONS.HR_WRITE,
+    PERMISSIONS.PRICEFLOOR_WRITE,
+    PERMISSIONS.PRICEFLOOR_OVERRIDE,
     PERMISSIONS.TASK_WRITE,
     PERMISSIONS.CAMPAIGN_WRITE,
     PERMISSIONS.FINANCE_READ,
@@ -282,6 +287,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.INVOICE_WRITE,
     PERMISSIONS.FINANCE_READ,
     PERMISSIONS.PRICE_WRITE,
+    PERMISSIONS.PRICEFLOOR_WRITE,
   ],
 
   // Marketing: chiến dịch, nguồn khách, catalog sản phẩm bán lẻ, ROI, báo cáo

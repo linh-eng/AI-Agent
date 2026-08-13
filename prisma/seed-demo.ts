@@ -216,6 +216,14 @@ async function main() {
     },
   });
 
+  // --- Giá sàn (mục 25–26): khai báo chi phí cấu thành cho dịch vụ RF ---
+  // Chi phí: nhân sự 700k (KTV+master) + vận hành 150k + khấu hao 200k + vật tư 250k
+  // + phòng 100k = 1.400.000; biên tối thiểu 15% → giá sàn 1.610.000 (giá chuẩn RF
+  // 1.800.000 > sàn: OK). Bán < 1.610.000 sẽ bị chặn/cần duyệt.
+  await prisma.servicePriceFloor.create({
+    data: { serviceId: svcRF.id, laborCost: 700_000, operationCost: 150_000, depreciationCost: 200_000, materialCost: 250_000, roomCost: 100_000, minMarginPercent: 15, updatedBy: "Trần Quản Lý" },
+  });
+
   // --- Nhân sự (mục 22–24): đa vai trò + phân công buổi kèm phí ---
   const nvKTV = await prisma.employee.create({ data: { code: "NV-000001", fullName: "Phạm Chuyên Viên", phone: "0911000001", roles: ["Kỹ thuật viên", "Tư vấn"], defaultFee: 200_000 } });
   const nvMaster = await prisma.employee.create({ data: { code: "NV-000002", fullName: "Trần Quản Lý", phone: "0911000002", roles: ["Master", "Quản lý", "Kiểm tra"], defaultFee: 500_000 } });

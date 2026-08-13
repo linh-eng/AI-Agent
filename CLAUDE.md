@@ -623,6 +623,50 @@ Trần Quản Lý (Kiểm tra, 500k) → tổng phí 700k.
 Danh mục tài nguyên booking (phòng/máy) liên kết nhân sự; báo cáo hiệu suất/thù lao theo nhân sự; phí nhân sự
 cộng vào giá sàn (làm ở #3 Giá sàn); chấm công/lịch làm việc. Nhân sự chưa liên kết `User` đăng nhập (tách biệt).
 
+## Giá sàn (mục 25–26) — Bảng chi phí cấu thành → Giá sàn + chặn/duyệt bán dưới sàn
+
+Phase sau MASTER PROMPT, ưu tiên #3. **Đã xác thực PostgreSQL 16 thật**: tsc sạch · lint 0 lỗi · build OK ·
+**82 test pass** (thêm `test/price-floor.test.ts`, 4 test) · migrate deploy (14 migration) + seed + seed:demo sạch.
+
+### Migration — `D_price_floor`
+`service_price_floors` (1-1 với Service). Additive, **0 lệnh DROP**. Tổng **14 migration**:
+`0_init` … `C_hr` → `D_price_floor`.
+
+### Dữ liệu & công thức — `src/lib/price-floor.ts`
+`ServicePriceFloor`: 6 thành phần chi phí (`laborCost` nhân sự KTV/master · `operationCost` vận hành ·
+`depreciationCost` khấu hao thiết bị · `materialCost` vật tư · `roomCost` phòng/giường · `otherCost`) +
+`minMarginPercent` (biên lợi nhuận tối thiểu %). **Tổng chi phí = Σ 6 thành phần**; **Giá sàn = tổng chi phí ×
+(1 + biên/100)**. `computeFloor()` + `checkServicePriceFloor(serviceId, price)` → `{hasFloor, totalCost,
+floorPrice, below, shortfall}`. Dịch vụ chưa khai báo chi phí → `hasFloor=false` (không chặn).
+
+### API
+`/api/price-floors` (GET: **cần `finance.read`** — trả list dịch vụ + chi phí + giá sàn + cờ `belowFloor` của
+giá chuẩn; POST: upsert theo `serviceId`, cần `pricefloor.write`).
+
+### Enforcement — Booking
+`POST /api/bookings` sau khi chốt giá: nếu giá < giá sàn dịch vụ → **409** kèm `details.priceFloor`
+(floorPrice/shortfall/`canOverride`). Chỉ ghi khi `allowBelowFloor=true` **VÀ** người dùng có
+`pricefloor.override`. UI booking hiện **banner đỏ "Giá dưới giá sàn"** + nút **"Duyệt bán dưới sàn & lưu"**
+(người có quyền) hoặc **"Cần người có quyền duyệt"** (khóa).
+
+### RBAC
+`pricefloor.write` (MANAGER/CASHIER — khai báo chi phí) · `pricefloor.override` (MANAGER/BOD — duyệt bán dưới
+sàn). Chi phí/giá sàn **chỉ `finance.read` xem** (trang trả 403 nếu thiếu). 
+
+### UI — `/price-floor`
+Sidebar nhóm **Spa & CRM → Giá sàn**: bảng dịch vụ (tổng chi phí/biên/giá sàn/giá chuẩn + cờ "Giá chuẩn dưới
+sàn"); modal khai báo 6 thành phần + biên → **xem trước tổng chi phí & giá sàn ngay**. Thiếu `finance.read`
+thì trang báo không đủ quyền.
+
+### Demo
+Dịch vụ RF: chi phí 1.400.000 (nhân sự 700k + vận hành 150k + khấu hao 200k + vật tư 250k + phòng 100k),
+biên 15% → **giá sàn 1.610.000**; giá chuẩn 1.800.000 (trên sàn). Thử tạo booking RF giá 1.000.000 để thấy
+chặn/duyệt dưới sàn.
+
+### Còn lại (phase sau)
+Áp giá sàn cho **báo giá/hóa đơn** (hiện enforce ở booking); chi phí nhân sự tự lấy từ phân công buổi (hiện
+nhập tay `laborCost`); giá sàn theo **gói/khuyến mãi**; lịch sử thay đổi giá sàn (version).
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

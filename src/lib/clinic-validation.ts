@@ -128,6 +128,7 @@ export const bookingCreateSchema = z.object({
   campaign: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
   allowConflict: z.boolean().optional(), // cho phép đặt dù trùng lịch (không lưu DB)
+  allowBelowFloor: z.boolean().optional(), // cho phép bán dưới giá sàn (cần quyền override)
 });
 export const bookingUpdateSchema = bookingCreateSchema.partial().omit({ code: true });
 export const bookingStatusUpdateSchema = z.object({
@@ -303,6 +304,19 @@ export const sessionStaffCreateSchema = z.object({
   staffName: z.string().min(1, "Chọn/nhập nhân sự"),
   role: sessionStaffRoleEnum.default("PRIMARY"),
   fee: z.coerce.number().min(0).optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+
+// ----- Giá sàn (mục 25–26) -----
+export const priceFloorUpsertSchema = z.object({
+  serviceId: z.string().min(1),
+  laborCost: z.coerce.number().min(0).default(0),
+  operationCost: z.coerce.number().min(0).default(0),
+  depreciationCost: z.coerce.number().min(0).default(0),
+  materialCost: z.coerce.number().min(0).default(0),
+  roomCost: z.coerce.number().min(0).default(0),
+  otherCost: z.coerce.number().min(0).default(0),
+  minMarginPercent: z.coerce.number().min(0).max(1000).default(0),
   note: z.string().optional().nullable(),
 });
 

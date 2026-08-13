@@ -1096,9 +1096,10 @@ model Service {
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
 
-  category ServiceCategory?   @relation(fields: [categoryId], references: [id])
-  bookings Booking[]
-  sessions TreatmentSession[]
+  category   ServiceCategory?   @relation(fields: [categoryId], references: [id])
+  bookings   Booking[]
+  sessions   TreatmentSession[]
+  priceFloor ServicePriceFloor?
 
   @@map("services")
 }
@@ -2275,4 +2276,29 @@ model SessionStaff {
   @@index([sessionId])
   @@index([employeeId])
   @@map("session_staff")
+}
+
+// =============================================================================
+// GIÁ SÀN (mục 25–26) — Bảng chi phí cấu thành → tổng chi phí → GIÁ SÀN.
+// Bán DƯỚI giá sàn phải có quyền đặc biệt (pricefloor.override) để duyệt.
+// Chi phí là dữ liệu nhạy cảm → chỉ finance.read được xem.
+// =============================================================================
+model ServicePriceFloor {
+  id               String   @id @default(cuid())
+  serviceId        String   @unique
+  laborCost        Decimal  @default(0) @db.Decimal(18, 2) // nhân sự (KTV/master)
+  operationCost    Decimal  @default(0) @db.Decimal(18, 2) // vận hành
+  depreciationCost Decimal  @default(0) @db.Decimal(18, 2) // khấu hao thiết bị
+  materialCost     Decimal  @default(0) @db.Decimal(18, 2) // vật tư
+  roomCost         Decimal  @default(0) @db.Decimal(18, 2) // phòng/giường
+  otherCost        Decimal  @default(0) @db.Decimal(18, 2) // khác
+  minMarginPercent Decimal  @default(0) @db.Decimal(6, 2) // biên lợi nhuận tối thiểu (%)
+  note             String?
+  updatedBy        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("service_price_floors")
 }

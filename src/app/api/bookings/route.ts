@@ -8,6 +8,8 @@ import { bookingCreateSchema } from "@/lib/clinic-validation";
 import { sequentialCode } from "@/lib/clinic";
 import { resolvePrice } from "@/lib/pricing";
 import { detectBookingConflicts } from "@/lib/booking";
+import { checkServicePriceFloor } from "@/lib/price-floor";
+import { getSession } from "@/lib/session";
 
 export const GET = handle(async (req) => {
   await requirePermission(PERMISSIONS.BOOKING_READ);
@@ -42,7 +44,7 @@ export const GET = handle(async (req) => {
 
 export const POST = handle(async (req) => {
   await requirePermission(PERMISSIONS.BOOKING_WRITE);
-  const { allowConflict, ...parsed } = bookingCreateSchema.parse(await req.json());
+  const { allowConflict, allowBelowFloor, ...parsed } = bookingCreateSchema.parse(await req.json());
   const code = parsed.code ?? sequentialCode("BK", await prisma.booking.count());
 
   // Phát hiện trùng lịch tài nguyên (KTV/master/phòng/giường/máy). Cảnh báo → chặn
@@ -76,6 +78,26 @@ export const POST = handle(async (req) => {
         select: { standardPrice: true },
       });
       if (svc) price = Number(svc.standardPrice);
+    }
+  }
+
+  // Kiểm tra GIÁ SÀN (mục 26): bán dưới sàn phải có quyền override + xác nhận.
+  if (parsed.serviceId && price != null) {
+    const check = await checkServicePriceFloor(parsed.serviceId, Number(price));
+    if (check.below) {
+      const session = await getSession();
+      const canOverride = !!session?.permissions.includes(PERMISSIONS.PRICEFLOOR_OVERRIDE);
+      if (!allowBelowFloor || !canOverride) {
+        return fail(409, "Giá dưới giá sàn", {
+          priceFloor: {
+            ...check,
+            canOverride,
+            reason: canOverride
+              ? "Giá bán thấp hơn giá sàn — cần xác nhận duyệt."
+              : "Giá bán thấp hơn giá sàn — cần người có quyền duyệt bán dưới sàn.",
+          },
+        });
+      }
     }
   }
 
