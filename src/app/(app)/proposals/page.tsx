@@ -37,7 +37,14 @@ export default function ProposalsPage() {
     setLoading(true);
     try { setRows(await apiFetch<Proposal[]>("/api/proposals")); } finally { setLoading(false); }
   }
-  useEffect(() => { load(); apiFetch<Opt[]>("/api/customers").then(setCustomers).catch(() => {}); }, []);
+  useEffect(() => {
+    load();
+    apiFetch<Opt[]>("/api/customers").then(setCustomers).catch(() => {});
+    // Cho phép mở sẵn form tạo báo giá cho 1 khách (từ nút "Báo giá" ở hồ sơ khách).
+    const sp = new URLSearchParams(window.location.search);
+    const cid = sp.get("customerId");
+    if (cid) { setForm((f) => ({ ...f, customerId: cid })); if (sp.get("new") === "1") setOpen(true); }
+  }, []);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();

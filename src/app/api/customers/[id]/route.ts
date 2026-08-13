@@ -8,6 +8,7 @@ import { customerUpdateSchema } from "@/lib/clinic-validation";
 import {
   buildCustomerTimeline,
   customerFinancials,
+  customerSummary,
   canSeeFinance,
   auditLog,
 } from "@/lib/clinic";
@@ -21,29 +22,48 @@ export const GET = handle(async (_req, { params }) => {
       bookings: {
         include: { service: { select: { name: true } } },
         orderBy: { scheduledAt: "desc" },
-        take: 50,
+        take: 100,
       },
       assessments: { orderBy: { assessedAt: "desc" } },
       plans: {
-        include: { _count: { select: { sessions: true } } },
+        include: {
+          _count: { select: { sessions: true } },
+          sessions: { select: { status: true }, },
+        },
         orderBy: { createdAt: "desc" },
       },
-      payments: { orderBy: { paidAt: "desc" } },
-      activities: { orderBy: { occurredAt: "desc" }, take: 50 },
-      tasks: { orderBy: { createdAt: "desc" }, where: { status: { not: "DONE" } } },
+      sessions: {
+        include: {
+          service: { select: { name: true } },
+          plan: { select: { name: true, code: true } },
+          staff: { orderBy: { createdAt: "asc" } },
+          review: { select: { satisfactionScore: true, technicianScore: true, comment: true, wouldReturn: true } },
+        },
+        orderBy: [{ performedAt: "desc" }, { createdAt: "desc" }],
+        take: 100,
+      },
+      proposals: {
+        include: { _count: { select: { options: true } } },
+        orderBy: { createdAt: "desc" },
+      },
+      payments: { include: { invoice: { select: { code: true } } }, orderBy: { paidAt: "desc" } },
+      activities: { orderBy: { occurredAt: "desc" }, take: 100 },
+      tasks: { orderBy: [{ status: "asc" }, { dueDate: "asc" }] },
     },
   });
   if (!customer) return fail(404, "Không tìm thấy khách hàng");
 
-  const [financials, timeline] = await Promise.all([
+  const [financials, timeline, summary] = await Promise.all([
     customerFinancials(customer.id),
     buildCustomerTimeline(customer.id),
+    customerSummary(customer.id),
   ]);
 
   return ok({
     ...customer,
     financials,
     timeline,
+    summary,
     canSeeFinance: canSeeFinance(session),
   });
 });

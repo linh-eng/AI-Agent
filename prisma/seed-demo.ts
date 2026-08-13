@@ -290,6 +290,29 @@ async function main() {
     where: { code: "CARE-DEMO-POST-RF" }, update: {},
     create: { code: "CARE-DEMO-POST-RF", title: "Dặn dò sau RF/HIFU (demo)", kind: "POST_CARE", category: "RF/HIFU", status: "ACTIVE", content: "Uống đủ nước, tránh nắng, dùng chống nắng SPF50, không xông hơi 3 ngày.", createdBy: "Phạm Chuyên Viên" },
   });
+  // --- Vật tư khách hàng (riêng KH — Hồ sơ 360°) ---
+  await prisma.customerMaterial.create({
+    data: { code: "VTKH-100001", customerId: kDangPD.id, name: "Kem chống nắng SPF50 (gói VIP)", unit: "tuýp", allocatedQty: 10, usedQty: 3, unitCost: 120_000, planId: planLinh.id, status: "ACTIVE", note: "Cấp kèm phác đồ nâng cơ", createdBy: "Phạm Chuyên Viên" },
+  });
+  // --- Hướng dẫn chăm sóc ĐÃ GỬI cho khách (instance, snapshot nội dung) ---
+  await prisma.careInstructionInstance.create({
+    data: { kind: "POST_CARE", title: "Dặn dò sau RF buổi 1", content: "Uống đủ nước, tránh nắng, dùng chống nắng SPF50, không xông hơi 3 ngày.", customerId: kDangPD.id, sessionId: sLinh1.id, deliveredVia: "ZALO", deliveredAt: new Date("2026-07-25T10:00:00Z"), providedBy: "Lê Thị CSKH" },
+  });
+  // --- Việc follow-up CSKH đang chờ ---
+  await prisma.task.create({
+    data: { title: "Gọi hỏi thăm sau RF buổi 1", customerId: kDangPD.id, assignee: "Lê Thị CSKH", dueDate: new Date("2026-08-19T02:00:00Z"), priority: "NORMAL", status: "OPEN", channel: "ZALO", createdBy: "Lê Thị CSKH" },
+  });
+  // --- Booking SẮP TỚI (HIFU buổi 2) để hiển thị "Booking tiếp theo" ---
+  await prisma.booking.create({
+    data: { code: "BK-100004", customerId: kDangPD.id, serviceId: svcHIFU.id, scheduledAt: new Date("2026-08-20T07:00:00Z"), durationMinutes: 60, room: "Phòng 3", bed: "Giường B", machine: "Máy HIFU #1", technician: "Phạm Chuyên Viên", master: "Trần Quản Lý", performer: "Phạm Chuyên Viên", status: "CONFIRMED", price: 6_000_000 },
+  });
+  // --- Biểu mẫu đã áp cho khách (snapshot schema, không đổi mẫu gốc) ---
+  const skinForm = await prisma.formTemplate.findUnique({ where: { code: "FORM-SKIN-ASSESS" } });
+  if (skinForm) {
+    await prisma.formInstance.create({
+      data: { templateId: skinForm.id, templateVersion: skinForm.version, schemaSnapshot: skinForm.schema as any, customerId: kDangPD.id, planId: planLinh.id, name: "Phiếu đánh giá da – Đỗ Thùy Linh", status: "COMPLETED", completedBy: "Phạm Chuyên Viên", completedAt: new Date("2026-07-25T07:00:00Z"), createdBy: "Phạm Chuyên Viên" },
+    });
+  }
   await prisma.payment.create({ data: { customerId: kDangPD.id, planId: planLinh.id, amount: 8_000_000, method: "TRANSFER", receivedBy: "Đỗ Thu Ngân", note: "Đặt cọc phác đồ nâng cơ", paidAt: new Date("2026-07-25T09:00:00Z") } });
   await prisma.crmActivity.create({ data: { customerId: kDangPD.id, type: "CALL", content: "Nhắc lịch HIFU buổi 2, khách xác nhận.", result: "Xác nhận", performedBy: "Lê Thị CSKH", occurredAt: new Date("2026-08-10T03:00:00Z"), nextAction: "Chuẩn bị phòng HIFU", followUpDate: new Date("2026-08-19T02:00:00Z"), followUpOwner: "Lê Thị CSKH" } });
   // Báo giá 3 phương án — ĐÃ CHỐT phương án "Khuyến nghị" → tạo HÓA ĐƠN → thu một phần.

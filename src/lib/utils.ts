@@ -38,6 +38,18 @@ export function mediaSrc(idOrUrl: string): string {
   return `/api/media/${idOrUrl}`;
 }
 
+/** Tính tuổi từ ngày sinh (năm tròn). Trả null nếu không có/không hợp lệ. */
+export function computeAge(dob: Date | string | null | undefined, now?: Date): number | null {
+  if (!dob) return null;
+  const d = typeof dob === "string" ? new Date(dob) : dob;
+  if (Number.isNaN(d.getTime())) return null;
+  const ref = now ?? new Date();
+  let age = ref.getFullYear() - d.getFullYear();
+  const m = ref.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && ref.getDate() < d.getDate())) age--;
+  return age >= 0 && age < 200 ? age : null;
+}
+
 /** Định dạng ngày kiểu VN dd/MM/yyyy. */
 export function formatDate(value: Date | string | null | undefined): string {
   if (!value) return "—";

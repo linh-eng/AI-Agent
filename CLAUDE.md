@@ -812,6 +812,59 @@ thấy nút (vd "Thêm nhân sự"). **Sửa:** `api/auth/login` nay lấy quy�
 nguồn sự thật), fallback DB cho vai trò lạ → cập nhật code là có quyền ngay **sau khi đăng nhập lại** (không cần
 seed). Người dùng đang đăng nhập cần **đăng xuất & đăng nhập lại** để nhận quyền mới (JWT nạp lúc login).
 
+### FIX QUYỀN v2 — tính quyền lại ở MỖI request (v0.9.2, KHÔNG cần đăng nhập lại)
+`getSession()` (`src/lib/session.ts`) nay **suy quyền lại từ `session.roles` qua `ROLE_PERMISSIONS`** ở mỗi
+request (hợp nhất với quyền trong token cho vai trò lạ). Token cũ vẫn giữ `roles` đúng → quyền luôn khớp mã
+nguồn ngay, **không cần đăng xuất/đăng nhập lại**. Áp cho cả server (`requirePermission`) lẫn client
+(`useCan` qua layout `getSession()` + `/api/auth/me`).
+
+## Hồ sơ khách hàng 360° (v0.10.0) — danh sách + hồ sơ trung tâm khách
+
+Tổ chức lại & bổ sung dữ liệu/UX cho **module Khách hàng** (KHÔNG đổi engine Booking/Phác đồ/Giá/Vật tư/
+Marketing). **KHÔNG migration mới** (dùng model sẵn có). Xác thực: tsc sạch · lint 0 lỗi · build OK ·
+**101 test pass** (thêm `test/customer360.test.ts`, 4 test).
+
+### Backend
+- `src/lib/utils.ts`: `computeAge(dob, now?)` — tính tuổi tròn (tất định qua tham số `now` để test).
+- `src/lib/clinic.ts`: `customerSummary(customerId)` → KPI hồ sơ (tổng buổi hoàn thành, tổng booking, **booking
+  tiếp theo**, **follow-up tiếp theo**, việc CSKH đang chờ, **phác đồ đang chạy** + tiến độ buổi + buổi kế,
+  **lần thực hiện / KTV / dịch vụ / đánh giá gần nhất**). Suy từ dữ liệu hiện có, thiếu → `null` (UI không lỗi).
+- `GET /api/customers`: bộ lọc kết hợp (AND) — `q` (tên/mã/SĐT/email), `source`, `assignedTo`, `serviceId`
+  (booking/session), `technician` (booking.technician / session.performer / session.staff), `plan` (tên),
+  `status` (active/inactive/all), `from`/`to` (ngày tạo). Trả thêm dob/gender/group/isActive.
+- `GET /api/customers/facets`: nguồn/nhân viên/KTV/dịch vụ distinct cho dropdown lọc.
+- `GET /api/customers/[id]`: thêm `sessions` (service/plan/staff/review), `proposals` (+`_count.options`),
+  `summary`. Payment kèm `invoice.code`. (`customer-materials` GET thêm `planName`, `lastUsedAt`.)
+
+### UI — Danh sách (`/customers`)
+Cột: Mã · Họ tên · Giới tính · **Ngày sinh · Tuổi** (tính từ dob) · Điện thoại · Nguồn · Phụ trách · Ngày tạo ·
+Trạng thái. Ô tìm nhanh + panel **Bộ lọc** (nguồn/phụ trách/KTV/dịch vụ/phác đồ/trạng thái/khoảng ngày) +
+Áp dụng/Xóa lọc. Bảng cuộn ngang khi hẹp.
+
+### UI — Hồ sơ 360° (`/customers/[id]`)
+- **Header**: tên, mã, ngày sinh + tuổi, giới tính, SĐT, email, nguồn, phụ trách (+ badge nhóm/lưu trữ/nguồn cũ).
+- **Hàng KPI** (8 thẻ): tổng lần thực hiện, tổng giá trị, đã thanh toán, công nợ, booking tiếp theo, follow-up
+  tiếp theo, phác đồ đang thực hiện, KTV gần nhất.
+- **Quick actions**: Tạo Booking (modal, POST `/api/bookings`, xử lý cảnh báo trùng lịch/giá sàn → "vẫn đặt") ·
+  Nhật ký CSKH · Báo giá (→ `/proposals?customerId=&new=1` mở sẵn form) · Follow-up (modal → Task). Menu
+  **"Thêm thao tác"**: Đánh giá · Đề xuất sản phẩm · Gửi hướng dẫn · Thêm Before/After (→ trang phác đồ đang
+  chạy) · Áp biểu mẫu · Ghi nhận thanh toán · Cấp tài khoản Cổng khách.
+- **11 tab đúng thứ tự**: Tổng quan · Timeline · Booking & Lần thực hiện · Phác đồ · Đánh giá & Before/After ·
+  Sản phẩm đề xuất · Vật tư khách hàng · Chăm sóc khách hàng · Báo giá · Hóa đơn & Thanh toán · Biểu mẫu & Tài
+  liệu. Có **tab con**: Visits (Booking | Lần thực hiện), Đánh giá (Đánh giá | Before/After), Chăm sóc (Nhật ký |
+  Follow-up | Hướng dẫn), Hóa đơn (Hóa đơn | Thanh toán).
+- **Tổng quan** = dashboard mini 6 panel (Thông tin hiện tại / Hành động tiếp theo / Lịch sử gần nhất / Tài chính
+  / Before/After gần nhất [thumbnail] / Sản phẩm đề xuất gần nhất).
+- **Timeline** có lọc: từ/đến ngày, loại sự kiện, từ khóa (dịch vụ/KTV/phác đồ). **Before/After** lọc theo dịch
+  vụ/ngày + lightbox phóng to. **Tải lười theo tab** (materials/forms/care/invoices) → không query toàn bộ 1 lúc.
+- **RBAC giữ nguyên**: nút quick-action ẩn theo `useCan(*.write)`; media qua route kiểm quyền (không public);
+  chi phí/giá vốn vẫn mask theo `finance.read` ở tầng server.
+
+### Demo (seed:demo) — KH-100004 (Đỗ Thùy Linh) đủ mọi tab
+Có dob/nguồn/phụ trách/phác đồ/booking (quá khứ COMPLETED + **sắp tới CONFIRMED**)/session + KTV + review/
+Before-After/đề xuất SP/**vật tư khách hàng**/nhật ký CSKH/**follow-up task**/**hướng dẫn đã gửi**/**biểu mẫu áp
+sẵn**/báo giá đã chốt/hóa đơn HD-000001 (trả một phần)/thanh toán.
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

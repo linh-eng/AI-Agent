@@ -17,12 +17,23 @@ export const GET = handle(async (req) => {
   const items = await prisma.customerMaterial.findMany({
     where: { ...(customerId ? { customerId } : {}) },
     orderBy: { createdAt: "desc" },
-    include: { customer: { select: { code: true, fullName: true } } },
+    include: {
+      customer: { select: { code: true, fullName: true } },
+      usages: { orderBy: { occurredAt: "desc" }, take: 1, select: { occurredAt: true } },
+    },
   });
+  // Bổ sung tên phác đồ liên quan (liên kết mềm planId) để hiển thị ở hồ sơ khách.
+  const planIds = [...new Set(items.map((m) => m.planId).filter((x): x is string => !!x))];
+  const plans = planIds.length
+    ? await prisma.treatmentPlan.findMany({ where: { id: { in: planIds } }, select: { id: true, name: true } })
+    : [];
+  const planName = new Map(plans.map((p) => [p.id, p.name]));
   return ok(
     items.map((m) => ({
       ...maskFinance(m, canSee, ["unitCost"]),
       remainingQty: Number(m.allocatedQty) - Number(m.usedQty),
+      planName: m.planId ? planName.get(m.planId) ?? null : null,
+      lastUsedAt: m.usages[0]?.occurredAt ?? null,
     }))
   );
 });

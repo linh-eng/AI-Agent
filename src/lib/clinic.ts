@@ -260,6 +260,118 @@ export async function buildCustomerTimeline(customerId: string): Promise<Timelin
   return events;
 }
 
+// Trạng thái booking còn "giữ chỗ" (chưa hủy/không đến/hoàn thành).
+const BOOKING_ACTIVE = ["NEW", "PENDING", "CONFIRMED", "ARRIVED", "IN_PROGRESS", "RESCHEDULED"] as const;
+
+export interface CustomerSummary {
+  totalSessions: number; // buổi đã hoàn thành
+  totalBookings: number;
+  nextBooking: { id: string; code: string; scheduledAt: string; serviceName: string | null; technician: string | null; status: string } | null;
+  nextFollowUp: { id: string; title: string; dueDate: string | null; assignee: string | null } | null;
+  pendingCareTasks: number; // số việc CSKH đang chờ
+  activePlan: { id: string; code: string; name: string; version: number; status: string; totalSessions: number; doneSessions: number; nextSessionAt: string | null } | null;
+  lastSession: { id: string; at: string | null; serviceName: string | null; technician: string | null; planName: string | null } | null;
+  lastService: string | null;
+  lastTechnician: string | null;
+  lastReview: { at: string; satisfactionScore: number | null; technicianScore: number | null } | null;
+}
+
+/**
+ * Tổng hợp nhanh cho HEADER hồ sơ khách hàng 360° — trả lời "khách đang ở đâu,
+ * làm gì tiếp theo, gần nhất làm gì". Mọi số liệu suy từ dữ liệu hiện có, không
+ * lưu cứng. Nếu thiếu dữ liệu → trả null để UI hiển thị trạng thái rõ ràng.
+ */
+export async function customerSummary(customerId: string): Promise<CustomerSummary> {
+  const now = new Date();
+  const [completedCount, totalBookings, nextBookingRow, nextTask, pendingCareTasks, plan, lastSess, lastReview] =
+    await Promise.all([
+      prisma.treatmentSession.count({ where: { customerId, status: "COMPLETED" } }),
+      prisma.booking.count({ where: { customerId } }),
+      prisma.booking.findFirst({
+        where: { customerId, scheduledAt: { gte: now }, status: { in: [...BOOKING_ACTIVE] as any } },
+        include: { service: { select: { name: true } } },
+        orderBy: { scheduledAt: "asc" },
+      }),
+      prisma.task.findFirst({
+        where: { customerId, status: { in: ["OPEN", "IN_PROGRESS"] }, dueDate: { not: null } },
+        orderBy: { dueDate: "asc" },
+      }),
+      prisma.task.count({ where: { customerId, status: { in: ["OPEN", "IN_PROGRESS"] } } }),
+      prisma.treatmentPlan.findFirst({
+        where: { customerId, status: { in: ["ACTIVE", "PAUSED"] } },
+        include: {
+          _count: { select: { sessions: true } },
+          sessions: { select: { id: true, status: true, scheduledAt: true, sessionNumber: true }, orderBy: { sessionNumber: "asc" } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.treatmentSession.findFirst({
+        where: { customerId, status: "COMPLETED" },
+        include: { service: { select: { name: true } }, plan: { select: { name: true } }, staff: { orderBy: { createdAt: "asc" } } },
+        orderBy: [{ performedAt: "desc" }, { updatedAt: "desc" }],
+      }),
+      prisma.sessionReview.findFirst({ where: { customerId }, orderBy: { createdAt: "desc" } }),
+    ]);
+
+  const nextBooking = nextBookingRow
+    ? {
+        id: nextBookingRow.id,
+        code: nextBookingRow.code,
+        scheduledAt: nextBookingRow.scheduledAt.toISOString(),
+        serviceName: nextBookingRow.service?.name ?? null,
+        technician: nextBookingRow.technician ?? null,
+        status: nextBookingRow.status,
+      }
+    : null;
+
+  const nextFollowUp = nextTask
+    ? { id: nextTask.id, title: nextTask.title, dueDate: nextTask.dueDate ? nextTask.dueDate.toISOString() : null, assignee: nextTask.assignee ?? null }
+    : null;
+
+  let activePlan: CustomerSummary["activePlan"] = null;
+  if (plan) {
+    const doneSessions = plan.sessions.filter((s) => s.status === "COMPLETED").length;
+    const upcoming = plan.sessions.find((s) => s.status !== "COMPLETED" && s.status !== "CANCELLED" && s.scheduledAt);
+    activePlan = {
+      id: plan.id,
+      code: plan.code,
+      name: plan.name,
+      version: plan.version,
+      status: plan.status,
+      totalSessions: plan._count.sessions,
+      doneSessions,
+      nextSessionAt: upcoming?.scheduledAt ? upcoming.scheduledAt.toISOString() : null,
+    };
+  }
+
+  const primaryStaff = lastSess?.staff?.find((st) => st.role === "PRIMARY") ?? lastSess?.staff?.[0];
+  const lastTechnician = lastSess?.performer ?? primaryStaff?.staffName ?? null;
+  const lastSession = lastSess
+    ? {
+        id: lastSess.id,
+        at: (lastSess.performedAt ?? lastSess.updatedAt)?.toISOString() ?? null,
+        serviceName: lastSess.service?.name ?? null,
+        technician: lastTechnician,
+        planName: lastSess.plan?.name ?? null,
+      }
+    : null;
+
+  return {
+    totalSessions: completedCount,
+    totalBookings,
+    nextBooking,
+    nextFollowUp,
+    pendingCareTasks,
+    activePlan,
+    lastSession,
+    lastService: lastSess?.service?.name ?? null,
+    lastTechnician,
+    lastReview: lastReview
+      ? { at: lastReview.createdAt.toISOString(), satisfactionScore: lastReview.satisfactionScore, technicianScore: lastReview.technicianScore }
+      : null,
+  };
+}
+
 /** Tổng giá 1 phương án báo giá = Σ(đơn giá × SL) − chiết khấu. */
 export function proposalOptionTotal(
   items: { unitPrice?: unknown; quantity?: number | null }[],
