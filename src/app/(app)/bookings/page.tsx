@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, ChevronLeft, ChevronRight, AlertTriangle, Clock, X, SlidersHorizontal } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, AlertTriangle, Clock, X, SlidersHorizontal, ChevronDown, Settings2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -27,6 +27,7 @@ interface Booking {
 interface Customer { id: string; code: string; fullName: string; phone?: string | null }
 interface Service { id: string; name: string; durationMinutes?: number | null; standardPrice?: number | string }
 interface Employee { id: string; fullName: string; roles: string[]; isActive?: boolean }
+interface Resource { id: string; name: string; type: "ROOM" | "BED" | "MACHINE"; parentId?: string | null; isActive: boolean }
 interface Conflict { field: string; label: string; value: string; bookingCode: string; customerName: string; scheduledAt: string; durationMinutes: number }
 interface Slot { scheduledAt: string }
 
@@ -56,10 +57,13 @@ export default function BookingsPage() {
   const [filter, setFilter] = useState({ ...EMPTY_FILTER });
   const [showFilter, setShowFilter] = useState(false);
   const [open, setOpen] = useState(false);
+  const [resourceMgr, setResourceMgr] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const loadResources = useCallback(() => { apiFetch<Resource[]>("/api/booking-resources?active=1").then(setResources).catch(() => {}); }, []);
 
   const range = useMemo(() => {
     if (view === "day") return { from: anchor, to: addDays(anchor, 1) };
@@ -91,7 +95,8 @@ export default function BookingsPage() {
     apiFetch<Customer[]>("/api/customers").then(setCustomers).catch(() => {});
     apiFetch<Service[]>("/api/services").then(setServices).catch(() => {});
     apiFetch<Employee[]>("/api/employees?active=1").then(setEmployees).catch(() => {});
-  }, []);
+    loadResources();
+  }, [loadResources]);
 
   function shift(dir: number) {
     if (view === "day") setAnchor((a) => addDays(a, dir));
@@ -114,7 +119,12 @@ export default function BookingsPage() {
       <PageHeader
         title="Lịch hẹn"
         description="Đặt lịch dịch vụ theo kỹ thuật viên/master/phòng/giường/máy — tự cảnh báo trùng tài nguyên & gợi ý giờ khác."
-        action={canWrite && <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Tạo lịch hẹn</Button>}
+        action={canWrite && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setResourceMgr(true)}><Settings2 className="h-4 w-4" /> Tài nguyên</Button>
+            <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Tạo lịch hẹn</Button>
+          </div>
+        )}
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -162,9 +172,136 @@ export default function BookingsPage() {
         <MonthView rows={rows} anchor={anchor} onOpenDay={(d) => { setAnchor(d); setView("day"); }} onOpen={setDetailId} />
       )}
 
-      <BookingFormModal open={open} onClose={() => setOpen(false)} customers={customers} services={services} employees={employees} canOverride={canOverride} onSaved={() => { setOpen(false); load(); }} />
-      {detailId && <BookingDetailModal id={detailId} onClose={() => setDetailId(null)} canWrite={canWrite} canOverride={canOverride} employees={employees} onChanged={load} />}
+      <BookingFormModal open={open} onClose={() => setOpen(false)} customers={customers} services={services} employees={employees} resources={resources} canOverride={canOverride} onSaved={() => { setOpen(false); load(); }} />
+      {detailId && <BookingDetailModal id={detailId} onClose={() => setDetailId(null)} canWrite={canWrite} canOverride={canOverride} employees={employees} resources={resources} onChanged={load} />}
+      {resourceMgr && <ResourceManagerModal resources={resources} onClose={() => setResourceMgr(false)} onChanged={loadResources} />}
     </div>
+  );
+}
+
+/* ===================== Searchable / Multi selects ===================== */
+function SearchableSelect({ options, value, onChange, placeholder }: { options: string[]; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const filtered = options.filter((o) => o.toLowerCase().includes(q.toLowerCase()));
+  return (
+    <div className="relative">
+      <div className="flex h-9 cursor-pointer items-center gap-1 rounded-md border border-input bg-card px-2 text-sm" onClick={() => setOpen((o) => !o)}>
+        <span className={`flex-1 truncate ${value ? "" : "text-muted-foreground"}`}>{value || placeholder || "— Chọn —"}</span>
+        {value && <button type="button" onClick={(e) => { e.stopPropagation(); onChange(""); }} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </div>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-card p-1 shadow-lg">
+            <input autoFocus className="mb-1 w-full rounded border border-input bg-card px-2 py-1 text-sm" placeholder="Tìm..." value={q} onChange={(e) => setQ(e.target.value)} />
+            {filtered.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">Không có trong danh mục</div> :
+              filtered.map((o) => <button key={o} type="button" className={`block w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-muted ${o === value ? "bg-primary/10 text-primary" : ""}`} onClick={() => { onChange(o); setOpen(false); setQ(""); }}>{o}</button>)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+function MultiSelect({ options, values, onChange, placeholder }: { options: string[]; values: string[]; onChange: (v: string[]) => void; placeholder?: string }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const filtered = options.filter((o) => o.toLowerCase().includes(q.toLowerCase()) && !values.includes(o));
+  return (
+    <div className="relative">
+      <div className="flex min-h-9 cursor-text flex-wrap items-center gap-1 rounded-md border border-input bg-card px-2 py-1 text-sm" onClick={() => setOpen(true)}>
+        {values.map((v) => <span key={v} className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-0.5 text-xs text-primary">{v}<button type="button" onClick={(e) => { e.stopPropagation(); onChange(values.filter((x) => x !== v)); }}><X className="h-3 w-3" /></button></span>)}
+        {values.length === 0 && <span className="text-muted-foreground">{placeholder || "— Chọn —"}</span>}
+      </div>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-card p-1 shadow-lg">
+            <input autoFocus className="mb-1 w-full rounded border border-input bg-card px-2 py-1 text-sm" placeholder="Tìm..." value={q} onChange={(e) => setQ(e.target.value)} />
+            {filtered.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">Không có</div> :
+              filtered.map((o) => <button key={o} type="button" className="block w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-muted" onClick={() => { onChange([...values, o]); setQ(""); }}>{o}</button>)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* Danh sách tùy chọn nhân sự/tài nguyên từ danh mục. */
+function useResourceOptions(employees: Employee[], resources: Resource[]) {
+  const techNames = employees.filter((e) => e.roles?.some((r) => /kỹ thuật/i.test(r))).map((e) => e.fullName);
+  const masterNames = employees.filter((e) => e.roles?.some((r) => /master/i.test(r))).map((e) => e.fullName);
+  const allNames = employees.map((e) => e.fullName);
+  const rooms = resources.filter((r) => r.type === "ROOM");
+  const beds = resources.filter((r) => r.type === "BED");
+  const machines = resources.filter((r) => r.type === "MACHINE").map((r) => r.name);
+  const roomNames = rooms.map((r) => r.name);
+  return {
+    technicians: techNames.length ? techNames : allNames,
+    masters: masterNames.length ? masterNames : allNames,
+    assistants: allNames,
+    roomNames, machines,
+    bedsFor: (roomName: string) => {
+      if (!roomName) return beds.map((b) => b.name);
+      const room = rooms.find((r) => r.name === roomName);
+      const scoped = beds.filter((b) => b.parentId === room?.id);
+      return (scoped.length ? scoped : beds).map((b) => b.name);
+    },
+  };
+}
+
+/* ===================== Resource manager ===================== */
+function ResourceManagerModal({ resources, onClose, onChanged }: { resources: Resource[]; onClose: () => void; onChanged: () => void }) {
+  const [type, setType] = useState<"ROOM" | "BED" | "MACHINE">("ROOM");
+  const [name, setName] = useState("");
+  const [parentId, setParentId] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const rooms = resources.filter((r) => r.type === "ROOM");
+  const TYPE_LABEL = { ROOM: "Phòng", BED: "Giường", MACHINE: "Máy/Thiết bị" } as const;
+
+  async function add() {
+    setErr(null);
+    try {
+      await apiFetch("/api/booking-resources", { method: "POST", body: JSON.stringify({ name, type, parentId: type === "BED" ? parentId || null : null }) });
+      setName(""); setParentId(""); onChanged();
+    } catch (e) { setErr(e instanceof Error ? e.message : "Lỗi"); }
+  }
+  async function toggle(r: Resource) {
+    try { await apiFetch(`/api/booking-resources/${r.id}`, { method: "PATCH", body: JSON.stringify({ isActive: !r.isActive }) }); onChanged(); } catch { /* noop */ }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Danh mục tài nguyên (Phòng / Giường / Máy)" className="max-w-2xl">
+      <div className="space-y-4">
+        <div className="grid grid-cols-[auto_1fr_auto] items-end gap-2">
+          <div className="space-y-1"><Label>Loại</Label><Select value={type} onChange={(e) => setType(e.target.value as any)}><option value="ROOM">Phòng</option><option value="BED">Giường</option><option value="MACHINE">Máy/Thiết bị</option></Select></div>
+          <div className="space-y-1"><Label>Tên</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: Phòng 4 / Giường C / Máy Laser 01" /></div>
+          <Button type="button" disabled={!name.trim()} onClick={add}>Thêm</Button>
+        </div>
+        {type === "BED" && (
+          <div className="space-y-1"><Label>Thuộc phòng (tùy chọn)</Label><Select value={parentId} onChange={(e) => setParentId(e.target.value)}><option value="">— Không gắn phòng —</option>{rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</Select></div>
+        )}
+        {err && <p className="text-sm text-destructive">{err}</p>}
+        <div className="max-h-80 overflow-auto rounded-md border">
+          <Table>
+            <THead><TR><TH>Loại</TH><TH>Tên</TH><TH>Thuộc phòng</TH><TH>Trạng thái</TH><TH></TH></TR></THead>
+            <TBody>
+              {resources.length === 0 ? <TR><TD colSpan={5} className="py-4 text-center text-muted-foreground">Chưa có tài nguyên</TD></TR> : resources.map((r) => (
+                <TR key={r.id} className={r.isActive ? "" : "opacity-50"}>
+                  <TD>{TYPE_LABEL[r.type]}</TD>
+                  <TD className="font-medium">{r.name}</TD>
+                  <TD>{r.parentId ? rooms.find((x) => x.id === r.parentId)?.name ?? "—" : "—"}</TD>
+                  <TD>{r.isActive ? <Badge tone="success">Hoạt động</Badge> : <Badge tone="muted">Ngưng</Badge>}</TD>
+                  <TD className="text-right"><Button size="sm" variant="ghost" onClick={() => toggle(r)}>{r.isActive ? "Ngưng" : "Bật lại"}</Button></TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </div>
+        <div className="flex justify-end"><Button variant="outline" onClick={onClose}>Đóng</Button></div>
+      </div>
+    </Modal>
   );
 }
 
@@ -341,10 +478,12 @@ function ConflictBlock({ conflicts, suggestions, canOverride, overrideReason, se
 }
 
 /* ===================== Create modal ===================== */
-const EMPTY = { customerId: "", serviceId: "", scheduledAt: "", durationMinutes: "", technician: "", master: "", assistants: "", room: "", bed: "", machine: "", planId: "", stageId: "", sessionNumber: "", price: "", deposit: "", note: "" };
+const EMPTY = { customerId: "", serviceId: "", scheduledAt: "", durationMinutes: "", technician: "", master: "", room: "", bed: "", machine: "", planId: "", stageId: "", sessionNumber: "", price: "", deposit: "", note: "" };
 
-function BookingFormModal({ open, onClose, customers, services, employees, canOverride, onSaved }: { open: boolean; onClose: () => void; customers: Customer[]; services: Service[]; employees: Employee[]; canOverride: boolean; onSaved: () => void }) {
+function BookingFormModal({ open, onClose, customers, services, employees, resources, canOverride, onSaved }: { open: boolean; onClose: () => void; customers: Customer[]; services: Service[]; employees: Employee[]; resources: Resource[]; canOverride: boolean; onSaved: () => void }) {
   const [form, setForm] = useState({ ...EMPTY });
+  const [assistants, setAssistants] = useState<string[]>([]);
+  const opts = useResourceOptions(employees, resources);
   const [error, setError] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<Conflict[] | null>(null);
   const [suggestions, setSuggestions] = useState<Slot[]>([]);
@@ -354,7 +493,7 @@ function BookingFormModal({ open, onClose, customers, services, employees, canOv
   const [plans, setPlans] = useState<any[]>([]);
   const [stages, setStages] = useState<any[]>([]);
   const resetWarn = () => { setConflicts(null); setSuggestions([]); setFloor(null); setOverrideReason(""); };
-  useEffect(() => { if (open) { setForm({ ...EMPTY }); setError(null); resetWarn(); setPlans([]); setStages([]); } }, [open]);
+  useEffect(() => { if (open) { setForm({ ...EMPTY }); setAssistants([]); setError(null); resetWarn(); setPlans([]); setStages([]); } }, [open]);
 
   const set = (patch: Partial<typeof form>) => { setForm((f) => ({ ...f, ...patch })); setConflicts(null); setSuggestions([]); };
 
@@ -385,9 +524,9 @@ function BookingFormModal({ open, onClose, customers, services, employees, canOv
 
   function buildBody(extra: Record<string, unknown> = {}) {
     const body: any = { ...form, ...extra };
-    body.assistants = form.assistants ? form.assistants.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
+    body.assistants = assistants.length ? assistants : undefined;
     ["serviceId", "durationMinutes", "technician", "master", "room", "bed", "machine", "planId", "stageId", "sessionNumber", "price", "deposit", "note"].forEach((k) => { if (!body[k]) delete body[k]; });
-    if (!body.assistants || body.assistants.length === 0) delete body.assistants;
+    if (!body.assistants) delete body.assistants;
     ["durationMinutes", "sessionNumber", "price", "deposit"].forEach((k) => { if (body[k]) body[k] = Number(body[k]); });
     return body;
   }
@@ -425,15 +564,14 @@ function BookingFormModal({ open, onClose, customers, services, employees, canOv
           <div className="space-y-1.5 col-span-2"><Label>Giờ kết thúc dự kiến</Label><div className="flex h-9 items-center rounded-md border border-input bg-muted/40 px-3 text-sm">{form.scheduledAt ? `${hhmm(form.scheduledAt)} – ${endPreview ? hhmm(endPreview) : "—"}` : "— chọn giờ bắt đầu —"}</div></div>
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1.5"><Label>Kỹ thuật viên chính</Label><Input list="emp-list" value={form.technician} onChange={(e) => set({ technician: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label>Master</Label><Input list="emp-list" value={form.master} onChange={(e) => set({ master: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label>Nhân sự hỗ trợ</Label><Input value={form.assistants} onChange={(e) => setForm({ ...form, assistants: e.target.value })} placeholder="Ngăn cách bởi dấu phẩy" /></div>
+          <div className="space-y-1.5"><Label>Kỹ thuật viên chính</Label><SearchableSelect options={opts.technicians} value={form.technician} onChange={(v) => set({ technician: v })} placeholder="Chọn KTV" /></div>
+          <div className="space-y-1.5"><Label>Master</Label><SearchableSelect options={opts.masters} value={form.master} onChange={(v) => set({ master: v })} placeholder="Chọn Master" /></div>
+          <div className="space-y-1.5"><Label>Nhân sự hỗ trợ</Label><MultiSelect options={opts.assistants} values={assistants} onChange={(v) => { setAssistants(v); setConflicts(null); }} placeholder="Chọn nhiều người" /></div>
         </div>
-        <datalist id="emp-list">{employees.map((e) => <option key={e.id} value={e.fullName} />)}</datalist>
         <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1.5"><Label>Phòng</Label><Input value={form.room} onChange={(e) => set({ room: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label>Giường</Label><Input value={form.bed} onChange={(e) => set({ bed: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label>Máy</Label><Input value={form.machine} onChange={(e) => set({ machine: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>Phòng</Label><SearchableSelect options={opts.roomNames} value={form.room} onChange={(v) => set({ room: v, bed: "" })} placeholder="Chọn phòng" /></div>
+          <div className="space-y-1.5"><Label>Giường</Label><SearchableSelect options={opts.bedsFor(form.room)} value={form.bed} onChange={(v) => set({ bed: v })} placeholder="Chọn giường" /></div>
+          <div className="space-y-1.5"><Label>Máy / thiết bị</Label><SearchableSelect options={opts.machines} value={form.machine} onChange={(v) => set({ machine: v })} placeholder="Chọn máy" /></div>
         </div>
         {/* Liên kết phác đồ */}
         {form.customerId && plans.length > 0 && (
@@ -478,7 +616,7 @@ function BookingFormModal({ open, onClose, customers, services, employees, canOv
 }
 
 /* ===================== Detail modal ===================== */
-function BookingDetailModal({ id, onClose, canWrite, canOverride, employees, onChanged }: { id: string; onClose: () => void; canWrite: boolean; canOverride: boolean; employees: Employee[]; onChanged: () => void }) {
+function BookingDetailModal({ id, onClose, canWrite, canOverride, employees, resources, onChanged }: { id: string; onClose: () => void; canWrite: boolean; canOverride: boolean; employees: Employee[]; resources: Resource[]; onChanged: () => void }) {
   const [b, setB] = useState<any | null>(null);
   const [sub, setSub] = useState<null | "cancel" | "noshow" | "reschedule">(null);
   const [reason, setReason] = useState("");
@@ -507,7 +645,6 @@ function BookingDetailModal({ id, onClose, canWrite, canOverride, employees, onC
 
   return (
     <Modal open onClose={onClose} title={`Lịch hẹn ${b.code}`} className="max-w-2xl">
-      <datalist id="emp-list">{employees.map((e) => <option key={e.id} value={e.fullName} />)}</datalist>
       <div className="space-y-4 text-sm">
         <div className="flex items-center gap-2"><Badge tone={BOOKING_STATUS_TONE[st]}>{BOOKING_STATUS_LABEL[st]}</Badge><span className="text-xs text-muted-foreground">Tạo bởi {b.createdBy ?? "—"}</span></div>
 
@@ -568,7 +705,7 @@ function BookingDetailModal({ id, onClose, canWrite, canOverride, employees, onC
             {["NEW", "PENDING", "CONFIRMED", "ARRIVED"].includes(st) && <Button size="sm" variant="outline" disabled={busy} onClick={() => setSub("reschedule")}>Đổi lịch</Button>}
             {["CONFIRMED", "ARRIVED"].includes(st) && <Button size="sm" variant="outline" disabled={busy} onClick={() => setSub("noshow")}>Không đến</Button>}
             {!["COMPLETED", "CANCELLED", "NO_SHOW"].includes(st) && <Button size="sm" variant="destructive" disabled={busy} onClick={() => setSub("cancel")}>Hủy</Button>}
-            {st === "COMPLETED" && b.planId && <Link href={`/treatment-plans/${b.planId}`}><Button size="sm" variant="outline">Ghi nhận lần thực hiện</Button></Link>}
+            {(st === "IN_PROGRESS" || st === "COMPLETED") && b.planId && <Link href={`/treatment-plans/${b.planId}`}><Button size="sm" variant="outline">Ghi nhận lần thực hiện</Button></Link>}
             <Link href={`/customers/${b.customer?.id ?? b.customerId}`}><Button size="sm" variant="ghost">Mở hồ sơ khách</Button></Link>
           </div>
         )}
@@ -580,7 +717,7 @@ function BookingDetailModal({ id, onClose, canWrite, canOverride, employees, onC
           <ReasonBox title="Ghi nhận khách không đến" placeholder="Lý do (nếu biết)" reason={reason} setReason={setReason} onCancel={() => setSub(null)} onConfirm={() => setStatus("NO_SHOW", { reason })} busy={busy} confirmLabel="Ghi nhận không đến" destructive />
         )}
         {sub === "reschedule" && (
-          <RescheduleBox booking={b} employees={employees} canOverride={canOverride} onCancel={() => setSub(null)} onDone={() => { setSub(null); load(); onChanged(); }} />
+          <RescheduleBox booking={b} employees={employees} resources={resources} canOverride={canOverride} onCancel={() => setSub(null)} onDone={() => { setSub(null); load(); onChanged(); }} />
         )}
       </div>
     </Modal>
@@ -606,7 +743,8 @@ function ReasonBox({ title, placeholder, reason, setReason, onCancel, onConfirm,
   );
 }
 
-function RescheduleBox({ booking, employees, canOverride, onCancel, onDone }: { booking: any; employees: Employee[]; canOverride: boolean; onCancel: () => void; onDone: () => void }) {
+function RescheduleBox({ booking, employees, resources, canOverride, onCancel, onDone }: { booking: any; employees: Employee[]; resources: Resource[]; canOverride: boolean; onCancel: () => void; onDone: () => void }) {
+  const opts = useResourceOptions(employees, resources);
   const toLocal = (iso: string) => new Date(new Date(iso).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   const [f, setF] = useState({
     scheduledAt: toLocal(booking.scheduledAt), durationMinutes: String(booking.durationMinutes ?? 60),
@@ -640,11 +778,11 @@ function RescheduleBox({ booking, employees, canOverride, onCancel, onDone }: { 
         <div className="space-y-1"><Label>Thời lượng (phút)</Label><Input type="number" value={f.durationMinutes} onChange={(e) => { setF({ ...f, durationMinutes: e.target.value }); setConflicts(null); }} /></div>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <div className="space-y-1"><Label>KTV</Label><Input list="emp-list" value={f.technician} onChange={(e) => { setF({ ...f, technician: e.target.value }); setConflicts(null); }} /></div>
-        <div className="space-y-1"><Label>Phòng</Label><Input value={f.room} onChange={(e) => { setF({ ...f, room: e.target.value }); setConflicts(null); }} /></div>
-        <div className="space-y-1"><Label>Máy</Label><Input value={f.machine} onChange={(e) => { setF({ ...f, machine: e.target.value }); setConflicts(null); }} /></div>
+        <div className="space-y-1"><Label>KTV</Label><SearchableSelect options={opts.technicians} value={f.technician} onChange={(v) => { setF({ ...f, technician: v }); setConflicts(null); }} placeholder="Chọn KTV" /></div>
+        <div className="space-y-1"><Label>Phòng</Label><SearchableSelect options={opts.roomNames} value={f.room} onChange={(v) => { setF({ ...f, room: v, bed: "" }); setConflicts(null); }} placeholder="Chọn phòng" /></div>
+        <div className="space-y-1"><Label>Máy</Label><SearchableSelect options={opts.machines} value={f.machine} onChange={(v) => { setF({ ...f, machine: v }); setConflicts(null); }} placeholder="Chọn máy" /></div>
       </div>
-      <div className="space-y-1"><Label>Lý do đổi lịch</Label><Input value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} /></div>
+      <div className="space-y-1"><Label>Lý do đổi lịch *</Label><Input value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} placeholder="Bắt buộc nhập lý do" /></div>
       {conflicts && conflicts.length > 0 && (
         <ConflictBlock conflicts={conflicts} suggestions={suggestions} canOverride={canOverride} overrideReason={overrideReason} setOverrideReason={setOverrideReason}
           onPickSlot={(iso) => { setF({ ...f, scheduledAt: toLocal(iso) }); setConflicts(null); }} onOverride={() => submit(true)} saving={busy} />
@@ -652,7 +790,7 @@ function RescheduleBox({ booking, employees, canOverride, onCancel, onDone }: { 
       {err && <p className="text-xs text-destructive">{err}</p>}
       <div className="flex justify-end gap-2">
         <Button size="sm" variant="outline" onClick={onCancel}>Đóng</Button>
-        {(!conflicts || conflicts.length === 0) && <Button size="sm" disabled={busy} onClick={() => submit()}>Lưu đổi lịch</Button>}
+        {(!conflicts || conflicts.length === 0) && <Button size="sm" disabled={busy || !f.reason.trim()} onClick={() => submit()}>Lưu đổi lịch</Button>}
       </div>
     </div>
   );

@@ -331,6 +331,33 @@ async function main() {
       ],
     },
   });
+
+  // --- Danh mục TÀI NGUYÊN (Phòng/Giường/Máy) cho dropdown form Lịch hẹn ---
+  const rP1 = await prisma.bookingResource.create({ data: { code: "PH-000001", name: "Phòng 1", type: "ROOM" } });
+  const rP2 = await prisma.bookingResource.create({ data: { code: "PH-000002", name: "Phòng 2", type: "ROOM" } });
+  await prisma.bookingResource.create({ data: { code: "PH-000003", name: "Phòng 3", type: "ROOM" } });
+  await prisma.bookingResource.createMany({ data: [
+    { code: "GI-000001", name: "Giường A", type: "BED", parentId: rP1.id },
+    { code: "GI-000002", name: "Giường B", type: "BED", parentId: rP2.id },
+  ] });
+  await prisma.bookingResource.createMany({ data: [
+    { code: "MAY-000001", name: "Máy RF #1", type: "MACHINE" },
+    { code: "MAY-000002", name: "Máy RF #2", type: "MACHINE" },
+    { code: "MAY-000003", name: "Máy HIFU #1", type: "MACHINE" },
+  ] });
+
+  // --- Lịch hẹn HÔM NAY (2026-08-13) đủ TRẠNG THÁI để xem View Ngày (mục 7–8) ---
+  const KTV = "Phạm Chuyên Viên";
+  const day = (h: number) => new Date(`2026-08-13T${String(h).padStart(2, "0")}:00:00Z`);
+  await prisma.booking.create({ data: { code: "BK-100010", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(8), durationMinutes: 60, technician: KTV, room: "Phòng 1", status: "NEW", price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
+  await prisma.booking.create({ data: { code: "BK-100011", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(9), durationMinutes: 60, technician: KTV, room: "Phòng 1", status: "CONFIRMED", confirmedAt: day(8), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
+  await prisma.booking.create({ data: { code: "BK-100012", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(10), durationMinutes: 60, technician: KTV, room: "Phòng 2", status: "ARRIVED", checkedInAt: day(10), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
+  await prisma.booking.create({ data: { code: "BK-100013", customerId: kDangPD.id, serviceId: svcHIFU.id, scheduledAt: day(11), durationMinutes: 60, technician: KTV, master: "Trần Quản Lý", room: "Phòng 3", machine: "Máy HIFU #1", status: "IN_PROGRESS", startedAt: day(11), price: 6_000_000, createdBy: "Nguyễn Lễ Tân", planId: planLinh.id, stageId: planLinh.stages[1].id, sessionNumber: 3, assistants: ["Đỗ Thu Ngân"] } });
+  await prisma.booking.create({ data: { code: "BK-100014", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(13), durationMinutes: 60, technician: KTV, room: "Phòng 2", status: "COMPLETED", completedAt: day(14), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
+  await prisma.booking.create({ data: { code: "BK-100015", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(14), durationMinutes: 60, technician: "Lê Thị CSKH", room: "Phòng 1", status: "CANCELLED", cancelReason: "Khách báo bận đột xuất", cancelledBy: "Nguyễn Lễ Tân", cancelledAt: day(9), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
+  await prisma.booking.create({ data: { code: "BK-100016", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(15), durationMinutes: 60, technician: "Lê Thị CSKH", room: "Phòng 2", status: "NO_SHOW", noShowReason: "Không liên lạc được", noShowBy: "Nguyễn Lễ Tân", noShowAt: day(16), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
+  await prisma.booking.create({ data: { code: "BK-100017", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(16), durationMinutes: 60, technician: KTV, room: "Phòng 3", status: "CONFIRMED", confirmedAt: day(12), price: 1_800_000, createdBy: "Nguyễn Lễ Tân",
+    rescheduleHistory: [ { from: "2026-08-13T07:00:00.000Z", to: "2026-08-13T16:00:00.000Z", oldResources: `KTV ${KTV}, Phòng 3`, newResources: `KTV ${KTV}, Phòng 3`, by: "Nguyễn Lễ Tân", at: "2026-08-12T03:00:00.000Z", reason: "Khách yêu cầu đổi giờ sang chiều" } ] } });
   // --- Biểu mẫu đã áp cho khách (snapshot schema, không đổi mẫu gốc) ---
   const skinForm = await prisma.formTemplate.findUnique({ where: { code: "FORM-SKIN-ASSESS" } });
   if (skinForm) {

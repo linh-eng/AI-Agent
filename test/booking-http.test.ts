@@ -20,6 +20,9 @@ import { resetDb, uniq } from "./helpers";
 
 import { POST as createBookingRaw } from "@/app/api/bookings/route";
 const createBooking = (r: Request) => createBookingRaw(r, {} as any);
+import { GET as resourcesGetRaw, POST as resourcesPostRaw } from "@/app/api/booking-resources/route";
+const resourcesGet = (r: Request) => resourcesGetRaw(r, {} as any);
+const resourcesPost = (r: Request) => resourcesPostRaw(r, {} as any);
 import { GET as getBooking } from "@/app/api/bookings/[id]/route";
 import { PATCH as patchStatus } from "@/app/api/bookings/[id]/status/route";
 import { POST as reschedule } from "@/app/api/bookings/[id]/reschedule/route";
@@ -200,6 +203,32 @@ describe("Lịch hẹn · Vòng đời (đổi/hủy/không đến) + liên kế
     expect(d.sessionNumber).toBe(2);
     expect(d.plan.name).toBe("Phác đồ nâng cơ");
     expect(d.stage.name).toBe("Can thiệp");
+  });
+
+  it("đổi lịch THIẾU lý do → 400 (bắt buộc nhập lý do)", async () => {
+    await resetDbKeepUsers();
+    const b = await makeOne();
+    auth(writer);
+    const res = await reschedule(req(`http://t/api/bookings/${b.id}/reschedule`, "POST", { scheduledAt: FUT(16) }), { params: { id: b.id } });
+    expect(res.status).toBe(422); // Zod validation error (thiếu lý do)
+  });
+});
+
+describe("Lịch hẹn · Danh mục tài nguyên (Phòng/Giường/Máy)", () => {
+  it("tạo tài nguyên (booking.write) rồi GET list active trả về", async () => {
+    auth(writer);
+    const created = await resourcesPost(req("http://t/api/booking-resources", "POST", { name: `Phòng ${uniq("P")}`, type: "ROOM" }));
+    expect(created.status).toBe(201);
+    const list = await resourcesGet(req("http://t/api/booking-resources?type=ROOM&active=1", "GET"));
+    const rows = (await readJson(list)).data;
+    expect(rows.some((r: any) => r.type === "ROOM")).toBe(true);
+  });
+
+  it("giường có thể gắn phòng (parentId)", async () => {
+    auth(writer);
+    const room = (await readJson(await resourcesPost(req("http://t/api/booking-resources", "POST", { name: `Phòng ${uniq("P")}`, type: "ROOM" })))).data;
+    const bed = (await readJson(await resourcesPost(req("http://t/api/booking-resources", "POST", { name: `Giường ${uniq("G")}`, type: "BED", parentId: room.id })))).data;
+    expect(bed.parentId).toBe(room.id);
   });
 });
 

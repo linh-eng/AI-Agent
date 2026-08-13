@@ -915,6 +915,22 @@ cancelledAt`, không đến `noShowReason/noShowBy/noShowAt`, `rescheduleHistory
   (conflict checker đã sẵn cấu trúc để bổ sung; hiện chỉ bỏ qua nhân sự `isActive=false` khi gợi ý slot). Nhãn
   "Booking tiếp theo" trong Hồ sơ khách 360° giữ nguyên (không đổi cấu trúc mục đã nghiệm thu).
 
+### Lịch hẹn — tài nguyên từ danh mục (v0.11.1)
+Chỉnh cuối Mục Lịch hẹn: các trường tài nguyên trong form là **Select thực từ danh mục** (không gõ tự do).
+Migration **`H_booking_resources`** (`booking_resources` + enum `ResourceType` ROOM/BED/MACHINE, `parentId`
+giường→phòng, `isActive`; additive, 0 DROP; **tổng 18 migration**). **119 test pass**.
+- **API:** `/api/booking-resources` (GET lọc `type`/`active`; POST tạo — gated `booking.write`) ·
+  `/api/booking-resources/[id]` (PATCH sửa/bật-tắt, KHÔNG hard-delete).
+- **UI:** component **SearchableSelect** (KTV chính, Master, Phòng, Giường, Máy — tìm kiếm trong danh mục) +
+  **MultiSelect** (Nhân sự hỗ trợ, chọn nhiều). Giường **lọc theo phòng** đã chọn (parentId). Nút **"Tài
+  nguyên"** mở modal quản lý danh mục (thêm/bật-tắt Phòng/Giường/Máy) → "workflow tạo tài nguyên riêng".
+  Booking vẫn lưu **tên** (String) — không đổi cột; danh mục chỉ ràng buộc lựa chọn.
+- **Đổi lịch bắt buộc lý do** (server `bookingRescheduleSchema.reason` required + UI khóa nút khi trống).
+  Nút **"Ghi nhận lần thực hiện"** hiện khi buổi **Đang thực hiện** hoặc **Hoàn thành** (Booking ≠ Session).
+- **Demo:** danh mục Phòng 1–3 / Giường A–B / Máy RF #1–2 · HIFU #1; **8 lịch ngày 2026-08-13** đủ trạng thái
+  (Mới/Đã xác nhận/Khách đã đến/Đang thực hiện/Hoàn thành/Hủy/Không đến/đã đổi lịch) để View Ngày & công suất
+  có dữ liệu. Test thêm: đổi lịch thiếu lý do → 422; tạo tài nguyên + giường gắn phòng.
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

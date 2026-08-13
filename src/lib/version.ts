@@ -3,9 +3,9 @@
 // Khi phát hành bản mới: tăng APP_VERSION + đổi ngày + mô tả ngắn, rồi build lại.
 // (Giữ đồng bộ với "version" trong package.json.)
 // =============================================================================
-export const APP_VERSION = "0.11.0";
+export const APP_VERSION = "0.11.1";
 export const APP_RELEASE_DATE = "2026-08-13";
-export const APP_RELEASE_NAME = "Lịch hẹn nâng cao: khung giờ bắt đầu–kết thúc, tự lấy thời lượng dịch vụ, cảnh báo trùng tài nguyên cụ thể + gợi ý giờ khác, quyền đặt đè có lý do + audit, đổi/hủy/không đến có lịch sử, liên kết phác đồ, chi tiết lịch + công suất ngày";
+export const APP_RELEASE_NAME = "Lịch hẹn: tài nguyên chọn từ DANH MỤC (KTV/Master searchable, hỗ trợ multi-select, Phòng/Giường/Máy dropdown; giường lọc theo phòng) + quản lý danh mục tài nguyên; đổi lịch bắt buộc lý do; demo đủ trạng thái cho View Ngày";
 
 /** Chuỗi hiển thị gọn: v0.2.0 · 13/08/2026 */
 export function versionLabel(): string {

@@ -150,7 +150,7 @@ export const bookingRescheduleSchema = z.object({
   room: z.string().optional().nullable(),
   bed: z.string().optional().nullable(),
   machine: z.string().optional().nullable(),
-  reason: z.string().optional().nullable(),
+  reason: z.string().min(1, "Nhập lý do đổi lịch"),
   allowConflict: z.boolean().optional(),
   overrideReason: z.string().optional().nullable(),
 });

@@ -2393,3 +2393,31 @@ model SessionReview {
   @@index([customerId])
   @@map("session_reviews")
 }
+
+// ============================================================================
+// Danh mục TÀI NGUYÊN đặt lịch (mục 25) — Phòng / Giường / Máy để Booking chọn
+// từ danh mục thay vì gõ tự do. Giường có thể thuộc một Phòng (parentId).
+// ============================================================================
+enum ResourceType {
+  ROOM
+  BED
+  MACHINE
+}
+
+model BookingResource {
+  id        String       @id @default(cuid())
+  code      String?      @unique
+  name      String
+  type      ResourceType
+  parentId  String? // giường thuộc phòng nào
+  isActive  Boolean      @default(true)
+  note      String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  parent   BookingResource?  @relation("ResourceParent", fields: [parentId], references: [id])
+  children BookingResource[] @relation("ResourceParent")
+
+  @@index([type])
+  @@map("booking_resources")
+}
