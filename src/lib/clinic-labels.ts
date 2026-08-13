@@ -198,6 +198,10 @@ export const SESSION_STAFF_ROLE_LABEL: Record<string, string> = {
 export const SESSION_STAFF_ROLE_TONE: Record<string, Tone> = {
   PRIMARY: "default", ASSISTANT: "muted", MASTER: "success", CHECKER: "warning", CONSULTANT: "muted",
 };
+// CSKH follow-up (mục 31).
+export const FOLLOWUP_TRIGGER_LABEL: Record<string, string> = {
+  AFTER_SERVICE: "Sau dịch vụ", AFTER_SESSION: "Sau buổi điều trị", BIRTHDAY: "Sinh nhật", MANUAL: "Thủ công",
+};
 export const CARE_KIND_LABEL: Record<string, string> = {
   PRE_CARE: "Trước dịch vụ", POST_CARE: "Sau dịch vụ", GENERAL: "Chung", FOLLOW_UP: "Theo dõi",
 };

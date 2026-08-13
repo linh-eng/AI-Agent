@@ -1305,20 +1305,23 @@ model Payment {
 // TASK & FOLLOW-UP (mục 22)
 // ----------------------------------------------------------------------------
 model Task {
-  id          String       @id @default(cuid())
-  title       String
-  description String?
-  customerId  String?
-  bookingId   String?
-  planId      String?
-  sessionId   String?
-  assignee    String? // Người phụ trách (tên)
-  dueDate     DateTime?
-  priority    TaskPriority @default(NORMAL)
-  status      TaskStatus   @default(OPEN)
-  createdBy   String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                 String           @id @default(cuid())
+  title              String
+  description        String?
+  customerId         String?
+  bookingId          String?
+  planId             String?
+  sessionId          String?
+  assignee           String? // Người phụ trách (tên)
+  dueDate            DateTime?
+  priority           TaskPriority     @default(NORMAL)
+  status             TaskStatus       @default(OPEN)
+  channel            DeliveryChannel? // Kênh liên hệ (follow-up CSKH: gọi/Zalo/SMS...)
+  followUpTemplateId String? // nguồn: quy trình CSKH đã áp (mục 31)
+  checklist          Json? // checklist việc cần làm của bước follow-up
+  createdBy          String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   customer Customer?         @relation(fields: [customerId], references: [id])
   booking  Booking?          @relation(fields: [bookingId], references: [id])
@@ -2301,4 +2304,48 @@ model ServicePriceFloor {
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   @@map("service_price_floors")
+}
+
+// =============================================================================
+// CSKH — QUY TRÌNH FOLLOW-UP (mục 31–35). Mẫu quy trình chăm sóc có nhiều BƯỚC
+// (mốc ngày + kênh + kịch bản + checklist). Áp cho khách → sinh Task follow-up
+// theo lịch. Chương trình sinh nhật/loyalty tách khỏi Marketing.
+// =============================================================================
+enum FollowUpTrigger {
+  AFTER_SERVICE // sau khi dùng dịch vụ
+  AFTER_SESSION // sau một buổi điều trị
+  BIRTHDAY // sinh nhật
+  MANUAL // áp thủ công
+}
+
+model FollowUpTemplate {
+  id          String          @id @default(cuid())
+  code        String          @unique // CS-xxxxxx
+  name        String
+  description String?
+  trigger     FollowUpTrigger @default(MANUAL)
+  isActive    Boolean         @default(true)
+  createdBy   String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  steps FollowUpStep[]
+
+  @@map("followup_templates")
+}
+
+model FollowUpStep {
+  id         String          @id @default(cuid())
+  templateId String
+  orderIndex Int             @default(0)
+  dayOffset  Int             @default(0) // số ngày sau mốc (anchor) để đến hạn
+  channel    DeliveryChannel @default(IN_PERSON)
+  title      String // việc cần làm (vd "Gọi hỏi thăm sau 1 ngày")
+  script     String? // kịch bản/nội dung mẫu
+  checklist  String[]        @default([]) // các mục cần kiểm
+
+  template FollowUpTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@map("followup_steps")
 }

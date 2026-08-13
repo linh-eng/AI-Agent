@@ -307,6 +307,34 @@ export const sessionStaffCreateSchema = z.object({
   note: z.string().optional().nullable(),
 });
 
+// ----- CSKH follow-up (mục 31–35) -----
+export const deliveryChannelEnum = z.enum(["IN_PERSON", "PORTAL", "EMAIL", "ZALO", "WHATSAPP", "SMS"]);
+export const followUpTriggerEnum = z.enum(["AFTER_SERVICE", "AFTER_SESSION", "BIRTHDAY", "MANUAL"]);
+
+export const followUpStepSchema = z.object({
+  orderIndex: z.coerce.number().int().default(0),
+  dayOffset: z.coerce.number().int().default(0),
+  channel: deliveryChannelEnum.default("IN_PERSON"),
+  title: z.string().min(1, "Nhập việc cần làm"),
+  script: z.string().optional().nullable(),
+  checklist: z.array(z.string()).default([]),
+});
+
+export const followUpTemplateCreateSchema = z.object({
+  name: z.string().min(1, "Nhập tên quy trình"),
+  description: z.string().optional().nullable(),
+  trigger: followUpTriggerEnum.default("MANUAL"),
+  isActive: z.boolean().optional(),
+  steps: z.array(followUpStepSchema).default([]),
+});
+export const followUpTemplateUpdateSchema = followUpTemplateCreateSchema.partial();
+
+export const followUpApplySchema = z.object({
+  customerId: z.string().min(1, "Chọn khách hàng"),
+  anchorDate: dateOpt, // mốc tính (mặc định hôm nay)
+  assignee: z.string().optional().nullable(),
+});
+
 // ----- Giá sàn (mục 25–26) -----
 export const priceFloorUpsertSchema = z.object({
   serviceId: z.string().min(1),

@@ -37,6 +37,7 @@ import {
   Receipt,
   Wallet,
   Settings,
+  MessageCircleHeart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
@@ -60,7 +61,8 @@ const NAV_GROUPS = [
       { href: "/pricing", label: "Bảng giá", icon: Tag },
       { href: "/price-floor", label: "Giá sàn", icon: Gauge },
       { href: "/marketing", label: "Marketing", icon: Megaphone },
-      { href: "/tasks", label: "Công việc / Follow-up", icon: ListTodo },
+      { href: "/followups", label: "CSKH · Follow-up", icon: MessageCircleHeart },
+      { href: "/tasks", label: "Công việc", icon: ListTodo },
     ],
   },
   {

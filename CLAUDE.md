@@ -667,6 +667,47 @@ chặn/duyệt dưới sàn.
 Áp giá sàn cho **báo giá/hóa đơn** (hiện enforce ở booking); chi phí nhân sự tự lấy từ phân công buổi (hiện
 nhập tay `laborCost`); giá sàn theo **gói/khuyến mãi**; lịch sử thay đổi giá sàn (version).
 
+## CSKH follow-up (mục 31–35) — Quy trình chăm sóc + chương trình sinh nhật
+
+Phase sau MASTER PROMPT, ưu tiên #4. **Đã xác thực PostgreSQL 16 thật**: tsc sạch · lint 0 lỗi · build OK ·
+**85 test pass** (thêm `test/followup.test.ts`, 3 test) · migrate deploy (15 migration) + seed + seed:demo sạch.
+
+### Migration — `E_followup`
+`followup_templates` + `followup_steps` + enum `FollowUpTrigger`; `tasks` thêm `channel` (DeliveryChannel),
+`checklist` (Json), `followUpTemplateId`. Additive, **0 lệnh DROP**. Tổng **15 migration**:
+`0_init` … `D_price_floor` → `E_followup`.
+
+### Dữ liệu & service — `src/lib/followup.ts`
+`FollowUpTemplate` (code CS-xxxxxx, `trigger`: AFTER_SERVICE/AFTER_SESSION/BIRTHDAY/MANUAL, isActive) →
+`FollowUpStep[]` (`dayOffset` số ngày sau mốc · `channel` kênh · `title` việc · `script` kịch bản ·
+`checklist String[]`). `applyFollowUpTemplate({templateId, customerId, anchorDate, assignee})` → sinh **Task**
+mỗi bước (dueDate = anchor + dayOffset, gắn channel/checklist/followUpTemplateId) trong 1 transaction + ghi
+**CrmActivity** FOLLOW_UP (hiện trong timeline khách). `upcomingBirthdays(days, today)` → khách sinh nhật trong
+N ngày tới (so ngày/tháng, tính tuổi + số ngày còn lại; `today` truyền vào để test tất định).
+
+### API
+`/api/followup-templates` (GET list; POST cần `followup.write`) · `/api/followup-templates/[id]` (GET/PATCH,
+thay toàn bộ steps khi gửi) · `/api/followup-templates/[id]/apply` (POST, cần `task.write` — áp cho khách) ·
+`/api/crm/birthdays?days=30` (sinh nhật sắp tới).
+
+### RBAC
+`followup.write` (MANAGER/CUSTOMER_CARE/RECEPTION — quản lý quy trình). Áp quy trình dùng `task.write`; đọc
+quy trình/sinh nhật dùng `customer.read`.
+
+### UI — `/followups`
+Sidebar **Spa & CRM → CSKH · Follow-up**: **(1)** thẻ **Sinh nhật 30 ngày tới** (chip tên + ngày + tuổi +
+"còn N ngày" + nút **Chúc mừng** áp quy trình BIRTHDAY); **(2)** bảng **quy trình** (mở rộng xem các bước) +
+**Tạo/Sửa** (trình soạn bước: mốc ngày/kênh/việc/kịch bản/checklist mỗi dòng) + nút **Áp** (chọn khách +
+mốc + người phụ trách → tạo N việc follow-up). Việc sinh ra hiện ở **/tasks** và **timeline khách**.
+
+### Demo
+2 quy trình: `CS-000001` Chăm sóc sau liệu trình (3 bước: Zalo +1 ngày, SMS +3, gặp +14) · `CS-000002` Chúc
+mừng sinh nhật (BIRTHDAY). 2 khách có sinh nhật gần (KH-100002 20/08, KH-100004 30/08) để thấy thẻ sinh nhật.
+
+### Còn lại (phase sau)
+Tự động kích hoạt quy trình khi hoàn thành buổi/dịch vụ (hiện áp thủ công); gửi tin thật qua Zalo/SMS/Email
+(hiện tạo việc để nhân viên chủ động liên hệ); chương trình loyalty/tích điểm; báo cáo hiệu quả follow-up.
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

@@ -182,7 +182,7 @@ async function main() {
 
   // 2) ĐANG TƯ VẤN
   const kTuVan = await prisma.customer.create({
-    data: { code: "KH-100002", fullName: "Trần Bảo Ngọc", gender: "FEMALE", phone: "0900100002", source: "Giới thiệu", group: "Thường", assignedTo: "Phạm Chuyên Viên", goals: "Trẻ hóa, nâng cơ" },
+    data: { code: "KH-100002", fullName: "Trần Bảo Ngọc", gender: "FEMALE", phone: "0900100002", source: "Giới thiệu", group: "Thường", assignedTo: "Phạm Chuyên Viên", goals: "Trẻ hóa, nâng cơ", dob: new Date("1996-08-20") },
   });
   await prisma.assessment.create({ data: { customerId: kTuVan.id, name: "Da chảy xệ nhẹ", area: "Đường viền hàm", severity: "Nhẹ", description: "Bắt đầu chùng nhẹ vùng hàm", assessedBy: "Phạm Chuyên Viên" } });
   await prisma.crmActivity.create({ data: { customerId: kTuVan.id, type: "CONSULT", content: "Tư vấn HIFU vs RF, khách đang cân nhắc ngân sách.", result: "Đang cân nhắc", performedBy: "Phạm Chuyên Viên", occurredAt: new Date("2026-08-06T04:00:00Z"), nextAction: "Gửi báo giá", followUpDate: new Date("2026-08-12T02:00:00Z"), followUpOwner: "Phạm Chuyên Viên" } });
@@ -196,7 +196,7 @@ async function main() {
 
   // 4) ĐANG THỰC HIỆN PHÁC ĐỒ (đầy đủ) — có portal
   const kDangPD = await prisma.customer.create({
-    data: { code: "KH-100004", fullName: "Đỗ Thùy Linh", gender: "FEMALE", phone: "0900100004", email: "linh.do@example.com", source: "Facebook Ads", group: "VIP", assignedTo: "Phạm Chuyên Viên", goals: "Trẻ hóa, nâng cơ mặt", tags: ["nâng cơ", "VIP"], campaignId: campTiktok.id },
+    data: { code: "KH-100004", fullName: "Đỗ Thùy Linh", gender: "FEMALE", phone: "0900100004", email: "linh.do@example.com", source: "Facebook Ads", group: "VIP", assignedTo: "Phạm Chuyên Viên", goals: "Trẻ hóa, nâng cơ mặt", tags: ["nâng cơ", "VIP"], campaignId: campTiktok.id, dob: new Date("1993-08-30") },
   });
   await prisma.assessment.create({ data: { customerId: kDangPD.id, name: "Chảy xệ vùng má - hàm", area: "Má, hàm", severity: "Vừa", description: "Chùng da vùng má, đường hàm chưa gọn", assessedBy: "Phạm Chuyên Viên", indicators: { do_dan_hoi: "trung bình" } } });
   const planLinh = await prisma.treatmentPlan.create({
@@ -213,6 +213,28 @@ async function main() {
       planId: planLinh.id, stageId: planLinh.stages[0].id, customerId: kDangPD.id, bookingId: bkLinh1.id, serviceId: svcRF.id,
       sessionNumber: 1, name: "RF nâng cơ buổi 1", status: "COMPLETED", scheduledAt: new Date("2026-07-25T07:00:00Z"), performedAt: new Date("2026-07-25T07:15:00Z"),
       performer: "Phạm Chuyên Viên", objective: "RF vùng má", actualParams: { nang_luong: "làm ấm 42°C" }, conditionBefore: "Da chùng nhẹ", conditionAfter: "Săn hơn tức thì", customerFeedback: "Ưng ý", plannedCost: 500_000, actualCost: 480_000, price: 1_800_000, checkedBy: "Trần Quản Lý",
+    },
+  });
+
+  // --- CSKH follow-up (mục 31–35): quy trình chăm sóc sau dịch vụ + sinh nhật ---
+  await prisma.followUpTemplate.create({
+    data: {
+      code: "CS-000001", name: "Chăm sóc sau liệu trình", trigger: "AFTER_SERVICE", createdBy: "Lê Thị CSKH",
+      description: "Quy trình hỏi thăm & nhắc lịch sau buổi điều trị.",
+      steps: { create: [
+        { orderIndex: 0, dayOffset: 1, channel: "ZALO", title: "Hỏi thăm phản ứng sau 1 ngày", script: "Chào chị, sau buổi hôm qua da mình có bị đỏ/ngứa gì không ạ?", checklist: ["Hỏi phản ứng da", "Nhắc kiêng nắng 48h", "Nhắc uống đủ nước"] },
+        { orderIndex: 1, dayOffset: 3, channel: "SMS", title: "Nhắc dùng sản phẩm tại nhà", script: "Nhắc chị dùng serum sáng/tối theo hướng dẫn nhé.", checklist: ["Xác nhận đang dùng đúng"] },
+        { orderIndex: 2, dayOffset: 14, channel: "IN_PERSON", title: "Mời đặt lịch buổi kế", script: "Đã đến lịch buổi kế, mời chị sắp xếp thời gian ạ.", checklist: ["Chốt ngày buổi kế"] },
+      ] },
+    },
+  });
+  await prisma.followUpTemplate.create({
+    data: {
+      code: "CS-000002", name: "Chúc mừng sinh nhật", trigger: "BIRTHDAY", createdBy: "Lê Thị CSKH",
+      description: "Gửi lời chúc + ưu đãi sinh nhật.",
+      steps: { create: [
+        { orderIndex: 0, dayOffset: 0, channel: "ZALO", title: "Gửi lời chúc + voucher sinh nhật", script: "Chúc mừng sinh nhật chị! Spa gửi tặng ưu đãi sinh nhật...", checklist: ["Gửi voucher", "Ghi nhận phản hồi"] },
+      ] },
     },
   });
 

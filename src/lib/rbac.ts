@@ -91,6 +91,7 @@ export const PERMISSIONS = {
   HR_WRITE: "hr.write", // thêm/sửa nhân sự + gán nhân sự buổi kèm phí
   PRICEFLOOR_WRITE: "pricefloor.write", // khai báo cấu trúc chi phí + giá sàn (mục 25)
   PRICEFLOOR_OVERRIDE: "pricefloor.override", // duyệt bán DƯỚI giá sàn (mục 26)
+  FOLLOWUP_WRITE: "followup.write", // quản lý quy trình CSKH follow-up (mục 31)
   TASK_WRITE: "task.write",
   CAMPAIGN_WRITE: "campaign.write",
   /// Dữ liệu tài chính nhạy cảm: giá vốn, chi phí, lợi nhuận (mục 24)
@@ -218,6 +219,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.HR_WRITE,
     PERMISSIONS.PRICEFLOOR_WRITE,
     PERMISSIONS.PRICEFLOOR_OVERRIDE,
+    PERMISSIONS.FOLLOWUP_WRITE,
     PERMISSIONS.TASK_WRITE,
     PERMISSIONS.CAMPAIGN_WRITE,
     PERMISSIONS.FINANCE_READ,
@@ -248,6 +250,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PAYMENT_WRITE,
     PERMISSIONS.INVOICE_WRITE,
     PERMISSIONS.HR_WRITE,
+    PERMISSIONS.FOLLOWUP_WRITE,
     PERMISSIONS.TASK_WRITE,
     PERMISSIONS.PROPOSAL_ACCEPT,
     PERMISSIONS.CARE_WRITE,
@@ -260,6 +263,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.CUSTOMER_WRITE,
     PERMISSIONS.CRM_WRITE,
     PERMISSIONS.TASK_WRITE,
+    PERMISSIONS.FOLLOWUP_WRITE,
     PERMISSIONS.MEDIA_WRITE,
   ],
 
