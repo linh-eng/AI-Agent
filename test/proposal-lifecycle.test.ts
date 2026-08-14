@@ -95,28 +95,41 @@ describe("2) Hủy Payment — audit người hủy + thời điểm + lý do (t
   beforeEach(async () => { await resetDb(); });
   afterAll(async () => { await prisma.$disconnect(); });
 
-  it("void ghi voidedBy/voidedAt/voidReason RIÊNG, không đụng receivedBy ban đầu", async () => {
+  it("void ghi ĐỦ 3 TRƯỜNG: người hủy (voidedBy) + thời điểm hủy (voidedAt) + lý do (voidReason), tách biệt receivedBy", async () => {
     const c = await makeCustomer();
     const inv = await prisma.invoice.create({ data: { code: uniq("HD"), customerId: c.id, total: 2_000_000, subtotal: 2_000_000 } });
     const pay = await prisma.payment.create({
       data: { code: uniq("PT"), customerId: c.id, invoiceId: inv.id, amount: 2_000_000, method: "CASH", receivedBy: "Thu Ngân A" },
     });
+    // Trước khi hủy: cả 3 trường đều rỗng.
+    expect(pay.voidedBy).toBeNull();
+    expect(pay.voidedAt).toBeNull();
+    expect(pay.voidReason).toBeNull();
 
     const before = new Date();
     await voidPayment(pay.id, "Khách hủy giao dịch — hoàn tiền mặt", "Quản Lý B");
     const after = await prisma.payment.findUniqueOrThrow({ where: { id: pay.id } });
 
-    // Người THU ban đầu giữ nguyên.
-    expect(after.receivedBy).toBe("Thu Ngân A");
-    // Người HỦY, thời điểm, lý do được ghi RIÊNG.
+    // (1) NGƯỜI THỰC HIỆN HỦY
     expect(after.voidedBy).toBe("Quản Lý B");
-    expect(after.voidReason).toBe("Khách hủy giao dịch — hoàn tiền mặt");
+    // (2) THỜI ĐIỂM HỦY (đã set, không lùi quá thời điểm trước lệnh)
     expect(after.voidedAt).not.toBeNull();
     expect(after.voidedAt!.getTime()).toBeGreaterThanOrEqual(before.getTime() - 1000);
-    // Người hủy KHÁC người thu (không dùng lại người thu ban đầu).
+    // (3) LÝ DO HỦY
+    expect(after.voidReason).toBe("Khách hủy giao dịch — hoàn tiền mặt");
+
+    // Tách biệt: người THU ban đầu giữ nguyên và KHÁC người hủy.
+    expect(after.receivedBy).toBe("Thu Ngân A");
     expect(after.voidedBy).not.toBe(after.receivedBy);
     // Không hard-delete: bản ghi vẫn tồn tại.
     expect(after.id).toBe(pay.id);
+
+    // Lý do là BẮT BUỘC (schema paymentVoidSchema.reason min 1) — không hủy trống lý do.
+    const pay2 = await prisma.payment.create({ data: { code: uniq("PT"), customerId: c.id, invoiceId: inv.id, amount: 1_000_000, receivedBy: "Thu Ngân A" } });
+    const { paymentVoidSchema } = await import("@/lib/clinic-validation");
+    expect(paymentVoidSchema.safeParse({ reason: "" }).success).toBe(false);
+    expect(paymentVoidSchema.safeParse({ reason: "hợp lệ" }).success).toBe(true);
+    expect(pay2.id).toBeTruthy();
   });
 
   it("audit_logs lưu bản ghi PAYMENT_VOID kèm userId + lý do (như route ghi)", async () => {

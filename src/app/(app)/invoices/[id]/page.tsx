@@ -154,7 +154,7 @@ export default function InvoiceDetailPage() {
         <CardContent className="p-0">
           <div className="border-b px-4 py-3 text-sm font-medium">Lịch sử thanh toán ({inv.payments.length})</div>
           <Table>
-            <THead><TR><TH>Mã</TH><TH>Thời điểm</TH><TH className="text-right">Số tiền</TH><TH>Hình thức</TH><TH>Người thu</TH><TH>Trạng thái</TH><TH></TH></TR></THead>
+            <THead><TR><TH>Mã</TH><TH>Thời điểm</TH><TH className="text-right">Số tiền</TH><TH>Hình thức</TH><TH>Người thu</TH><TH>Trạng thái</TH><TH className="text-right">Thao tác / Chi tiết hủy</TH></TR></THead>
             <TBody>
               {inv.payments.length === 0 ? (
                 <TR><TD colSpan={7} className="py-6 text-center text-muted-foreground">Chưa có thanh toán</TD></TR>
@@ -170,7 +170,13 @@ export default function InvoiceDetailPage() {
                     {!p.voidedAt && canVoid && inv.status !== "CANCELLED" && (
                       <Button size="sm" variant="ghost" onClick={() => setVoidTarget(p)}><Ban className="h-3.5 w-3.5" /> Hủy</Button>
                     )}
-                    {p.voidedAt && p.voidReason && <span className="text-xs text-muted-foreground" title={p.voidReason}>Lý do: {p.voidReason}</span>}
+                    {p.voidedAt && (
+                      <div className="space-y-0.5 text-xs text-muted-foreground">
+                        <div>Người hủy: <span className="font-medium text-foreground">{p.voidedBy ?? "—"}</span></div>
+                        <div>Thời điểm: {formatDateTime(p.voidedAt)}</div>
+                        <div>Lý do: <span className="text-foreground">{p.voidReason ?? "—"}</span></div>
+                      </div>
+                    )}
                   </TD>
                 </TR>
               ))}
