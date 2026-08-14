@@ -293,10 +293,11 @@ async function main() {
     },
   });
 
-  // --- CSKH follow-up (mục 31–35): quy trình chăm sóc sau dịch vụ + sinh nhật ---
-  await prisma.followUpTemplate.create({
+  // --- CSKH follow-up (mục 9): quy trình chăm sóc sau dịch vụ + sinh nhật ---
+  const tplCare = await prisma.followUpTemplate.create({
     data: {
       code: "CS-000001", name: "Chăm sóc sau liệu trình", trigger: "AFTER_SERVICE", createdBy: "Lê Thị CSKH",
+      version: 1,
       description: "Quy trình hỏi thăm & nhắc lịch sau buổi điều trị.",
       steps: { create: [
         { orderIndex: 0, dayOffset: 1, channel: "ZALO", title: "Hỏi thăm phản ứng sau 1 ngày", script: "Chào chị, sau buổi hôm qua da mình có bị đỏ/ngứa gì không ạ?", checklist: ["Hỏi phản ứng da", "Nhắc kiêng nắng 48h", "Nhắc uống đủ nước"] },
@@ -304,10 +305,12 @@ async function main() {
         { orderIndex: 2, dayOffset: 14, channel: "IN_PERSON", title: "Mời đặt lịch buổi kế", script: "Đã đến lịch buổi kế, mời chị sắp xếp thời gian ạ.", checklist: ["Chốt ngày buổi kế"] },
       ] },
     },
+    include: { steps: { orderBy: { orderIndex: "asc" } } },
   });
   await prisma.followUpTemplate.create({
     data: {
       code: "CS-000002", name: "Chúc mừng sinh nhật", trigger: "BIRTHDAY", createdBy: "Lê Thị CSKH",
+      version: 1,
       description: "Gửi lời chúc + ưu đãi sinh nhật.",
       steps: { create: [
         { orderIndex: 0, dayOffset: 0, channel: "ZALO", title: "Gửi lời chúc + voucher sinh nhật", script: "Chúc mừng sinh nhật chị! Spa gửi tặng ưu đãi sinh nhật...", checklist: ["Gửi voucher", "Ghi nhận phản hồi"] },
@@ -315,6 +318,41 @@ async function main() {
     },
   });
 
+  // Một LẦN ÁP quy trình CSKH thật cho KH-100004 (mốc 05/08 → có task quá hạn để
+  // minh họa bộ lọc "Quá hạn"; task đầu đã hoàn thành có kết quả/kênh thực tế).
+  const careAnchor = new Date("2026-08-05T00:00:00Z");
+  const careInst = await prisma.careProcessInstance.create({
+    data: {
+      code: "CSI-000001", templateId: tplCare.id, templateCode: tplCare.code, templateName: tplCare.name,
+      templateVersion: tplCare.version, trigger: tplCare.trigger, customerId: kDangPD.id, startDate: careAnchor,
+      status: "ACTIVE", appliedBy: "Lê Thị CSKH",
+    },
+  });
+  const careSnap = (s: (typeof tplCare.steps)[number]) => ({ stepId: s.id, orderIndex: s.orderIndex, dayOffset: s.dayOffset, channel: s.channel, title: s.title, script: s.script, checklist: s.checklist });
+  const addCareDays = (n: number) => { const x = new Date(careAnchor); x.setDate(x.getDate() + n); return x; };
+  // Bước 1 (+1 = 06/08): ĐÃ HOÀN THÀNH (có kết quả + kênh thực tế + audit qua editLog không cần)
+  await prisma.task.create({ data: {
+    title: tplCare.steps[0].title, description: tplCare.steps[0].script, customerId: kDangPD.id, assignee: "Lê Thị CSKH",
+    dueDate: addCareDays(1), channel: tplCare.steps[0].channel, checklist: tplCare.steps[0].checklist as any,
+    followUpTemplateId: tplCare.id, careProcessInstanceId: careInst.id, processStepId: tplCare.steps[0].id, processVersion: tplCare.version,
+    stepSnapshot: careSnap(tplCare.steps[0]) as any, priority: "NORMAL", status: "DONE",
+    completedAt: vnts("2026-08-06T03:30:00"), completedBy: "Lê Thị CSKH", completionNote: "Đã gọi Zalo, da ổn không đỏ ngứa.", actualChannel: "ZALO",
+    checklistState: [true, true, true] as any, createdBy: "Lê Thị CSKH",
+  } });
+  // Bước 2 (+3 = 08/08): CHƯA XONG → QUÁ HẠN
+  await prisma.task.create({ data: {
+    title: tplCare.steps[1].title, description: tplCare.steps[1].script, customerId: kDangPD.id, assignee: "Lê Thị CSKH",
+    dueDate: addCareDays(3), channel: tplCare.steps[1].channel, checklist: tplCare.steps[1].checklist as any,
+    followUpTemplateId: tplCare.id, careProcessInstanceId: careInst.id, processStepId: tplCare.steps[1].id, processVersion: tplCare.version,
+    stepSnapshot: careSnap(tplCare.steps[1]) as any, priority: "HIGH", status: "OPEN", createdBy: "Lê Thị CSKH",
+  } });
+  // Bước 3 (+14 = 19/08): sắp tới
+  await prisma.task.create({ data: {
+    title: tplCare.steps[2].title, description: tplCare.steps[2].script, customerId: kDangPD.id, assignee: "Lê Thị CSKH",
+    dueDate: addCareDays(14), channel: tplCare.steps[2].channel, checklist: tplCare.steps[2].checklist as any,
+    followUpTemplateId: tplCare.id, careProcessInstanceId: careInst.id, processStepId: tplCare.steps[2].id, processVersion: tplCare.version,
+    stepSnapshot: careSnap(tplCare.steps[2]) as any, priority: "NORMAL", status: "OPEN", createdBy: "Lê Thị CSKH",
+  } });
   // --- Giá sàn (mục 25–26): khai báo chi phí cấu thành cho dịch vụ RF ---
   // Chi phí: nhân sự 700k (KTV+master) + vận hành 150k + khấu hao 200k + vật tư 250k
   // + phòng 100k = 1.400.000; biên tối thiểu 15% → giá sàn 1.610.000 (giá chuẩn RF

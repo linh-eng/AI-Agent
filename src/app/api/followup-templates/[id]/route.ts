@@ -29,9 +29,14 @@ export const PATCH = handle(async (req, { params }) => {
   if (parsed.trigger !== undefined) data.trigger = parsed.trigger;
   if (parsed.isActive !== undefined) data.isActive = parsed.isActive;
 
-  // Thay toàn bộ bước nếu gửi steps.
+  // Thay toàn bộ bước nếu gửi steps → BUMP VERSION (task đã áp giữ snapshot version
+  // cũ, không đổi theo — mục 9 group 4). Chỉ đổi metadata (tên/mô tả/kích hoạt)
+  // KHÔNG bump version (không ảnh hưởng nội dung bước đã áp).
+  let versionBumped = false;
   if (parsed.steps) {
     await prisma.followUpStep.deleteMany({ where: { templateId: params.id } });
+    data.version = current.version + 1;
+    versionBumped = true;
     data.steps = {
       create: parsed.steps.map((s, i) => ({
         orderIndex: s.orderIndex ?? i,
@@ -54,7 +59,10 @@ export const PATCH = handle(async (req, { params }) => {
     action: "FOLLOWUP_TEMPLATE_UPDATED",
     entityType: "FollowUpTemplate",
     entityId: template.id,
-    changes: { isActive: template.isActive },
+    changes: {
+      isActive: template.isActive,
+      ...(versionBumped ? { versionFrom: current.version, versionTo: template.version, stepsChanged: true } : {}),
+    },
   });
   return ok(template);
 });

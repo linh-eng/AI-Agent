@@ -104,7 +104,8 @@ export const PERMISSIONS = {
   PRICEFLOOR_WRITE: "pricefloor.write", // khai báo cấu trúc chi phí + tạo/sửa version giá sàn (mục 25,7)
   PRICEFLOOR_APPROVE: "pricefloor.approve", // duyệt + áp dụng version giá sàn (mục 7)
   PRICEFLOOR_OVERRIDE: "pricefloor.override", // duyệt bán DƯỚI giá sàn (mục 26)
-  FOLLOWUP_WRITE: "followup.write", // quản lý quy trình CSKH follow-up (mục 31)
+  FOLLOWUP_WRITE: "followup.write", // TẠO/SỬA/NGƯNG quy trình CSKH (mẫu) — chỉ Quản lý (mục 9)
+  FOLLOWUP_APPLY: "followup.apply", // ÁP quy trình cho khách + hủy lần áp (mục 9)
   TASK_WRITE: "task.write",
   CAMPAIGN_WRITE: "campaign.write",
   /// Dữ liệu tài chính nhạy cảm: giá vốn, chi phí, lợi nhuận (mục 24)
@@ -249,6 +250,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PRICEFLOOR_APPROVE,
     PERMISSIONS.PRICEFLOOR_OVERRIDE,
     PERMISSIONS.FOLLOWUP_WRITE,
+    PERMISSIONS.FOLLOWUP_APPLY,
     PERMISSIONS.TASK_WRITE,
     PERMISSIONS.CAMPAIGN_WRITE,
     PERMISSIONS.FINANCE_READ,
@@ -284,20 +286,20 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.STAFF_ROLE_MANAGE,
     PERMISSIONS.STAFF_SCHEDULE_MANAGE,
     PERMISSIONS.PRICEFLOOR_READ,
-    PERMISSIONS.FOLLOWUP_WRITE,
+    // Lễ tân: xử lý task được giao (TASK_WRITE) nhưng KHÔNG sửa mẫu quy trình (mục 9).
     PERMISSIONS.TASK_WRITE,
     PERMISSIONS.PROPOSAL_ACCEPT,
     PERMISSIONS.CARE_WRITE,
     PERMISSIONS.MEDIA_WRITE,
   ],
 
-  // CSKH: nhật ký chăm sóc, follow-up, task (không xem tài chính)
+  // CSKH: nhật ký chăm sóc, ÁP quy trình + xử lý task; KHÔNG sửa mẫu quy trình (mục 9)
   CUSTOMER_CARE: [
     ...CLINIC_READ,
     PERMISSIONS.CUSTOMER_WRITE,
     PERMISSIONS.CRM_WRITE,
     PERMISSIONS.TASK_WRITE,
-    PERMISSIONS.FOLLOWUP_WRITE,
+    PERMISSIONS.FOLLOWUP_APPLY,
     PERMISSIONS.MEDIA_WRITE,
   ],
 

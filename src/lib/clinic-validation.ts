@@ -592,6 +592,13 @@ export const followUpApplySchema = z.object({
   customerId: z.string().min(1, "Chọn khách hàng"),
   anchorDate: dateOpt, // mốc tính (mặc định hôm nay)
   assignee: z.string().optional().nullable(),
+  force: z.boolean().optional(), // true = xác nhận tạo dù đã có lần áp trùng (mục 9)
+  note: z.string().optional().nullable(),
+});
+
+// Hủy một LẦN ÁP quy trình (khác "ngưng dùng" mẫu) — lý do bắt buộc (mục 9).
+export const careInstanceCancelSchema = z.object({
+  reason: z.string().min(1, "Nhập lý do hủy lần áp"),
 });
 
 // ----- Giá sàn (mục 25–26) -----
@@ -675,6 +682,26 @@ export const taskCreateSchema = z.object({
   createdBy: z.string().optional().nullable(),
 });
 export const taskUpdateSchema = taskCreateSchema.partial();
+
+// Vòng đời task CSKH (mục 9) — hành động có audit, KHÔNG hard-delete lịch sử.
+// action: start (→IN_PROGRESS) | complete (→DONE) | reopen (DONE→OPEN) | cancel (→CANCELLED)
+//         | update (sửa hạn/phụ trách/nội dung/kênh → ghi audit thay đổi)
+export const taskActionSchema = z.object({
+  action: z.enum(["start", "complete", "reopen", "cancel", "update"]),
+  // complete:
+  completionNote: z.string().optional().nullable(),
+  checklistState: z.array(z.boolean()).optional().nullable(), // các mục đã tick (theo thứ tự checklist)
+  actualChannel: deliveryChannelEnum.optional().nullable(),
+  // reopen/cancel: lý do bắt buộc (kiểm ở route)
+  reason: z.string().optional().nullable(),
+  // update: các trường được phép sửa (mỗi thay đổi ghi audit)
+  assignee: z.string().optional().nullable(),
+  dueDate: dateOpt,
+  priority: taskPriorityEnum.optional(),
+  channel: deliveryChannelEnum.optional().nullable(),
+  description: z.string().optional().nullable(),
+  title: z.string().min(1).optional(),
+});
 
 // Sắp xếp lại thứ tự buổi (kéo–thả)
 export const sessionReorderSchema = z.object({

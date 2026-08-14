@@ -1347,6 +1347,81 @@ availability cùng một record). Seed demo dùng helper `vnts()` để lưu gi�
   `createdAt=now()` cũng hiển thị đúng giờ VN. Nếu về sau hỗ trợ đa múi giờ (chi nhánh khác vùng) cần chuyển
   offset cố định +7 sang tz-per-branch — hiện ngoài phạm vi (VN một múi giờ).
 
+## CSKH · Follow-up & Sinh nhật Mục 9 (v0.18.0) — Lần áp có snapshot · Chống trùng · Vòng đời task · RBAC tách
+
+Hoàn thiện LOGIC NGHIỆP VỤ của module CSKH (giữ nguyên UI khung, chỉ bổ sung). Migration
+**`P_care_process`** (additive, 0 DROP; tổng **26 migration**). **223 test pass** (thêm `test/followup.test.ts`
+8 + `test/followup-http.test.ts` 5, thay cho 3 test cũ).
+
+### Migration & schema (`P_care_process`)
+- `FollowUpTemplate` +`version Int @default(1)` — **tăng khi sửa các bước** (metadata như tên/mô tả/kích hoạt
+  KHÔNG bump).
+- Enum mới `CareInstanceStatus` (ACTIVE/CANCELLED/COMPLETED). Model mới **`CareProcessInstance`**
+  (`care_process_instances`, code CSI-xxxxxx): **một LẦN ÁP** quy trình cho khách — snapshot
+  `templateCode/templateName/templateVersion/trigger` + `startDate` (anchor) + `appliedBy/At` +
+  `cancelledAt/By/cancelReason`. Quan hệ `Customer.careProcessInstances`, `FollowUpTemplate.instances`,
+  `Task.careInstance`.
+- `Task` +`careProcessInstanceId`/`processStepId`/`processVersion`/`stepSnapshot(Json)` (SNAPSHOT bước lúc áp:
+  dayOffset/channel/title/script/checklist) + vòng đời: `completedAt/By`/`completionNote`/`checklistState(Json)`/
+  `actualChannel` · `reopenedAt/By`/`reopenReason` · `cancelledAt/By`/`cancelReason`.
+
+### Service — `src/lib/followup.ts`
+- `applyFollowUpTemplate` (viết lại): **(1) chống trùng** — nếu đã có instance **ACTIVE** cùng
+  (khách, quy trình, **ngày mốc** theo lịch VN) và không `force` → ném `FollowUpDuplicateError` (409, kèm lần áp
+  đang chạy). **(2)** tạo `CareProcessInstance` (snapshot version). **(3)** mỗi bước → 1 Task hạn =
+  `startDate + dayOffset` + **stepSnapshot** + `processVersion` (đông cứng — sửa mẫu về sau KHÔNG đổi task đã
+  áp). **(4)** ghi CrmActivity FOLLOW_UP. Trả `{instance, tasks}`.
+- `cancelCareInstance` (khác "ngưng mẫu"): instance → CANCELLED (ai/khi/lý do) + **hủy task chưa xong**
+  (OPEN/IN_PROGRESS → CANCELLED, KHÔNG hard-delete; task DONE giữ). `recomputeCareInstanceStatus` (mọi task
+  kết thúc + có ≥1 DONE → COMPLETED).
+- `upcomingBirthdays` (hardening): tính ngày/tháng sinh + "hôm nay" qua **`vnClock`** (lịch VN, không phụ thuộc
+  TZ tiến trình); sinh nhật gần nhất theo năm nay/năm sau (KHÔNG dùng năm sinh tính khoảng cách), **xử lý wrap
+  cuối năm**; tuổi từ DOB đầy đủ; thiếu DOB → loại. Trả thêm `assignedTo` + `nextBirthdayDate` (yyyy-MM-dd) để
+  prefill.
+
+### API
+- `POST /api/followup-templates/[id]/apply`: quyền **`FOLLOWUP_APPLY`** (không dùng TASK_WRITE nữa); nhận
+  `force`/`note`; 409 kèm `details.existing` khi trùng; audit `FOLLOWUP_APPLIED` (entityType CareProcessInstance).
+- `PATCH /api/followup-templates/[id]`: **bump version** khi gửi `steps` (thay toàn bộ bước); audit kèm
+  `versionFrom/To`.
+- **`/api/care-process-instances`** (GET list + tiến độ done/cancelled/overdue), **`/[id]/cancel`** (POST,
+  `FOLLOWUP_APPLY`, lý do bắt buộc, audit `CARE_INSTANCE_CANCELLED`).
+- `GET /api/tasks`: **filter=today|upcoming|overdue|open|done|all** (quá hạn = chưa xong + dueDate < now, mốc
+  ngày theo lịch VN) + `assignee`/`careInstanceId`; include `careInstance`.
+- `PATCH /api/tasks/[id]`: **vòng đời có audit** — `action=start|complete|reopen|cancel|update`. complete ghi
+  `completedAt/By`/`completionNote`/`checklistState`/`actualChannel` + audit `TASK_COMPLETED` + tự
+  recompute instance; reopen/cancel **lý do bắt buộc** (422) + audit `TASK_REOPENED`/`TASK_CANCELLED`; update ghi
+  **diff từng trường** (audit `TASK_UPDATED`). Không `action` → giữ PATCH cũ (tương thích). **KHÔNG hard-delete.**
+- `src/lib/client.ts`: `apiFetch` ném `ApiError` mang `status`+`details` (để UI xử lý 409 chống trùng).
+
+### RBAC (tách quyền — enforce backend, mục 9 group 8)
+- **`FOLLOWUP_WRITE`** (tạo/sửa/ngưng MẪU quy trình): **chỉ MANAGER** (+ADMIN). RECEPTION & CUSTOMER_CARE
+  KHÔNG còn quyền này → PATCH mẫu trả **403**.
+- **`FOLLOWUP_APPLY`** (áp quy trình + hủy lần áp): **MANAGER + CUSTOMER_CARE**.
+- **`TASK_WRITE`** (xử lý/hoàn thành task) giữ rộng: MANAGER/RECEPTION/CUSTOMER_CARE/SPECIALIST.
+
+### UI
+- `/followups`: nút **"Chúc mừng"** ở thẻ sinh nhật → mở modal **prefill** khách + **mốc = ngày sinh nhật sắp
+  tới** + **phụ trách = CSKH của khách** (`assignedTo`); thành công báo "Đã tạo chăm sóc sinh nhật CSI-xxxxxx".
+  Modal áp xử lý **409 chống trùng** (banner vàng + "Vẫn tạo lần áp mới (xác nhận)"). Bảng quy trình hiện **badge
+  vX**. Modal sửa mẫu có **cảnh báo bump version + ngưng dùng**. `canApply` dùng `FOLLOWUP_APPLY`.
+- `/tasks`: **bộ lọc** Hôm nay/Sắp tới/Quá hạn/Hoàn thành/Tất cả (kèm số đếm); cột **Nguồn** (badge CSI /
+  Thủ công), **Kênh**, checklist/kịch bản; **"Quá hạn X ngày"**; thao tác theo trạng thái (Bắt đầu/Hoàn thành/
+  Hủy/Mở lại). **Modal Hoàn thành** (tick checklist snapshot + kênh thực tế + kết quả). **Modal lý do** cho
+  Mở lại/Hủy.
+
+### Demo (seed:demo)
+- 2 mẫu: `CS-000001` (3 bước +1/+3/+14, AFTER_SERVICE) · `CS-000002` (BIRTHDAY). 2 khách sinh nhật ≤30 ngày
+  (KH-100002 20/08 · KH-100004 30/08 — từ ngày container 14/08).
+- **`CSI-000001`** (áp CS-000001 cho KH-100004, mốc 05/08): buổi 1 (+1=06/08) **DONE** (kết quả + kênh ZALO +
+  checklist tick), buổi 2 (+3=08/08) **quá hạn**, buổi 3 (+14=19/08) sắp tới → minh họa bộ lọc & snapshot.
+
+### Nợ kỹ thuật (CSKH)
+- Chống trùng theo **ngày mốc** (VN) của instance ACTIVE cùng quy trình; nếu muốn chặn theo cửa sổ N ngày cần
+  mở rộng. Kích hoạt tự động quy trình khi hoàn thành buổi/dịch vụ vẫn **thủ công** (áp qua UI). Gửi tin thật
+  (Zalo/SMS/Email) chưa tích hợp — tạo Task để nhân viên chủ động liên hệ. Chưa có màn danh sách lần áp
+  (CareProcessInstance) riêng ngoài API + timeline khách.
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

@@ -1059,6 +1059,7 @@ model Customer {
   portalAccount     CustomerPortalAccount?
   invoices          Invoice[]
   deposits          Deposit[]
+  careProcessInstances CareProcessInstance[]
   marketingCampaign MarketingCampaign?        @relation(fields: [campaignId], references: [id])
 
   @@index([phone])
@@ -1470,13 +1471,33 @@ model Task {
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
-  customer Customer?         @relation(fields: [customerId], references: [id])
-  booking  Booking?          @relation(fields: [bookingId], references: [id])
-  plan     TreatmentPlan?    @relation(fields: [planId], references: [id])
-  session  TreatmentSession? @relation(fields: [sessionId], references: [id])
+  // --- CSKH mục 9 (bước 2): liên kết instance quy trình + snapshot bất biến của bước ---
+  careProcessInstanceId String? // thuộc lần áp quy trình nào
+  processStepId         String? // id bước gốc (truy vết) — nội dung dùng stepSnapshot
+  processVersion        Int? // version quy trình tại thời điểm áp (đông cứng)
+  stepSnapshot          Json? // snapshot bước lúc áp: {dayOffset,channel,title,script,checklist}
+  // --- Vòng đời hoàn thành / mở lại / hủy có audit (không hard-delete lịch sử) ---
+  completedAt    DateTime?
+  completedBy    String?
+  completionNote String? // kết quả/ghi chú khi hoàn thành
+  checklistState Json? // các mục checklist đã tick khi xử lý
+  actualChannel  DeliveryChannel? // kênh liên hệ thực tế (có thể khác kênh dự kiến)
+  reopenedAt     DateTime?
+  reopenedBy     String?
+  reopenReason   String?
+  cancelledAt    DateTime?
+  cancelledBy    String?
+  cancelReason   String?
+
+  customer     Customer?            @relation(fields: [customerId], references: [id])
+  booking      Booking?             @relation(fields: [bookingId], references: [id])
+  plan         TreatmentPlan?       @relation(fields: [planId], references: [id])
+  session      TreatmentSession?    @relation(fields: [sessionId], references: [id])
+  careInstance CareProcessInstance? @relation(fields: [careProcessInstanceId], references: [id])
 
   @@index([status, dueDate])
   @@index([customerId])
+  @@index([careProcessInstanceId])
   @@map("tasks")
 }
 
@@ -2769,20 +2790,59 @@ enum FollowUpTrigger {
   MANUAL // áp thủ công
 }
 
+/// Trạng thái một lần áp quy trình CSKH cho khách (mục 9)
+enum CareInstanceStatus {
+  ACTIVE // đang chạy (các task còn hiệu lực)
+  CANCELLED // đã hủy lần áp (task tương lai bị hủy, giữ lịch sử)
+  COMPLETED // đã hoàn tất toàn bộ bước
+}
+
 model FollowUpTemplate {
   id          String          @id @default(cuid())
   code        String          @unique // CS-xxxxxx
   name        String
   description String?
   trigger     FollowUpTrigger @default(MANUAL)
+  version     Int             @default(1) // tăng khi sửa các bước → task đã áp giữ snapshot version cũ
   isActive    Boolean         @default(true)
   createdBy   String?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  steps FollowUpStep[]
+  steps     FollowUpStep[]
+  instances CareProcessInstance[]
 
   @@map("followup_templates")
+}
+
+/// Một lần ÁP quy trình CSKH cho một khách (mục 9). Snapshot version + nội dung
+/// quy trình tại thời điểm áp → sửa mẫu về sau KHÔNG đổi lần áp/tasks đã sinh.
+model CareProcessInstance {
+  id              String             @id @default(cuid())
+  code            String             @unique // CSI-xxxxxx
+  templateId      String
+  templateCode    String // snapshot mã quy trình
+  templateName    String // snapshot tên quy trình
+  templateVersion Int // snapshot version tại thời điểm áp
+  trigger         FollowUpTrigger // snapshot loại kích hoạt
+  customerId      String
+  startDate       DateTime // mốc anchor (dueAt = startDate + offsetDays của từng bước)
+  status          CareInstanceStatus @default(ACTIVE)
+  appliedBy       String?
+  appliedAt       DateTime           @default(now())
+  cancelledAt     DateTime?
+  cancelledBy     String?
+  cancelReason    String?
+  note            String?
+
+  template FollowUpTemplate @relation(fields: [templateId], references: [id])
+  customer Customer         @relation(fields: [customerId], references: [id])
+  tasks    Task[]
+
+  @@index([customerId])
+  @@index([templateId])
+  @@index([customerId, templateId, startDate])
+  @@map("care_process_instances")
 }
 
 model FollowUpStep {

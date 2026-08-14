@@ -17,19 +17,20 @@ const TRIGGERS = ["MANUAL", "AFTER_SERVICE", "AFTER_SESSION", "BIRTHDAY"];
 const CHANNELS = ["IN_PERSON", "PORTAL", "EMAIL", "ZALO", "WHATSAPP", "SMS"];
 
 interface Step { orderIndex?: number; dayOffset: number; channel: string; title: string; script?: string | null; checklist: string[] }
-interface Template { id: string; code: string; name: string; description?: string | null; trigger: string; isActive: boolean; steps: Step[] }
-interface Birthday { id: string; code: string; fullName: string; phone: string | null; day: number; month: number; turningAge: number | null; inDays: number }
+interface Template { id: string; code: string; name: string; description?: string | null; trigger: string; version?: number; isActive: boolean; steps: Step[] }
+interface Birthday { id: string; code: string; fullName: string; phone: string | null; day: number; month: number; turningAge: number | null; inDays: number; assignedTo?: string | null; nextBirthdayDate?: string }
 interface Cust { id: string; code?: string; fullName?: string }
+interface ApplyPrefill { template: Template; customerId?: string; anchorDate?: string; assignee?: string; birthday?: boolean }
 
 export default function FollowUpsPage() {
   const canWrite = useCan(PERMISSIONS.FOLLOWUP_WRITE);
-  const canApply = useCan(PERMISSIONS.TASK_WRITE);
+  const canApply = useCan(PERMISSIONS.FOLLOWUP_APPLY);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [birthdays, setBirthdays] = useState<Birthday[]>([]);
   const [customers, setCustomers] = useState<Cust[]>([]);
   const [edit, setEdit] = useState<Template | null>(null);
   const [creating, setCreating] = useState(false);
-  const [applyFor, setApplyFor] = useState<{ template: Template; customerId?: string } | null>(null);
+  const [applyFor, setApplyFor] = useState<ApplyPrefill | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   async function load() {
@@ -59,7 +60,7 @@ export default function FollowUpsPage() {
                   <span className="font-medium">{b.fullName}</span>
                   <span className="text-xs text-muted-foreground">{String(b.day).padStart(2, "0")}/{String(b.month).padStart(2, "0")}{b.turningAge ? ` · ${b.turningAge} tuổi` : ""} · {b.inDays === 0 ? "hôm nay" : `còn ${b.inDays} ngày`}</span>
                   {canApply && templates.some((t) => t.trigger === "BIRTHDAY" && t.isActive) && (
-                    <button className="text-primary hover:underline" onClick={() => { const t = templates.find((x) => x.trigger === "BIRTHDAY" && x.isActive)!; setApplyFor({ template: t, customerId: b.id }); }}>Chúc mừng</button>
+                    <button className="text-primary hover:underline" onClick={() => { const t = templates.find((x) => x.trigger === "BIRTHDAY" && x.isActive)!; setApplyFor({ template: t, customerId: b.id, anchorDate: b.nextBirthdayDate, assignee: b.assignedTo ?? undefined, birthday: true }); }}>Chúc mừng</button>
                   )}
                 </div>
               ))}
@@ -83,7 +84,7 @@ export default function FollowUpsPage() {
                   <TR className={t.isActive ? "" : "opacity-50"}>
                     <TD><button onClick={() => setExpanded(expanded === t.id ? null : t.id)}>{expanded === t.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button></TD>
                     <TD className="font-mono">{t.code}</TD>
-                    <TD className="font-medium">{t.name}</TD>
+                    <TD className="font-medium">{t.name} {t.version ? <span className="ml-1 rounded bg-muted px-1 text-xs font-normal text-muted-foreground">v{t.version}</span> : null}</TD>
                     <TD><Badge tone="muted">{FOLLOWUP_TRIGGER_LABEL[t.trigger]}</Badge></TD>
                     <TD>{t.steps.length}</TD>
                     <TD>{t.isActive ? <Badge tone="success">Đang dùng</Badge> : <Badge tone="muted">Ngưng</Badge>}</TD>
@@ -172,6 +173,12 @@ function TemplateModal({ template, onClose, onSaved }: { template: Template | nu
           <Button type="button" variant="ghost" size="sm" onClick={() => setSteps([...steps, { dayOffset: (steps.at(-1)?.dayOffset ?? 0) + 3, channel: "ZALO", title: "", script: "", checklist: [] }])}><Plus className="h-4 w-4" /> Thêm bước</Button>
         </div>
 
+        {editing && (
+          <div className="space-y-1.5 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
+            <p>• Sửa các bước sẽ tăng <b>phiên bản</b> quy trình (v{template!.version ?? 1} → v{(template!.version ?? 1) + 1}). Các việc đã áp trước đó <b>giữ nguyên</b> nội dung/lịch theo phiên bản cũ.</p>
+            <p>• Bỏ tick “Đang sử dụng” = <b>ngưng dùng</b> quy trình: không áp mới được nữa, nhưng các việc/lần áp đã tạo vẫn giữ.</p>
+          </div>
+        )}
         {editing && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> Đang sử dụng</label>}
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Hủy</Button><Button type="submit" disabled={saving || !name}>{saving ? "Đang lưu..." : "Lưu"}</Button></div>
@@ -180,38 +187,67 @@ function TemplateModal({ template, onClose, onSaved }: { template: Template | nu
   );
 }
 
-function ApplyModal({ apply, customers, onClose, onDone }: { apply: { template: Template; customerId?: string }; customers: Cust[]; onClose: () => void; onDone: () => void }) {
+function ApplyModal({ apply, customers, onClose, onDone }: { apply: ApplyPrefill; customers: Cust[]; onClose: () => void; onDone: () => void }) {
   const [customerId, setCustomerId] = useState(apply.customerId ?? "");
-  const [anchorDate, setAnchorDate] = useState("");
-  const [assignee, setAssignee] = useState("");
+  const [anchorDate, setAnchorDate] = useState(apply.anchorDate ?? "");
+  const [assignee, setAssignee] = useState(apply.assignee ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [result, setResult] = useState<number | null>(null);
+  const [result, setResult] = useState<{ code: string; count: number } | null>(null);
+  // Chống trùng: khi server trả 409 → hiện cảnh báo + cho phép xác nhận tạo lần áp mới.
+  const [dup, setDup] = useState<{ code: string; startDate?: string } | null>(null);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault(); setSaving(true); setError(null);
+  async function doApply(force: boolean) {
+    setSaving(true); setError(null);
     try {
-      const r = await apiFetch<{ count: number }>(`/api/followup-templates/${apply.template.id}/apply`, {
+      const r = await apiFetch<{ instance: { code: string }; count: number }>(`/api/followup-templates/${apply.template.id}/apply`, {
         method: "POST",
-        body: JSON.stringify({ customerId, anchorDate: anchorDate || undefined, assignee: assignee || undefined }),
+        body: JSON.stringify({ customerId, anchorDate: anchorDate || undefined, assignee: assignee || undefined, force }),
       });
-      setResult(r.count);
-      setTimeout(onDone, 900);
-    } catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); setSaving(false); }
+      setDup(null);
+      setResult({ code: r.instance.code, count: r.count });
+      setTimeout(onDone, 1200);
+    } catch (err: unknown) {
+      const e = err as { status?: number; details?: { existing?: { code: string; startDate?: string } }; message?: string };
+      if (e?.status === 409 && e?.details?.existing) {
+        setDup({ code: e.details.existing.code, startDate: e.details.existing.startDate });
+      } else {
+        setError(e?.message ?? "Lỗi");
+      }
+      setSaving(false);
+    }
   }
 
+  async function submit(e: React.FormEvent) { e.preventDefault(); await doApply(false); }
+
   return (
-    <Modal open onClose={onClose} title={`Áp quy trình: ${apply.template.name}`}>
+    <Modal open onClose={onClose} title={apply.birthday ? `Chúc mừng sinh nhật: ${apply.template.name}` : `Áp quy trình: ${apply.template.name}`}>
       <form onSubmit={submit} className="space-y-4">
-        <p className="text-xs text-muted-foreground">Sẽ sinh {apply.template.steps.length} việc follow-up theo lịch (mốc = ngày áp + số ngày mỗi bước).</p>
-        <div className="space-y-1.5"><Label>Khách hàng *</Label><Select value={customerId} onChange={(e) => setCustomerId(e.target.value)} required><option value="">— Chọn khách —</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.fullName}</option>)}</Select></div>
+        <p className="text-xs text-muted-foreground">
+          Sẽ tạo <b>1 lần áp</b> (snapshot v{apply.template.version ?? 1}) và sinh {apply.template.steps.length} việc follow-up theo lịch (mốc = ngày bắt đầu + số ngày mỗi bước).
+          {apply.birthday && " Mốc mặc định = ngày sinh nhật sắp tới; phụ trách = nhân viên chăm sóc của khách."}
+        </p>
+        <div className="space-y-1.5"><Label>Khách hàng *</Label><Select value={customerId} onChange={(e) => { setCustomerId(e.target.value); setDup(null); }} required disabled={!!apply.birthday}><option value="">— Chọn khách —</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.fullName}</option>)}</Select></div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5"><Label>Mốc bắt đầu</Label><Input type="date" value={anchorDate} onChange={(e) => setAnchorDate(e.target.value)} /></div>
+          <div className="space-y-1.5"><Label>Mốc bắt đầu</Label><Input type="date" value={anchorDate} onChange={(e) => { setAnchorDate(e.target.value); setDup(null); }} /></div>
           <div className="space-y-1.5"><Label>Người phụ trách</Label><Input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="mặc định: bạn" /></div>
         </div>
-        {result != null && <p className="text-sm text-emerald-600">✓ Đã tạo {result} việc follow-up.</p>}
+
+        {dup && (
+          <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+            <p>⚠ Khách đã được áp quy trình này cùng ngày mốc — lần áp <b>{dup.code}</b> đang chạy. Tránh tạo trùng?</p>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={onClose}>Không tạo (giữ lần áp cũ)</Button>
+              <Button type="button" size="sm" onClick={() => doApply(true)} disabled={saving}>Vẫn tạo lần áp mới (xác nhận)</Button>
+            </div>
+          </div>
+        )}
+
+        {result != null && <p className="text-sm text-emerald-600">✓ {apply.birthday ? "Đã tạo chăm sóc sinh nhật" : "Đã tạo lần áp"} {result.code} · {result.count} việc follow-up.</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Đóng</Button><Button type="submit" disabled={saving || !customerId}>{saving ? "Đang áp..." : "Áp quy trình"}</Button></div>
+        {!dup && !result && (
+          <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Đóng</Button><Button type="submit" disabled={saving || !customerId}>{saving ? "Đang áp..." : (apply.birthday ? "Tạo chăm sóc sinh nhật" : "Áp quy trình")}</Button></div>
+        )}
       </form>
     </Modal>
   );
