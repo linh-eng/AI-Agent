@@ -538,16 +538,22 @@ async function main() {
   // Hóa đơn từ báo giá đã chốt (subtotal 12,300,000 − chiết khấu 400,000 = 11,900,000).
   const invLinh = await prisma.invoice.create({
     data: {
-      code: "HD-000001", customerId: kDangPD.id, proposalId: proposalLinh.id, planId: planLinh.id, status: "PARTIAL",
+      code: "HD-000001", customerId: kDangPD.id, proposalId: proposalLinh.id, proposalOptionId: chosen.id, planId: planLinh.id, status: "PARTIAL",
       subtotal: 12_300_000, discount: 400_000, total: agreedLinh, createdBy: "Đỗ Thu Ngân",
       items: { create: chosen.items.map((it, i) => ({ name: it.name, quantity: it.quantity ?? 1, unitPrice: Number(it.unitPrice ?? 0), amount: Number(it.unitPrice ?? 0) * (it.quantity ?? 1), note: it.isHomeCare ? "Sản phẩm tại nhà" : null, orderIndex: i })) },
     },
   });
+  // Báo giá đã chuyển thành hóa đơn → trạng thái CONVERTED (Đã chuyển hóa đơn).
+  await prisma.treatmentProposal.update({ where: { id: proposalLinh.id }, data: { status: "CONVERTED" } });
   // Thu 2 đợt vào hóa đơn (tổng 8.000.000 ≤ tổng phải thu 11.900.000) → còn phải
   // thu 3.900.000. Mọi khoản thu đều gắn hóa đơn nên "Đã thanh toán" luôn ≤ "Tổng
   // phải thu" (không có tiền dư trộn vào).
-  await prisma.payment.create({ data: { customerId: kDangPD.id, invoiceId: invLinh.id, amount: 5_000_000, method: "TRANSFER", receivedBy: "Đỗ Thu Ngân", note: "Đặt cọc hóa đơn nâng cơ (đợt 1)", paidAt: new Date("2026-08-01T03:00:00Z") } });
-  await prisma.payment.create({ data: { customerId: kDangPD.id, invoiceId: invLinh.id, amount: 3_000_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đợt 2 hóa đơn nâng cơ", paidAt: new Date("2026-08-08T03:00:00Z") } });
+  await prisma.payment.create({ data: { code: "PT-000001", customerId: kDangPD.id, invoiceId: invLinh.id, amount: 5_000_000, method: "TRANSFER", txnRef: "CK20260801", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đợt 1 hóa đơn nâng cơ", paidAt: new Date("2026-08-01T03:00:00Z") } });
+  await prisma.payment.create({ data: { code: "PT-000002", customerId: kDangPD.id, invoiceId: invLinh.id, amount: 3_000_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đợt 2 hóa đơn nâng cơ", paidAt: new Date("2026-08-08T03:00:00Z") } });
+  // Phiếu thu ghi nhầm → HỦY (giữ vết, không xóa; KHÔNG tính vào "đã trả").
+  await prisma.payment.create({ data: { code: "PT-000003", customerId: kDangPD.id, invoiceId: invLinh.id, amount: 500_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thu nhầm — đã hủy", paidAt: new Date("2026-08-08T04:00:00Z"), voidedAt: new Date("2026-08-08T05:00:00Z"), voidReason: "Thu nhầm hóa đơn khác", voidedBy: "Trần Quản Lý" } });
+  // Tiền cọc lịch hẹn 1.000.000 — ĐANG GIỮ (ACTIVE), có thể phân bổ vào hóa đơn (mục 17).
+  await prisma.deposit.create({ data: { code: "DC-000001", customerId: kDangPD.id, amount: 1_000_000, method: "TRANSFER", txnRef: "CK-COC-01", status: "ACTIVE", receivedBy: "Nguyễn Lễ Tân", receivedAt: new Date("2026-08-05T02:00:00Z"), note: "Cọc giữ chỗ lịch hẹn HIFU" } });
   await prisma.customerPortalAccount.upsert({
     where: { customerId: kDangPD.id }, update: {},
     create: { customerId: kDangPD.id, email: "linh.do@example.com", passwordHash: await hashPassword("khach123") },

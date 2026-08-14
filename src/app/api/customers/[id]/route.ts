@@ -47,6 +47,8 @@ export const GET = handle(async (_req, { params }) => {
         orderBy: { createdAt: "desc" },
       },
       payments: { include: { invoice: { select: { code: true } } }, orderBy: { paidAt: "desc" } },
+      invoices: { include: { _count: { select: { items: true } } }, orderBy: { issuedAt: "desc" } },
+      deposits: { include: { invoice: { select: { code: true } }, booking: { select: { code: true } } }, orderBy: { receivedAt: "desc" } },
       activities: { orderBy: { occurredAt: "desc" }, take: 100 },
       tasks: { orderBy: [{ status: "asc" }, { dueDate: "asc" }] },
     },

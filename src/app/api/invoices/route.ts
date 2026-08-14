@@ -28,12 +28,18 @@ export const GET = handle(async (req) => {
     orderBy: { issuedAt: "desc" },
     take: 300,
   });
-  // Kèm số đã trả để hiển thị còn phải thu (không cần join payment ở list).
+  // Kèm số đã trả để hiển thị còn phải thu: phiếu thu CHƯA HỦY + cọc đã PHÂN BỔ
+  // (khớp invoicePaidAmount; không đếm phiếu đã hủy, không đếm trùng cọc).
   const ids = invoices.map((i) => i.id);
-  const paidRows = ids.length
-    ? await prisma.payment.groupBy({ by: ["invoiceId"], where: { invoiceId: { in: ids } }, _sum: { amount: true } })
-    : [];
-  const paidMap = new Map(paidRows.map((r) => [r.invoiceId, Number(r._sum.amount ?? 0)]));
+  const [paidRows, depRows] = ids.length
+    ? await Promise.all([
+        prisma.payment.groupBy({ by: ["invoiceId"], where: { invoiceId: { in: ids }, voidedAt: null }, _sum: { amount: true } }),
+        prisma.deposit.groupBy({ by: ["invoiceId"], where: { invoiceId: { in: ids }, status: "ALLOCATED" }, _sum: { amount: true } }),
+      ])
+    : [[], []];
+  const paidMap = new Map<string, number>();
+  for (const r of paidRows) if (r.invoiceId) paidMap.set(r.invoiceId, (paidMap.get(r.invoiceId) ?? 0) + Number(r._sum.amount ?? 0));
+  for (const r of depRows) if (r.invoiceId) paidMap.set(r.invoiceId, (paidMap.get(r.invoiceId) ?? 0) + Number(r._sum.amount ?? 0));
   const withPaid = invoices.map((i) => {
     const paid = paidMap.get(i.id) ?? 0;
     const outstanding = i.status === "CANCELLED" ? 0 : Math.max(0, Number(i.total) - paid);

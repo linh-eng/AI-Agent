@@ -86,6 +86,8 @@ export const PERMISSIONS = {
   TREATMENT_EDIT_COMPLETED: "treatment.editCompleted", // sửa lần thực hiện ĐÃ hoàn thành (có lý do + audit)
   PAYMENT_READ: "payment.read",
   PAYMENT_WRITE: "payment.write",
+  PAYMENT_VOID: "payment.void", // hủy phiếu thu đã ghi (giữ vết + audit, mục 16)
+  DEPOSIT_WRITE: "deposit.write", // thu cọc + phân bổ cọc vào hóa đơn (mục 17)
   INVOICE_READ: "invoice.read", // xem hóa đơn & công nợ
   INVOICE_WRITE: "invoice.write", // tạo/hủy hóa đơn (mục 18)
   SETTING_WRITE: "setting.write", // cấu hình hệ thống (Thương hiệu, mục 1)
@@ -220,6 +222,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.TREATMENT_EDIT_COMPLETED,
     PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.PAYMENT_WRITE,
+    PERMISSIONS.PAYMENT_VOID,
+    PERMISSIONS.DEPOSIT_WRITE,
     PERMISSIONS.INVOICE_WRITE,
     PERMISSIONS.SETTING_WRITE,
     PERMISSIONS.HR_WRITE,
@@ -254,6 +258,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.CRM_WRITE,
     PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.PAYMENT_WRITE,
+    PERMISSIONS.DEPOSIT_WRITE,
     PERMISSIONS.INVOICE_WRITE,
     PERMISSIONS.HR_WRITE,
     PERMISSIONS.FOLLOWUP_WRITE,
@@ -294,6 +299,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     ...CLINIC_READ,
     PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.PAYMENT_WRITE,
+    PERMISSIONS.PAYMENT_VOID,
+    PERMISSIONS.DEPOSIT_WRITE,
     PERMISSIONS.INVOICE_WRITE,
     PERMISSIONS.FINANCE_READ,
     PERMISSIONS.PRICE_WRITE,

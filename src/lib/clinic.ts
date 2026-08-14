@@ -7,6 +7,7 @@
 import { prisma } from "./prisma";
 import { PERMISSIONS } from "./rbac";
 import type { SessionPayload } from "./auth";
+import { customerInvoiceFinancials } from "./invoice";
 
 /** Sinh mã tuần tự dạng PREFIX-000123 dựa trên số bản ghi hiện có. */
 export function sequentialCode(prefix: string, count: number): string {
@@ -43,11 +44,15 @@ export interface CustomerFinancials {
  *  - debt: chênh lệch (>= 0).
  */
 export async function customerFinancials(customerId: string): Promise<CustomerFinancials> {
-  const [invoices, plans, bookings, payments] = await Promise.all([
-    prisma.invoice.findMany({
-      where: { customerId, status: { not: "CANCELLED" } },
-      select: { total: true },
-    }),
+  // Công nợ tính TỪ HÓA ĐƠN (mục 18): khi khách đã có hóa đơn, dùng nguồn sự thật
+  // hóa đơn (đã trừ phiếu thu đã hủy + cộng cọc đã phân bổ, không đếm trùng).
+  const invoiceFin = await customerInvoiceFinancials(customerId);
+  if (invoiceFin.invoiceCount > 0) {
+    return { totalPaid: invoiceFin.totalPaid, totalBilled: invoiceFin.totalBilled, debt: invoiceFin.debt };
+  }
+
+  // Fallback (khách chưa có hóa đơn nào) — giữ tương thích dữ liệu cũ theo phác đồ/booking.
+  const [plans, bookings, payments] = await Promise.all([
     prisma.treatmentPlan.findMany({
       where: { customerId, status: { not: "CANCELLED" } },
       select: { totalPrice: true, discount: true },
@@ -56,19 +61,12 @@ export async function customerFinancials(customerId: string): Promise<CustomerFi
       where: { customerId, status: { in: ["COMPLETED", "IN_PROGRESS", "ARRIVED", "CONFIRMED"] } },
       select: { price: true, discount: true },
     }),
-    prisma.payment.findMany({ where: { customerId }, select: { amount: true } }),
+    prisma.payment.findMany({ where: { customerId, voidedAt: null }, select: { amount: true } }),
   ]);
 
-  // Công nợ tính TỪ HÓA ĐƠN (mục 18). Nếu khách chưa có hóa đơn nào, fallback về
-  // phác đồ/booking để giữ tương thích dữ liệu cũ.
-  let totalBilled: number;
-  if (invoices.length > 0) {
-    totalBilled = invoices.reduce((s, i) => s + num(i.total), 0);
-  } else {
-    const planBilled = plans.reduce((s, p) => s + num(p.totalPrice) - num(p.discount), 0);
-    const bookingBilled = bookings.reduce((s, b) => s + num(b.price) - num(b.discount), 0);
-    totalBilled = planBilled + (plans.length === 0 ? bookingBilled : 0);
-  }
+  const planBilled = plans.reduce((s, p) => s + num(p.totalPrice) - num(p.discount), 0);
+  const bookingBilled = bookings.reduce((s, b) => s + num(b.price) - num(b.discount), 0);
+  const totalBilled = planBilled + (plans.length === 0 ? bookingBilled : 0);
   const totalPaid = payments.reduce((s, p) => s + num(p.amount), 0);
   return {
     totalPaid,

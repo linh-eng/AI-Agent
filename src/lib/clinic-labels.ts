@@ -205,10 +205,12 @@ export const RECOMMENDATION_PRIORITY_TONE: Record<string, Tone> = {
 
 // ----- Module 5–10 labels -----
 export const PROPOSAL_STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Nháp", SENT: "Đã gửi", ACCEPTED: "Đã chốt", REJECTED: "Từ chối", EXPIRED: "Hết hạn",
+  DRAFT: "Bản nháp", SENT: "Đã gửi", VIEWING: "Khách đang xem", ACCEPTED: "Khách chốt",
+  REJECTED: "Khách từ chối", EXPIRED: "Hết hiệu lực", CONVERTED: "Đã chuyển hóa đơn", CANCELLED: "Hủy",
 };
 export const PROPOSAL_STATUS_TONE: Record<string, Tone> = {
-  DRAFT: "muted", SENT: "warning", ACCEPTED: "success", REJECTED: "danger", EXPIRED: "muted",
+  DRAFT: "muted", SENT: "warning", VIEWING: "default", ACCEPTED: "success",
+  REJECTED: "danger", EXPIRED: "muted", CONVERTED: "success", CANCELLED: "muted",
 };
 export const PROPOSAL_KIND_LABEL: Record<string, string> = {
   ESSENTIAL: "Thiết yếu", RECOMMENDED: "Khuyến nghị", PREMIUM: "Cao cấp", CUSTOM: "Tùy chỉnh",
@@ -221,6 +223,12 @@ export const INVOICE_STATUS_LABEL: Record<string, string> = {
 };
 export const INVOICE_STATUS_TONE: Record<string, Tone> = {
   UNPAID: "warning", PARTIAL: "default", PAID: "success", CANCELLED: "muted",
+};
+export const DEPOSIT_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: "Đang giữ", ALLOCATED: "Đã phân bổ", REFUNDED: "Đã hoàn", VOID: "Đã hủy",
+};
+export const DEPOSIT_STATUS_TONE: Record<string, Tone> = {
+  ACTIVE: "warning", ALLOCATED: "success", REFUNDED: "muted", VOID: "muted",
 };
 // Vai trò công việc của nhân sự (đa vai trò) — danh mục gợi ý (mục 22).
 export const EMPLOYEE_ROLE_OPTIONS = [
@@ -297,6 +305,7 @@ export function statusLabel(value?: string | null): string {
     LIBRARY_STATUS_LABEL[value] ??
     PROPOSAL_STATUS_LABEL[value] ??
     INVOICE_STATUS_LABEL[value] ??
+    DEPOSIT_STATUS_LABEL[value] ??
     SESSION_STAFF_ROLE_LABEL[value] ??
     LEAD_STATUS_LABEL[value] ??
     RECOMMENDATION_PRIORITY_LABEL[value] ??

@@ -44,7 +44,9 @@ export const proposalCreateSchema = z.object({
 export const proposalUpdateSchema = z.object({
   title: z.string().min(1).optional(),
   note: z.string().optional().nullable(),
-  status: z.enum(["DRAFT", "SENT", "ACCEPTED", "REJECTED", "EXPIRED"]).optional(),
+  // Vòng đời báo giá (mục 15): Nháp → Đã gửi → Khách đang xem → Chốt/Từ chối/Hết hạn.
+  // ACCEPTED/CONVERTED đặt qua luồng chốt + tạo hóa đơn, không sửa tay ở đây.
+  status: z.enum(["DRAFT", "SENT", "VIEWING", "REJECTED", "EXPIRED", "CANCELLED"]).optional(),
   options: z.array(proposalOptionSchema).optional(), // thay thế toàn bộ (chỉ khi chưa ACCEPTED)
 });
 export const proposalAcceptSchema = z.object({
@@ -52,6 +54,8 @@ export const proposalAcceptSchema = z.object({
   agreedPrice: money,
   appliedDiscount: money,
   acceptedBy: z.string().optional().nullable(),
+  priceAdjustReason: z.string().optional().nullable(), // lý do khi giá chốt khác giá phương án / dưới sàn
+  allowBelowFloor: z.boolean().optional(), // duyệt bán dưới giá sàn (cần pricefloor.override)
 });
 
 // ===== Module 6 — Care instruction library =====

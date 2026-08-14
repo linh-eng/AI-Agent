@@ -390,9 +390,34 @@ export const paymentCreateSchema = z.object({
   invoiceId: z.string().optional().nullable(),
   amount: z.coerce.number().positive("Số tiền phải > 0"),
   method: paymentMethodEnum.default("CASH"),
+  txnRef: z.string().optional().nullable(),
   paidAt: dateOpt,
   receivedBy: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
+});
+
+// Hủy phiếu thu (mục 16) — bắt buộc lý do, không hard-delete.
+export const paymentVoidSchema = z.object({
+  reason: z.string().min(1, "Nhập lý do hủy phiếu thu"),
+});
+
+// ----- Tiền cọc (mục 17) -----
+export const depositCreateSchema = z.object({
+  customerId: z.string().min(1),
+  bookingId: z.string().optional().nullable(),
+  amount: z.coerce.number().positive("Số tiền cọc phải > 0"),
+  method: paymentMethodEnum.default("CASH"),
+  txnRef: z.string().optional().nullable(),
+  receivedBy: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+
+export const depositAllocateSchema = z.object({
+  invoiceId: z.string().min(1, "Chọn hóa đơn để phân bổ cọc"),
+});
+
+export const depositVoidSchema = z.object({
+  reason: z.string().min(1, "Nhập lý do hủy phiếu cọc"),
 });
 
 // ----- Hóa đơn (mục 14–18) -----

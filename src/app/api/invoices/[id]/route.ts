@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { invoiceUpdateSchema } from "@/lib/clinic-validation";
 import { auditLog } from "@/lib/clinic";
-import { recomputeInvoiceStatus } from "@/lib/invoice";
+import { recomputeInvoiceStatus, invoicePaidAmount } from "@/lib/invoice";
 
 export const GET = handle(async (_req, { params }) => {
   await requirePermission(PERMISSIONS.INVOICE_READ);
@@ -17,10 +17,12 @@ export const GET = handle(async (_req, { params }) => {
       proposal: { select: { id: true, code: true, title: true } },
       items: { orderBy: { orderIndex: "asc" } },
       payments: { orderBy: { paidAt: "desc" } },
+      deposits: { orderBy: { receivedAt: "desc" } },
     },
   });
   if (!invoice) return fail(404, "Không tìm thấy hóa đơn");
-  const paidAmount = invoice.payments.reduce((s, p) => s + Number(p.amount), 0);
+  // Đã trả = phiếu thu CHƯA HỦY + cọc đã PHÂN BỔ (không đếm trùng).
+  const paidAmount = await invoicePaidAmount(params.id);
   const outstanding = invoice.status === "CANCELLED" ? 0 : Math.max(0, Number(invoice.total) - paidAmount);
   return ok({ ...invoice, paidAmount, outstanding });
 });
@@ -32,7 +34,14 @@ export const PATCH = handle(async (req, { params }) => {
   const parsed = invoiceUpdateSchema.parse(await req.json());
   const current = await prisma.invoice.findUnique({
     where: { id: params.id },
-    include: { _count: { select: { payments: true } } },
+    include: {
+      _count: {
+        select: {
+          payments: { where: { voidedAt: null } },
+          deposits: { where: { status: "ALLOCATED" } },
+        },
+      },
+    },
   });
   if (!current) return fail(404, "Không tìm thấy hóa đơn");
 
@@ -42,8 +51,8 @@ export const PATCH = handle(async (req, { params }) => {
 
   if (parsed.status === "CANCELLED") {
     if (current.status === "CANCELLED") return fail(409, "Hóa đơn đã hủy trước đó");
-    if (current._count.payments > 0)
-      return fail(409, "Hóa đơn đã có thanh toán — không thể hủy (hoàn tiền trước nếu cần)");
+    if (current._count.payments > 0 || current._count.deposits > 0)
+      return fail(409, "Hóa đơn đã có thanh toán/cọc — không thể hủy (hủy phiếu thu / gỡ cọc trước nếu cần)");
     data.status = "CANCELLED";
   }
 

@@ -58,3 +58,27 @@ export async function checkServicePriceFloor(serviceId: string, price: number): 
   const below = price + 1e-6 < floorPrice;
   return { hasFloor: true, totalCost, floorPrice, price, below, shortfall: below ? floorPrice - price : 0 };
 }
+
+/**
+ * Tổng giá sàn của một phương án báo giá = Σ giá sàn từng hạng mục DỊCH VỤ
+ * (itemType SERVICE, refId=serviceId) × số buổi/số lượng. Hạng mục không phải
+ * dịch vụ hoặc dịch vụ chưa khai báo giá sàn không cộng vào (floorApplicable=false).
+ * Dùng để cảnh báo/chặn khi giá chốt phương án thấp hơn tổng giá sàn (mục 26).
+ */
+export async function proposalOptionFloorTotal(
+  items: Array<{ itemType: string; refId?: string | null; quantity?: number | null; sessions?: number | null }>,
+  agreedPrice: number
+): Promise<{ floorApplicable: boolean; floorTotal: number; below: boolean; shortfall: number }> {
+  let floorTotal = 0;
+  let floorApplicable = false;
+  for (const it of items) {
+    if (it.itemType !== "SERVICE" || !it.refId) continue;
+    const fc = await checkServicePriceFloor(it.refId, 0);
+    if (!fc.hasFloor) continue;
+    floorApplicable = true;
+    const times = num(it.sessions ?? it.quantity ?? 1) || 1;
+    floorTotal += fc.floorPrice * times;
+  }
+  const below = floorApplicable && agreedPrice + 1e-6 < floorTotal;
+  return { floorApplicable, floorTotal, below, shortfall: below ? floorTotal - agreedPrice : 0 };
+}

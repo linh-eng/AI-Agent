@@ -59,16 +59,21 @@ export function computeInvoiceTotals(
   return { subtotal, discount: num(discount), total, lines };
 }
 
-/** Tổng đã trả cho một hóa đơn. */
+/**
+ * Tổng đã trả cho một hóa đơn = thanh toán CHƯA HỦY (voidedAt null) + tiền cọc
+ * đã PHÂN BỔ vào chính hóa đơn này (status ALLOCATED). KHÔNG đếm trùng: cọc chỉ
+ * được cộng khi đã phân bổ (allocate) đúng một lần vào hóa đơn, và phiếu thu bị
+ * hủy không còn tính.
+ */
 export async function invoicePaidAmount(
   invoiceId: string,
   tx: Prisma.TransactionClient = prisma
 ): Promise<number> {
-  const agg = await tx.payment.aggregate({
-    where: { invoiceId },
-    _sum: { amount: true },
-  });
-  return num(agg._sum.amount);
+  const [payAgg, depAgg] = await Promise.all([
+    tx.payment.aggregate({ where: { invoiceId, voidedAt: null }, _sum: { amount: true } }),
+    tx.deposit.aggregate({ where: { invoiceId, status: "ALLOCATED" }, _sum: { amount: true } }),
+  ]);
+  return num(payAgg._sum.amount) + num(depAgg._sum.amount);
 }
 
 /**
@@ -104,7 +109,8 @@ export async function createInvoiceFromProposal(
 ): Promise<{ invoice: any; reused: boolean }> {
   const proposal = await prisma.treatmentProposal.findUnique({ where: { id: proposalId } });
   if (!proposal) throw Object.assign(new Error("Không tìm thấy báo giá"), { status: 404 });
-  if (proposal.status !== "ACCEPTED")
+  // ACCEPTED = vừa chốt; CONVERTED = đã có hóa đơn (trả lại bản đã tạo — idempotent).
+  if (proposal.status !== "ACCEPTED" && proposal.status !== "CONVERTED")
     throw Object.assign(new Error("Chỉ tạo hóa đơn từ báo giá đã được khách chốt"), { status: 409 });
 
   const existing = await prisma.invoice.findFirst({
@@ -119,29 +125,35 @@ export async function createInvoiceFromProposal(
   const total = num(proposal.agreedPrice) || subtotal;
   const discount = Math.max(0, subtotal - total);
 
-  const invoice = await prisma.invoice.create({
-    data: {
-      code: await nextInvoiceCode(),
-      customerId: proposal.customerId,
-      proposalId: proposal.id,
-      planId: proposal.planId,
-      status: "UNPAID",
-      subtotal,
-      discount,
-      total,
-      createdBy: createdBy ?? null,
-      items: {
-        create: lines.map((l, i) => ({
-          name: l.name,
-          quantity: l.quantity ?? 1,
-          unitPrice: num(l.unitPrice),
-          amount: l.amount,
-          note: l.note ?? null,
-          orderIndex: i,
-        })),
+  const invoice = await prisma.$transaction(async (tx) => {
+    const inv = await tx.invoice.create({
+      data: {
+        code: await nextInvoiceCode(),
+        customerId: proposal.customerId,
+        proposalId: proposal.id,
+        proposalOptionId: proposal.acceptedOptionId,
+        planId: proposal.planId,
+        status: "UNPAID",
+        subtotal,
+        discount,
+        total,
+        createdBy: createdBy ?? null,
+        items: {
+          create: lines.map((l, i) => ({
+            name: l.name,
+            quantity: l.quantity ?? 1,
+            unitPrice: num(l.unitPrice),
+            amount: l.amount,
+            note: l.note ?? null,
+            orderIndex: i,
+          })),
+        },
       },
-    },
-    include: { items: { orderBy: { orderIndex: "asc" } } },
+      include: { items: { orderBy: { orderIndex: "asc" } } },
+    });
+    // Báo giá đã chốt → chuyển sang "Đã chuyển hóa đơn" (giữ acceptedSnapshot bất biến).
+    await tx.treatmentProposal.update({ where: { id: proposal.id }, data: { status: "CONVERTED" } });
+    return inv;
   });
   return { invoice, reused: false };
 }
@@ -165,10 +177,13 @@ export async function customerInvoiceFinancials(customerId: string): Promise<{
   });
   const totalBilled = invoices.reduce((s, i) => s + num(i.total), 0);
   const ids = invoices.map((i) => i.id);
-  const paidAgg = ids.length
-    ? await prisma.payment.aggregate({ where: { invoiceId: { in: ids } }, _sum: { amount: true } })
-    : { _sum: { amount: null } };
-  const totalPaid = num(paidAgg._sum.amount);
+  const [paidAgg, depAgg] = ids.length
+    ? await Promise.all([
+        prisma.payment.aggregate({ where: { invoiceId: { in: ids }, voidedAt: null }, _sum: { amount: true } }),
+        prisma.deposit.aggregate({ where: { invoiceId: { in: ids }, status: "ALLOCATED" }, _sum: { amount: true } }),
+      ])
+    : [{ _sum: { amount: null } }, { _sum: { amount: null } }];
+  const totalPaid = num(paidAgg._sum.amount) + num(depAgg._sum.amount);
   return {
     totalBilled,
     totalPaid,

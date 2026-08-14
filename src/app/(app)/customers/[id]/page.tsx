@@ -23,6 +23,7 @@ import {
   TIMELINE_KIND_LABEL, TIMELINE_KIND_TONE, RECOMMENDATION_PRIORITY_LABEL, RECOMMENDATION_PRIORITY_TONE,
   CARE_KIND_LABEL, CARE_KIND_TONE, DELIVERY_CHANNEL_LABEL, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE,
   PROPOSAL_STATUS_LABEL, PROPOSAL_STATUS_TONE, TASK_STATUS_LABEL, statusLabel,
+  DEPOSIT_STATUS_LABEL, DEPOSIT_STATUS_TONE,
 } from "@/lib/clinic-labels";
 
 /* ============================ Types ============================ */
@@ -46,7 +47,7 @@ interface Customer {
   summary: Summary;
   timeline: { id: string; at: string; kind: string; title: string; detail?: string; status?: string; href?: string }[];
   bookings: any[]; assessments: any[]; plans: any[]; sessions: any[]; proposals: any[];
-  payments: any[]; activities: any[]; tasks: any[];
+  payments: any[]; activities: any[]; tasks: any[]; deposits?: any[];
   canSeeFinance: boolean;
 }
 
@@ -221,7 +222,7 @@ export default function CustomerProfilePage() {
       {tab === "materials" && <MaterialsTab materials={custMaterials} />}
       {tab === "care" && <CareTab activities={c.activities} tasks={c.tasks} careItems={careItems} />}
       {tab === "proposals" && <ProposalsTab proposals={c.proposals} />}
-      {tab === "billing" && <BillingTab invoices={invoices} payments={c.payments} financials={c.financials} />}
+      {tab === "billing" && <BillingTab invoices={invoices} payments={c.payments} deposits={c.deposits ?? []} financials={c.financials} />}
       {tab === "forms" && <FormsTab forms={forms} />}
 
       {/* ---------- Modals ---------- */}
@@ -769,9 +770,12 @@ function ProposalsTab({ proposals }: { proposals: any[] }) {
   );
 }
 
-/* ---- Billing (invoices + payments) ---- */
-function BillingTab({ invoices, payments, financials }: { invoices: any[] | null; payments: any[]; financials: Customer["financials"] }) {
-  const [sub, setSub] = useState<"invoices" | "payments">("invoices");
+/* ---- Billing (invoices + payments + deposits) ---- */
+function BillingTab({ invoices, payments, deposits, financials }: { invoices: any[] | null; payments: any[]; deposits: any[]; financials: Customer["financials"] }) {
+  const [sub, setSub] = useState<"invoices" | "payments" | "deposits">("invoices");
+  const validPaid = payments.filter((p) => !p.voidedAt).reduce((s, p) => s + Number(p.amount), 0);
+  const allocatedDep = deposits.filter((d) => d.status === "ALLOCATED").reduce((s, d) => s + Number(d.amount), 0);
+  const activeDep = deposits.filter((d) => d.status === "ACTIVE").reduce((s, d) => s + Number(d.amount), 0);
   return (
     <div>
       <div className="mb-3 grid grid-cols-3 gap-3">
@@ -779,7 +783,17 @@ function BillingTab({ invoices, payments, financials }: { invoices: any[] | null
         <Kpi icon={Wallet} label="Đã thanh toán" value={formatCurrency(financials.totalPaid)} tone="emerald" />
         <Kpi icon={Wallet} label="Công nợ" value={formatCurrency(financials.debt)} tone={financials.debt > 0 ? "red" : "emerald"} />
       </div>
-      <SubTabs tabs={[{ key: "invoices", label: `Hóa đơn${invoices ? ` (${invoices.length})` : ""}` }, { key: "payments", label: `Thanh toán (${payments.length})` }]} active={sub} onChange={setSub} />
+      {/* Đối soát: công nợ chỉ từ hóa đơn; đã trả = phiếu thu hợp lệ + cọc đã phân bổ. */}
+      <div className="mb-3 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">Đối soát: </span>
+        Đã thanh toán {formatCurrency(financials.totalPaid)} = phiếu thu hợp lệ {formatCurrency(validPaid)} + cọc đã phân bổ {formatCurrency(allocatedDep)}.
+        {activeDep > 0 && <> Còn <span className="font-medium text-amber-600">cọc đang giữ {formatCurrency(activeDep)}</span> (chưa trừ công nợ tới khi phân bổ vào hóa đơn).</>}
+      </div>
+      <SubTabs tabs={[
+        { key: "invoices", label: `Hóa đơn${invoices ? ` (${invoices.length})` : ""}` },
+        { key: "payments", label: `Thanh toán (${payments.length})` },
+        { key: "deposits", label: `Tiền cọc (${deposits.length})` },
+      ]} active={sub} onChange={setSub as any} />
       {sub === "invoices" ? (
         <Card><CardContent className="p-0"><div className="overflow-x-auto"><Table>
           <THead><TR><TH>Mã HĐ</TH><TH>Ngày</TH><TH className="text-right">Tổng</TH><TH className="text-right">Đã trả</TH><TH className="text-right">Còn thu</TH><TH>Trạng thái</TH></TR></THead>
@@ -796,18 +810,34 @@ function BillingTab({ invoices, payments, financials }: { invoices: any[] | null
             ))}
           </TBody>
         </Table></div></CardContent></Card>
-      ) : (
+      ) : sub === "payments" ? (
         <Card><CardContent className="p-0"><div className="overflow-x-auto"><Table>
-          <THead><TR><TH>Ngày</TH><TH>Hóa đơn</TH><TH>Hình thức</TH><TH>Người thu</TH><TH>Ghi chú</TH><TH className="text-right">Số tiền</TH></TR></THead>
+          <THead><TR><TH>Ngày</TH><TH>Hóa đơn</TH><TH>Hình thức</TH><TH>Người thu</TH><TH>Trạng thái</TH><TH className="text-right">Số tiền</TH></TR></THead>
           <TBody>
             {payments.length === 0 ? <TR><TD colSpan={6}><Empty>Chưa có thanh toán</Empty></TD></TR> : payments.map((p) => (
-              <TR key={p.id}>
+              <TR key={p.id} className={p.voidedAt ? "opacity-60" : ""}>
                 <TD>{formatDate(p.paidAt)}</TD>
                 <TD className="font-mono">{p.invoice?.code ?? "—"}</TD>
                 <TD>{PAYMENT_METHOD_LABEL[p.method] ?? p.method}</TD>
                 <TD>{p.receivedBy ?? "—"}</TD>
-                <TD>{p.note ?? "—"}</TD>
-                <TD className="text-right font-medium">{formatCurrency(Number(p.amount))}</TD>
+                <TD>{p.voidedAt ? <Badge tone="muted">Đã hủy</Badge> : <Badge tone="success">Hợp lệ</Badge>}</TD>
+                <TD className={`text-right font-medium ${p.voidedAt ? "line-through" : ""}`}>{formatCurrency(Number(p.amount))}</TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table></div></CardContent></Card>
+      ) : (
+        <Card><CardContent className="p-0"><div className="overflow-x-auto"><Table>
+          <THead><TR><TH>Mã cọc</TH><TH>Ngày thu</TH><TH>Nguồn</TH><TH>Hóa đơn</TH><TH>Trạng thái</TH><TH className="text-right">Số tiền</TH></TR></THead>
+          <TBody>
+            {deposits.length === 0 ? <TR><TD colSpan={6}><Empty>Chưa có tiền cọc</Empty></TD></TR> : deposits.map((d) => (
+              <TR key={d.id}>
+                <TD className="font-mono">{d.code}</TD>
+                <TD>{formatDate(d.receivedAt)}</TD>
+                <TD>{d.booking?.code ? `Lịch ${d.booking.code}` : "—"}</TD>
+                <TD className="font-mono">{d.invoice?.code ?? "—"}</TD>
+                <TD><Badge tone={DEPOSIT_STATUS_TONE[d.status]}>{DEPOSIT_STATUS_LABEL[d.status]}</Badge></TD>
+                <TD className="text-right font-medium">{formatCurrency(Number(d.amount))}</TD>
               </TR>
             ))}
           </TBody>

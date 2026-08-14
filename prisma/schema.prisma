@@ -1058,6 +1058,7 @@ model Customer {
   customerMaterials CustomerMaterial[]
   portalAccount     CustomerPortalAccount?
   invoices          Invoice[]
+  deposits          Deposit[]
   marketingCampaign MarketingCampaign?        @relation(fields: [campaignId], references: [id])
 
   @@index([phone])
@@ -1211,6 +1212,7 @@ model Booking {
   service           Service?           @relation(fields: [serviceId], references: [id])
   session           TreatmentSession? // buổi thực hiện gắn với booking (1-1)
   payments          Payment[]
+  deposits          Deposit[]
   tasks             Task[]
   marketingCampaign MarketingCampaign? @relation(fields: [campaignId], references: [id])
 
@@ -1418,15 +1420,21 @@ model TreatmentSession {
 // ----------------------------------------------------------------------------
 model Payment {
   id         String        @id @default(cuid())
+  code       String?       @unique // PT-xxxxxx mã phiếu thu
   customerId String
   planId     String?
   bookingId  String?
   invoiceId  String? // Thanh toán gắn với hóa đơn (mục 18) — 1 hóa đơn nhiều lần trả
   amount     Decimal       @db.Decimal(18, 2)
   method     PaymentMethod @default(CASH)
+  txnRef     String? // mã tham chiếu giao dịch (số CK/mã POS/ví...)
   paidAt     DateTime      @default(now())
   receivedBy String?
   note       String?
+  // --- Hủy phiếu thu (không hard-delete, giữ vết) ---
+  voidedAt   DateTime?
+  voidReason String?
+  voidedBy   String?
   createdAt  DateTime      @default(now())
 
   customer Customer       @relation(fields: [customerId], references: [id])
@@ -1751,9 +1759,12 @@ enum FormInstanceStatus {
 enum ProposalStatus {
   DRAFT
   SENT // đã gửi khách
+  VIEWING // khách đang xem
   ACCEPTED // khách đã chốt
   REJECTED
   EXPIRED
+  CONVERTED // đã chuyển thành hóa đơn
+  CANCELLED // hủy
 }
 
 enum ProposalOptionKind {
@@ -1782,6 +1793,7 @@ model TreatmentProposal {
   note             String? // ghi chú nội bộ (ẩn khỏi khách)
   createdBy        String?
   // --- Chốt phương án (snapshot bất biến) ---
+  priceAdjustReason String? // lý do điều chỉnh giá khi chốt (khác giá phương án gốc / bán dưới sàn)
   acceptedOptionId String?
   acceptedAt       DateTime?
   acceptedBy       String?
@@ -2311,32 +2323,79 @@ enum InvoiceStatus {
 }
 
 model Invoice {
-  id         String        @id @default(cuid())
-  code       String        @unique // HĐ-xxxxxx
-  customerId String
-  proposalId String? // báo giá nguồn (khi tạo từ báo giá đã chốt)
-  planId     String?
-  status     InvoiceStatus @default(UNPAID)
-  issuedAt   DateTime      @default(now())
-  dueDate    DateTime?
-  subtotal   Decimal       @default(0) @db.Decimal(18, 2) // tổng hạng mục trước chiết khấu
-  discount   Decimal       @default(0) @db.Decimal(18, 2)
-  total      Decimal       @default(0) @db.Decimal(18, 2) // phải thu = subtotal - discount
-  note       String?
-  createdBy  String?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  id               String        @id @default(cuid())
+  code             String        @unique // HĐ-xxxxxx
+  customerId       String
+  proposalId       String? // báo giá nguồn (khi tạo từ báo giá đã chốt)
+  proposalOptionId String? // phương án đã chốt (tham chiếu mềm) — truy vết
+  planId           String?
+  status           InvoiceStatus @default(UNPAID)
+  issuedAt         DateTime      @default(now())
+  dueDate          DateTime?
+  subtotal         Decimal       @default(0) @db.Decimal(18, 2) // tổng hạng mục trước chiết khấu
+  discount         Decimal       @default(0) @db.Decimal(18, 2)
+  total            Decimal       @default(0) @db.Decimal(18, 2) // phải thu = subtotal - discount
+  note             String?
+  createdBy        String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   customer Customer           @relation(fields: [customerId], references: [id])
   proposal TreatmentProposal? @relation(fields: [proposalId], references: [id])
   plan     TreatmentPlan?     @relation(fields: [planId], references: [id])
   items    InvoiceItem[]
   payments Payment[]
+  deposits Deposit[]
 
   @@index([customerId])
   @@index([proposalId])
   @@index([status])
   @@map("invoices")
+}
+
+// ----------------------------------------------------------------------------
+// TIỀN CỌC (mục 17) — khoản thu trước khi có hóa đơn (thường từ Booking).
+// Cọc là MỘT bản ghi tiền thật, có thể phân bổ (allocate) vào 1 hóa đơn ĐÚNG
+// MỘT LẦN. Không đếm trùng: paidAmount hóa đơn = payment (chưa hủy) + cọc đã
+// phân bổ vào chính hóa đơn đó. Cọc chưa phân bổ = tiền giữ, chưa trừ công nợ.
+// ----------------------------------------------------------------------------
+enum DepositStatus {
+  ACTIVE // đã thu, chưa phân bổ (đang giữ)
+  ALLOCATED // đã phân bổ vào 1 hóa đơn
+  REFUNDED // đã hoàn khách
+  VOID // hủy phiếu cọc
+}
+
+model Deposit {
+  id          String        @id @default(cuid())
+  code        String        @unique // DC-xxxxxx
+  customerId  String
+  bookingId   String? // nguồn cọc (nếu từ lịch hẹn)
+  invoiceId   String? // hóa đơn đã phân bổ vào (khi ALLOCATED)
+  amount      Decimal       @db.Decimal(18, 2)
+  method      PaymentMethod @default(CASH)
+  txnRef      String?
+  status      DepositStatus @default(ACTIVE)
+  receivedBy  String?
+  receivedAt  DateTime      @default(now())
+  allocatedAt DateTime?
+  allocatedBy String?
+  note        String?
+  // --- Hoàn/hủy ---
+  refundedAt  DateTime?
+  voidedAt    DateTime?
+  voidReason  String?
+  voidedBy    String?
+  createdAt   DateTime      @default(now())
+
+  customer Customer  @relation(fields: [customerId], references: [id])
+  booking  Booking?  @relation(fields: [bookingId], references: [id])
+  invoice  Invoice?  @relation(fields: [invoiceId], references: [id])
+
+  @@index([customerId])
+  @@index([invoiceId])
+  @@index([status])
+  @@map("deposits")
 }
 
 model InvoiceItem {

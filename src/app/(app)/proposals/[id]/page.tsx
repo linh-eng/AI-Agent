@@ -60,8 +60,9 @@ export default function ProposalDetailPage() {
     apiFetch<any[]>("/api/spa-products").then((r) => setEntities((e) => ({ ...e, PRODUCT: r }))).catch(() => {});
   }, []);
 
-  const accepted = p?.status === "ACCEPTED";
-  const editable = canWrite && !accepted;
+  const accepted = p?.status === "ACCEPTED" || p?.status === "CONVERTED";
+  const editable = canWrite && !accepted && p?.status !== "CANCELLED";
+  const canOverrideFloor = useCan(PERMISSIONS.PRICEFLOOR_OVERRIDE);
 
   function mutate(fn: (opts: any[]) => void) {
     setOptions((prev) => { const copy = JSON.parse(JSON.stringify(prev)); fn(copy); return copy; });
@@ -225,39 +226,98 @@ export default function ProposalDetailPage() {
       <AcceptModal
         open={acceptOpen}
         onClose={() => setAcceptOpen(false)}
+        proposalId={id}
+        canOverrideFloor={canOverrideFloor}
         options={options.filter((o) => o.id)}
-        onSubmit={async (body) => {
-          setError(null);
-          try { await apiFetch(`/api/proposals/${id}/accept`, { method: "POST", body: JSON.stringify(body) }); setAcceptOpen(false); load(); }
-          catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); }
-        }}
+        onDone={() => { setAcceptOpen(false); load(); }}
       />
     </div>
   );
 }
 
-function AcceptModal({ open, onClose, options, onSubmit }: { open: boolean; onClose: () => void; options: any[]; onSubmit: (b: any) => void }) {
+function AcceptModal({ open, onClose, proposalId, options, canOverrideFloor, onDone }: { open: boolean; onClose: () => void; proposalId: string; options: any[]; canOverrideFloor: boolean; onDone: () => void }) {
   const [optionId, setOptionId] = useState("");
   const [agreedPrice, setAgreedPrice] = useState("");
   const [acceptedBy, setAcceptedBy] = useState("");
+  const [priceAdjustReason, setPriceAdjustReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [floor, setFloor] = useState<{ floorTotal: number; shortfall: number; canOverride: boolean } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => { if (open) { setOptionId(""); setAgreedPrice(""); setAcceptedBy(""); setPriceAdjustReason(""); setError(null); setFloor(null); } }, [open]);
+
   const sel = options.find((o) => o.id === optionId);
   const suggested = sel ? optionTotal(sel) : 0;
+  const priceNum = agreedPrice ? Number(agreedPrice) : suggested;
+  const priceAdjusted = !!sel && Math.abs(priceNum - suggested) > 1e-6;
+
+  async function submit(allowBelowFloor: boolean) {
+    setSubmitting(true); setError(null);
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          optionId,
+          agreedPrice: agreedPrice ? Number(agreedPrice) : undefined,
+          acceptedBy: acceptedBy || undefined,
+          priceAdjustReason: priceAdjustReason || undefined,
+          allowBelowFloor: allowBelowFloor || undefined,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 409 && json?.details?.priceFloor) {
+          setFloor(json.details.priceFloor);
+          setError("Giá chốt thấp hơn tổng giá sàn của phương án.");
+        } else {
+          setError(json?.error ?? "Có lỗi xảy ra");
+        }
+        return;
+      }
+      onDone();
+    } catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); }
+    finally { setSubmitting(false); }
+  }
+
   return (
     <Modal open={open} onClose={onClose} title="Khách chốt phương án">
-      <form onSubmit={(e) => { e.preventDefault(); onSubmit({ optionId, agreedPrice: agreedPrice ? Number(agreedPrice) : undefined, acceptedBy: acceptedBy || undefined }); }} className="space-y-4">
+      <form onSubmit={(e) => { e.preventDefault(); submit(false); }} className="space-y-4">
         <p className="text-xs text-muted-foreground">Lưu ý: chốt xong sẽ đông cứng snapshot, không sửa được phương án nữa. Cần lưu các thay đổi trước khi chốt.</p>
         <div className="space-y-1.5">
           <Label>Phương án khách chọn *</Label>
-          <Select value={optionId} onChange={(e) => { setOptionId(e.target.value); const o = options.find((x) => x.id === e.target.value); setAgreedPrice(o ? String(optionTotal(o)) : ""); }} required>
+          <Select value={optionId} onChange={(e) => { setOptionId(e.target.value); const o = options.find((x) => x.id === e.target.value); setAgreedPrice(o ? String(optionTotal(o)) : ""); setFloor(null); }} required>
             <option value="">— Chọn —</option>
             {options.map((o) => <option key={o.id} value={o.id}>{o.name} · {formatNumber(optionTotal(o))} ₫</option>)}
           </Select>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5"><Label>Giá thống nhất</Label><Input type="number" value={agreedPrice} onChange={(e) => setAgreedPrice(e.target.value)} placeholder={String(suggested)} /></div>
+          <div className="space-y-1.5"><Label>Giá thống nhất</Label><Input type="number" value={agreedPrice} onChange={(e) => { setAgreedPrice(e.target.value); setFloor(null); }} placeholder={String(suggested)} /></div>
           <div className="space-y-1.5"><Label>Người xác nhận</Label><Input value={acceptedBy} onChange={(e) => setAcceptedBy(e.target.value)} /></div>
         </div>
-        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Hủy</Button><Button type="submit" disabled={!optionId}>Xác nhận chốt</Button></div>
+        {priceAdjusted && (
+          <div className="space-y-1.5">
+            <Label>Lý do điều chỉnh giá * <span className="font-normal text-muted-foreground">(giá chốt khác giá phương án {formatNumber(suggested)} ₫)</span></Label>
+            <Input value={priceAdjustReason} onChange={(e) => setPriceAdjustReason(e.target.value)} placeholder="VD: khách thân thiết, khuyến mãi..." required />
+          </div>
+        )}
+        {floor && (
+          <div className="rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-700">
+            <div className="font-medium">Giá chốt dưới giá sàn</div>
+            <div className="mt-1">Tổng giá sàn phương án: <strong>{formatNumber(floor.floorTotal)} ₫</strong> · Thiếu <strong>{formatNumber(floor.shortfall)} ₫</strong>.</div>
+            {floor.canOverride ? (
+              <div className="mt-2">
+                <p>Nhập lý do rồi bấm duyệt bán dưới sàn:</p>
+                <Input className="mt-1 bg-white" value={priceAdjustReason} onChange={(e) => setPriceAdjustReason(e.target.value)} placeholder="Lý do bán dưới giá sàn *" />
+                <Button type="button" size="sm" variant="destructive" className="mt-2" disabled={!priceAdjustReason.trim() || submitting} onClick={() => submit(true)}>Duyệt bán dưới sàn & chốt</Button>
+              </div>
+            ) : (
+              <div className="mt-1 font-medium">Cần người có quyền duyệt bán dưới giá sàn.</div>
+            )}
+          </div>
+        )}
+        {error && !floor && <p className="text-xs text-destructive">{error}</p>}
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Hủy</Button><Button type="submit" disabled={!optionId || submitting || (priceAdjusted && !priceAdjustReason.trim())}>Xác nhận chốt</Button></div>
       </form>
     </Modal>
   );

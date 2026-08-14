@@ -7,6 +7,7 @@ import { PERMISSIONS } from "@/lib/rbac";
 import { paymentCreateSchema } from "@/lib/clinic-validation";
 import { customerFinancials, auditLog } from "@/lib/clinic";
 import { recomputeInvoiceStatus, invoicePaidAmount } from "@/lib/invoice";
+import { nextPaymentCode } from "@/lib/deposit";
 import { fail } from "@/lib/api";
 
 export const GET = handle(async (req) => {
@@ -48,6 +49,7 @@ export const POST = handle(async (req) => {
   const payment = await prisma.payment.create({
     data: {
       ...parsed,
+      code: await nextPaymentCode(),
       paidAt: parsed.paidAt ?? new Date(),
       receivedBy: parsed.receivedBy ?? session.name,
     },

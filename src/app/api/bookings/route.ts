@@ -9,6 +9,7 @@ import { sequentialCode, auditLog } from "@/lib/clinic";
 import { resolvePrice } from "@/lib/pricing";
 import { detectBookingConflicts, suggestAlternativeSlots, logBookingActivity } from "@/lib/booking";
 import { checkServicePriceFloor } from "@/lib/price-floor";
+import { createDeposit } from "@/lib/deposit";
 
 export const GET = handle(async (req) => {
   await requirePermission(PERMISSIONS.BOOKING_READ);
@@ -142,6 +143,24 @@ export const POST = handle(async (req) => {
       });
     } catch {
       // buổi không tồn tại hoặc đã gắn booking khác — bỏ qua, không chặn tạo lịch
+    }
+  }
+
+  // Tiền cọc lịch hẹn (mục 17) → tạo bản ghi tiền thật (Deposit, ACTIVE) để có thể
+  // phân bổ vào hóa đơn sau này. Chỉ tạo khi người dùng có quyền thu cọc; Booking.deposit
+  // chỉ là con số tham chiếu, KHÔNG được cộng vào công nợ (tránh đếm trùng).
+  if (Number(parsed.deposit) > 0 && session.permissions.includes(PERMISSIONS.DEPOSIT_WRITE)) {
+    try {
+      const dep = await createDeposit({
+        customerId: booking.customerId,
+        bookingId: booking.id,
+        amount: Number(parsed.deposit),
+        receivedBy: session.name,
+        note: `Cọc lịch hẹn ${booking.code}`,
+      });
+      await auditLog({ userId: session.userId, action: "DEPOSIT_CREATED", entityType: "Deposit", entityId: dep.id, changes: { bookingId: booking.id, amount: Number(parsed.deposit) } });
+    } catch {
+      // không chặn tạo lịch nếu tạo cọc lỗi
     }
   }
 

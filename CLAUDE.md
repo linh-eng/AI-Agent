@@ -1133,6 +1133,80 @@ thị `editLog`. Nút ghi-nhận/xem-kết-quả ở trang Phác đồ nay **đi
 - Validate hoàn thành mới **chặn cứng** thiếu dịch vụ thực tế; các điều kiện khác (nhân sự chính, tình trạng sau) là
   khuyến nghị UI. `treatmentArea`/thông số nền chuyên môn dựa Biểu mẫu (không hard-code field theo từng công nghệ).
 
+## Lõi tài chính Mục 6 (v0.15.0) — Báo giá → Hóa đơn → Thanh toán → **Cọc & Hủy phiếu thu** → Công nợ
+
+Chuẩn hóa dòng tiền: **Báo giá (nhiều phương án) → khách chốt 1 → đông cứng snapshot → HÓA ĐƠN → thu
+nhiều lần → CÔNG NỢ**. Chỉ đụng luồng tài chính + tích hợp tối thiểu Booking/Báo giá/Khách hàng; KHÔNG
+sửa sâu Giá sàn/Marketing/Nhân sự/Kho/Session/CSKH/Portal. Migration **`M_finance`** (additive, 0 DROP;
+tổng **23 migration**). **167 test pass** (thêm `test/finance-deposit.test.ts` 6).
+
+### Nguyên tắc cứng (đúng bản mô tả mục 14–18)
+- **Báo giá ≠ Hóa đơn.** Thanh toán KHÔNG dựa trực tiếp vào báo giá. **Công nợ tính TỪ HÓA ĐƠN**.
+- **Đã trả của hóa đơn = phiếu thu CHƯA HỦY + cọc đã PHÂN BỔ** (`invoicePaidAmount`, `src/lib/invoice.ts`).
+  KHÔNG đếm trùng: cọc chỉ cộng khi đã phân bổ đúng 1 lần; phiếu thu đã hủy không tính. Áp đồng bộ ở
+  `/api/invoices` (list), `/api/invoices/[id]` (GET), `customerInvoiceFinancials`, `customerFinancials`.
+
+### Migration & schema (`M_finance`)
+- Enum `ProposalStatus` +`VIEWING`/`CONVERTED`/`CANCELLED`; enum mới `DepositStatus` (ACTIVE/ALLOCATED/
+  REFUNDED/VOID).
+- `Payment` +`code`(PT-xxxxxx unique)/`txnRef`/`voidedAt`/`voidReason`/`voidedBy` (hủy phiếu thu, không xóa).
+- `Invoice` +`proposalOptionId` (truy vết phương án đã chốt) + quan hệ `deposits`.
+- `TreatmentProposal` +`priceAdjustReason` (lý do điều chỉnh giá / bán dưới sàn khi chốt).
+- Model mới `Deposit` (`deposits`): code DC-xxxxxx, customerId, bookingId?, invoiceId?, amount, method,
+  txnRef, status, receivedBy/At, allocatedAt/By, refundedAt, void*. Quan hệ ngược `Customer.deposits`/
+  `Booking.deposits` (additive, không thêm cột).
+
+### Service — `src/lib/deposit.ts`
+- `createDeposit` (ACTIVE — tiền thật đang giữ) · `allocateDeposit` (**khóa dòng `SELECT … FOR UPDATE`**;
+  chặn: cọc không ACTIVE / hóa đơn đã hủy / khác khách / **cọc vượt công nợ còn lại** → chuyển ALLOCATED +
+  gán invoiceId + tính lại trạng thái HĐ) · `voidPayment` (ghi vết + tính lại trạng thái HĐ) · `voidDeposit`
+  (chỉ cọc ACTIVE; cọc đã phân bổ chặn) · `nextPaymentCode`/`nextDepositCode`. `FinanceError` mang mã HTTP.
+- **Booking có cọc → tự tạo `Deposit` thật** (ACTIVE, gắn bookingId) khi người tạo có `deposit.write`
+  (`/api/bookings` POST). `Booking.deposit` chỉ là con số tham chiếu — KHÔNG cộng vào công nợ (tránh đếm trùng).
+- **Chốt báo giá (`/api/proposals/[id]/accept`):** giá chốt khác giá phương án → **bắt buộc `priceAdjustReason`**
+  (422); giá dưới **tổng giá sàn** phương án (Σ giá sàn hạng mục DỊCH VỤ, `proposalOptionFloorTotal` trong
+  `price-floor.ts`) → **409** kèm `details.priceFloor`; duyệt cần `pricefloor.override` + lý do (403/422 nếu
+  thiếu). Tạo hóa đơn từ báo giá đã chốt → proposal chuyển **CONVERTED**.
+
+### RBAC
+`payment.void` (MANAGER/CASHIER — hủy phiếu thu) · `deposit.write` (MANAGER/RECEPTION/CASHIER — thu & phân bổ
+cọc). Giá vốn/giá sàn vẫn mask theo `finance.read`.
+
+### API
+`/api/payments` POST (thêm `txnRef` + sinh `code`) · **`/api/payments/[id]/void`** (POST, `payment.void`,
+audit `PAYMENT_VOID`) · **`/api/deposits`** (GET lọc khách/trạng thái; POST thu cọc) · **`/api/deposits/[id]/
+allocate`** (POST, audit `DEPOSIT_ALLOCATED`) · **`/api/deposits/[id]/void`** (POST). `/api/customers/[id]`
+kèm `invoices`/`deposits`. Validation: `paymentVoidSchema`, `depositCreate/Allocate/VoidSchema`,
+`proposalAcceptSchema` +`priceAdjustReason`/`allowBelowFloor`.
+
+### UI
+- **Hóa đơn `/invoices/[id]`:** nút **Dùng cọc (n)** (modal chọn phiếu cọc ACTIVE → phân bổ, chặn vượt công
+  nợ) · bảng **cọc đã phân bổ** · lịch sử thanh toán thêm cột **Mã/Trạng thái** + nút **Hủy phiếu thu** (modal
+  lý do bắt buộc) — phiếu hủy gạch ngang + badge "Đã hủy". Nút Hủy hóa đơn khóa khi còn phiếu thu hợp lệ / cọc
+  đã phân bổ. Nhãn "Từ báo giá PROP-xxxxxx".
+- **Sổ thu `/payments`:** cột Mã/Trạng thái (Hợp lệ/Đã hủy) + txnRef; tổng đã thu chỉ tính phiếu hợp lệ.
+- **Báo giá `/proposals/[id]`:** modal Chốt thêm ô **Lý do điều chỉnh giá** (hiện khi giá khác giá phương án)
+  + xử lý **409 dưới giá sàn** (banner đỏ + "Duyệt bán dưới sàn & chốt" nếu có quyền). Trạng thái Việt hóa đủ
+  8 giá trị; CONVERTED khóa sửa như ACCEPTED.
+- **Hồ sơ khách → Hóa đơn & Thanh toán:** dòng **Đối soát** (Đã thanh toán = phiếu thu hợp lệ + cọc đã phân
+  bổ; còn cọc đang giữ) + tab con **Tiền cọc** (trạng thái từng phiếu) + thanh toán hiển thị Hợp lệ/Đã hủy.
+- Nhãn: `PROPOSAL_STATUS_LABEL` (Bản nháp/Đã gửi/Khách đang xem/Khách chốt/Khách từ chối/Hết hiệu lực/Đã
+  chuyển hóa đơn/Hủy), `DEPOSIT_STATUS_LABEL` (Đang giữ/Đã phân bổ/Đã hoàn/Đã hủy) trong `clinic-labels.ts`.
+
+### Demo (seed:demo) — KH-100004 Đỗ Thùy Linh
+PROP-100001 (3 phương án) **CONVERTED** phương án Khuyến nghị 11.900.000 → **HD-000001** (PARTIAL,
+`proposalOptionId`) → **PT-000001** 5.000.000 (CK #CK20260801) + **PT-000002** 3.000.000 (tiền mặt) =
+**đã trả 8.000.000, còn 3.900.000**; **PT-000003** 500.000 **ĐÃ HỦY** (lý do "Thu nhầm hóa đơn khác", không
+tính vào đã trả); **DC-000001** 1.000.000 cọc **ĐANG GIỮ** (có thể phân bổ, chưa trừ công nợ). Đối soát:
+8.000.000 = phiếu thu hợp lệ 8.000.000 + cọc phân bổ 0.
+
+### Nợ kỹ thuật (Mục 6)
+- Chưa có UI thu cọc độc lập (ngoài Booking) & hoàn cọc (REFUND) — service `voidDeposit` có sẵn, thu cọc qua
+  Booking hoặc `/api/deposits` POST. Gỡ phân bổ cọc (de-allocate) chưa mở ở UI.
+- Giá sàn phương án tính theo hạng mục **DỊCH VỤ** (SERVICE có refId + khai báo giá sàn); hạng mục sản phẩm/
+  công nghệ chưa cộng sàn.
+- Booking auto-tạo Deposit chỉ khi người tạo có `deposit.write`; vai trò khác thì `Booking.deposit` là ghi chú.
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ
