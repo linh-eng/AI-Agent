@@ -21,6 +21,7 @@ import { parseVnLocal } from "@/lib/timezone";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "@/lib/rbac";
 import { POST as staffLogin } from "@/app/api/auth/login/route";
 import { POST as roleFeePost } from "@/app/api/employees/[id]/role-fees/route";
+import { POST as sessionStaffPost } from "@/app/api/session-staff/route";
 
 function jsonReq(url: string, method: string, body?: unknown) {
   return new Request(url, { method, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -189,5 +190,66 @@ describe("Mục 8.3 — Snapshot phí Session + RBAC", () => {
     expect(ROLE_PERMISSIONS.RECEPTION).not.toContain(PERMISSIONS.STAFF_FEE_READ);
     expect(ROLE_PERMISSIONS.RECEPTION).not.toContain(PERMISSIONS.STAFF_FEE_WRITE);
     expect(ROLE_PERMISSIONS.SPECIALIST).not.toContain(PERMISSIONS.STAFF_WRITE);
+  });
+});
+
+describe("Mục 8.4 — Biên hiệu lực phí (không chồng lấn) + snapshot theo NGÀY DỊCH VỤ + negative năng lực", () => {
+  beforeEach(async () => { await resetDb(); });
+  afterAll(async () => { await prisma.$disconnect(); });
+
+  it("[#3] effectiveTo EXCLUSIVE: mốc 01/09 chỉ thuộc bản MỚI (không trả 2 giá)", async () => {
+    const e = await emp({ fullName: "NV Biên" });
+    await prisma.employeeRoleFee.createMany({ data: [
+      { employeeId: e.id, role: "Kiểm tra", fee: 200_000, effectiveFrom: new Date("2023-01-10"), effectiveTo: new Date("2026-09-01") },
+      { employeeId: e.id, role: "Kiểm tra", fee: 250_000, effectiveFrom: new Date("2026-09-01") },
+    ] });
+    expect(await resolveRoleFee(e.id, "Kiểm tra", new Date("2026-08-31"))).toBe(200_000); // trước mốc
+    expect(await resolveRoleFee(e.id, "Kiểm tra", new Date("2026-09-01"))).toBe(250_000); // ĐÚNG mốc → bản mới
+    expect(await resolveRoleFee(e.id, "Kiểm tra", new Date("2026-09-02"))).toBe(250_000);
+    // currentRoleFees không nhân đôi vai trò ở đúng mốc
+    const cur = await currentRoleFees(e.id, new Date("2026-09-01"));
+    expect(cur.filter((r) => r.role === "Kiểm tra").length).toBe(1);
+    expect(cur.find((r) => r.role === "Kiểm tra")?.fee).toBe(250_000);
+  });
+
+  it("[#1] snapshot phí Session theo NGÀY DỊCH VỤ: buổi 25/07 = 500k, buổi 03/09 = 600k", async () => {
+    const e = await emp({ fullName: "Master SD" });
+    await prisma.employeeRoleFee.createMany({ data: [
+      { employeeId: e.id, role: "Master", fee: 500_000, effectiveFrom: new Date("2023-01-10"), effectiveTo: new Date("2026-09-01") },
+      { employeeId: e.id, role: "Master", fee: 600_000, effectiveFrom: new Date("2026-09-01") },
+    ] });
+    const cust = await prisma.customer.create({ data: { code: uniq("KH"), fullName: "KH" } });
+    const plan = await prisma.treatmentPlan.create({ data: { code: uniq("TP"), customerId: cust.id, name: "P" } });
+    const old = await prisma.treatmentSession.create({ data: { planId: plan.id, customerId: cust.id, sessionNumber: 1, name: "Cũ", performedAt: new Date("2026-07-25T02:00:00Z") } });
+    const neu = await prisma.treatmentSession.create({ data: { planId: plan.id, customerId: cust.id, sessionNumber: 3, name: "Mới", performedAt: new Date("2026-09-03T02:00:00Z") } });
+
+    const mgr = await makeStaff([PERMISSIONS.TREATMENT_WRITE]);
+    await login(mgr.email, mgr.password);
+    const r1 = await sessionStaffPost(jsonReq("http://t", "POST", { sessionId: old.id, employeeId: e.id, staffName: "Master SD", role: "MASTER" }), {});
+    const r2 = await sessionStaffPost(jsonReq("http://t", "POST", { sessionId: neu.id, employeeId: e.id, staffName: "Master SD", role: "MASTER" }), {});
+    expect(r1.status).toBe(201); expect(r2.status).toBe(201);
+    const ssOld = await prisma.sessionStaff.findFirstOrThrow({ where: { sessionId: old.id } });
+    const ssNew = await prisma.sessionStaff.findFirstOrThrow({ where: { sessionId: neu.id } });
+    expect(Number(ssOld.fee)).toBe(500_000); // buổi 25/07 → biểu phí cũ
+    expect(Number(ssNew.fee)).toBe(600_000); // buổi 03/09 → biểu phí mới
+
+    // Bất biến: đổi phí Master sau này KHÔNG đổi buổi cũ
+    await prisma.employeeRoleFee.updateMany({ where: { employeeId: e.id, role: "Master", effectiveTo: null }, data: { effectiveTo: new Date("2026-10-01") } });
+    await prisma.employeeRoleFee.create({ data: { employeeId: e.id, role: "Master", fee: 900_000, effectiveFrom: new Date("2026-10-01") } });
+    expect(Number((await prisma.sessionStaff.findFirstOrThrow({ where: { sessionId: neu.id } })).fee)).toBe(600_000);
+  });
+
+  it("[#2] NEGATIVE năng lực: nhân sự khai báo KHÁC HIFU → KHÔNG được gợi ý cho dịch vụ HIFU", async () => {
+    const hifu = await prisma.service.create({ data: { code: uniq("DV"), name: "HIFU", standardPrice: 6_000_000 } });
+    const rf = await prisma.service.create({ data: { code: uniq("DV"), name: "RF", standardPrice: 1_800_000 } });
+    const at = parseVnLocal("2026-08-24T13:00"); // Thứ 2
+    const noHifu = await emp({ fullName: "Chỉ RF " + uniq("n"), roles: ["Kỹ thuật viên"] });
+    await prisma.employeeSchedule.create({ data: { employeeId: noHifu.id, dayOfWeek: 1, startTime: "08:00", endTime: "17:00" } });
+    await prisma.employeeCompetence.create({ data: { employeeId: noHifu.id, kind: "SERVICE", refId: rf.id, name: "RF" } });
+
+    const forHifu = await suggestEmployeesForBooking({ serviceId: hifu.id, at, durationMinutes: 60 });
+    expect(forHifu.some((x) => x.id === noHifu.id)).toBe(false); // KHÔNG gợi ý cho HIFU
+    const forRf = await suggestEmployeesForBooking({ serviceId: rf.id, at, durationMinutes: 60 });
+    expect(forRf.some((x) => x.id === noHifu.id)).toBe(true); // nhưng ĐƯỢC gợi ý cho RF (đúng năng lực)
   });
 });

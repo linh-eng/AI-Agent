@@ -372,8 +372,9 @@ async function main() {
   await prisma.employeeLeave.create({ data: { employeeId: nvKTV.id, type: "ANNUAL", fromAt: vnts("2026-08-20T08:00:00"), toAt: vnts("2026-08-20T12:00:00"), reason: "Nghỉ phép cá nhân buổi sáng", createdBy: "Trần Quản Lý" } });
 
   // Phân công buổi RF #1: KTV chính + Master kiểm tra (fee SNAPSHOT — buổi cũ không đổi khi phí master đổi).
+  // Buổi 1 thực hiện 25/07/2026 (trước 01/09) → phí Kiểm tra theo biểu HIỆN HÀNH lúc đó = 200k (snapshot).
   await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvKTV.id, staffName: nvKTV.fullName, role: "PRIMARY", fee: 250_000 } });
-  await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvMaster.id, staffName: nvMaster.fullName, role: "CHECKER", fee: 500_000 } });
+  await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvMaster.id, staffName: nvMaster.fullName, role: "CHECKER", fee: 200_000 } });
 
   // --- GIÁ SÀN v2 (mục 7): cost breakdown theo dòng + version + duyệt ---
   async function publishFloor(versionId: string) {
@@ -469,8 +470,11 @@ async function main() {
     },
   });
   // Nhân sự buổi 3 (mục 35): KTV chính + Master + Hỗ trợ (phí snapshot).
+  // Buổi 3 thực hiện 03/09/2026 (SAU 01/09) → phí Master theo biểu HIỆN HÀNH lúc đó = 600k (snapshot).
+  // Đây là bằng chứng snapshot theo NGÀY DỊCH VỤ: buổi cũ (25/07) Master/Kiểm tra rate cũ; buổi 3
+  // (03/09) Master 600k. Đổi phí master về sau KHÔNG đổi các buổi này.
   await prisma.sessionStaff.create({ data: { sessionId: sLinh3.id, employeeId: nvKTV.id, staffName: nvKTV.fullName, role: "PRIMARY", fee: 250_000 } });
-  await prisma.sessionStaff.create({ data: { sessionId: sLinh3.id, employeeId: nvMaster.id, staffName: nvMaster.fullName, role: "MASTER", fee: 500_000 } });
+  await prisma.sessionStaff.create({ data: { sessionId: sLinh3.id, employeeId: nvMaster.id, staffName: nvMaster.fullName, role: "MASTER", fee: 600_000 } });
   await prisma.sessionStaff.create({ data: { sessionId: sLinh3.id, employeeId: nvSale.id, staffName: nvSale.fullName, role: "ASSISTANT", fee: 100_000 } });
   // Before/After buổi 3: 1 ảnh chia sẻ khách + 1 ảnh nội bộ (mục 36).
   await writeBlob("demo/before-linh3.png", PNG_BEFORE);

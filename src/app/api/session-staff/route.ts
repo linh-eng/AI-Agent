@@ -38,12 +38,17 @@ export const GET = handle(async (req) => {
 export const POST = handle(async (req) => {
   const session = await requirePermission(PERMISSIONS.TREATMENT_WRITE);
   const parsed = sessionStaffCreateSchema.parse(await req.json());
-  const treatmentSession = await prisma.treatmentSession.findUnique({ where: { id: parsed.sessionId }, select: { id: true } });
+  const treatmentSession = await prisma.treatmentSession.findUnique({
+    where: { id: parsed.sessionId },
+    select: { id: true, performedAt: true, scheduledAt: true, plannedDate: true },
+  });
   if (!treatmentSession) return fail(404, "Không tìm thấy buổi thực hiện");
 
-  // Chọn từ danh mục nhân sự: snapshot tên; nếu bỏ trống phí → gợi ý PHÍ HIỆN HÀNH
-  // theo vai trò (EmployeeRoleFee, mục 13); fallback defaultFee. Phí lưu = SNAPSHOT
-  // tại buổi (đổi phí master sau này KHÔNG đổi buổi cũ).
+  // SNAPSHOT PHÍ: chốt tại thời điểm PHÂN CÔNG (createdAt), lấy đơn giá HIỆN HÀNH theo
+  // vai trò TẠI NGÀY DỊCH VỤ của buổi (performedAt → scheduledAt → plannedDate → hôm nay)
+  // — đúng biểu phí có hiệu lực cho ngày thực hiện; fallback defaultFee. Lưu xong BẤT BIẾN
+  // (đổi phí master sau này KHÔNG đổi buổi cũ — mục 13,24).
+  const serviceDate = treatmentSession.performedAt ?? treatmentSession.scheduledAt ?? treatmentSession.plannedDate ?? new Date();
   let staffName = parsed.staffName;
   let fee = parsed.fee ?? null;
   if (parsed.employeeId) {
@@ -52,7 +57,7 @@ export const POST = handle(async (req) => {
       staffName = staffName || emp.fullName;
       if (fee == null) {
         const hints = ROLE_HINT[parsed.role] ?? [];
-        const roleFees = await currentRoleFees(parsed.employeeId);
+        const roleFees = await currentRoleFees(parsed.employeeId, serviceDate);
         const match = roleFees.find((rf) => hints.some((h) => rf.role.toLowerCase().includes(h)));
         if (match) fee = match.fee;
         else if (emp.defaultFee != null) fee = Number(emp.defaultFee);

@@ -73,7 +73,7 @@ export default function EmployeeDetailPage() {
               <tbody>
                 {e.roleFees.length === 0 ? <tr><td colSpan={6} className="p-3 text-center text-muted-foreground">Chưa khai báo phí vai trò</td></tr> : e.roleFees.map((r: any) => {
                   const started = !r.effectiveFrom || new Date(r.effectiveFrom) <= now;
-                  const ended = r.effectiveTo && new Date(r.effectiveTo) < now;
+                  const ended = r.effectiveTo && new Date(r.effectiveTo) <= now; // effectiveTo EXCLUSIVE
                   const active = r.isActive && started && !ended;
                   const upcoming = r.isActive && !started;
                   return (

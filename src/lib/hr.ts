@@ -24,8 +24,10 @@ export async function resolveRoleFee(
   const hit = fees.find((f) => {
     const from = f.effectiveFrom ? new Date(f.effectiveFrom) : null;
     const to = f.effectiveTo ? new Date(f.effectiveTo) : null;
+    // `effectiveTo` là mốc bản KẾ TIẾP bắt đầu → EXCLUSIVE (ngày mốc thuộc bản mới,
+    // không chồng lấn). Bản còn hiệu lực khi from ≤ at < to.
     if (from && from.getTime() > at.getTime()) return false;
-    if (to && to.getTime() < at.getTime()) return false;
+    if (to && to.getTime() <= at.getTime()) return false;
     return true;
   });
   return hit ? num(hit.fee) : null;
@@ -180,7 +182,7 @@ export async function currentRoleFees(employeeId: string, at: Date = new Date())
     const from = f.effectiveFrom ? new Date(f.effectiveFrom) : null;
     const to = f.effectiveTo ? new Date(f.effectiveTo) : null;
     if (from && from.getTime() > at.getTime()) continue;
-    if (to && to.getTime() < at.getTime()) continue;
+    if (to && to.getTime() <= at.getTime()) continue; // effectiveTo EXCLUSIVE (xem resolveRoleFee)
     if (!byRole.has(f.role)) byRole.set(f.role, { role: f.role, fee: num(f.fee), effectiveFrom: from ?? new Date(f.createdAt) });
   }
   return Array.from(byRole.values());
