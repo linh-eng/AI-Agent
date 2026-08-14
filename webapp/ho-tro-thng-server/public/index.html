@@ -242,7 +242,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <aside class="side">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.3</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.4</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="userbox" id="userbox"></div>
@@ -270,7 +270,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <div class="login-card">
     <div class="login-top">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.3</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.4</span></div>
     </div>
     <div class="login-body">
       <h2>Đăng nhập hệ thống</h2>
@@ -1164,6 +1164,13 @@ function blankTicket(){const l0=CAT.loai[0];return {id:"(tự sinh khi lưu)",tC
   watchers:"",noidung:"",soluong:"",dvt:CAT.dvt[0],quycach:"",diadiemGiao:"",diadiemNhan:"",tGiaoYC:"",uutien:priOf(l0),doi:"",assignee:"",phoihop:"",tAssign:"",tStart:"",tDone:"",trangthai:CAT.trangthai[0],slThucte:"",diadiemThucte:"",nguoiNhan:"",nghiemthu:"",dexuat:"",dathuchien:"",attach:"",csat:"",nhanxet:"",tClose:"",moLai:0,ghichu:"",hangMuc:[],tSubmit:"",nghiemThuBy:"",tNghiemThu:"",site:blankSite()};}
 function pickProxyUser(un){const u=PEOPLE.find(x=>x.username===un);EDIT._proxyUser=un;if(u){EDIT.donvi=u.dept;EDIT.nguoiYC=u.name;EDIT.sdt=u.sdt;EDIT.email=u.email;}drawForm();}
 function pickNguoiDuocYC(un){const u=PEOPLE.find(x=>x.username===un);EDIT.nguoiDuocYC=un;EDIT.nguoiDuocYCName=u?u.name:"";EDIT.nguoiDuocYCSdt=u?u.sdt:"";}
+// Danh bạ nhân viên xử lý (điều phối / xử lý / quản trị) để gán nhanh, không cần gõ tay
+function handlerPeople(){ return (Array.isArray(PEOPLE)?PEOPLE:[]).filter(u=>['admin','dieuphoi','xuly'].includes(u.role)); }
+function peopleOptions(cur){ const list=handlerPeople(); const names=list.map(u=>u.name); let opts='<option value="">— Chọn nhân viên xử lý —</option>';
+  if(cur&&!names.includes(cur)) opts+=`<option value="${esc(cur)}" selected>${esc(cur)} (ngoài danh sách)</option>`;
+  opts+=list.map(u=>`<option value="${esc(u.name)}" ${u.name===cur?'selected':''}>${esc(u.name)}${u.dept?' — '+esc(u.dept):''}${u.chucdanh?' · '+esc(u.chucdanh):''}</option>`).join('');
+  return opts; }
+function pickAssignee(v){ if(EDIT) EDIT.assignee=v; }
 
 function drawForm(){
   const t=EDIT;const isNew=!DB.tickets.some(x=>x.id===t.id);
@@ -1238,7 +1245,7 @@ function drawForm(){
   const step1=`<div class="form-grid">
     <div class="sec-title">Phân công & theo dõi SLA</div>
     <div class="f"><label>Nhóm/Đội hỗ trợ</label>${sel("doi",[""].concat(CAT.doi))}</div>
-    <div class="f"><label>Người xử lý chính</label>${inp("assignee","text","Trần Văn B")}</div>
+    <div class="f"><label>Người xử lý chính</label>${handlerPeople().length?`<select onchange="pickAssignee(this.value)">${peopleOptions(t.assignee)}</select><div class="hint" style="font-size:11px">Chọn từ danh bạ nhân viên xử lý — không cần gõ tay.</div>`:inp("assignee","text","Trần Văn B")}</div>
     <div class="f"><label>Người phối hợp</label>${inp("phoihop")}</div>
     <div class="f"><label>Thời gian phân công</label>${inp("tAssign","datetime-local")}</div>
     <div class="f"><label>Thời gian bắt đầu xử lý</label>${inp("tStart","datetime-local")}</div>
@@ -1923,8 +1930,8 @@ function openAssign(id){
   const t=DB.tickets.find(x=>x.id===id); if(!t)return;
   document.getElementById("overlay").innerHTML=`<div class="modal" style="max-width:520px">
     <div class="modal-h"><h3>Phân công người thực hiện</h3><div class="spacer"></div><button class="x" onclick="closeModal()">✕</button></div>
-    <div class="modal-b"><div class="f"><label>Người thực hiện <span class="req">*</span></label><input id="asgName" value="${esc(t.assignee||'')}" placeholder="Nhập tên người thực hiện"></div>
-      <div class="hint" style="margin-top:8px">Hệ thống sẽ kiểm tra xung đột mức độ ưu tiên & quá tải trước khi giao việc.</div></div>
+    <div class="modal-b"><div class="f"><label>Người thực hiện <span class="req">*</span></label>${handlerPeople().length?`<select id="asgName">${peopleOptions(t.assignee)}</select>`:`<input id="asgName" value="${esc(t.assignee||'')}" placeholder="Nhập tên người thực hiện">`}</div>
+      <div class="hint" style="margin-top:8px">Chọn từ danh bạ nhân viên xử lý. Hệ thống sẽ kiểm tra xung đột mức độ ưu tiên & quá tải trước khi giao việc.</div></div>
     <div class="modal-f"><button class="btn" onclick="closeModal()">Hủy</button><button class="btn primary" id="asgOk">Kiểm tra & phân công</button></div></div>`;
   document.getElementById("overlay").classList.add("show");
   document.getElementById("asgOk").onclick=()=>{ const name=document.getElementById("asgName").value.trim(); if(!name){toast('Nhập tên người thực hiện',true);return;} checkConflict(id,name); };
