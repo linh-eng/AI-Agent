@@ -12,7 +12,7 @@ import { Input, Label, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { formatNumber, formatDate, formatDateTime } from "@/lib/utils";
-import { VN_TZ, formatVnTime } from "@/lib/timezone";
+import { VN_TZ, formatVnTime, parseVnLocal } from "@/lib/timezone";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_TONE } from "@/lib/clinic-labels";
@@ -519,10 +519,13 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
   const [suggestions, setSuggestions] = useState<Slot[]>([]);
   const [overrideReason, setOverrideReason] = useState("");
   const [floor, setFloor] = useState<any | null>(null);
+  const [staffIssues, setStaffIssues] = useState<Array<{ name: string; reasons: string[]; resigned: boolean }> | null>(null);
+  const [suggested, setSuggested] = useState<Array<{ id: string; code: string; fullName: string; roles: string[] }> | null>(null);
+  const [loadingSuggest, setLoadingSuggest] = useState(false);
   const [saving, setSaving] = useState(false);
   const [plans, setPlans] = useState<any[]>([]);
   const [stages, setStages] = useState<any[]>([]);
-  const resetWarn = () => { setConflicts(null); setSuggestions([]); setFloor(null); setOverrideReason(""); };
+  const resetWarn = () => { setConflicts(null); setSuggestions([]); setFloor(null); setStaffIssues(null); setOverrideReason(""); };
   useEffect(() => {
     if (!open) return;
     setAssistants([]); setError(null); resetWarn(); setPlans([]); setStages([]);
@@ -540,7 +543,21 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const set = (patch: Partial<typeof form>) => { setForm((f) => ({ ...f, ...patch })); setConflicts(null); setSuggestions([]); };
+  const set = (patch: Partial<typeof form>) => { setForm((f) => ({ ...f, ...patch })); setConflicts(null); setSuggestions([]); setStaffIssues(null); setSuggested(null); };
+
+  // Gợi ý nhân sự ĐỦ NĂNG LỰC + rảnh cho dịch vụ/thời điểm đã chọn (mục 8.10–12).
+  async function loadSuggest() {
+    if (!form.serviceId || !form.scheduledAt) return;
+    setLoadingSuggest(true); setSuggested(null);
+    try {
+      const at = parseVnLocal(form.scheduledAt).toISOString();
+      const dur = Number(form.durationMinutes) || 60;
+      const list = await apiFetch<Array<{ id: string; code: string; fullName: string; roles: string[] }>>(
+        `/api/employees/suggest?serviceId=${form.serviceId}&at=${encodeURIComponent(at)}&duration=${dur}`
+      );
+      setSuggested(list);
+    } catch { setSuggested([]); } finally { setLoadingSuggest(false); }
+  }
 
   // Chọn khách → nạp phác đồ của khách.
   function onCustomer(id: string) {
@@ -583,8 +600,9 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
     try {
       const res = await fetch("/api/bookings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const json = await res.json().catch(() => ({}));
-      if (res.status === 409 && json?.details?.conflicts) { setConflicts(json.details.conflicts); setSuggestions(json.details.suggestions ?? []); setFloor(null); setSaving(false); return; }
-      if (res.status === 409 && json?.details?.priceFloor) { setFloor(json.details.priceFloor); setConflicts(null); setSaving(false); return; }
+      if (res.status === 409 && json?.details?.staffUnavailable) { setStaffIssues(json.details.staffUnavailable); setConflicts(null); setFloor(null); setSaving(false); return; }
+      if (res.status === 409 && json?.details?.conflicts) { setConflicts(json.details.conflicts); setSuggestions(json.details.suggestions ?? []); setFloor(null); setStaffIssues(null); setSaving(false); return; }
+      if (res.status === 409 && json?.details?.priceFloor) { setFloor(json.details.priceFloor); setConflicts(null); setStaffIssues(null); setSaving(false); return; }
       if (!res.ok) throw new Error(json?.error ?? "Lỗi");
       onSaved();
     } catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); }
@@ -619,6 +637,27 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
           <div className="space-y-1.5"><Label>Master</Label><SearchableSelect options={opts.masters} value={form.master} onChange={(v) => set({ master: v })} placeholder="Chọn Master" /></div>
           <div className="space-y-1.5"><Label>Nhân sự hỗ trợ</Label><MultiSelect options={opts.assistants} values={assistants} onChange={(v) => { setAssistants(v); setConflicts(null); }} placeholder="Chọn nhiều người" /></div>
         </div>
+        {form.serviceId && form.scheduledAt && (
+          <div className="rounded-md border bg-muted/30 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium">Gợi ý nhân sự đủ năng lực &amp; rảnh cho dịch vụ này</span>
+              <Button type="button" size="sm" variant="outline" disabled={loadingSuggest} onClick={loadSuggest}>{loadingSuggest ? "Đang tìm..." : "Gợi ý nhân sự"}</Button>
+            </div>
+            {suggested && (
+              suggested.length === 0
+                ? <p className="mt-2 text-xs text-muted-foreground">Không có nhân sự đủ năng lực &amp; rảnh ở khung giờ này.</p>
+                : <div className="mt-2 flex flex-wrap gap-2">
+                    {suggested.map((s) => (
+                      <button type="button" key={s.id} onClick={() => set({ technician: s.fullName })}
+                        className="rounded-full border border-primary/40 bg-primary/5 px-3 py-1 text-xs text-primary hover:bg-primary/10">
+                        {s.fullName} <span className="opacity-60">({s.roles.join("/")})</span>
+                      </button>
+                    ))}
+                  </div>
+            )}
+            <p className="mt-1.5 text-[11px] text-muted-foreground">Chỉ liệt kê người đang làm việc, đúng ca, không nghỉ phép, không trùng lịch và <b>đủ năng lực</b> dịch vụ. Bấm để chọn KTV.</p>
+          </div>
+        )}
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1.5"><Label>Phòng</Label><SearchableSelect options={opts.roomNames} value={form.room} onChange={(v) => set({ room: v, bed: "" })} placeholder="Chọn phòng" /></div>
           <div className="space-y-1.5"><Label>Giường</Label><SearchableSelect options={opts.bedsFor(form.room)} value={form.bed} onChange={(v) => set({ bed: v })} placeholder="Chọn giường" /></div>
@@ -650,6 +689,26 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
             <p className="mt-1 text-xs text-muted-foreground">{floor.reason}</p>
           </div>
         )}
+        {staffIssues && staffIssues.length > 0 && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
+            <div className="flex items-center gap-2 font-medium text-destructive"><AlertTriangle className="h-4 w-4" /> Nhân sự không khả dụng</div>
+            <ul className="mt-1 space-y-0.5 text-xs">
+              {staffIssues.map((s, i) => (
+                <li key={i}>• <b>{s.name}</b>: {s.reasons.join(", ")}{s.resigned && " (đã nghỉ việc — không thể phân công)"}</li>
+              ))}
+            </ul>
+            {staffIssues.some((s) => s.resigned) ? (
+              <p className="mt-1.5 text-xs text-muted-foreground">Vui lòng chọn nhân sự khác hoặc đổi giờ.</p>
+            ) : canOverride ? (
+              <div className="mt-2 flex items-center gap-2">
+                <Input className="h-8 flex-1" placeholder="Lý do đặt đè (bắt buộc)" value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} />
+                <Button type="button" size="sm" variant="destructive" disabled={saving || !overrideReason.trim()} onClick={() => submit({ allowConflict: true })}>Vẫn đặt (duyệt)</Button>
+              </div>
+            ) : (
+              <p className="mt-1.5 text-xs text-muted-foreground">Cần người có quyền duyệt để đặt đè.</p>
+            )}
+          </div>
+        )}
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose}>Hủy</Button>
@@ -657,7 +716,7 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
             floor.canOverride
               ? <Button type="button" variant="destructive" disabled={saving} onClick={() => submit({ allowBelowFloor: true })}>Duyệt bán dưới sàn & lưu</Button>
               : <Button type="button" disabled>Cần người có quyền duyệt</Button>
-          ) : (!conflicts || conflicts.length === 0) && (
+          ) : (!conflicts || conflicts.length === 0) && (!staffIssues || staffIssues.length === 0) && (
             <Button type="submit" disabled={saving}>{saving ? "Đang lưu..." : "Lưu lịch hẹn"}</Button>
           )}
         </div>
