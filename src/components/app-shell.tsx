@@ -23,6 +23,7 @@ import {
   BarChart3,
   Users,
   Settings,
+  DatabaseBackup,
   LogOut,
   Menu,
 } from "lucide-react";
@@ -75,6 +76,7 @@ const NAV = [
     items: [
       { href: "/users", label: "Người dùng", icon: Users, perm: PERMISSIONS.USER_MANAGE },
       { href: "/settings", label: "Cài đặt công ty", icon: Settings, perm: PERMISSIONS.SETTING_MANAGE },
+      { href: "/backup", label: "Sao lưu & Phục hồi", icon: DatabaseBackup, perm: PERMISSIONS.USER_MANAGE },
     ],
   },
 ];

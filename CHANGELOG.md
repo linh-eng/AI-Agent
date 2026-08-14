@@ -3,6 +3,12 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.1.0 — 2026-08-14
+- **Module Sao lưu & Phục hồi** (menu Hệ thống, chỉ Quản trị):
+  - Tải toàn bộ dữ liệu (kèm logo công ty) về 1 tệp `.json`.
+  - Khôi phục từ tệp `.json` — ghi đè toàn bộ dữ liệu hiện tại (có cảnh báo, ghi `audit_logs`).
+- Không đổi cấu trúc database (không cần `prisma:push`).
+
 ## 1.0.0 — 2026-08-13
 Mốc phát hành đầu tiên có **đánh số phiên bản** (gộp toàn bộ cập nhật theo góp ý demo).
 
