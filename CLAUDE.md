@@ -1265,6 +1265,68 @@ draft, gửi duyệt/duyệt/áp dụng/hủy). Dịch vụ → link **Xem/Thi�
 - Máy/phòng theo per-minute cần nhập `minutes`/rate thủ công (mặc định lấy durationMinutes dịch vụ).
 - Khấu hao thiết bị = phí máy/buổi đơn giản (chưa có asset depreciation engine — đúng phạm vi phase).
 
+## Nhân sự master data Mục 8 (v0.17.0) — Đa vai trò · Phí theo vai trò (hiệu lực) · Năng lực · Lịch · Nghỉ phép
+
+Nâng cấp Nhân sự từ danh mục tối giản → **master data đầy đủ** để Booking/Session/Giá sàn dùng đúng.
+**NHÂN SỰ ≠ tài khoản đăng nhập (User/RBAC)** — không merge. Migration **`O_hr`** (additive, 0 DROP; tổng
+**25 migration**). **200 test pass** (thêm `test/hr-master.test.ts` 10).
+
+### Migration & schema (`O_hr`) — GIỮ `Employee.roles[]`/`defaultFee` cũ (tương thích)
+- `Employee` +`dob`/`title`/`branch`/`startDate`/`status` (enum **EmployeeStatus** ACTIVE/ON_LEAVE/RESIGNED;
+  `isActive` = status==ACTIVE giữ tương thích).
+- `EmployeeRoleFee` (`employee_role_fees`): phí theo vai trò CÓ hiệu lực ngày (`effectiveFrom/To`+`isActive`)
+  — đổi phí = TẠO BẢN MỚI, không sửa lịch sử.
+- `EmployeeCompetence` (kind TECHNOLOGY/SERVICE/PROTOCOL/ROLE + refId soft), `EmployeeCertification`
+  (issuedAt/expiresAt → cảnh báo hết hạn), `EmployeeSchedule` (recurring theo `dayOfWeek` 0–6 + giờ),
+  `EmployeeLeave` (enum **LeaveType** ANNUAL/SICK/EMERGENCY/UNAVAILABLE/OTHER + from/to).
+
+### Lib `src/lib/hr.ts`
+`resolveRoleFee(empId, role, at)` (phí hiện hành theo ngày) · `currentRoleFees` · `employeeAvailability`
+(active + trong ca `isWithinSchedule` + không nghỉ phép + không trùng booking → `available`) · `hasCompetence`
+· `suggestEmployeesForBooking` (đang làm + đúng vai trò + đủ năng lực + rảnh) · `employeeKpi` (buổi/điểm KTV/
+đánh giá/hài lòng/sự cố — read-only từ Session/Review). **isActive ≠ availability** (mục 11).
+
+### API
+`/api/employees` GET (enrich roleFees/competences/status + filter q/role/branch/status/technology; mask phí)
+· POST (thông tin cơ bản) · `/api/employees/[id]` GET (roleFees/competences/certs/schedules/leaves + kpi) ·
+PATCH (info/status; audit `EMPLOYEE_STATUS_CHANGED`). Sub-resource (POST + DELETE query): `[id]/role-fees`
+(versioning + audit **STAFF_FEE_CHANGED cũ→mới**), `[id]/competences`, `[id]/certifications`, `[id]/schedules`,
+`[id]/leaves`. `/api/employees/suggest` (gợi ý cho Booking).
+
+### Integration (tối thiểu, không sửa cấu trúc mục cũ)
+- **Lịch hẹn:** `/api/bookings` POST validate nhân sự đã chọn (so theo tên với danh mục): **RESIGNED → chặn
+  cứng 409**; nghỉ phép/ngoài ca/trùng lịch → 409 (cần `allowConflict` để đặt đè). `/api/employees/suggest`
+  gợi ý người phù hợp. (mục 10–11,16)
+- **Session:** thêm nhân sự buổi → gợi ý **phí hiện hành theo vai trò** (`resolveRoleFee`); lưu = SNAPSHOT
+  (`SessionStaff.fee`) — đổi phí master sau KHÔNG đổi buổi cũ (mục 13,24).
+- **Giá sàn:** `buildDefaultLinesFromService` lấy phí nhân sự từ **EmployeeRoleFee hiện hành**; publish version
+  vẫn snapshot cost (mục 14).
+
+### RBAC (enforce backend) — mục 19
+`staff.read` (gộp CLINIC_READ) · `staff.write` · `staff.role.manage` · `staff.schedule.manage` ·
+`staff.fee.read` · `staff.fee.write`. Phí nhân sự CHỈ hiện với `staff.fee.read` HOẶC `finance.read` (mask ở
+server, không chỉ ẩn UI). MANAGER đủ; RECEPTION có write/role/schedule nhưng KHÔNG thấy phí; SPECIALIST không
+quản lý nhân sự.
+
+### UI
+`/employees` (list: Mã/Họ tên/Chức danh/Vai trò chip/Chuyên môn chính/Chi nhánh/Trạng thái + search + filter
+vai trò/chi nhánh/trạng thái) · `/employees/[id]` (7 tab **A Thông tin · B Vai trò & Phí · C Năng lực · D
+Chứng nhận · E Lịch làm việc · F Nghỉ phép · G Hoạt động & Đánh giá**; đổi trạng thái; thêm/bỏ vai trò-phí/
+năng lực/chứng nhận/ca/nghỉ). Chứng nhận hết hạn hiện badge đỏ.
+
+### Demo (seed:demo)
+- **NV-000001 Phạm Chuyên Viên** (ACTIVE): KTV chính 250k + Hỗ trợ 100k; năng lực RF+HIFU; chứng nhận (1 còn
+  hạn + 1 **hết hạn** → cảnh báo); lịch T2–T6 08:00–17:00; **nghỉ 20/08/2026 08:00–12:00**.
+- **NV-000002 Trần Quản Lý**: Master **500k đến 31/08/2026, 600k từ 01/09** (hiệu lực ngày); Kiểm tra 200k;
+  năng lực chỉ HIFU (để demo lọc năng lực).
+- **NV-000005 Ngô Nghỉ Việc**: RESIGNED (không được phân công mới; lịch sử giữ).
+
+### Nợ kỹ thuật (Nhân sự)
+- Booking lưu nhân sự bằng **tên (String)** — validate/suggest so theo tên; chưa đổi sang FK employeeId (giữ
+  tương thích mục Lịch hẹn đã nghiệm thu). Gợi ý slot của Booking chưa nhúng suggestEmployees (mới có API).
+- File chứng nhận: mới lưu `mediaId` (chưa gắn upload trong UI). KPI đọc theo tên performer/technicianName +
+  SessionStaff.employeeId (chưa chuẩn hoá hoàn toàn về employeeId).
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

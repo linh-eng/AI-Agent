@@ -454,17 +454,61 @@ export const invoiceUpdateSchema = z.object({
 // ----- Nhân sự (mục 22–24) -----
 export const sessionStaffRoleEnum = z.enum(["PRIMARY", "ASSISTANT", "MASTER", "CHECKER", "CONSULTANT"]);
 
+export const employeeStatusEnum = z.enum(["ACTIVE", "ON_LEAVE", "RESIGNED"]);
+
 export const employeeCreateSchema = z.object({
   code: z.string().min(1).max(30).optional(), // tự sinh nếu bỏ trống
   fullName: z.string().min(1, "Bắt buộc họ tên"),
   phone: z.string().max(30).optional().nullable(),
   email: z.string().email().optional().nullable().or(z.literal("")),
+  dob: dateOpt,
+  title: z.string().optional().nullable(),
+  branch: z.string().optional().nullable(),
+  startDate: dateOpt,
+  status: employeeStatusEnum.optional(),
   roles: z.array(z.string()).default([]), // đa vai trò
   defaultFee: z.coerce.number().min(0).optional().nullable(),
   note: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
 });
 export const employeeUpdateSchema = employeeCreateSchema.partial().omit({ code: true });
+
+// ----- Nhân sự master data (mục 8) -----
+export const roleFeeCreateSchema = z.object({
+  role: z.string().min(1, "Chọn vai trò"),
+  fee: z.coerce.number().min(0).default(0),
+  effectiveFrom: dateOpt,
+  effectiveTo: dateOpt,
+  note: z.string().optional().nullable(),
+});
+export const competenceCreateSchema = z.object({
+  kind: z.enum(["TECHNOLOGY", "SERVICE", "PROTOCOL", "ROLE"]),
+  refId: z.string().optional().nullable(),
+  name: z.string().min(1, "Nhập tên năng lực"),
+  note: z.string().optional().nullable(),
+});
+export const certificationCreateSchema = z.object({
+  name: z.string().min(1, "Nhập tên chứng nhận"),
+  issuer: z.string().optional().nullable(),
+  issuedAt: dateOpt,
+  expiresAt: dateOpt,
+  mediaId: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export const scheduleCreateSchema = z.object({
+  dayOfWeek: z.coerce.number().int().min(0).max(6),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "HH:mm"),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "HH:mm"),
+  shift: z.string().optional().nullable(),
+  effectiveFrom: dateOpt,
+  effectiveTo: dateOpt,
+});
+export const leaveCreateSchema = z.object({
+  type: z.enum(["ANNUAL", "SICK", "EMERGENCY", "UNAVAILABLE", "OTHER"]).default("ANNUAL"),
+  fromAt: z.coerce.date(),
+  toAt: z.coerce.date(),
+  reason: z.string().optional().nullable(),
+});
 
 export const sessionStaffCreateSchema = z.object({
   sessionId: z.string().min(1),

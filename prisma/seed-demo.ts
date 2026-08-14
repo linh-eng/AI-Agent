@@ -318,13 +318,52 @@ async function main() {
     data: { serviceId: svcRF.id, laborCost: 700_000, operationCost: 150_000, depreciationCost: 200_000, materialCost: 250_000, roomCost: 100_000, minMarginPercent: 15, updatedBy: "Trần Quản Lý" },
   });
 
-  // --- Nhân sự (mục 22–24): đa vai trò + phân công buổi kèm phí ---
-  const nvKTV = await prisma.employee.create({ data: { code: "NV-000001", fullName: "Phạm Chuyên Viên", phone: "0911000001", roles: ["Kỹ thuật viên", "Tư vấn"], defaultFee: 200_000 } });
-  const nvMaster = await prisma.employee.create({ data: { code: "NV-000002", fullName: "Trần Quản Lý", phone: "0911000002", roles: ["Master", "Quản lý", "Kiểm tra"], defaultFee: 500_000 } });
-  await prisma.employee.create({ data: { code: "NV-000003", fullName: "Lê Thị CSKH", phone: "0911000003", roles: ["CSKH", "Lễ tân"], defaultFee: 100_000 } });
-  const nvSale = await prisma.employee.create({ data: { code: "NV-000004", fullName: "Đỗ Thu Ngân", phone: "0911000004", roles: ["Sales", "Lễ tân"], defaultFee: 100_000 } });
-  // Phân công buổi RF #1: KTV chính + Master kiểm tra (tổng phí 700k).
-  await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvKTV.id, staffName: nvKTV.fullName, role: "PRIMARY", fee: 200_000 } });
+  // --- Nhân sự (mục 8, mở rộng từ mục 22–24): master data đa vai trò + phí có
+  // hiệu lực + năng lực + lịch làm việc + nghỉ phép ---
+  const hrTechRF = await prisma.technology.findFirst({ where: { name: { contains: "RF" } }, select: { id: true, name: true } });
+  const hrTechHIFU = await prisma.technology.findFirst({ where: { name: { contains: "HIFU" } }, select: { id: true, name: true } });
+  const nvKTV = await prisma.employee.create({ data: { code: "NV-000001", fullName: "Phạm Chuyên Viên", phone: "0911000001", email: "chuyenvien@sophia.com.vn", title: "Chuyên viên da", branch: "CS1", startDate: new Date("2024-03-01"), status: "ACTIVE", roles: ["Kỹ thuật viên", "Tư vấn"], defaultFee: 200_000 } });
+  const nvMaster = await prisma.employee.create({ data: { code: "NV-000002", fullName: "Trần Quản Lý", phone: "0911000002", title: "Master/Quản lý", branch: "CS1", startDate: new Date("2023-01-10"), status: "ACTIVE", roles: ["Master", "Quản lý", "Kiểm tra"], defaultFee: 500_000 } });
+  await prisma.employee.create({ data: { code: "NV-000003", fullName: "Lê Thị CSKH", phone: "0911000003", title: "CSKH", branch: "CS1", status: "ACTIVE", roles: ["CSKH", "Lễ tân"], defaultFee: 100_000 } });
+  const nvSale = await prisma.employee.create({ data: { code: "NV-000004", fullName: "Đỗ Thu Ngân", phone: "0911000004", title: "Thu ngân/Lễ tân", branch: "CS1", status: "ACTIVE", roles: ["Sales", "Lễ tân"], defaultFee: 100_000 } });
+  // Nhân sự đã NGHỈ VIỆC (mục 16): không được phân công booking/session mới; lịch sử giữ.
+  await prisma.employee.create({ data: { code: "NV-000005", fullName: "Ngô Nghỉ Việc", phone: "0911000005", title: "KTV (cũ)", branch: "CS1", status: "RESIGNED", roles: ["Kỹ thuật viên"], defaultFee: 200_000 } });
+
+  // Phí theo vai trò (mục 4): mỗi vai trò một mức; có HIỆU LỰC theo ngày (mục 5).
+  await prisma.employeeRoleFee.createMany({ data: [
+    { employeeId: nvKTV.id, role: "KTV chính", fee: 250_000, effectiveFrom: new Date("2024-03-01"), createdBy: "Trần Quản Lý" },
+    { employeeId: nvKTV.id, role: "Hỗ trợ", fee: 100_000, effectiveFrom: new Date("2024-03-01"), createdBy: "Trần Quản Lý" },
+    // Master: 500k đến hết 31/08/2026, từ 01/09/2026 tăng 600k (bản cũ đóng hạn) — mục 5.
+    { employeeId: nvMaster.id, role: "Master", fee: 500_000, effectiveFrom: new Date("2023-01-10"), effectiveTo: new Date("2026-08-31T23:59:59Z"), createdBy: "Ban giám đốc" },
+    { employeeId: nvMaster.id, role: "Master", fee: 600_000, effectiveFrom: new Date("2026-09-01"), createdBy: "Ban giám đốc" },
+    { employeeId: nvMaster.id, role: "Kiểm tra", fee: 200_000, effectiveFrom: new Date("2023-01-10"), createdBy: "Ban giám đốc" },
+  ] });
+
+  // Năng lực (mục 6): Phạm Chuyên Viên làm RF + HIFU + Facial.
+  await prisma.employeeCompetence.createMany({ data: [
+    { employeeId: nvKTV.id, kind: "TECHNOLOGY", refId: hrTechRF?.id ?? null, name: hrTechRF?.name ?? "RF" },
+    { employeeId: nvKTV.id, kind: "TECHNOLOGY", refId: hrTechHIFU?.id ?? null, name: hrTechHIFU?.name ?? "HIFU" },
+    { employeeId: nvKTV.id, kind: "SERVICE", refId: svcRF.id, name: "RF nâng cơ mặt" },
+    { employeeId: nvKTV.id, kind: "SERVICE", refId: svcHIFU.id, name: "Nâng cơ HIFU" },
+    // Master chỉ có năng lực HIFU (để demo lọc năng lực khác nhau).
+    { employeeId: nvMaster.id, kind: "TECHNOLOGY", refId: hrTechHIFU?.id ?? null, name: hrTechHIFU?.name ?? "HIFU" },
+  ] });
+
+  // Chứng nhận (mục 7): 1 còn hạn + 1 đã hết hạn (để hiện cảnh báo).
+  await prisma.employeeCertification.createMany({ data: [
+    { employeeId: nvKTV.id, name: "Chứng chỉ vận hành HIFU", issuer: "Hãng ABC", issuedAt: new Date("2025-01-15"), expiresAt: new Date("2027-01-15") },
+    { employeeId: nvKTV.id, name: "Chứng chỉ Laser cơ bản", issuer: "Sở Y tế", issuedAt: new Date("2023-06-01"), expiresAt: new Date("2025-06-01") },
+  ] });
+
+  // Lịch làm việc (mục 8): T2–T6, 08:00–17:00.
+  await prisma.employeeSchedule.createMany({ data: [1, 2, 3, 4, 5].map((d) => ({ employeeId: nvKTV.id, dayOfWeek: d, startTime: "08:00", endTime: "17:00", shift: "Hành chính" })) });
+  await prisma.employeeSchedule.createMany({ data: [1, 2, 3, 4, 5, 6].map((d) => ({ employeeId: nvMaster.id, dayOfWeek: d, startTime: "09:00", endTime: "18:00" })) });
+
+  // Nghỉ phép (mục 9,22): Phạm Chuyên Viên nghỉ 20/08/2026 08:00–12:00.
+  await prisma.employeeLeave.create({ data: { employeeId: nvKTV.id, type: "ANNUAL", fromAt: new Date("2026-08-20T01:00:00Z"), toAt: new Date("2026-08-20T05:00:00Z"), reason: "Nghỉ phép cá nhân buổi sáng", createdBy: "Trần Quản Lý" } });
+
+  // Phân công buổi RF #1: KTV chính + Master kiểm tra (fee SNAPSHOT — buổi cũ không đổi khi phí master đổi).
+  await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvKTV.id, staffName: nvKTV.fullName, role: "PRIMARY", fee: 250_000 } });
   await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvMaster.id, staffName: nvMaster.fullName, role: "CHECKER", fee: 500_000 } });
 
   // --- GIÁ SÀN v2 (mục 7): cost breakdown theo dòng + version + duyệt ---

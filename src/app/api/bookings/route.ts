@@ -10,6 +10,7 @@ import { resolvePrice } from "@/lib/pricing";
 import { detectBookingConflicts, suggestAlternativeSlots, logBookingActivity } from "@/lib/booking";
 import { checkServicePriceFloor } from "@/lib/price-floor";
 import { createDeposit } from "@/lib/deposit";
+import { employeeAvailability } from "@/lib/hr";
 
 export const GET = handle(async (req) => {
   await requirePermission(PERMISSIONS.BOOKING_READ);
@@ -63,6 +64,26 @@ export const POST = handle(async (req) => {
   if ((durationMinutes == null || durationMinutes <= 0) && parsed.serviceId) {
     const svc = await prisma.service.findUnique({ where: { id: parsed.serviceId }, select: { durationMinutes: true } });
     if (svc?.durationMinutes) durationMinutes = svc.durationMinutes;
+  }
+
+  // Kiểm tra khả dụng NHÂN SỰ đã chọn (mục 8.10–11): nghỉ việc → chặn cứng; nghỉ
+  // phép/ngoài ca → cảnh báo, cần allowConflict để lưu đè. So theo tên với danh mục NS.
+  {
+    const start = new Date(parsed.scheduledAt);
+    const end = new Date(start.getTime() + (durationMinutes ?? 60) * 60_000);
+    const names = [parsed.technician, parsed.master, ...(parsed.assistants ?? [])].filter(Boolean) as string[];
+    const staffIssues: Array<{ name: string; reasons: string[]; resigned: boolean }> = [];
+    for (const nm of Array.from(new Set(names))) {
+      const emp = await prisma.employee.findFirst({ where: { fullName: nm }, select: { id: true, status: true } });
+      if (!emp) continue; // tên tự do không khớp danh mục → bỏ qua
+      const av = await employeeAvailability(emp.id, start, end);
+      if (!av.available) staffIssues.push({ name: nm, reasons: av.reasons, resigned: emp.status === "RESIGNED" });
+    }
+    if (staffIssues.length > 0) {
+      const hardBlock = staffIssues.some((s) => s.resigned);
+      if (hardBlock) return fail(409, "Nhân sự đã nghỉ việc — không thể phân công", { staffUnavailable: staffIssues });
+      if (!allowConflict) return fail(409, "Nhân sự không khả dụng (nghỉ phép/ngoài ca/trùng lịch)", { staffUnavailable: staffIssues });
+    }
   }
 
   // Phát hiện trùng lịch tài nguyên theo khoảng [bắt đầu, kết thúc) (mục 9–10).

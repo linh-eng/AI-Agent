@@ -2444,23 +2444,146 @@ enum SessionStaffRole {
   CONSULTANT // Tư vấn/CSKH
 }
 
+/// Trạng thái nhân sự (khác availability — xem lib hr). Đang làm/Tạm nghỉ/Nghỉ việc.
+enum EmployeeStatus {
+  ACTIVE // Đang làm việc
+  ON_LEAVE // Tạm nghỉ
+  RESIGNED // Nghỉ việc
+}
+
 model Employee {
-  id         String   @id @default(cuid())
-  code       String   @unique // NV-xxxxxx
+  id         String         @id @default(cuid())
+  code       String         @unique // NV-xxxxxx
   fullName   String
   phone      String?
   email      String?
-  roles      String[] @default([]) // vai trò công việc (đa vai trò): Kỹ thuật viên/Master/CSKH/Sales/Quản lý/Lễ tân...
-  defaultFee Decimal? @db.Decimal(18, 2) // phí mặc định mỗi buổi (nhạy cảm — mask theo finance.read)
+  dob        DateTime? // ngày sinh (mục 8.2)
+  title      String? // chức danh chính
+  branch     String? // chi nhánh/cơ sở
+  startDate  DateTime? // ngày bắt đầu làm việc
+  status     EmployeeStatus @default(ACTIVE)
+  roles      String[]       @default([]) // đa vai trò (giữ tương thích; nguồn phí = EmployeeRoleFee)
+  defaultFee Decimal?       @db.Decimal(18, 2) // phí mặc định (giữ tương thích/mask theo finance.read)
   note       String?
-  isActive   Boolean  @default(true) // soft delete
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  isActive   Boolean        @default(true) // = status==ACTIVE (giữ tương thích lọc cũ)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 
   sessionAssignments SessionStaff[]
+  roleFees           EmployeeRoleFee[]
+  competences        EmployeeCompetence[]
+  certifications     EmployeeCertification[]
+  schedules          EmployeeSchedule[]
+  leaves             EmployeeLeave[]
 
   @@index([isActive])
+  @@index([status])
   @@map("employees")
+}
+
+/// Phí theo vai trò của nhân sự, CÓ hiệu lực theo ngày (mục 8.4–8.5). Đổi phí =
+/// tạo bản mới, KHÔNG sửa lịch sử; Session/Giá sàn version cũ giữ snapshot.
+model EmployeeRoleFee {
+  id            String    @id @default(cuid())
+  employeeId    String
+  role          String // vai trò (KTV chính/Master/Hỗ trợ/Kiểm tra/Tư vấn...)
+  fee           Decimal   @default(0) @db.Decimal(18, 2) // phí/buổi (nhạy cảm)
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime? // null = còn hiệu lực
+  isActive      Boolean   @default(true)
+  note          String?
+  createdBy     String?
+  createdAt     DateTime  @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, role])
+  @@map("employee_role_fees")
+}
+
+enum CompetenceKind {
+  TECHNOLOGY
+  SERVICE
+  PROTOCOL
+  ROLE
+}
+
+/// Năng lực/chuyên môn được phép thực hiện (mục 8.6) — liên kết mềm.
+model EmployeeCompetence {
+  id         String         @id @default(cuid())
+  employeeId String
+  kind       CompetenceKind
+  refId      String? // id Technology/Service/BrandProtocol (soft)
+  name       String // snapshot tên
+  note       String?
+  createdAt  DateTime       @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([kind, refId])
+  @@map("employee_competences")
+}
+
+/// Chứng nhận/bằng cấp (mục 8.7) — cảnh báo khi hết hạn.
+model EmployeeCertification {
+  id         String    @id @default(cuid())
+  employeeId String
+  name       String
+  issuer     String?
+  issuedAt   DateTime?
+  expiresAt  DateTime?
+  mediaId    String? // file tài liệu (MediaAsset) nếu có
+  note       String?
+  createdAt  DateTime  @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@map("employee_certifications")
+}
+
+/// Lịch làm việc (mục 8.8) — recurring theo thứ (dayOfWeek 0=CN..6=T7).
+model EmployeeSchedule {
+  id            String    @id @default(cuid())
+  employeeId    String
+  dayOfWeek     Int // 0..6
+  startTime     String // "HH:mm"
+  endTime       String // "HH:mm"
+  shift         String? // ca (sáng/chiều/tối) nếu có
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  createdAt     DateTime  @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@map("employee_schedules")
+}
+
+enum LeaveType {
+  ANNUAL // nghỉ phép
+  SICK // nghỉ bệnh
+  EMERGENCY // nghỉ đột xuất
+  UNAVAILABLE // không khả dụng
+  OTHER
+}
+
+/// Nghỉ phép / không khả dụng (mục 8.9) — chặn gợi ý/booking trong khoảng.
+model EmployeeLeave {
+  id         String    @id @default(cuid())
+  employeeId String
+  type       LeaveType @default(ANNUAL)
+  fromAt     DateTime
+  toAt       DateTime
+  reason     String?
+  createdBy  String?
+  createdAt  DateTime  @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, fromAt])
+  @@map("employee_leaves")
 }
 
 model SessionStaff {

@@ -6,6 +6,16 @@ import { requirePermission, getSession } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { sessionStaffCreateSchema } from "@/lib/clinic-validation";
 import { canSeeFinance, maskFinance, auditLog } from "@/lib/clinic";
+import { currentRoleFees } from "@/lib/hr";
+
+// Gợi ý tên vai trò master theo vai trò buổi (SessionStaffRole).
+const ROLE_HINT: Record<string, string[]> = {
+  PRIMARY: ["ktv chính", "kỹ thuật viên chính", "kỹ thuật viên"],
+  MASTER: ["master"],
+  ASSISTANT: ["hỗ trợ"],
+  CHECKER: ["kiểm tra"],
+  CONSULTANT: ["tư vấn"],
+};
 
 // Danh sách nhân sự của một buổi (kèm tổng phí nếu có quyền tài chính).
 export const GET = handle(async (req) => {
@@ -31,14 +41,22 @@ export const POST = handle(async (req) => {
   const treatmentSession = await prisma.treatmentSession.findUnique({ where: { id: parsed.sessionId }, select: { id: true } });
   if (!treatmentSession) return fail(404, "Không tìm thấy buổi thực hiện");
 
-  // Nếu chọn từ danh mục nhân sự, snapshot tên; phí mặc định lấy từ nhân sự nếu bỏ trống.
+  // Chọn từ danh mục nhân sự: snapshot tên; nếu bỏ trống phí → gợi ý PHÍ HIỆN HÀNH
+  // theo vai trò (EmployeeRoleFee, mục 13); fallback defaultFee. Phí lưu = SNAPSHOT
+  // tại buổi (đổi phí master sau này KHÔNG đổi buổi cũ).
   let staffName = parsed.staffName;
   let fee = parsed.fee ?? null;
   if (parsed.employeeId) {
     const emp = await prisma.employee.findUnique({ where: { id: parsed.employeeId } });
     if (emp) {
       staffName = staffName || emp.fullName;
-      if (fee == null && emp.defaultFee != null) fee = Number(emp.defaultFee);
+      if (fee == null) {
+        const hints = ROLE_HINT[parsed.role] ?? [];
+        const roleFees = await currentRoleFees(parsed.employeeId);
+        const match = roleFees.find((rf) => hints.some((h) => rf.role.toLowerCase().includes(h)));
+        if (match) fee = match.fee;
+        else if (emp.defaultFee != null) fee = Number(emp.defaultFee);
+      }
     }
   }
 

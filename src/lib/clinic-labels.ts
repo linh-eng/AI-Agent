@@ -254,6 +254,20 @@ export const COST_CALC_TYPE_LABEL: Record<string, string> = {
 export const EMPLOYEE_ROLE_OPTIONS = [
   "Kỹ thuật viên", "Master", "CSKH", "Sales", "Quản lý", "Lễ tân", "Tư vấn", "Bác sĩ",
 ];
+// Nhân sự master data (mục 8)
+export const EMPLOYEE_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: "Đang làm việc", ON_LEAVE: "Tạm nghỉ", RESIGNED: "Nghỉ việc",
+};
+export const EMPLOYEE_STATUS_TONE: Record<string, Tone> = {
+  ACTIVE: "success", ON_LEAVE: "warning", RESIGNED: "muted",
+};
+export const LEAVE_TYPE_LABEL: Record<string, string> = {
+  ANNUAL: "Nghỉ phép", SICK: "Nghỉ bệnh", EMERGENCY: "Nghỉ đột xuất", UNAVAILABLE: "Không khả dụng", OTHER: "Khác",
+};
+export const COMPETENCE_KIND_LABEL: Record<string, string> = {
+  TECHNOLOGY: "Công nghệ", SERVICE: "Dịch vụ", PROTOCOL: "Protocol", ROLE: "Vai trò",
+};
+export const DOW_LABEL = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
 // Vai trò trong buổi (mục 24).
 export const SESSION_STAFF_ROLE_LABEL: Record<string, string> = {
   PRIMARY: "Chính", ASSISTANT: "Hỗ trợ", MASTER: "Master", CHECKER: "Kiểm tra", CONSULTANT: "Tư vấn",
@@ -327,6 +341,8 @@ export function statusLabel(value?: string | null): string {
     INVOICE_STATUS_LABEL[value] ??
     DEPOSIT_STATUS_LABEL[value] ??
     FLOOR_VERSION_STATUS_LABEL[value] ??
+    EMPLOYEE_STATUS_LABEL[value] ??
+    LEAVE_TYPE_LABEL[value] ??
     SESSION_STAFF_ROLE_LABEL[value] ??
     LEAD_STATUS_LABEL[value] ??
     RECOMMENDATION_PRIORITY_LABEL[value] ??

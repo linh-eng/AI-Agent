@@ -226,14 +226,23 @@ export async function buildDefaultLinesFromService(serviceId: string): Promise<A
     });
   }
 
-  // Nhân sự
+  // Nhân sự — gợi ý phí theo vai trò từ MASTER phí nhân sự (EmployeeRoleFee hiện hành,
+  // mục 8/14); fallback defaultFee cũ. Giá sàn version publish sẽ snapshot (không đổi sau).
   const staffReq = Array.isArray(service.staffRequirements) ? (service.staffRequirements as any[]) : [];
+  const now = new Date();
   for (const r of staffReq) {
     const role = String(r.role ?? "").trim();
     if (!role) continue;
-    // Gợi ý phí theo vai trò từ nhân sự đang hoạt động.
-    const emps = await prisma.employee.findMany({ where: { isActive: true, roles: { has: role } }, select: { defaultFee: true } });
-    const fees = emps.map((e) => num(e.defaultFee)).filter((x) => x > 0);
+    // Ưu tiên phí vai trò hiện hành (EmployeeRoleFee), else defaultFee.
+    const roleFees = await prisma.employeeRoleFee.findMany({
+      where: { role, isActive: true, effectiveFrom: { lte: now }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }], employee: { status: "ACTIVE" } },
+      select: { fee: true },
+    });
+    let fees = roleFees.map((f) => num(f.fee)).filter((x) => x > 0);
+    if (fees.length === 0) {
+      const emps = await prisma.employee.findMany({ where: { isActive: true, roles: { has: role } }, select: { defaultFee: true } });
+      fees = emps.map((e) => num(e.defaultFee)).filter((x) => x > 0);
+    }
     const suggested = fees.length ? Math.round(fees.reduce((s, x) => s + x, 0) / fees.length) : 0;
     lines.push({
       category: "STAFF", name: role, quantity: num(r.quantity) || 1, unit: "người", unitCost: suggested,

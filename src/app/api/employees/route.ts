@@ -5,47 +5,77 @@ import { ok, created, handle } from "@/lib/api";
 import { requirePermission, getSession } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { employeeCreateSchema } from "@/lib/clinic-validation";
-import { sequentialCode, canSeeFinance, maskFinance, auditLog } from "@/lib/clinic";
+import { sequentialCode, canSeeFinance, auditLog } from "@/lib/clinic";
+import { currentRoleFees } from "@/lib/hr";
+
+/** Được xem phí nhân sự: finance.read HOẶC staff.fee.read (mục 19). */
+function canSeeStaffFee(session: { permissions: string[] } | null): boolean {
+  return !!session && (canSeeFinance(session as any) || session.permissions.includes(PERMISSIONS.STAFF_FEE_READ));
+}
 
 export const GET = handle(async (req) => {
-  await requirePermission(PERMISSIONS.HR_READ);
+  await requirePermission(PERMISSIONS.STAFF_READ);
   const session = await getSession();
   const url = new URL(req.url);
-  const activeOnly = url.searchParams.get("active") === "1";
-  const role = url.searchParams.get("role") ?? undefined;
+  const p = url.searchParams;
+  const activeOnly = p.get("active") === "1";
+  const role = p.get("role") ?? undefined;
+  const branch = p.get("branch")?.trim();
+  const status = p.get("status") ?? undefined;
+  const technology = p.get("technology") ?? undefined; // refId công nghệ (năng lực)
+  const q = p.get("q")?.trim().toLowerCase();
+
   const employees = await prisma.employee.findMany({
     where: {
-      ...(activeOnly ? { isActive: true } : {}),
-      ...(role ? { roles: { has: role } } : {}),
+      ...(activeOnly ? { status: "ACTIVE" } : {}),
+      ...(status ? { status: status as any } : {}),
+      ...(branch ? { branch: { contains: branch, mode: "insensitive" } } : {}),
+      ...(technology ? { competences: { some: { kind: "TECHNOLOGY", refId: technology } } } : {}),
     },
-    orderBy: [{ isActive: "desc" }, { fullName: "asc" }],
+    include: {
+      roleFees: { where: { isActive: true } },
+      competences: true,
+      _count: { select: { certifications: true, schedules: true } },
+    },
+    orderBy: [{ status: "asc" }, { fullName: "asc" }],
     take: 500,
   });
-  const canSee = canSeeFinance(session);
-  return ok(employees.map((e) => maskFinance(e, canSee, ["defaultFee"])));
+
+  const showFee = canSeeStaffFee(session);
+  const now = new Date();
+  let rows = await Promise.all(
+    employees.map(async (e) => {
+      const feeRows = showFee ? await currentRoleFees(e.id, now) : [];
+      const roleSet = Array.from(new Set<string>([...(e.roles ?? []), ...e.roleFees.map((r) => r.role)]));
+      const mainCompetence = e.competences.find((c) => c.kind === "TECHNOLOGY") ?? e.competences[0] ?? null;
+      return {
+        id: e.id, code: e.code, fullName: e.fullName, phone: e.phone, email: e.email,
+        title: e.title, branch: e.branch, status: e.status, startDate: e.startDate,
+        roles: roleSet,
+        roleFees: feeRows, // [] nếu không có quyền xem phí
+        competenceCount: e.competences.length,
+        mainCompetence: mainCompetence?.name ?? null,
+        certCount: e._count.certifications, scheduleCount: e._count.schedules,
+      };
+    })
+  );
+  if (role) rows = rows.filter((r) => r.roles.includes(role));
+  if (q) rows = rows.filter((r) => r.code.toLowerCase().includes(q) || r.fullName.toLowerCase().includes(q));
+  return ok(rows);
 });
 
 export const POST = handle(async (req) => {
-  const session = await requirePermission(PERMISSIONS.HR_WRITE);
+  const session = await requirePermission(PERMISSIONS.STAFF_WRITE);
   const parsed = employeeCreateSchema.parse(await req.json());
   const code = parsed.code ?? sequentialCode("NV", await prisma.employee.count());
+  const status = parsed.status ?? "ACTIVE";
   const employee = await prisma.employee.create({
     data: {
-      code,
-      fullName: parsed.fullName,
-      phone: parsed.phone ?? null,
-      email: parsed.email || null,
-      roles: parsed.roles ?? [],
-      defaultFee: parsed.defaultFee ?? null,
-      note: parsed.note ?? null,
+      code, fullName: parsed.fullName, phone: parsed.phone ?? null, email: parsed.email || null,
+      dob: parsed.dob ?? null, title: parsed.title ?? null, branch: parsed.branch ?? null, startDate: parsed.startDate ?? null,
+      status, isActive: status === "ACTIVE", roles: parsed.roles ?? [], defaultFee: parsed.defaultFee ?? null, note: parsed.note ?? null,
     },
   });
-  await auditLog({
-    userId: session.userId,
-    action: "EMPLOYEE_CREATED",
-    entityType: "Employee",
-    entityId: employee.id,
-    changes: { code, roles: parsed.roles },
-  });
+  await auditLog({ userId: session.userId, action: "EMPLOYEE_CREATED", entityType: "Employee", entityId: employee.id, changes: { code, roles: parsed.roles, status } });
   return created(employee);
 });

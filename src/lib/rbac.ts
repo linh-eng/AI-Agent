@@ -93,6 +93,13 @@ export const PERMISSIONS = {
   SETTING_WRITE: "setting.write", // cấu hình hệ thống (Thương hiệu, mục 1)
   HR_READ: "hr.read", // xem danh sách nhân sự (mục 22)
   HR_WRITE: "hr.write", // thêm/sửa nhân sự + gán nhân sự buổi kèm phí
+  // --- Nhân sự master data (mục 8) ---
+  STAFF_READ: "staff.read", // xem hồ sơ nhân sự
+  STAFF_WRITE: "staff.write", // tạo/sửa thông tin nhân sự
+  STAFF_ROLE_MANAGE: "staff.role.manage", // thêm/bỏ vai trò + năng lực + chứng nhận
+  STAFF_SCHEDULE_MANAGE: "staff.schedule.manage", // lịch làm việc + nghỉ phép
+  STAFF_FEE_READ: "staff.fee.read", // xem phí nhân sự (nhạy cảm)
+  STAFF_FEE_WRITE: "staff.fee.write", // thay đổi phí theo vai trò
   PRICEFLOOR_READ: "pricefloor.read", // xem giá sàn (giá sàn/cảnh báo; cost breakdown vẫn cần finance.read)
   PRICEFLOOR_WRITE: "pricefloor.write", // khai báo cấu trúc chi phí + tạo/sửa version giá sàn (mục 25,7)
   PRICEFLOOR_APPROVE: "pricefloor.approve", // duyệt + áp dụng version giá sàn (mục 7)
@@ -150,6 +157,7 @@ const CLINIC_READ: PermissionCode[] = [
   PERMISSIONS.PRICE_READ,
   PERMISSIONS.INVOICE_READ,
   PERMISSIONS.HR_READ,
+  PERMISSIONS.STAFF_READ,
 ];
 
 /**
@@ -231,6 +239,11 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.INVOICE_WRITE,
     PERMISSIONS.SETTING_WRITE,
     PERMISSIONS.HR_WRITE,
+    PERMISSIONS.STAFF_WRITE,
+    PERMISSIONS.STAFF_ROLE_MANAGE,
+    PERMISSIONS.STAFF_SCHEDULE_MANAGE,
+    PERMISSIONS.STAFF_FEE_READ,
+    PERMISSIONS.STAFF_FEE_WRITE,
     PERMISSIONS.PRICEFLOOR_READ,
     PERMISSIONS.PRICEFLOOR_WRITE,
     PERMISSIONS.PRICEFLOOR_APPROVE,
@@ -267,6 +280,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.DEPOSIT_WRITE,
     PERMISSIONS.INVOICE_WRITE,
     PERMISSIONS.HR_WRITE,
+    PERMISSIONS.STAFF_WRITE,
+    PERMISSIONS.STAFF_ROLE_MANAGE,
+    PERMISSIONS.STAFF_SCHEDULE_MANAGE,
     PERMISSIONS.PRICEFLOOR_READ,
     PERMISSIONS.FOLLOWUP_WRITE,
     PERMISSIONS.TASK_WRITE,
