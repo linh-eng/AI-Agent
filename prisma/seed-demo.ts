@@ -627,6 +627,15 @@ async function main() {
       },
     });
   }
+  // Báo giá DEMO BÁN DƯỚI GIÁ SÀN (mục 7,26): 1 hạng mục RF nâng cơ mặt, giá niêm yết
+  // 1.800.000 — khi chốt 1.600.000 sẽ THẤP HƠN giá sàn hiện hành 1.715.000 (V2).
+  // → user thường bị chặn; user có quyền duyệt phải nhập lý do + lưu snapshot/audit.
+  await prisma.treatmentProposal.create({
+    data: {
+      code: "PROP-100008", customerId: kDangPD.id, title: "Báo giá RF (thử bán dưới sàn)", status: "SENT", createdBy: "Phạm Chuyên Viên",
+      options: { create: [{ kind: "RECOMMENDED", name: "Gói RF 1 buổi", orderIndex: 0, sessions: 1, items: { create: [{ itemType: "SERVICE", refId: svcRF.id, name: "RF nâng cơ mặt", quantity: 1, unitPrice: 1_800_000, orderIndex: 0 }] } }] },
+    },
+  });
   await prisma.customerPortalAccount.upsert({
     where: { customerId: kDangPD.id }, update: {},
     create: { customerId: kDangPD.id, email: "linh.do@example.com", passwordHash: await hashPassword("khach123") },
