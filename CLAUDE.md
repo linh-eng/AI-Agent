@@ -1207,6 +1207,64 @@ tính vào đã trả); **DC-000001** 1.000.000 cọc **ĐANG GIỮ** (có thể
   công nghệ chưa cộng sàn.
 - Booking auto-tạo Deposit chỉ khi người tạo có `deposit.write`; vai trò khác thì `Booking.deposit` là ghi chú.
 
+## Giá sàn v2 Mục 7 (v0.16.0) — Cost breakdown theo dòng → Giá sàn (margin) → Version + duyệt dưới sàn
+
+Nâng cấp Giá sàn từ 6 số phẳng → **bảng chi phí cấu thành theo DÒNG (6 nhóm)** → tổng giá vốn → giá sàn
+theo biên (margin) → chiết khấu tối đa, có **VERSION (V1/V2)** + snapshot bất biến + duyệt bán dưới sàn có
+audit. Chỉ đụng module Giá sàn + integration tối thiểu Dịch vụ/Báo giá. Migration **`N_price_floor`**
+(additive, 0 DROP; tổng **24 migration**). **187 test pass** (thêm `test/price-floor-v2.test.ts` 15).
+
+### Migration & schema (`N_price_floor`) — GIỮ model cũ `ServicePriceFloor` (fallback/tương thích Booking)
+- Model mới `ServicePriceFloorVersion` (`service_price_floor_versions`): version, status (`FloorVersionStatus`
+  DRAFT/PENDING_APPROVAL/APPROVED/ACTIVE/EXPIRED/CANCELLED), method (`FloorMethod` MARGIN/MARKUP/MANUAL),
+  minMarginPercent, manualFloorPrice?, roundingUnit, durationMinutes; **snapshot tổng** material/staff/machine/
+  room/operation/other/**totalCost/floorPrice/maxDiscount/maxDiscountPercent** + standardPriceSnapshot;
+  effectiveFrom/To, changeReason, createdBy/approvedBy/approvedAt. `@@unique([serviceId, version])`.
+- `PriceFloorCostLine` (`price_floor_cost_lines`): category (`CostCategory` MATERIAL/STAFF/MACHINE/ROOM/
+  OPERATION/OTHER), name, quantity, unit, unitCost, calcType (`CostCalcType` FIXED/PER_MINUTE/PER_SESSION/
+  PER_USE/PERCENT_DIRECT/PER_DURATION), calcValue, minutes, amount (snapshot), refId (soft), source, required.
+- `BelowFloorApproval` (`below_floor_approvals`): context, serviceId?, floorVersionId?, proposalId?, standardPrice,
+  **floorPrice (snapshot)**, actualPrice, belowAmount, belowPercent, reason, approvedBy, approvedAt.
+
+### Lib (`src/lib/price-floor.ts` + `price-floor-service.ts`)
+- `computeVersionCost(lines, minutes)` — 2 pha: chi phí trực tiếp → **vận hành % trên chi phí trực tiếp**;
+  máy/phòng theo FIXED/PER_MINUTE/PER_SESSION/PER_USE. `computeFloorPrice` (MARGIN mặc định = **giá vốn /
+  (1 − biên%)**, làm tròn LÊN theo roundingUnit). `maxDiscount(standard, floor)`. `activeFloorVersion` +
+  `checkServicePriceFloor` **ưu tiên version ACTIVE** (fallback model cũ). `buildDefaultLinesFromService`
+  (tự lấy vật tư từ định mức + đơn giá SpaProduct.cost, nhân sự từ staffRequirements + gợi ý fee vai trò).
+- `price-floor-service.ts`: `createFloorVersion` (bỏ trống lines → auto), `updateFloorVersion` (chỉ DRAFT/
+  PENDING), `recomputeVersion` (ghi amount + snapshot tổng), `transitionFloorVersion` (submit/approve/activate/
+  cancel — activate **hết hạn version ACTIVE cũ**, cần `pricefloor.approve`).
+
+### API
+`/api/price-floors` GET (list enrich: version active + tổng/sàn/biên/CK tối đa/cảnh báo; filter q/nhóm/trạng
+thái/hiệu lực; **mask cost/margin theo finance.read**) · `/api/price-floors/[serviceId]` (GET versions+lines;
+POST tạo draft) · `/api/price-floor-versions/[id]` (GET/PATCH draft) · `/[id]/status` (submit/approve/activate/
+cancel + audit). Chốt báo giá dưới sàn → tạo **BelowFloorApproval snapshot** + audit `BELOW_FLOOR_APPROVED`.
+
+### RBAC (enforce backend)
+`pricefloor.read` (xem giá sàn/cảnh báo — MANAGER/CASHIER/RECEPTION/BOD) · `pricefloor.write` (sửa cost + tạo
+version — MANAGER/CASHIER) · `pricefloor.approve` (duyệt+áp dụng version — MANAGER/BOD) · `pricefloor.override`
+(duyệt bán DƯỚI sàn — MANAGER/BOD). **Cost breakdown/biên/margin CHỈ `finance.read`** thấy (mask ở server).
+
+### UI
+`/price-floor` (list: Dịch vụ/Nhóm/Giá chuẩn/Tổng giá vốn/Giá sàn/Biên/Chiết khấu tối đa/Version/Hiệu lực/
+Trạng thái + search + filter) → `/price-floor/[serviceId]` (cột trái danh sách version; cột phải **7 khối
+A–F cost breakdown theo dòng + G tổng hợp/công thức/giá sàn/chiết khấu tối đa/cảnh báo dưới sàn**; tạo/sửa
+draft, gửi duyệt/duyệt/áp dụng/hủy). Dịch vụ → link **Xem/Thiết lập giá sàn** tới đúng dịch vụ.
+
+### Demo (seed:demo)
+- **RF (DV-RF-01):** V1 (VT 250k+NS 400k+Máy 300k+VH 100k+Khác 50k = 1.100.000; biên 30% → **giá sàn
+  1.572.000**) đã ÁP DỤNG rồi **V2** (gel tăng 250k→350k → 1.200.000 → **1.715.000**); V1 **EXPIRED**, V2 ACTIVE.
+- **HIFU (DV-HIFU-01):** VT 160k (2 tuýp×80k) + KTV 250k + Master 500k + Máy 300k + Phòng 100k + Overhead
+  **10% chi phí trực tiếp (131k)** = 1.441.000; biên 30% → **giá sàn 2.059.000**. ACTIVE.
+
+### Nợ kỹ thuật (Giá sàn)
+- Booking vẫn dùng `checkServicePriceFloor` (nay ưu tiên version) — chưa tạo BelowFloorApproval snapshot cho
+  luồng Booking (mới có ở Báo giá). Chưa có màn danh sách BelowFloorApproval (đã lưu + audit).
+- Máy/phòng theo per-minute cần nhập `minutes`/rate thủ công (mặc định lấy durationMinutes dịch vụ).
+- Khấu hao thiết bị = phí máy/buổi đơn giản (chưa có asset depreciation engine — đúng phạm vi phase).
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

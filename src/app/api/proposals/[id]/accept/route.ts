@@ -36,9 +36,10 @@ export const POST = handle(async (req, { params }) => {
 
   // --- Chặn/duyệt bán DƯỚI giá sàn (mục 26) ---
   const floor = await proposalOptionFloorTotal(
-    option.items.map((it) => ({ itemType: it.itemType, refId: it.refId, quantity: it.quantity, sessions: it.sessions })),
+    option.items.map((it) => ({ itemType: it.itemType, refId: it.refId, name: it.name, quantity: it.quantity, sessions: it.sessions })),
     agreedPrice
   );
+  let belowFloorApproved = false;
   if (floor.below) {
     const canOverride = session.permissions.includes(P.PRICEFLOOR_OVERRIDE);
     if (!parsed.allowBelowFloor)
@@ -47,6 +48,7 @@ export const POST = handle(async (req, { params }) => {
       });
     if (!canOverride) return fail(403, "Cần quyền duyệt bán dưới giá sàn (pricefloor.override)");
     if (!parsed.priceAdjustReason) return fail(422, "Bán dưới giá sàn — cần nhập lý do");
+    belowFloorApproved = true;
   }
 
   // Đông cứng option đã chọn (item + giá) — không phụ thuộc bản gốc về sau.
@@ -83,6 +85,21 @@ export const POST = handle(async (req, { params }) => {
       acceptedSnapshot: snapshot as any,
     },
   });
+
+  // Bán dưới sàn được duyệt → LƯU SNAPSHOT DUYỆT (mục 26): giá chuẩn/giá sàn tại thời
+  // điểm + giá bán + % dưới sàn + người duyệt + lý do (bất biến, không đổi theo version sau).
+  if (belowFloorApproved) {
+    const belowPercent = floor.floorTotal > 0 ? Math.round(((floor.floorTotal - agreedPrice) / floor.floorTotal) * 10000) / 100 : 0;
+    await prisma.belowFloorApproval.create({
+      data: {
+        context: "PROPOSAL", proposalId: updated.id,
+        serviceId: floor.details[0]?.serviceId ?? null, floorVersionId: floor.details[0]?.floorVersionId ?? null,
+        itemName: option.name, standardPrice: computedTotal, floorPrice: floor.floorTotal, actualPrice: agreedPrice,
+        belowAmount: floor.shortfall, belowPercent, reason: parsed.priceAdjustReason!, approvedBy: session.name,
+      },
+    });
+    await auditLog({ userId: session.userId, action: "BELOW_FLOOR_APPROVED", entityType: "TreatmentProposal", entityId: updated.id, changes: { floorTotal: floor.floorTotal, agreedPrice, shortfall: floor.shortfall, reason: parsed.priceAdjustReason } });
+  }
 
   await auditLog({
     userId: session.userId,

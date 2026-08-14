@@ -230,6 +230,26 @@ export const DEPOSIT_STATUS_LABEL: Record<string, string> = {
 export const DEPOSIT_STATUS_TONE: Record<string, Tone> = {
   ACTIVE: "warning", ALLOCATED: "success", REFUNDED: "muted", VOID: "muted",
 };
+// Giá sàn v2 (mục 7)
+export const FLOOR_VERSION_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Bản nháp", PENDING_APPROVAL: "Chờ duyệt", APPROVED: "Đã duyệt",
+  ACTIVE: "Đang hiệu lực", EXPIRED: "Hết hiệu lực", CANCELLED: "Hủy",
+};
+export const FLOOR_VERSION_STATUS_TONE: Record<string, Tone> = {
+  DRAFT: "muted", PENDING_APPROVAL: "warning", APPROVED: "default",
+  ACTIVE: "success", EXPIRED: "muted", CANCELLED: "muted",
+};
+export const FLOOR_METHOD_LABEL: Record<string, string> = {
+  MARGIN: "Theo biên lợi nhuận", MARKUP: "Theo markup", MANUAL: "Nhập tay có kiểm soát",
+};
+export const COST_CATEGORY_LABEL: Record<string, string> = {
+  MATERIAL: "Vật tư", STAFF: "Nhân sự", MACHINE: "Máy / thiết bị",
+  ROOM: "Phòng / giường", OPERATION: "Vận hành", OTHER: "Chi phí khác",
+};
+export const COST_CALC_TYPE_LABEL: Record<string, string> = {
+  FIXED: "Cố định", PER_MINUTE: "Theo phút", PER_SESSION: "Trọn buổi",
+  PER_USE: "Theo lần dùng", PERCENT_DIRECT: "% trên chi phí trực tiếp", PER_DURATION: "Theo thời lượng",
+};
 // Vai trò công việc của nhân sự (đa vai trò) — danh mục gợi ý (mục 22).
 export const EMPLOYEE_ROLE_OPTIONS = [
   "Kỹ thuật viên", "Master", "CSKH", "Sales", "Quản lý", "Lễ tân", "Tư vấn", "Bác sĩ",
@@ -306,6 +326,7 @@ export function statusLabel(value?: string | null): string {
     PROPOSAL_STATUS_LABEL[value] ??
     INVOICE_STATUS_LABEL[value] ??
     DEPOSIT_STATUS_LABEL[value] ??
+    FLOOR_VERSION_STATUS_LABEL[value] ??
     SESSION_STAFF_ROLE_LABEL[value] ??
     LEAD_STATUS_LABEL[value] ??
     RECOMMENDATION_PRIORITY_LABEL[value] ??

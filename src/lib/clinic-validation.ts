@@ -560,6 +560,59 @@ export const priceFloorUpsertSchema = z.object({
   note: z.string().optional().nullable(),
 });
 
+// ----- Giá sàn v2 (mục 7): cost breakdown theo dòng + version -----
+export const costCategoryEnum = z.enum(["MATERIAL", "STAFF", "MACHINE", "ROOM", "OPERATION", "OTHER"]);
+export const costCalcTypeEnum = z.enum(["FIXED", "PER_MINUTE", "PER_SESSION", "PER_USE", "PERCENT_DIRECT", "PER_DURATION"]);
+export const floorMethodEnum = z.enum(["MARGIN", "MARKUP", "MANUAL"]);
+
+export const floorCostLineSchema = z.object({
+  category: costCategoryEnum,
+  name: z.string().min(1, "Nhập tên dòng chi phí"),
+  quantity: z.coerce.number().min(0).default(1),
+  unit: z.string().optional().nullable(),
+  unitCost: z.coerce.number().min(0).default(0),
+  calcType: costCalcTypeEnum.default("FIXED"),
+  calcValue: z.coerce.number().min(0).optional().nullable(),
+  minutes: z.coerce.number().int().min(0).optional().nullable(),
+  refId: z.string().optional().nullable(),
+  source: z.string().optional().nullable(),
+  required: z.boolean().default(true),
+  note: z.string().optional().nullable(),
+});
+
+// Tạo version mới (nếu không gửi lines → tự dựng từ định mức dịch vụ).
+export const floorVersionCreateSchema = z.object({
+  serviceId: z.string().min(1),
+  method: floorMethodEnum.default("MARGIN"),
+  minMarginPercent: z.coerce.number().min(0).max(99.99).default(0),
+  manualFloorPrice: z.coerce.number().min(0).optional().nullable(),
+  roundingUnit: z.coerce.number().int().min(1).default(1000),
+  changeReason: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+  lines: z.array(floorCostLineSchema).optional(), // bỏ trống → auto từ dịch vụ
+});
+
+// Sửa version DRAFT/PENDING (thay toàn bộ lines).
+export const floorVersionUpdateSchema = z.object({
+  method: floorMethodEnum.optional(),
+  minMarginPercent: z.coerce.number().min(0).max(99.99).optional(),
+  manualFloorPrice: z.coerce.number().min(0).optional().nullable(),
+  roundingUnit: z.coerce.number().int().min(1).optional(),
+  effectiveFrom: dateOpt,
+  effectiveTo: dateOpt,
+  changeReason: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+  lines: z.array(floorCostLineSchema).optional(),
+});
+
+// Chuyển trạng thái version: submit | approve | activate | cancel.
+export const floorVersionStatusSchema = z.object({
+  action: z.enum(["submit", "approve", "activate", "cancel"]),
+  effectiveFrom: dateOpt,
+  effectiveTo: dateOpt,
+  reason: z.string().optional().nullable(),
+});
+
 // ----- Task -----
 export const taskCreateSchema = z.object({
   title: z.string().min(1, "Nhập nội dung"),

@@ -1138,6 +1138,7 @@ model Service {
   bookings          Booking[]
   sessions          TreatmentSession[]
   priceFloor        ServicePriceFloor?
+  floorVersions     ServicePriceFloorVersion[]
   materialStandards ServiceMaterialStandard[]
 
   @@map("services")
@@ -2503,6 +2504,134 @@ model ServicePriceFloor {
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   @@map("service_price_floors")
+}
+
+// =============================================================================
+// GIÁ SÀN v2 (mục 7) — Cost breakdown theo DÒNG (6 nhóm) → tổng giá vốn → GIÁ SÀN
+// theo margin, có VERSION (V1/V2...) + snapshot bất biến + duyệt dưới sàn có audit.
+// Model cũ ServicePriceFloor giữ nguyên (tương thích Booking/checkServicePriceFloor).
+// =============================================================================
+enum FloorMethod {
+  MARGIN // Giá sàn = tổng giá vốn / (1 - margin%) — mặc định
+  MARKUP // Giá sàn = tổng giá vốn × (1 + margin%)
+  MANUAL // Giá sàn nhập tay có kiểm soát
+}
+
+enum FloorVersionStatus {
+  DRAFT // Bản nháp
+  PENDING_APPROVAL // Chờ duyệt
+  APPROVED // Đã duyệt (chưa áp dụng)
+  ACTIVE // Đang hiệu lực
+  EXPIRED // Hết hiệu lực
+  CANCELLED // Hủy
+}
+
+enum CostCategory {
+  MATERIAL // Vật tư
+  STAFF // Nhân sự
+  MACHINE // Máy / thiết bị
+  ROOM // Phòng / giường
+  OPERATION // Vận hành phân bổ
+  OTHER // Chi phí khác
+}
+
+enum CostCalcType {
+  FIXED // Số tiền cố định (đơn giá × số lượng, hoặc trọn buổi)
+  PER_MINUTE // theo phút × thời lượng
+  PER_SESSION // trọn buổi
+  PER_USE // theo lần dùng (× số lượng)
+  PERCENT_DIRECT // % trên chi phí trực tiếp (vận hành)
+  PER_DURATION // theo thời lượng (giá trị × số phút)
+}
+
+model ServicePriceFloorVersion {
+  id                 String             @id @default(cuid())
+  serviceId          String
+  version            Int
+  status             FloorVersionStatus @default(DRAFT)
+  method             FloorMethod        @default(MARGIN)
+  minMarginPercent   Decimal            @default(0) @db.Decimal(6, 2)
+  manualFloorPrice   Decimal?           @db.Decimal(18, 2) // khi method=MANUAL
+  roundingUnit       Int                @default(1000) // làm tròn lên (đ)
+  durationMinutes    Int? // snapshot thời lượng dịch vụ (cho per-minute/duration)
+  // --- Snapshot tổng (đông cứng khi publish) ---
+  standardPriceSnapshot Decimal @default(0) @db.Decimal(18, 2)
+  materialCost       Decimal            @default(0) @db.Decimal(18, 2)
+  staffCost          Decimal            @default(0) @db.Decimal(18, 2)
+  machineCost        Decimal            @default(0) @db.Decimal(18, 2)
+  roomCost           Decimal            @default(0) @db.Decimal(18, 2)
+  operationCost      Decimal            @default(0) @db.Decimal(18, 2)
+  otherCost          Decimal            @default(0) @db.Decimal(18, 2)
+  totalCost          Decimal            @default(0) @db.Decimal(18, 2)
+  floorPrice         Decimal            @default(0) @db.Decimal(18, 2)
+  maxDiscount        Decimal            @default(0) @db.Decimal(18, 2)
+  maxDiscountPercent Decimal            @default(0) @db.Decimal(6, 2)
+  // --- Hiệu lực + vết ---
+  effectiveFrom      DateTime?
+  effectiveTo        DateTime?
+  changeReason       String?
+  note               String?
+  createdBy          String?
+  approvedBy         String?
+  approvedAt         DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  service Service               @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  lines   PriceFloorCostLine[]
+
+  @@unique([serviceId, version])
+  @@index([serviceId, status])
+  @@map("service_price_floor_versions")
+}
+
+model PriceFloorCostLine {
+  id         String       @id @default(cuid())
+  versionId  String
+  category   CostCategory
+  name       String
+  quantity   Decimal      @default(1) @db.Decimal(14, 3)
+  unit       String?
+  unitCost   Decimal      @default(0) @db.Decimal(18, 2) // đơn giá cost
+  calcType   CostCalcType @default(FIXED)
+  calcValue  Decimal?     @db.Decimal(18, 2) // giá trị theo cách tính (rate/phần trăm)
+  minutes    Int? // số phút cho PER_MINUTE/PER_DURATION
+  amount     Decimal      @default(0) @db.Decimal(18, 2) // thành tiền (snapshot)
+  refId      String? // liên kết mềm SpaProduct/UsageMaterial/vai trò
+  source     String? // nguồn cost (vd "Định mức dịch vụ", "Fee vai trò")
+  required   Boolean      @default(true)
+  note       String?
+  orderIndex Int          @default(0)
+
+  version ServicePriceFloorVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId])
+  @@map("price_floor_cost_lines")
+}
+
+// Bản ghi DUYỆT BÁN DƯỚI GIÁ SÀN (mục 26) — snapshot giá sàn tại thời điểm nghiệp vụ,
+// KHÔNG đổi theo version giá sàn về sau. Lưu người duyệt / thời điểm / lý do.
+model BelowFloorApproval {
+  id             String   @id @default(cuid())
+  context        String // PROPOSAL | BOOKING
+  serviceId      String?
+  floorVersionId String? // version giá sàn dùng để đối chiếu (nếu có)
+  proposalId     String?
+  invoiceId      String?
+  itemName       String? // tên hạng mục/dịch vụ
+  standardPrice  Decimal  @default(0) @db.Decimal(18, 2)
+  floorPrice     Decimal  @default(0) @db.Decimal(18, 2) // snapshot
+  actualPrice    Decimal  @default(0) @db.Decimal(18, 2)
+  belowAmount    Decimal  @default(0) @db.Decimal(18, 2)
+  belowPercent   Decimal  @default(0) @db.Decimal(6, 2)
+  reason         String
+  approvedBy     String
+  approvedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  @@index([serviceId])
+  @@index([proposalId])
+  @@map("below_floor_approvals")
 }
 
 // =============================================================================

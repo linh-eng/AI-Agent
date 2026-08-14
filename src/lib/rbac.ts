@@ -93,7 +93,9 @@ export const PERMISSIONS = {
   SETTING_WRITE: "setting.write", // cấu hình hệ thống (Thương hiệu, mục 1)
   HR_READ: "hr.read", // xem danh sách nhân sự (mục 22)
   HR_WRITE: "hr.write", // thêm/sửa nhân sự + gán nhân sự buổi kèm phí
-  PRICEFLOOR_WRITE: "pricefloor.write", // khai báo cấu trúc chi phí + giá sàn (mục 25)
+  PRICEFLOOR_READ: "pricefloor.read", // xem giá sàn (giá sàn/cảnh báo; cost breakdown vẫn cần finance.read)
+  PRICEFLOOR_WRITE: "pricefloor.write", // khai báo cấu trúc chi phí + tạo/sửa version giá sàn (mục 25,7)
+  PRICEFLOOR_APPROVE: "pricefloor.approve", // duyệt + áp dụng version giá sàn (mục 7)
   PRICEFLOOR_OVERRIDE: "pricefloor.override", // duyệt bán DƯỚI giá sàn (mục 26)
   FOLLOWUP_WRITE: "followup.write", // quản lý quy trình CSKH follow-up (mục 31)
   TASK_WRITE: "task.write",
@@ -169,6 +171,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.FINANCE_READ,
     PERMISSIONS.TREATMENT_EDIT_COMPLETED,
     PERMISSIONS.PROTOCOL_APPROVE,
+    PERMISSIONS.PRICEFLOOR_READ,
+    PERMISSIONS.PRICEFLOOR_APPROVE,
     PERMISSIONS.PRICEFLOOR_OVERRIDE,
     PERMISSIONS.BOOKING_OVERRIDE,
     PERMISSIONS.MARKETING_READ,
@@ -227,7 +231,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.INVOICE_WRITE,
     PERMISSIONS.SETTING_WRITE,
     PERMISSIONS.HR_WRITE,
+    PERMISSIONS.PRICEFLOOR_READ,
     PERMISSIONS.PRICEFLOOR_WRITE,
+    PERMISSIONS.PRICEFLOOR_APPROVE,
     PERMISSIONS.PRICEFLOOR_OVERRIDE,
     PERMISSIONS.FOLLOWUP_WRITE,
     PERMISSIONS.TASK_WRITE,
@@ -261,6 +267,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.DEPOSIT_WRITE,
     PERMISSIONS.INVOICE_WRITE,
     PERMISSIONS.HR_WRITE,
+    PERMISSIONS.PRICEFLOOR_READ,
     PERMISSIONS.FOLLOWUP_WRITE,
     PERMISSIONS.TASK_WRITE,
     PERMISSIONS.PROPOSAL_ACCEPT,
@@ -304,6 +311,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.INVOICE_WRITE,
     PERMISSIONS.FINANCE_READ,
     PERMISSIONS.PRICE_WRITE,
+    PERMISSIONS.PRICEFLOOR_READ,
     PERMISSIONS.PRICEFLOOR_WRITE,
   ],
 

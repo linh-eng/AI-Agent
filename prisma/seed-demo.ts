@@ -18,6 +18,7 @@ import "dotenv/config"; // nạp .env (Windows/Linux) không cần set env thủ
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/auth";
 import { consumeFromContainer, consumeFromCustomerMaterial } from "../src/lib/spa-material-service";
+import { createFloorVersion, transitionFloorVersion } from "../src/lib/price-floor-service";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
@@ -325,6 +326,56 @@ async function main() {
   // Phân công buổi RF #1: KTV chính + Master kiểm tra (tổng phí 700k).
   await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvKTV.id, staffName: nvKTV.fullName, role: "PRIMARY", fee: 200_000 } });
   await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvMaster.id, staffName: nvMaster.fullName, role: "CHECKER", fee: 500_000 } });
+
+  // --- GIÁ SÀN v2 (mục 7): cost breakdown theo dòng + version + duyệt ---
+  async function publishFloor(versionId: string) {
+    await transitionFloorVersion(versionId, "submit", { canApprove: true });
+    await transitionFloorVersion(versionId, "approve", { actor: "Trần Quản Lý", canApprove: true });
+    await transitionFloorVersion(versionId, "activate", { actor: "Trần Quản Lý", canApprove: true });
+  }
+  // RF: V1 — Vật tư 250k + Nhân sự 400k + Máy 300k + Vận hành 100k + Khác 50k = 1.100.000;
+  // biên 30% → giá sàn 1.572.000 (giá chuẩn 1.800.000 > sàn). ACTIVE.
+  const rfV1 = await createFloorVersion({
+    serviceId: svcRF.id, method: "MARGIN", minMarginPercent: 30, roundingUnit: 1000, createdBy: "Trần Quản Lý",
+    changeReason: "Thiết lập giá sàn ban đầu",
+    lines: [
+      { category: "MATERIAL", name: "Gel dẫn RF", quantity: 1, unit: "lần", unitCost: 250_000, calcType: "FIXED", source: "Định mức dịch vụ" },
+      { category: "STAFF", name: "Kỹ thuật viên chính", quantity: 1, unit: "người", unitCost: 400_000, calcType: "FIXED", source: "Fee vai trò" },
+      { category: "MACHINE", name: "Máy RF #1", quantity: 1, unit: "buổi", calcType: "PER_SESSION", calcValue: 300_000, source: "Cấu hình dịch vụ" },
+      { category: "OPERATION", name: "Vận hành (điện/nước/quản lý)", quantity: 1, calcType: "FIXED", calcValue: 100_000 },
+      { category: "OTHER", name: "Chi phí khác", quantity: 1, unitCost: 50_000, calcType: "FIXED" },
+    ],
+  });
+  await publishFloor(rfV1.id);
+  // RF: V2 — giá gel tăng 250k→350k → tổng 1.200.000 → giá sàn 1.715.000. V1 hết hiệu lực.
+  const rfV2 = await createFloorVersion({
+    serviceId: svcRF.id, method: "MARGIN", minMarginPercent: 30, roundingUnit: 1000, createdBy: "Trần Quản Lý",
+    changeReason: "Giá gel dẫn RF tăng từ 250.000 lên 350.000",
+    lines: [
+      { category: "MATERIAL", name: "Gel dẫn RF", quantity: 1, unit: "lần", unitCost: 350_000, calcType: "FIXED", source: "Định mức dịch vụ" },
+      { category: "STAFF", name: "Kỹ thuật viên chính", quantity: 1, unit: "người", unitCost: 400_000, calcType: "FIXED", source: "Fee vai trò" },
+      { category: "MACHINE", name: "Máy RF #1", quantity: 1, unit: "buổi", calcType: "PER_SESSION", calcValue: 300_000, source: "Cấu hình dịch vụ" },
+      { category: "OPERATION", name: "Vận hành (điện/nước/quản lý)", quantity: 1, calcType: "FIXED", calcValue: 100_000 },
+      { category: "OTHER", name: "Chi phí khác", quantity: 1, unitCost: 50_000, calcType: "FIXED" },
+    ],
+  });
+  await publishFloor(rfV2.id);
+
+  // HIFU: V1 — vật tư 2 tuýp×80k=160k + KTV 250k + Master 500k + Máy 300k + Phòng 100k +
+  // Overhead 10% chi phí trực tiếp (131k) = 1.441.000; biên 30% → giá sàn 2.059.000. ACTIVE.
+  const hifuV1 = await createFloorVersion({
+    serviceId: svcHIFU.id, method: "MARGIN", minMarginPercent: 30, roundingUnit: 1000, createdBy: "Trần Quản Lý",
+    changeReason: "Thiết lập giá sàn HIFU",
+    lines: [
+      { category: "MATERIAL", name: "Gel siêu âm HIFU", quantity: 2, unit: "tuýp", unitCost: 80_000, calcType: "FIXED", source: "Định mức dịch vụ" },
+      { category: "STAFF", name: "Kỹ thuật viên chính", quantity: 1, unit: "người", unitCost: 250_000, calcType: "FIXED", source: "Fee vai trò" },
+      { category: "STAFF", name: "Master", quantity: 1, unit: "người", unitCost: 500_000, calcType: "FIXED", source: "Fee vai trò" },
+      { category: "MACHINE", name: "Máy HIFU #1", quantity: 1, unit: "buổi", calcType: "PER_SESSION", calcValue: 300_000, source: "Cấu hình dịch vụ" },
+      { category: "ROOM", name: "Phòng điều trị", quantity: 1, unit: "buổi", calcType: "PER_SESSION", calcValue: 100_000, source: "Cấu hình dịch vụ" },
+      { category: "OPERATION", name: "Overhead (10% chi phí trực tiếp)", calcType: "PERCENT_DIRECT", calcValue: 10 },
+    ],
+  });
+  await publishFloor(hifuV1.id);
 
   // --- Đánh giá sau buổi (mục 36–37) ---
   await prisma.sessionReview.create({

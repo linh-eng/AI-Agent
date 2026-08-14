@@ -356,12 +356,12 @@ function ServiceFormModal({ service, cats, techs, protos, resources, products, o
                 <span>Tổng chi phí dự kiến: <b>{formatCurrency(floorSummary.totalCost)}</b></span>
                 <span>Biên tối thiểu: <b>{floorSummary.minMarginPercent}%</b></span>
                 <span>Giá sàn: <b className="text-amber-600">{formatCurrency(floorSummary.floorPrice)}</b></span>
-                <Link href="/price-floor" className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Xem / Thiết lập giá sàn</Link>
+                <Link href={service?.id ? `/price-floor/${service.id}` : "/price-floor"} className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Xem / Thiết lập giá sàn</Link>
               </div>
             ) : (
               <div className="flex items-center justify-between text-muted-foreground">
                 <span>Chưa thiết lập cấu trúc chi phí / giá sàn cho dịch vụ này.</span>
-                <Link href="/price-floor" className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Thiết lập giá sàn</Link>
+                <Link href={service?.id ? `/price-floor/${service.id}` : "/price-floor"} className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Thiết lập giá sàn</Link>
               </div>
             )}
           </div>
