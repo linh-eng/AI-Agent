@@ -3,6 +3,12 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.1.1 — 2026-08-14
+- **Sửa lỗi:** phiếu nhập/xuất nhiều dòng hàng đôi khi **không lưu được mà không báo lỗi**
+  (do ô chọn gõ-tìm đặt `required` ẩn khiến trình duyệt chặn submit im lặng). Nay:
+  - Bỏ ô ẩn `required` ở Combobox; kiểm tra bắt buộc bằng JS + **báo lỗi rõ ràng**.
+  - Phiếu nhập/xuất tự **bỏ qua dòng trống**, báo cụ thể nếu có dòng thiếu sản phẩm/số lượng.
+
 ## 1.1.0 — 2026-08-14
 - **Module Sao lưu & Phục hồi** (menu Hệ thống, chỉ Quản trị):
   - Tải toàn bộ dữ liệu (kèm logo công ty) về 1 tệp `.json`.

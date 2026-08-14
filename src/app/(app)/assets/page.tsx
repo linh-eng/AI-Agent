@@ -104,6 +104,7 @@ export default function AssetsPage() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!editing && !form.productId) return setError("Vui lòng chọn thiết bị (sản phẩm).");
     try {
       if (editing) {
         await apiFetch(`/api/assets/${editing.id}`, {

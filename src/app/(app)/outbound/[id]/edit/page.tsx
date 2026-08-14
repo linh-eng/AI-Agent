@@ -109,6 +109,14 @@ export default function EditIssuePage({ params }: { params: { id: string } }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!reason || reason.trim().length < 3) return setError("Vui lòng nhập lý do sửa (tối thiểu 3 ký tự).");
+    if (!warehouseId) return setError("Vui lòng chọn kho xuất.");
+    const cleanItems = items.filter((it) => it.productId || it.quantity);
+    const valid = cleanItems.filter((it) => it.productId && Number(it.quantity) > 0);
+    if (valid.length === 0)
+      return setError("Cần ít nhất 1 dòng hàng: chọn sản phẩm và nhập số lượng > 0.");
+    if (cleanItems.some((it) => !it.productId || !(Number(it.quantity) > 0)))
+      return setError("Có dòng hàng chưa chọn sản phẩm hoặc chưa nhập số lượng. Vui lòng kiểm tra lại.");
     setSaving(true);
     try {
       const payload = {
@@ -117,7 +125,7 @@ export default function EditIssuePage({ params }: { params: { id: string } }) {
         issueType,
         customerName: customerName || null,
         note: note || null,
-        items: items.map((it) => ({
+        items: valid.map((it) => ({
           productId: it.productId,
           quantity: Number(it.quantity),
         })),

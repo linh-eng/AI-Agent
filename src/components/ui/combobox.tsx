@@ -99,21 +99,14 @@ export function Combobox({
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
-      {/* Ô hidden để form vẫn kiểm tra required như <select> */}
-      {required && (
-        <input
-          tabIndex={-1}
-          aria-hidden
-          required
-          value={value}
-          onChange={() => {}}
-          className="pointer-events-none absolute h-0 w-0 opacity-0"
-        />
-      )}
+      {/* KHÔNG dùng <input hidden required>: ô ẩn không focus được sẽ khiến trình
+          duyệt chặn submit mà không hiện thông báo. Việc bắt buộc chọn được kiểm
+          tra bằng JS ở hàm submit của từng form (báo lỗi rõ ràng cho người dùng). */}
       <button
         ref={triggerRef}
         type="button"
         data-nav
+        aria-required={required || undefined}
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className={cn(
