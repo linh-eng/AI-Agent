@@ -81,7 +81,8 @@ export default function EmployeeDetailPage() {
                       <td className="p-2 font-medium">{r.role}</td>
                       <td className="p-2 text-right">{r.fee != null ? formatCurrency(Number(r.fee)) : "•••"}</td>
                       <td className="p-2">{r.effectiveFrom ? formatDate(r.effectiveFrom) : "—"}</td>
-                      <td className="p-2">{r.effectiveTo ? formatDate(r.effectiveTo) : "—"}</td>
+                      {/* `effectiveTo` là mốc EXCLUSIVE (bản kế tiếp áp dụng từ ngày này) → hiển thị NGÀY CUỐI còn hiệu lực = effectiveTo − 1 ngày, tránh trùng ngày với "Hiệu lực từ" của bản sau. */}
+                      <td className="p-2">{r.effectiveTo ? formatDate(new Date(new Date(r.effectiveTo).getTime() - 86_400_000)) : "—"}</td>
                       <td className="p-2">{active ? <Badge tone="success">Hiện hành</Badge> : upcoming ? <Badge tone="default">Sắp áp dụng</Badge> : r.isActive ? <Badge tone="muted">Lịch sử</Badge> : <Badge tone="muted">Ngừng</Badge>}</td>
                       {canFee && <td className="p-2 text-right">{r.isActive && <Button size="icon" variant="ghost" onClick={() => post(`/api/employees/${id}/role-fees?feeId=${r.id}`, null, "DELETE")}><Trash2 className="h-3.5 w-3.5" /></Button>}</td>}
                     </tr>
@@ -89,6 +90,7 @@ export default function EmployeeDetailPage() {
                 })}
               </tbody>
             </table></div>
+            <p className="border-t px-4 py-2 text-xs text-muted-foreground">Cột <b>Đến</b> = ngày CUỐI còn hiệu lực. Bản kế tiếp áp dụng từ <b>ngày hôm sau</b> → không có ngày nào áp 2 mức phí (không chồng lấn).</p>
           </CardContent></Card>
           {canFee ? <AddRoleFee onAdd={(b) => post(`/api/employees/${id}/role-fees`, b)} /> : <p className="text-xs text-muted-foreground">Bạn không có quyền xem/sửa phí nhân sự.</p>}
         </div>

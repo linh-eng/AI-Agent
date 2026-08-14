@@ -339,7 +339,8 @@ async function main() {
     { employeeId: nvKTV.id, role: "KTV chính", fee: 250_000, effectiveFrom: new Date("2024-03-01"), createdBy: "Trần Quản Lý" },
     { employeeId: nvKTV.id, role: "Hỗ trợ", fee: 100_000, effectiveFrom: new Date("2024-03-01"), createdBy: "Trần Quản Lý" },
     // Master: 500k đến hết 31/08/2026, từ 01/09/2026 tăng 600k (bản cũ đóng hạn) — mục 5.
-    { employeeId: nvMaster.id, role: "Master", fee: 500_000, effectiveFrom: new Date("2023-01-10"), effectiveTo: vnts("2026-08-31T23:59:59"), createdBy: "Ban giám đốc" },
+    // effectiveTo = mốc EXCLUSIVE (bản 600k áp dụng TỪ 01/09) → ngày cuối còn hiệu lực = 31/08.
+    { employeeId: nvMaster.id, role: "Master", fee: 500_000, effectiveFrom: new Date("2023-01-10"), effectiveTo: new Date("2026-09-01"), createdBy: "Ban giám đốc" },
     { employeeId: nvMaster.id, role: "Master", fee: 600_000, effectiveFrom: new Date("2026-09-01"), createdBy: "Ban giám đốc" },
     { employeeId: nvMaster.id, role: "Kiểm tra", fee: 200_000, effectiveFrom: new Date("2023-01-10"), createdBy: "Ban giám đốc" },
   ] });
