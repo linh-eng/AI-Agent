@@ -2275,6 +2275,8 @@ model MaterialUsage {
   customerId         String?
   performedBy        String?
   quantity           Decimal        @db.Decimal(14, 3)
+  remainingBefore    Decimal?       @db.Decimal(14, 3) // tồn trước khi dùng (snapshot)
+  remainingAfter     Decimal?       @db.Decimal(14, 3) // tồn sau khi dùng (snapshot)
   unitCost           Decimal?       @db.Decimal(18, 2) // snapshot giá vốn/đơn vị
   costAllocated      Decimal?       @db.Decimal(18, 2) // chi phí phân bổ = quantity * unitCost
   serviceId          String? // snapshot (báo cáo theo dịch vụ)

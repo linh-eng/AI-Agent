@@ -85,16 +85,36 @@ export function SpaMaterialConsume({ sessionId, customerId, canWrite }: { sessio
         </form>
       )}
       {usages.length > 0 && (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <p className="text-xs font-medium text-muted-foreground">Đã dùng trong buổi này:</p>
-          {usages.map((u) => (
-            <div key={u.id} className="flex items-center gap-2 text-xs">
-              <Badge tone={u.source === "SHARED_STOCK" ? "default" : "warning"}>{MATERIAL_SOURCE_LABEL[u.source]}</Badge>
-              <span>{u.container?.material?.name ?? u.customerMaterial?.name}</span>
-              <span className="font-medium">{Number(u.quantity)} {u.container?.material?.unit ?? u.customerMaterial?.unit ?? ""}</span>
-              <span className="ml-auto text-muted-foreground">{formatDateTime(u.occurredAt)}</span>
-            </div>
-          ))}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="text-muted-foreground">
+                <tr className="border-b">
+                  <th className="p-1 text-left">Nguồn</th><th className="p-1 text-left">Vật tư · Lọ/lô</th>
+                  <th className="p-1 text-right">Tồn trước</th><th className="p-1 text-right">Dùng</th><th className="p-1 text-right">Tồn sau</th>
+                  <th className="p-1 text-right">Chi phí</th><th className="p-1 text-right">Thời điểm</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usages.map((u) => {
+                  const unit = u.container?.material?.unit ?? u.customerMaterial?.unit ?? "";
+                  const ct = u.container?.containerNo ? ` · ${u.container.containerNo}` : "";
+                  return (
+                    <tr key={u.id} className="border-b last:border-0">
+                      <td className="p-1"><Badge tone={u.source === "SHARED_STOCK" ? "default" : "warning"}>{MATERIAL_SOURCE_LABEL[u.source]}</Badge></td>
+                      <td className="p-1">{u.container?.material?.name ?? u.customerMaterial?.name}<span className="text-muted-foreground">{ct}</span></td>
+                      <td className="p-1 text-right text-muted-foreground">{u.remainingBefore != null ? `${Number(u.remainingBefore)}${unit}` : "—"}</td>
+                      <td className="p-1 text-right font-medium">{Number(u.quantity)}{unit}</td>
+                      <td className="p-1 text-right text-muted-foreground">{u.remainingAfter != null ? `${Number(u.remainingAfter)}${unit}` : "—"}</td>
+                      <td className="p-1 text-right">{u.costAllocated != null ? Number(u.costAllocated).toLocaleString("vi-VN") + "₫" : "—"}</td>
+                      <td className="p-1 text-right text-muted-foreground">{formatDateTime(u.occurredAt)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

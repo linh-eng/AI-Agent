@@ -1115,6 +1115,17 @@ thị `editLog`. Nút ghi-nhận/xem-kết-quả ở trang Phác đồ nay **đi
 - Buổi 3: **3 nhân sự** (KTV chính 250k + Master 500k + Hỗ trợ 100k, phí snapshot) · **Before/After 1 chia sẻ + 1
   nội bộ** · đánh giá 5/5 + báo cáo nội bộ KTV.
 
+### Hoàn thiện 4 điểm cuối (chứng minh)
+- **Vật tư thực tế** (mục 15,18): `MaterialUsage` +`remainingBefore`/`remainingAfter` (migration **`L_material_balance`**,
+  additive; tổng **22 migration**) — `consumeFromContainer`/`consumeFromCustomerMaterial` ghi tồn trước/sau. Widget
+  `SpaMaterialConsume` hiện bảng **Nguồn · Vật tư·Lọ-lô · Tồn trước · Dùng · Tồn sau · Chi phí · Thời điểm** (chi phí
+  mask theo `finance.read`).
+- **JetPeel nhiều Session** (mục 18): 1 lọ `JETPEEL-2026-01` dùng qua nhiều buổi với **số dư chạy tiếp**: buổi 1
+  100→95, buổi 2 88→82 (giữa là buổi khách khác) — chỉ trừ khi Session ghi nhận. Test kiểm tồn trước/sau từng lần.
+- **Before/After** (mục 21-22): cả 2 ảnh gắn Session; toggle **Khách thấy / Riêng tư** (mặc định riêng tư) trong khối F.
+- **Lịch sử chỉnh sửa** (mục 29): sau khi "Sửa ghi nhận" (lý do bắt buộc), khối **Lịch sử chỉnh sửa** hiện ai/khi/lý do
+  + diff từng field (trước→sau) từ `editLog`.
+
 ### Nợ kỹ thuật (Session)
 - Trang Phác đồ vẫn còn định nghĩa modal ghi-nhận/chi-tiết cũ (không mở nữa — đã chuyển sang `/sessions/[id]`); có thể
   dọn ở phase sau.

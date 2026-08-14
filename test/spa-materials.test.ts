@@ -40,6 +40,10 @@ describe("Kho vật tư sử dụng (container dùng chung)", () => {
     expect(Number(u1.costAllocated)).toBe(100_000);
     expect(Number(u2.costAllocated)).toBe(140_000);
     expect(Number(u3.costAllocated)).toBe(120_000);
+    // TỒN TRƯỚC / TỒN SAU từng lần (chạy nối tiếp trên cùng container) — mục 15,18
+    expect([Number(u1.remainingBefore), Number(u1.remainingAfter)]).toEqual([100, 95]);
+    expect([Number(u2.remainingBefore), Number(u2.remainingAfter)]).toEqual([95, 88]);
+    expect([Number(u3.remainingBefore), Number(u3.remainingAfter)]).toEqual([88, 82]);
     // session.materialCost của buổi A1 = 100k
     const sess = await prisma.treatmentSession.findUniqueOrThrow({ where: { id: sA1.id } });
     expect(Number(sess.materialCost)).toBe(100_000);
