@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input, Label, Select, Checkbox } from "@/components/ui/input";
 import { apiFetch } from "@/lib/client";
-import { mediaSrc } from "@/lib/utils";
+import { mediaSrc, formatDateTime } from "@/lib/utils";
 import {
   evaluateLogic,
   computeCalc,
@@ -282,7 +282,7 @@ function SignatureField({
       <div className="flex items-center gap-2">
         <Input className="h-8 max-w-[200px]" placeholder="Họ tên người ký" value={sig.signedBy ?? ""} disabled={disabled} onChange={(e) => onChange({ ...sig, signedBy: e.target.value })} />
         {!disabled && <button type="button" onClick={clear} className="rounded border px-2 py-1 text-xs hover:bg-accent">Xóa ký</button>}
-        {sig.signedAt && <span className="text-xs text-muted-foreground">Ký lúc {new Date(sig.signedAt).toLocaleString("vi-VN")}</span>}
+        {sig.signedAt && <span className="text-xs text-muted-foreground">Ký lúc {formatDateTime(sig.signedAt)}</span>}
       </div>
     </div>
   );

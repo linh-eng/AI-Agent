@@ -45,7 +45,7 @@ export function printDeliveryNote(order: any, delivery: any) {
      <table>
        <tr><th>Khách hàng</th><td>${order.customer?.name ?? "—"}</td><th>Dự án</th><td>${order.project?.code ?? "—"}</td></tr>
        <tr><th>Hình thức</th><td>${delivery.method ?? "—"}</td><th>Đơn vị VC</th><td>${delivery.carrier ?? "—"}</td></tr>
-       <tr><th>Mã vận đơn</th><td>${delivery.trackingNumber ?? "—"}</td><th>Ngày giao</th><td>${delivery.deliveredAt ? new Date(delivery.deliveredAt).toLocaleDateString("vi-VN") : "—"}</td></tr>
+       <tr><th>Mã vận đơn</th><td>${delivery.trackingNumber ?? "—"}</td><th>Ngày giao</th><td>${delivery.deliveredAt ? new Date(delivery.deliveredAt).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) : "—"}</td></tr>
      </table>
      <h2>Danh sách serial (${serials.length})</h2>
      <table><thead><tr><th>#</th><th>Serial</th></tr></thead><tbody>

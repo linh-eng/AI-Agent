@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, formatDate, formatDateTime } from "@/lib/utils";
+import { VN_TZ, formatVnTime } from "@/lib/timezone";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_TONE } from "@/lib/clinic-labels";
@@ -41,7 +42,9 @@ const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0);
 const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const mondayOf = (d: Date) => { const x = startOfDay(d); const dow = (x.getDay() + 6) % 7; return addDays(x, -dow); };
 const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-const hhmm = (iso: string | Date) => new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+// Hiển thị giờ VN (Asia/Ho_Chi_Minh) — đồng nhất với formatDateTime, mọi màn giống nhau.
+const VN = { timeZone: VN_TZ } as const;
+const hhmm = (iso: string | Date) => formatVnTime(iso);
 const endOf = (iso: string, dur?: number | null) => new Date(new Date(iso).getTime() + (dur ?? 60) * 60_000);
 const timeRange = (b: Booking) => `${hhmm(b.scheduledAt)}–${hhmm(endOf(b.scheduledAt, b.durationMinutes))}`;
 const resourceLine = (b: Booking) => [b.technician && `KTV: ${b.technician}`, b.master && `Master: ${b.master}`, b.room && `Phòng: ${b.room}`, b.bed && `Giường: ${b.bed}`, b.machine && `Máy: ${b.machine}`].filter(Boolean).join(" · ");
@@ -131,9 +134,9 @@ function BookingsPageInner() {
   }
 
   const rangeTitle = useMemo(() => {
-    if (view === "day") return anchor.toLocaleDateString("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
-    if (view === "week") { const m = mondayOf(anchor); return `Tuần ${m.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })} – ${addDays(m, 6).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}`; }
-    if (view === "month") return anchor.toLocaleDateString("vi-VN", { month: "long", year: "numeric" });
+    if (view === "day") return anchor.toLocaleDateString("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", ...VN });
+    if (view === "week") { const m = mondayOf(anchor); return `Tuần ${m.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", ...VN })} – ${addDays(m, 6).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", ...VN })}`; }
+    if (view === "month") return anchor.toLocaleDateString("vi-VN", { month: "long", year: "numeric", ...VN });
     return "";
   }, [view, anchor]);
 
@@ -342,7 +345,7 @@ function ListView({ rows, onOpen }: { rows: Booking[]; onOpen: (id: string) => v
         ) : rows.map((b) => (
           <TR key={b.id} className="cursor-pointer hover:bg-muted/40" onClick={() => onOpen(b.id)}>
             <TD className="font-mono font-medium">{b.code}</TD>
-            <TD><div>{new Date(b.scheduledAt).toLocaleDateString("vi-VN")}</div><div className="text-xs text-muted-foreground">{timeRange(b)}</div></TD>
+            <TD><div>{formatDate(b.scheduledAt)}</div><div className="text-xs text-muted-foreground">{timeRange(b)}</div></TD>
             <TD>{b.customer.fullName}<div className="text-xs text-muted-foreground">{b.customer.phone ?? b.customer.code}</div></TD>
             <TD>{b.service?.name ?? "—"}</TD>
             <TD className="text-xs">{resourceLine(b) || "—"}</TD>
@@ -411,7 +414,7 @@ function WeekView({ rows, monday, onOpen }: { rows: Booking[]; monday: Date; onO
         return (
           <Card key={d.toISOString()} className={sameDay(d, today) ? "ring-1 ring-primary" : ""}>
             <CardContent className="p-2">
-              <div className="mb-1.5 text-center text-xs font-medium">{d.toLocaleDateString("vi-VN", { weekday: "short" })}<div className="text-muted-foreground">{d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}</div></div>
+              <div className="mb-1.5 text-center text-xs font-medium">{d.toLocaleDateString("vi-VN", { weekday: "short", ...VN })}<div className="text-muted-foreground">{d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", ...VN })}</div></div>
               <div className="space-y-1.5">
                 {items.length === 0 ? <div className="py-2 text-center text-[11px] text-muted-foreground/60">—</div> : items.map((b) => <BookingChip key={b.id} b={b} onOpen={onOpen} />)}
               </div>
@@ -465,7 +468,7 @@ function ConflictBlock({ conflicts, suggestions, canOverride, overrideReason, se
   const today = new Date();
   const slotLabel = (iso: string) => {
     const d = new Date(iso);
-    const rel = sameDay(d, today) ? "hôm nay" : sameDay(d, addDays(today, 1)) ? "ngày mai" : d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+    const rel = sameDay(d, today) ? "hôm nay" : sameDay(d, addDays(today, 1)) ? "ngày mai" : d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", ...VN });
     return `${hhmm(iso)} ${rel}`;
   };
   return (
@@ -473,7 +476,7 @@ function ConflictBlock({ conflicts, suggestions, canOverride, overrideReason, se
       <div className="flex items-center gap-2 font-medium text-amber-700"><AlertTriangle className="h-4 w-4" /> Trùng tài nguyên</div>
       <ul className="space-y-1 text-xs text-amber-800">
         {conflicts.map((c, i) => (
-          <li key={i}>• <b>{c.label} &quot;{c.value}&quot;</b> đang bận {new Date(c.scheduledAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}–{hhmm(endOf(c.scheduledAt, c.durationMinutes))} ({c.bookingCode} · {c.customerName})</li>
+          <li key={i}>• <b>{c.label} &quot;{c.value}&quot;</b> đang bận {hhmm(c.scheduledAt)}–{hhmm(endOf(c.scheduledAt, c.durationMinutes))} ({c.bookingCode} · {c.customerName})</li>
         ))}
       </ul>
       {suggestions.length > 0 && (
@@ -708,7 +711,7 @@ function BookingDetailModal({ id, onClose, canWrite, canOverride, employees, res
             <Field label="Buổi / giai đoạn" value={b.plan ? `${b.stage ? b.stage.name + " · " : ""}${b.sessionNumber ? "Buổi " + b.sessionNumber : ""}` || "—" : "—"} />
           </Section>
           <Section title="Thời gian">
-            <Field label="Ngày" value={new Date(b.scheduledAt).toLocaleDateString("vi-VN")} />
+            <Field label="Ngày" value={formatDate(b.scheduledAt)} />
             <Field label="Khung giờ" value={`${hhmm(b.scheduledAt)} – ${hhmm(end)}`} />
             <Field label="Thời lượng" value={`${dur} phút`} />
           </Section>
@@ -728,7 +731,7 @@ function BookingDetailModal({ id, onClose, canWrite, canOverride, employees, res
           <Section title="Lịch sử đổi lịch">
             <ul className="space-y-1 text-xs text-muted-foreground">
               {history.map((h: any, i: number) => (
-                <li key={i}>• {new Date(h.from).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} → {new Date(h.to).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} · {h.by}{h.reason ? ` · ${h.reason}` : ""}</li>
+                <li key={i}>• {formatDateTime(h.from)} → {formatDateTime(h.to)} · {h.by}{h.reason ? ` · ${h.reason}` : ""}</li>
               ))}
             </ul>
           </Section>

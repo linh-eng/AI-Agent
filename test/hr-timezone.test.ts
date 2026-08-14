@@ -21,6 +21,7 @@ import { formatDateTime } from "@/lib/utils";
 import { employeeAvailability, suggestEmployeesForBooking, resolveRoleFee } from "@/lib/hr";
 import { POST as staffLogin } from "@/app/api/auth/login/route";
 import { GET as getEmployee } from "@/app/api/employees/[id]/route";
+import { POST as addLeave } from "@/app/api/employees/[id]/leaves/route";
 
 function jsonReq(url: string, method: string, body?: unknown) {
   return new Request(url, { method, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -40,29 +41,31 @@ async function emp(over: Record<string, any> = {}) {
 }
 
 describe("Mục 8 — A. Timezone nghỉ phép (giờ VN, ổn định bất kể TZ tiến trình)", () => {
-  it("parseVnLocal: nhập 20/08/2026 08:00 (giờ VN) → lưu wall-clock 08:00Z", () => {
+  it("parseVnLocal: nhập 20/08/2026 08:00 (giờ VN) → lưu true-UTC 01:00Z", () => {
     const d = parseVnLocal("2026-08-20T08:00");
-    expect(d.toISOString()).toBe("2026-08-20T08:00:00.000Z");
-    // chuỗi đã có Z / ±hh:mm → tôn trọng nguyên trạng
-    expect(parseVnLocal("2026-08-20T08:00:00Z").toISOString()).toBe("2026-08-20T08:00:00.000Z");
-    // date-only giữ như cũ
+    expect(d.toISOString()).toBe("2026-08-20T01:00:00.000Z"); // 08:00 VN = 01:00 UTC
+    // chuỗi đã có Z / ±hh:mm → tôn trọng nguyên trạng (true instant)
+    expect(parseVnLocal("2026-08-20T01:00:00Z").toISOString()).toBe("2026-08-20T01:00:00.000Z");
+    // date-only giữ nguyên (UTC 00:00)
     expect(parseVnLocal("1990-01-15").toISOString()).toBe("1990-01-15T00:00:00.000Z");
   });
 
-  it("formatDateTime: 08:00Z hiển thị ĐÚNG 08:00 (không render lệch −7h thành 01:00)", () => {
-    const from = new Date("2026-08-20T08:00:00Z");
-    const to = new Date("2026-08-20T12:00:00Z");
-    // Hiển thị ĐÚNG giờ VN đã nhập (08:00 / 12:00), ngày 20/08/2026.
+  it("formatDateTime: instant 01:00Z (=08:00 VN) hiển thị ĐÚNG 08:00 Asia/Ho_Chi_Minh", () => {
+    // DB lưu true-UTC; record nghỉ 08:00–12:00 VN = 01:00Z–05:00Z.
+    const from = new Date("2026-08-20T01:00:00.000Z");
+    const to = new Date("2026-08-20T05:00:00.000Z");
     expect(formatDateTime(from)).toContain("08:00");
     expect(formatDateTime(from)).toContain("20/08/2026");
     expect(formatDateTime(to)).toContain("12:00");
-    // KHÔNG bao giờ ra 01:00 / 05:00 (lỗi render UTC thô −7h trước đây)
+    // KHÔNG render UTC thô (01:00 / 05:00)
     expect(formatDateTime(from)).not.toContain("01:00");
     expect(formatDateTime(to)).not.toContain("05:00");
+    // Round-trip qua input người dùng: parseVnLocal(08:00 VN) rồi format lại = 08:00.
+    expect(formatDateTime(parseVnLocal("2026-08-20T08:00"))).toContain("08:00");
   });
 
-  it("vnClock: trích wall-clock VN từ Date đã lưu", () => {
-    const c = vnClock(new Date("2026-08-20T09:30:00Z"));
+  it("vnClock: convert true-UTC → wall-clock VN (Asia/Ho_Chi_Minh, +7)", () => {
+    const c = vnClock(new Date("2026-08-20T02:30:00Z")); // 02:30 UTC = 09:30 VN
     expect(c.hour).toBe(9); expect(c.minute).toBe(30);
     expect(c.year).toBe(2026); expect(c.month).toBe(8); expect(c.day).toBe(20);
   });
@@ -75,6 +78,43 @@ async function phamChuyenVien() {
   await prisma.employeeLeave.create({ data: { employeeId: e.id, type: "ANNUAL", fromAt: parseVnLocal("2026-08-20T08:00"), toAt: parseVnLocal("2026-08-20T12:00"), reason: "Nghỉ buổi sáng" } });
   return e;
 }
+
+describe("Mục 8 — A2. MỘT record nghỉ phép hiển thị GIỐNG NHAU: DB → API → Hồ sơ → Availability", () => {
+  beforeEach(async () => { await resetDb(); });
+  afterAll(async () => { await prisma.$disconnect(); });
+
+  it("nhập 20/08 08:00–12:00 (giờ VN) → DB true-UTC, API format, Hồ sơ, Booking availability đều 08:00–12:00", async () => {
+    const e = await emp({ fullName: "NV TZ " + uniq("z"), roles: ["Kỹ thuật viên"] });
+    await prisma.employeeSchedule.create({ data: { employeeId: e.id, dayOfWeek: 4, startTime: "08:00", endTime: "17:00" } });
+
+    // (1) NHẬP qua API bằng chuỗi datetime-local GIỜ VN (như form nhân viên gõ).
+    const mgr = await makeStaff(["staff.read", "staff.schedule.manage"]);
+    await login(mgr.email, mgr.password);
+    const r = await addLeave(jsonReq(`http://t/api/employees/${e.id}/leaves`, "POST", { type: "ANNUAL", fromAt: "2026-08-20T08:00", toAt: "2026-08-20T12:00", reason: "Nghỉ sáng" }), { params: { id: e.id } });
+    expect(r.status).toBe(201);
+
+    // (2) DB = true-UTC (01:00Z–05:00Z = 08:00–12:00 VN).
+    const row = await prisma.employeeLeave.findFirstOrThrow({ where: { employeeId: e.id } });
+    expect(row.fromAt.toISOString()).toBe("2026-08-20T01:00:00.000Z");
+    expect(row.toAt.toISOString()).toBe("2026-08-20T05:00:00.000Z");
+
+    // (3) API response (GET hồ sơ) trả ISO true-UTC — UI format ra 08:00–12:00.
+    const g = await getEmployee(jsonReq(`http://t/api/employees/${e.id}`, "GET"), { params: { id: e.id } });
+    const emp1 = (await readJson(g)).data;
+    const lv = emp1.leaves[0];
+    expect(formatDateTime(lv.fromAt)).toContain("08:00"); // Hồ sơ nhân sự (tab Nghỉ phép)
+    expect(formatDateTime(lv.toAt)).toContain("12:00");
+    expect(formatDateTime(lv.fromAt)).not.toContain("01:00");
+
+    // (4) Booking availability đọc CÙNG record → chặn 09:00 VN (trong 08:00–12:00).
+    const av9 = await employeeAvailability(e.id, parseVnLocal("2026-08-20T09:00"), parseVnLocal("2026-08-20T10:00"));
+    expect(av9.onLeave).toBe(true);
+    // 13:00 VN (ngoài giờ nghỉ) → rảnh
+    const av13 = await employeeAvailability(e.id, parseVnLocal("2026-08-20T13:00"), parseVnLocal("2026-08-20T14:00"));
+    expect(av13.onLeave).toBe(false);
+    expect(av13.available).toBe(true);
+  });
+});
 
 describe("Mục 8 — B/C. Booking dùng lịch làm việc + nghỉ phép (backend enforce)", () => {
   beforeEach(async () => { await resetDb(); });

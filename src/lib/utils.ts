@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { VN_TZ } from "./timezone";
 
 /** Ghép className có xử lý xung đột Tailwind. */
 export function cn(...inputs: ClassValue[]) {
@@ -22,15 +23,16 @@ export function formatCurrency(value: number | string | null | undefined): strin
 
 /**
  * Định dạng NGÀY GIỜ kiểu VN: dd/MM/yyyy HH:mm.
- * Thời gian lưu là wall-clock VN (xem `src/lib/timezone.ts`) → trích theo UTC để
- * hiển thị ĐÚNG giờ VN người dùng đã nhập, ổn định bất kể múi giờ tiến trình.
+ * Thời gian lưu là true-UTC → convert sang Asia/Ho_Chi_Minh (chuẩn hiển thị nghiệp
+ * vụ, xem `src/lib/timezone.ts`) → cùng record hiển thị GIỐNG NHAU ở mọi màn, bất
+ * kể múi giờ trình duyệt/máy chủ.
  */
 export function formatDateTime(value: Date | string | null | undefined): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
   return new Intl.DateTimeFormat("vi-VN", {
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
-    timeZone: "UTC",
+    hour12: false, timeZone: VN_TZ,
   }).format(d);
 }
 
@@ -55,7 +57,7 @@ export function computeAge(dob: Date | string | null | undefined, now?: Date): n
   return age >= 0 && age < 200 ? age : null;
 }
 
-/** Định dạng ngày kiểu VN dd/MM/yyyy (trích theo UTC — xem `formatDateTime`). */
+/** Định dạng ngày kiểu VN dd/MM/yyyy (convert Asia/Ho_Chi_Minh — xem `formatDateTime`). */
 export function formatDate(value: Date | string | null | undefined): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
@@ -63,6 +65,6 @@ export function formatDate(value: Date | string | null | undefined): string {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-    timeZone: "UTC",
+    timeZone: VN_TZ,
   }).format(d);
 }

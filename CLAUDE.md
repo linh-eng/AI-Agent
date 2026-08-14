@@ -1321,23 +1321,29 @@ năng lực/chứng nhận/ca/nghỉ). Chứng nhận hết hạn hiện badge �
   năng lực chỉ HIFU (để demo lọc năng lực).
 - **NV-000005 Ngô Nghỉ Việc**: RESIGNED (không được phân công mới; lịch sử giữ).
 
-### Múi giờ (timezone) — `src/lib/timezone.ts` (chuẩn hóa khi rà soát Mục 8)
-Hệ thống vận hành **một múi giờ Asia/Ho_Chi_Minh (UTC+7, không DST)**. Thời gian NGƯỜI DÙNG NHẬP (giờ làm
-việc VN) lưu dạng **wall-clock VN** (đúng chữ số giờ VN, đóng dấu Z) — đồng nhất Lịch hẹn/Buổi/Nghỉ phép để
-so lịch/trùng lịch/nghỉ phép cùng một hệ quy chiếu, không lệch ±7h giữa các thực thể. Để **ổn định bất kể TZ
-tiến trình** (container/CI): (a) `formatDate/formatDateTime` trích theo `timeZone: "UTC"` → hiển thị đúng giờ
-VN đã nhập (sửa bug nghỉ phép hiện 01:00–05:00 thay vì 08:00–12:00); (b) logic lịch dùng `vnClock()` (getUTC*)
-thay `getHours()` → availability Booking đúng; (c) input datetime-local qua `parseVnLocal()` (đóng Z). Chuyển
-sang lưu true-UTC + convert Asia/Ho_Chi_Minh cho TOÀN BỘ module là refactor lớn → ghi technical debt.
+### Múi giờ (timezone) — `src/lib/timezone.ts` — CHUẨN: true-UTC + hiển thị Asia/Ho_Chi_Minh
+Hệ thống vận hành **một múi giờ nghiệp vụ Asia/Ho_Chi_Minh (UTC+7, không DST)**. Mô hình **thống nhất ở
+layer dùng chung** (không vá từng màn):
+- **Lưu trữ = true-UTC** (instant thật). Thời gian người dùng nhập (giờ VN) được **chuyển sang UTC** trước khi
+  lưu qua `parseVnLocal()` (datetime-local "08:00" VN → `01:00Z`); `now()` vốn là UTC.
+- **Hiển thị = convert Asia/Ho_Chi_Minh** ở MỌI chỗ: `formatDate/formatDateTime` (`src/lib/utils.ts`) đặt
+  `timeZone: "Asia/Ho_Chi_Minh"`; toàn bộ `toLocale*` ngày giờ trong UI (Lịch hẹn, Cổng khách, form-renderer,
+  reschedule, print, import) đều gắn `timeZone` VN hoặc dùng `formatDateTime`/`formatVnTime`. → **cùng một
+  record hiển thị GIỐNG NHAU ở mọi màn**, bất kể múi giờ trình duyệt/máy chủ.
+- **Logic lịch** (availability, thứ/giờ/phút) qua `vnClock()` = convert UTC→VN (getUTC* + offset). Không dùng
+  `getHours()` (phụ thuộc TZ tiến trình).
+Ví dụ kiểm chứng: nghỉ phép 20/08 **08:00–12:00 VN** lưu DB `01:00Z–05:00Z`, hiển thị ở Hồ sơ nhân sự
+= 08:00–12:00, availability Booking chặn 09:00 / cho 13:00. Test `test/hr-timezone.test.ts` (DB→API→UI→
+availability cùng một record). Seed demo dùng helper `vnts()` để lưu giờ VN thành true-UTC.
 
 ### Nợ kỹ thuật (Nhân sự)
 - Booking lưu nhân sự bằng **tên (String)** — validate/suggest so theo tên; chưa đổi sang FK employeeId (giữ
   tương thích mục Lịch hẹn đã nghiệm thu). Gợi ý slot của Booking chưa nhúng suggestEmployees (mới có API).
 - File chứng nhận: mới lưu `mediaId` (chưa gắn upload trong UI). KPI đọc theo tên performer/technicianName +
   SessionStaff.employeeId (chưa chuẩn hoá hoàn toàn về employeeId).
-- **Timezone**: mô hình hiện tại là "wall-clock VN đóng Z" (xem trên) — đúng cho input người dùng & availability;
-  dấu thời gian máy sinh (`audit_logs.createdAt = now()`) là true-UTC nên hiển thị lệch −7h so giờ VN. Refactor
-  true-UTC toàn hệ thống (convert Asia/Ho_Chi_Minh khi hiển thị + đổi input parse + reseed) để phase riêng.
+- **Timezone**: đã chuẩn hóa true-UTC + hiển thị Asia/Ho_Chi_Minh ở layer dùng chung (xem trên) — audit
+  `createdAt=now()` cũng hiển thị đúng giờ VN. Nếu về sau hỗ trợ đa múi giờ (chi nhánh khác vùng) cần chuyển
+  offset cố định +7 sang tz-per-branch — hiện ngoài phạm vi (VN một múi giờ).
 
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 

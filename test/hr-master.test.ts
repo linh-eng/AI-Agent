@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword, SESSION_COOKIE } from "@/lib/auth";
 import { resetDb, uniq } from "./helpers";
 import { resolveRoleFee, employeeAvailability, suggestEmployeesForBooking, currentRoleFees } from "@/lib/hr";
+import { parseVnLocal } from "@/lib/timezone";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "@/lib/rbac";
 import { POST as staffLogin } from "@/app/api/auth/login/route";
 import { POST as roleFeePost } from "@/app/api/employees/[id]/role-fees/route";
@@ -96,8 +97,9 @@ describe("Mục 8.2 — Availability (khác isActive): ca làm / nghỉ phép / 
   afterAll(async () => { await prisma.$disconnect(); });
 
   // Chọn 1 ngày có thứ cố định để test lịch: 2026-08-17 là Thứ 2 (dayOfWeek=1).
-  const monday9 = new Date("2026-08-17T09:00:00");
-  const monday10 = new Date("2026-08-17T10:00:00");
+  // Dùng parseVnLocal → true-UTC, giờ VN (Asia/Ho_Chi_Minh) ổn định bất kể TZ tiến trình.
+  const monday9 = parseVnLocal("2026-08-17T09:00");
+  const monday10 = parseVnLocal("2026-08-17T10:00");
 
   it("nghỉ việc (RESIGNED) → không available; không được gợi ý", async () => {
     const e = await emp({ status: "RESIGNED", roles: ["Kỹ thuật viên"] });
@@ -117,12 +119,12 @@ describe("Mục 8.2 — Availability (khác isActive): ca làm / nghỉ phép / 
   it("nghỉ phép trùng giờ → không available (onLeave)", async () => {
     const e = await emp({ roles: ["Kỹ thuật viên"] });
     await prisma.employeeSchedule.create({ data: { employeeId: e.id, dayOfWeek: 1, startTime: "08:00", endTime: "17:00" } });
-    await prisma.employeeLeave.create({ data: { employeeId: e.id, type: "ANNUAL", fromAt: new Date("2026-08-17T08:00:00"), toAt: new Date("2026-08-17T12:00:00") } });
+    await prisma.employeeLeave.create({ data: { employeeId: e.id, type: "ANNUAL", fromAt: parseVnLocal("2026-08-17T08:00"), toAt: parseVnLocal("2026-08-17T12:00") } });
     const av = await employeeAvailability(e.id, monday9, monday10);
     expect(av.onLeave).toBe(true);
     expect(av.available).toBe(false);
     // Sau 13:00 (ngoài khoảng nghỉ) → rảnh lại
-    const av2 = await employeeAvailability(e.id, new Date("2026-08-17T13:30:00"), new Date("2026-08-17T14:30:00"));
+    const av2 = await employeeAvailability(e.id, parseVnLocal("2026-08-17T13:30"), parseVnLocal("2026-08-17T14:30"));
     expect(av2.available).toBe(true);
   });
 
@@ -130,8 +132,8 @@ describe("Mục 8.2 — Availability (khác isActive): ca làm / nghỉ phép / 
     const e = await emp({ fullName: "KTV Busy", roles: ["Kỹ thuật viên"] });
     await prisma.employeeSchedule.create({ data: { employeeId: e.id, dayOfWeek: 1, startTime: "08:00", endTime: "17:00" } });
     const cust = await prisma.customer.create({ data: { code: uniq("KH"), fullName: "KH" } });
-    await prisma.booking.create({ data: { code: uniq("BK"), customerId: cust.id, scheduledAt: new Date("2026-08-17T09:00:00"), durationMinutes: 60, technician: "KTV Busy", status: "CONFIRMED" } });
-    const av = await employeeAvailability(e.id, new Date("2026-08-17T09:30:00"), new Date("2026-08-17T10:30:00"));
+    await prisma.booking.create({ data: { code: uniq("BK"), customerId: cust.id, scheduledAt: parseVnLocal("2026-08-17T09:00"), durationMinutes: 60, technician: "KTV Busy", status: "CONFIRMED" } });
+    const av = await employeeAvailability(e.id, parseVnLocal("2026-08-17T09:30"), parseVnLocal("2026-08-17T10:30"));
     expect(av.bookingConflict).toBe(true);
     expect(av.available).toBe(false);
   });

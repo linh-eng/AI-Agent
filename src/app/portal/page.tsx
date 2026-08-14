@@ -6,14 +6,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/client";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, formatDateTime } from "@/lib/utils";
 import {
   BOOKING_STATUS_LABEL, PLAN_STATUS_LABEL, PROPOSAL_STATUS_LABEL, PROPOSAL_STATUS_TONE,
   CARE_KIND_LABEL, RECOMMENDATION_PRIORITY_LABEL,
 } from "@/lib/clinic-labels";
 
+// Hiển thị giờ VN (Asia/Ho_Chi_Minh) đồng nhất với toàn app.
 function fmt(d: string) {
-  return new Date(d).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return formatDateTime(d);
 }
 
 export default function PortalHome() {

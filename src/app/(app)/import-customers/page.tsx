@@ -195,7 +195,7 @@ export default function ImportCustomersPage() {
                     <TD>{a.index + 1}</TD>
                     <TD>{a.normalized.fullName || <span className="text-destructive">(trống)</span>}</TD>
                     <TD>{a.normalized.phone ?? "—"}</TD>
-                    <TD>{a.normalized.dob ? new Date(a.normalized.dob).toLocaleDateString("vi-VN") : "—"}</TD>
+                    <TD>{a.normalized.dob ? new Date(a.normalized.dob).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) : "—"}</TD>
                     <TD><Badge tone={STATUS_TONE[a.status]}>{STATUS_LABEL[a.status]}</Badge></TD>
                     <TD className="text-xs text-muted-foreground">{a.status === "ERROR" ? a.errors.join(", ") : a.status === "DUPLICATE" ? `Trùng theo ${a.matchedBy === "phone" ? "SĐT" : a.matchedBy === "legacyId" ? "mã cũ" : "trong lô"}` : ""}</TD>
                   </TR>

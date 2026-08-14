@@ -7,8 +7,9 @@ import { PERMISSIONS } from "@/lib/rbac";
 import { bookingRescheduleSchema } from "@/lib/clinic-validation";
 import { detectBookingConflicts, suggestAlternativeSlots, logBookingActivity } from "@/lib/booking";
 import { auditLog } from "@/lib/clinic";
+import { VN_TZ } from "@/lib/timezone";
 
-const hhmm = (d: Date) => d.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+const hhmm = (d: Date) => d.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: VN_TZ });
 const resStr = (b: { technician?: string | null; master?: string | null; room?: string | null; bed?: string | null; machine?: string | null }) =>
   [b.technician && `KTV ${b.technician}`, b.master && `Master ${b.master}`, b.room && `Phòng ${b.room}`, b.bed && `Giường ${b.bed}`, b.machine && `Máy ${b.machine}`].filter(Boolean).join(", ") || "—";
 

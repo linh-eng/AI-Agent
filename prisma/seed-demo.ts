@@ -19,11 +19,16 @@ import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/auth";
 import { consumeFromContainer, consumeFromCustomerMaterial } from "../src/lib/spa-material-service";
 import { createFloorVersion, transitionFloorVersion } from "../src/lib/price-floor-service";
+import { parseVnLocal } from "../src/lib/timezone";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 
 const prisma = new PrismaClient();
+
+// Thời gian nghiệp vụ nhập bằng GIỜ VN → lưu true-UTC (chuẩn Asia/Ho_Chi_Minh, xem
+// src/lib/timezone.ts). `vnts("2026-08-20T08:00:00")` = 08:00 VN → 01:00Z.
+const vnts = (isoVn: string) => parseVnLocal(isoVn.replace(/(\.\d+)?Z$/i, ""));
 
 const STORAGE_DIR = process.env.STORAGE_DIR ?? `${process.cwd()}/var/uploads`;
 
@@ -233,21 +238,21 @@ async function main() {
   const kMoi = await prisma.customer.create({
     data: { code: "KH-100001", fullName: "Lê Minh Anh", gender: "FEMALE", phone: "0900100001", source: "Zalo", group: "Thường", assignedTo: "Lê Thị CSKH", campaignId: campTiktok.id, dob: new Date("1994-03-18"), legacyId: "MYSPA-8842", legacySource: "MySpa" },
   });
-  await prisma.crmActivity.create({ data: { customerId: kMoi.id, type: "INTERNAL_NOTE", content: "Khách mới để lại số qua TikTok, chưa tư vấn.", performedBy: "Lê Thị CSKH", occurredAt: new Date("2026-08-05T02:00:00Z") } });
+  await prisma.crmActivity.create({ data: { customerId: kMoi.id, type: "INTERNAL_NOTE", content: "Khách mới để lại số qua TikTok, chưa tư vấn.", performedBy: "Lê Thị CSKH", occurredAt: vnts("2026-08-05T02:00:00") } });
 
   // 2) ĐANG TƯ VẤN
   const kTuVan = await prisma.customer.create({
     data: { code: "KH-100002", fullName: "Trần Bảo Ngọc", gender: "FEMALE", phone: "0900100002", source: "Giới thiệu", group: "Thường", assignedTo: "Phạm Chuyên Viên", goals: "Trẻ hóa, nâng cơ", dob: new Date("1996-08-20") },
   });
   await prisma.assessment.create({ data: { customerId: kTuVan.id, name: "Da chảy xệ nhẹ", area: "Đường viền hàm", severity: "Nhẹ", description: "Bắt đầu chùng nhẹ vùng hàm", assessedBy: "Phạm Chuyên Viên" } });
-  await prisma.crmActivity.create({ data: { customerId: kTuVan.id, type: "CONSULT", content: "Tư vấn HIFU vs RF, khách đang cân nhắc ngân sách.", result: "Đang cân nhắc", performedBy: "Phạm Chuyên Viên", occurredAt: new Date("2026-08-06T04:00:00Z"), nextAction: "Gửi báo giá", followUpDate: new Date("2026-08-12T02:00:00Z"), followUpOwner: "Phạm Chuyên Viên" } });
-  await prisma.task.create({ data: { title: "Gửi báo giá HIFU cho khách Bảo Ngọc", customerId: kTuVan.id, assignee: "Phạm Chuyên Viên", dueDate: new Date("2026-08-12T02:00:00Z"), priority: "NORMAL", status: "OPEN", createdBy: "Phạm Chuyên Viên" } });
+  await prisma.crmActivity.create({ data: { customerId: kTuVan.id, type: "CONSULT", content: "Tư vấn HIFU vs RF, khách đang cân nhắc ngân sách.", result: "Đang cân nhắc", performedBy: "Phạm Chuyên Viên", occurredAt: vnts("2026-08-06T04:00:00"), nextAction: "Gửi báo giá", followUpDate: vnts("2026-08-12T02:00:00"), followUpOwner: "Phạm Chuyên Viên" } });
+  await prisma.task.create({ data: { title: "Gửi báo giá HIFU cho khách Bảo Ngọc", customerId: kTuVan.id, assignee: "Phạm Chuyên Viên", dueDate: vnts("2026-08-12T02:00:00"), priority: "NORMAL", status: "OPEN", createdBy: "Phạm Chuyên Viên" } });
 
   // 3) ĐÃ BOOKING (chưa thực hiện)
   const kBooking = await prisma.customer.create({
     data: { code: "KH-100003", fullName: "Phạm Gia Hân", gender: "FEMALE", phone: "0900100003", source: "Facebook", group: "Thường", assignedTo: "Nguyễn Lễ Tân" },
   });
-  await prisma.booking.create({ data: { code: "BK-100001", customerId: kBooking.id, serviceId: svcRF.id, scheduledAt: new Date("2026-08-18T07:00:00Z"), durationMinutes: 45, room: "Phòng 2", bed: "Giường A", machine: "Máy RF #1", technician: "Phạm Chuyên Viên", master: "Trần Quản Lý", performer: "Phạm Chuyên Viên", status: "CONFIRMED", price: 1_800_000 } });
+  await prisma.booking.create({ data: { code: "BK-100001", customerId: kBooking.id, serviceId: svcRF.id, scheduledAt: vnts("2026-08-18T07:00:00"), durationMinutes: 45, room: "Phòng 2", bed: "Giường A", machine: "Máy RF #1", technician: "Phạm Chuyên Viên", master: "Trần Quản Lý", performer: "Phạm Chuyên Viên", status: "CONFIRMED", price: 1_800_000 } });
 
   // 4) ĐANG THỰC HIỆN PHÁC ĐỒ (đầy đủ) — có portal
   const kDangPD = await prisma.customer.create({
@@ -259,7 +264,7 @@ async function main() {
       code: "TP-100001", customerId: kDangPD.id, name: "Phác đồ trẻ hóa 8 buổi", version: 1, status: "ACTIVE",
       diagnosis: "Lão hóa nhẹ-vừa vùng má/hàm", goals: "Trẻ hóa, nâng cơ, gọn đường hàm sau 8 buổi",
       totalPrice: 32_000_000, createdBy: "Phạm Chuyên Viên", designer: "Phạm Chuyên Viên",
-      approver: "Trần Quản Lý", approvedAt: new Date("2026-08-15T02:00:00Z"),
+      approver: "Trần Quản Lý", approvedAt: vnts("2026-08-15T02:00:00"),
       plannedStartDate: new Date("2026-08-20"), plannedEndDate: new Date("2026-12-20"),
       note: "Phác đồ demo minh họa 4 lớp: Phác đồ → Giai đoạn → Buổi dự kiến → Lần thực hiện.",
       stages: { create: [
@@ -275,12 +280,12 @@ async function main() {
     },
     include: { stages: { orderBy: { orderIndex: "asc" } } },
   });
-  const bkLinh1 = await prisma.booking.create({ data: { code: "BK-100002", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: new Date("2026-07-25T07:00:00Z"), durationMinutes: 45, room: "Phòng 2", performer: "Phạm Chuyên Viên", status: "COMPLETED", price: 1_800_000 } });
+  const bkLinh1 = await prisma.booking.create({ data: { code: "BK-100002", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: vnts("2026-07-25T07:00:00"), durationMinutes: 45, room: "Phòng 2", performer: "Phạm Chuyên Viên", status: "COMPLETED", price: 1_800_000 } });
   const sLinh1 = await prisma.treatmentSession.create({
     data: {
       code: "SS-100001",
       planId: planLinh.id, stageId: planLinh.stages[0].id, customerId: kDangPD.id, bookingId: bkLinh1.id, serviceId: svcRF.id,
-      sessionNumber: 1, name: "RF nâng cơ buổi 1", status: "COMPLETED", scheduledAt: new Date("2026-07-25T07:00:00Z"), performedAt: new Date("2026-07-25T07:15:00Z"),
+      sessionNumber: 1, name: "RF nâng cơ buổi 1", status: "COMPLETED", scheduledAt: vnts("2026-07-25T07:00:00"), performedAt: vnts("2026-07-25T07:15:00"),
       performer: "Phạm Chuyên Viên", objective: "RF vùng má", actualParams: { nang_luong: "làm ấm 42°C" }, conditionBefore: "Da chùng nhẹ", conditionAfter: "Săn hơn tức thì", customerFeedback: "Ưng ý", plannedCost: 500_000, actualCost: 480_000, price: 1_800_000, checkedBy: "Trần Quản Lý",
       // KẾ HOẠCH buổi (khớp thực tế) + ghim version thực hiện = 1
       plannedServiceId: svcRF.id, plannedTechnologyId: techRF.id, plannedProtocolId: protoDemo.id, technologyId: techRF.id, brandProtocolId: protoDemo.id,
@@ -334,7 +339,7 @@ async function main() {
     { employeeId: nvKTV.id, role: "KTV chính", fee: 250_000, effectiveFrom: new Date("2024-03-01"), createdBy: "Trần Quản Lý" },
     { employeeId: nvKTV.id, role: "Hỗ trợ", fee: 100_000, effectiveFrom: new Date("2024-03-01"), createdBy: "Trần Quản Lý" },
     // Master: 500k đến hết 31/08/2026, từ 01/09/2026 tăng 600k (bản cũ đóng hạn) — mục 5.
-    { employeeId: nvMaster.id, role: "Master", fee: 500_000, effectiveFrom: new Date("2023-01-10"), effectiveTo: new Date("2026-08-31T23:59:59Z"), createdBy: "Ban giám đốc" },
+    { employeeId: nvMaster.id, role: "Master", fee: 500_000, effectiveFrom: new Date("2023-01-10"), effectiveTo: vnts("2026-08-31T23:59:59"), createdBy: "Ban giám đốc" },
     { employeeId: nvMaster.id, role: "Master", fee: 600_000, effectiveFrom: new Date("2026-09-01"), createdBy: "Ban giám đốc" },
     { employeeId: nvMaster.id, role: "Kiểm tra", fee: 200_000, effectiveFrom: new Date("2023-01-10"), createdBy: "Ban giám đốc" },
   ] });
@@ -361,7 +366,7 @@ async function main() {
 
   // Nghỉ phép (mục 9,22): Phạm Chuyên Viên nghỉ 20/08/2026 08:00–12:00 (giờ VN).
   // Lưu wall-clock VN (đóng Z) đồng nhất với Lịch hẹn/Buổi — xem src/lib/timezone.ts.
-  await prisma.employeeLeave.create({ data: { employeeId: nvKTV.id, type: "ANNUAL", fromAt: new Date("2026-08-20T08:00:00Z"), toAt: new Date("2026-08-20T12:00:00Z"), reason: "Nghỉ phép cá nhân buổi sáng", createdBy: "Trần Quản Lý" } });
+  await prisma.employeeLeave.create({ data: { employeeId: nvKTV.id, type: "ANNUAL", fromAt: vnts("2026-08-20T08:00:00"), toAt: vnts("2026-08-20T12:00:00"), reason: "Nghỉ phép cá nhân buổi sáng", createdBy: "Trần Quản Lý" } });
 
   // Phân công buổi RF #1: KTV chính + Master kiểm tra (fee SNAPSHOT — buổi cũ không đổi khi phí master đổi).
   await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvKTV.id, staffName: nvKTV.fullName, role: "PRIMARY", fee: 250_000 } });
@@ -432,7 +437,7 @@ async function main() {
       planId: planLinh.id, stageId: planLinh.stages[0].id, customerId: kDangPD.id, serviceId: svcRF.id,
       sessionNumber: 2, name: "RF làm sạch nền da buổi 2", status: "COMPLETED",
       plannedServiceId: svcRF.id, plannedTechnologyId: techRF.id, plannedProtocolId: protoDemo.id, technologyId: techRF.id, brandProtocolId: protoDemo.id,
-      plannedDate: new Date("2026-08-27"), scheduledAt: new Date("2026-08-27T07:00:00Z"), performedAt: new Date("2026-08-27T07:15:00Z"), performer: "Phạm Chuyên Viên",
+      plannedDate: new Date("2026-08-27"), scheduledAt: vnts("2026-08-27T07:00:00"), performedAt: vnts("2026-08-27T07:15:00"), performer: "Phạm Chuyên Viên",
       plannedMaterials: { text: "Gel RF 5 ml" }, actualMaterials: { text: "Gel RF 5 ml" }, plannedCost: 500_000, actualCost: 500_000, price: 1_800_000, checkedBy: "Trần Quản Lý", versionAtExecution: 1,
     },
   });
@@ -451,8 +456,8 @@ async function main() {
       warnings: "Da vùng má nhạy cảm nhẹ — giảm mức năng lượng, theo dõi phản ứng sau bắn", currentMeds: "Vitamin C uống",
       // C — Thực tế (đổi so với kế hoạch):
       serviceId: svcHIFU.id, technologyId: techHIFU.id, brandProtocolId: protoLift.id, treatmentArea: "Đường hàm 2 bên + dưới cằm",
-      actualStartAt: new Date("2026-09-03T07:00:00Z"), actualEndAt: new Date("2026-09-03T08:00:00Z"),
-      scheduledAt: new Date("2026-09-03T07:00:00Z"), performedAt: new Date("2026-09-03T07:20:00Z"), performer: "Phạm Chuyên Viên",
+      actualStartAt: vnts("2026-09-03T07:00:00"), actualEndAt: vnts("2026-09-03T08:00:00"),
+      scheduledAt: vnts("2026-09-03T07:00:00"), performedAt: vnts("2026-09-03T07:20:00"), performer: "Phạm Chuyên Viên",
       objective: "Chuyển sang HIFU do da đáp ứng tốt", actualParams: { text: "HIFU 4.5mm, 3 line, mức 1.0J" }, actualMaterials: { text: "Gel siêu âm 7 ml" }, actualCost: 700_000,
       steps: { items: [{ name: "Đánh dấu vùng" }, { name: "Bắn HIFU theo line" }, { name: "Làm dịu & dặn dò" }] },
       // F — Sau khi thực hiện:
@@ -475,12 +480,12 @@ async function main() {
   await prisma.sessionReview.create({ data: { sessionId: sLinh3.id, customerId: kDangPD.id, satisfactionScore: 5, technicianScore: 5, technicianName: "Phạm Chuyên Viên", comment: "Rất ưng, đường hàm gọn.", wouldReturn: true, technicianReport: "Da đáp ứng tốt HIFU, đề xuất giữ HIFU cho buổi can thiệp còn lại.", reviewedBy: "Phạm Chuyên Viên" } });
   // Buổi 4 (Can thiệp) — buổi DỰ KIẾN đã có LỊCH HẸN (mục 12): minh họa liên kết Buổi ↔ Booking.
   const bkLinh3 = await prisma.booking.create({
-    data: { code: "BK-100020", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: new Date("2026-09-10T07:00:00Z"), durationMinutes: 60, room: "Phòng 2", technician: "Phạm Chuyên Viên", status: "CONFIRMED", confirmedAt: new Date("2026-09-05T02:00:00Z"), price: 1_800_000, createdBy: "Nguyễn Lễ Tân", planId: planLinh.id, stageId: planLinh.stages[1].id, sessionNumber: 4 },
+    data: { code: "BK-100020", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: vnts("2026-09-10T07:00:00"), durationMinutes: 60, room: "Phòng 2", technician: "Phạm Chuyên Viên", status: "CONFIRMED", confirmedAt: vnts("2026-09-05T02:00:00"), price: 1_800_000, createdBy: "Nguyễn Lễ Tân", planId: planLinh.id, stageId: planLinh.stages[1].id, sessionNumber: 4 },
   });
   await prisma.treatmentSession.create({
     data: {
       planId: planLinh.id, stageId: planLinh.stages[1].id, customerId: kDangPD.id, bookingId: bkLinh3.id, serviceId: svcRF.id,
-      sessionNumber: 4, name: "RF nâng cơ buổi 4", status: "PLANNED", scheduledAt: new Date("2026-09-10T07:00:00Z"),
+      sessionNumber: 4, name: "RF nâng cơ buổi 4", status: "PLANNED", scheduledAt: vnts("2026-09-10T07:00:00"),
       plannedServiceId: svcRF.id, plannedTechnologyId: techRF.id, plannedProtocolId: protoDemo.id,
       plannedDate: new Date("2026-09-10"), objective: "RF vùng má buổi 4", plannedParams: { text: "RF 42°C" }, plannedMaterials: { text: "Gel RF 5 ml" }, plannedCost: 500_000, price: 1_800_000,
     },
@@ -507,7 +512,7 @@ async function main() {
   });
   await prisma.treatmentPlan.update({
     where: { id: planLinh.id },
-    data: { version: 2, changeLog: { items: [{ fromVersion: 1, toVersion: 2, reason: "Khách đáp ứng chậm hơn dự kiến, cần kéo dài giai đoạn phục hồi.", changedBy: "Phạm Chuyên Viên", at: "2026-09-05T02:00:00Z" }] } },
+    data: { version: 2, changeLog: { items: [{ fromVersion: 1, toVersion: 2, reason: "Khách đáp ứng chậm hơn dự kiến, cần kéo dài giai đoạn phục hồi.", changedBy: "Phạm Chuyên Viên", at: vnts("2026-09-05T02:00:00").toISOString() }] } },
   });
   // Before/After ảnh thật (placeholder) cho buổi 1
   await writeBlob("demo/before-linh.png", PNG_BEFORE);
@@ -535,38 +540,38 @@ async function main() {
   });
   // --- Hướng dẫn chăm sóc ĐÃ GỬI cho khách (instance, snapshot nội dung) ---
   await prisma.careInstructionInstance.create({
-    data: { kind: "POST_CARE", title: "Dặn dò sau RF buổi 1", content: "Uống đủ nước, tránh nắng, dùng chống nắng SPF50, không xông hơi 3 ngày.", customerId: kDangPD.id, sessionId: sLinh1.id, deliveredVia: "ZALO", deliveredAt: new Date("2026-07-25T10:00:00Z"), providedBy: "Lê Thị CSKH" },
+    data: { kind: "POST_CARE", title: "Dặn dò sau RF buổi 1", content: "Uống đủ nước, tránh nắng, dùng chống nắng SPF50, không xông hơi 3 ngày.", customerId: kDangPD.id, sessionId: sLinh1.id, deliveredVia: "ZALO", deliveredAt: vnts("2026-07-25T10:00:00"), providedBy: "Lê Thị CSKH" },
   });
   // --- Việc follow-up CSKH đang chờ ---
   await prisma.task.create({
-    data: { title: "Gọi hỏi thăm sau RF buổi 1", customerId: kDangPD.id, assignee: "Lê Thị CSKH", dueDate: new Date("2026-08-19T02:00:00Z"), priority: "NORMAL", status: "OPEN", channel: "ZALO", createdBy: "Lê Thị CSKH" },
+    data: { title: "Gọi hỏi thăm sau RF buổi 1", customerId: kDangPD.id, assignee: "Lê Thị CSKH", dueDate: vnts("2026-08-19T02:00:00"), priority: "NORMAL", status: "OPEN", channel: "ZALO", createdBy: "Lê Thị CSKH" },
   });
   // --- Lịch hẹn SẮP TỚI (HIFU buổi 2) — LIÊN KẾT PHÁC ĐỒ (Case 7) ---
   await prisma.booking.create({
     data: {
-      code: "BK-100004", customerId: kDangPD.id, serviceId: svcHIFU.id, scheduledAt: new Date("2026-08-20T07:00:00Z"), durationMinutes: 60,
+      code: "BK-100004", customerId: kDangPD.id, serviceId: svcHIFU.id, scheduledAt: vnts("2026-08-20T07:00:00"), durationMinutes: 60,
       room: "Phòng 3", bed: "Giường B", machine: "Máy HIFU #1", technician: "Phạm Chuyên Viên", master: "Trần Quản Lý", performer: "Phạm Chuyên Viên",
-      status: "CONFIRMED", confirmedAt: new Date("2026-08-15T02:00:00Z"), price: 6_000_000, createdBy: "Nguyễn Lễ Tân",
+      status: "CONFIRMED", confirmedAt: vnts("2026-08-15T02:00:00"), price: 6_000_000, createdBy: "Nguyễn Lễ Tân",
       planId: planLinh.id, stageId: planLinh.stages[1].id, sessionNumber: 2, assistants: ["Đỗ Thu Ngân"],
     },
   });
   // --- Lịch hẹn ĐÃ ĐỔI LỊCH (Case 5) — có lịch sử đổi lịch ---
   await prisma.booking.create({
     data: {
-      code: "BK-100005", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: new Date("2026-08-22T09:00:00Z"), durationMinutes: 60,
+      code: "BK-100005", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: vnts("2026-08-22T09:00:00"), durationMinutes: 60,
       room: "Phòng 2", technician: "Phạm Chuyên Viên", status: "CONFIRMED", price: 1_800_000, createdBy: "Nguyễn Lễ Tân",
       rescheduleHistory: [
-        { from: "2026-08-22T07:00:00.000Z", to: "2026-08-22T09:00:00.000Z", oldResources: "KTV Phạm Chuyên Viên, Phòng 2", newResources: "KTV Phạm Chuyên Viên, Phòng 2", by: "Nguyễn Lễ Tân", at: "2026-08-16T03:00:00.000Z", reason: "Khách bận buổi sáng sớm" },
+        { from: vnts("2026-08-22T07:00:00").toISOString(), to: vnts("2026-08-22T09:00:00").toISOString(), oldResources: "KTV Phạm Chuyên Viên, Phòng 2", newResources: "KTV Phạm Chuyên Viên, Phòng 2", by: "Nguyễn Lễ Tân", at: vnts("2026-08-16T03:00:00").toISOString(), reason: "Khách bận buổi sáng sớm" },
       ],
     },
   });
   // --- Lịch hẹn ĐẶT ĐÈ trùng lịch có LÝ DO (Case 6) — chỉ người có quyền mới đè ---
   await prisma.booking.create({
     data: {
-      code: "BK-100006", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: new Date("2026-08-20T07:30:00Z"), durationMinutes: 60,
+      code: "BK-100006", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: vnts("2026-08-20T07:30:00"), durationMinutes: 60,
       technician: "Phạm Chuyên Viên", room: "Phòng 1", status: "CONFIRMED", price: 1_800_000, createdBy: "Trần Quản Lý",
       overrideLog: [
-        { by: "Trần Quản Lý", at: "2026-08-17T04:00:00.000Z", reason: "Khách VIP yêu cầu đúng khung giờ", conflicts: ['Kỹ thuật viên "Phạm Chuyên Viên" (BK-100004)'] },
+        { by: "Trần Quản Lý", at: vnts("2026-08-17T04:00:00").toISOString(), reason: "Khách VIP yêu cầu đúng khung giờ", conflicts: ['Kỹ thuật viên "Phạm Chuyên Viên" (BK-100004)'] },
       ],
     },
   });
@@ -587,7 +592,7 @@ async function main() {
 
   // --- Lịch hẹn HÔM NAY (2026-08-13) đủ TRẠNG THÁI để xem View Ngày (mục 7–8) ---
   const KTV = "Phạm Chuyên Viên";
-  const day = (h: number) => new Date(`2026-08-13T${String(h).padStart(2, "0")}:00:00Z`);
+  const day = (h: number) => vnts(`2026-08-13T${String(h).padStart(2, "0")}:00:00`);
   await prisma.booking.create({ data: { code: "BK-100010", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(8), durationMinutes: 60, technician: KTV, room: "Phòng 1", status: "NEW", price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
   await prisma.booking.create({ data: { code: "BK-100011", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(9), durationMinutes: 60, technician: KTV, room: "Phòng 1", status: "CONFIRMED", confirmedAt: day(8), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
   await prisma.booking.create({ data: { code: "BK-100012", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(10), durationMinutes: 60, technician: KTV, room: "Phòng 2", status: "ARRIVED", checkedInAt: day(10), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
@@ -596,15 +601,15 @@ async function main() {
   await prisma.booking.create({ data: { code: "BK-100015", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(14), durationMinutes: 60, technician: "Lê Thị CSKH", room: "Phòng 1", status: "CANCELLED", cancelReason: "Khách báo bận đột xuất", cancelledBy: "Nguyễn Lễ Tân", cancelledAt: day(9), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
   await prisma.booking.create({ data: { code: "BK-100016", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(15), durationMinutes: 60, technician: "Lê Thị CSKH", room: "Phòng 2", status: "NO_SHOW", noShowReason: "Không liên lạc được", noShowBy: "Nguyễn Lễ Tân", noShowAt: day(16), price: 1_800_000, createdBy: "Nguyễn Lễ Tân" } });
   await prisma.booking.create({ data: { code: "BK-100017", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: day(16), durationMinutes: 60, technician: KTV, room: "Phòng 3", status: "CONFIRMED", confirmedAt: day(12), price: 1_800_000, createdBy: "Nguyễn Lễ Tân",
-    rescheduleHistory: [ { from: "2026-08-13T07:00:00.000Z", to: "2026-08-13T16:00:00.000Z", oldResources: `KTV ${KTV}, Phòng 3`, newResources: `KTV ${KTV}, Phòng 3`, by: "Nguyễn Lễ Tân", at: "2026-08-12T03:00:00.000Z", reason: "Khách yêu cầu đổi giờ sang chiều" } ] } });
+    rescheduleHistory: [ { from: vnts("2026-08-13T07:00:00").toISOString(), to: vnts("2026-08-13T16:00:00").toISOString(), oldResources: `KTV ${KTV}, Phòng 3`, newResources: `KTV ${KTV}, Phòng 3`, by: "Nguyễn Lễ Tân", at: vnts("2026-08-12T03:00:00").toISOString(), reason: "Khách yêu cầu đổi giờ sang chiều" } ] } });
   // --- Biểu mẫu đã áp cho khách (snapshot schema, không đổi mẫu gốc) ---
   const skinForm = await prisma.formTemplate.findUnique({ where: { code: "FORM-SKIN-ASSESS" } });
   if (skinForm) {
     await prisma.formInstance.create({
-      data: { templateId: skinForm.id, templateVersion: skinForm.version, schemaSnapshot: skinForm.schema as any, customerId: kDangPD.id, planId: planLinh.id, name: "Phiếu đánh giá da – Đỗ Thùy Linh", status: "COMPLETED", completedBy: "Phạm Chuyên Viên", completedAt: new Date("2026-07-25T07:00:00Z"), createdBy: "Phạm Chuyên Viên" },
+      data: { templateId: skinForm.id, templateVersion: skinForm.version, schemaSnapshot: skinForm.schema as any, customerId: kDangPD.id, planId: planLinh.id, name: "Phiếu đánh giá da – Đỗ Thùy Linh", status: "COMPLETED", completedBy: "Phạm Chuyên Viên", completedAt: vnts("2026-07-25T07:00:00"), createdBy: "Phạm Chuyên Viên" },
     });
   }
-  await prisma.crmActivity.create({ data: { customerId: kDangPD.id, type: "CALL", content: "Nhắc lịch HIFU buổi 2, khách xác nhận.", result: "Xác nhận", performedBy: "Lê Thị CSKH", occurredAt: new Date("2026-08-10T03:00:00Z"), nextAction: "Chuẩn bị phòng HIFU", followUpDate: new Date("2026-08-19T02:00:00Z"), followUpOwner: "Lê Thị CSKH" } });
+  await prisma.crmActivity.create({ data: { customerId: kDangPD.id, type: "CALL", content: "Nhắc lịch HIFU buổi 2, khách xác nhận.", result: "Xác nhận", performedBy: "Lê Thị CSKH", occurredAt: vnts("2026-08-10T03:00:00"), nextAction: "Chuẩn bị phòng HIFU", followUpDate: vnts("2026-08-19T02:00:00"), followUpOwner: "Lê Thị CSKH" } });
   // Báo giá 3 phương án — ĐÃ CHỐT phương án "Khuyến nghị" → tạo HÓA ĐƠN → thu một phần.
   const proposalLinh = await prisma.treatmentProposal.create({
     data: {
@@ -622,7 +627,7 @@ async function main() {
   await prisma.treatmentProposal.update({
     where: { id: proposalLinh.id },
     data: {
-      acceptedOptionId: chosen.id, acceptedAt: new Date("2026-08-01T02:00:00Z"), acceptedBy: "Đỗ Thùy Linh", agreedPrice: agreedLinh,
+      acceptedOptionId: chosen.id, acceptedAt: vnts("2026-08-01T02:00:00"), acceptedBy: "Đỗ Thùy Linh", agreedPrice: agreedLinh,
       acceptedSnapshot: { optionId: chosen.id, kind: chosen.kind, name: chosen.name, discount: 400_000, computedTotal: agreedLinh, items: chosen.items.map((it) => ({ itemType: it.itemType, name: it.name, quantity: it.quantity, unitPrice: it.unitPrice, isHomeCare: it.isHomeCare })) },
     },
   });
@@ -639,21 +644,21 @@ async function main() {
   // Thu 2 đợt vào hóa đơn (tổng 8.000.000 ≤ tổng phải thu 11.900.000) → còn phải
   // thu 3.900.000. Mọi khoản thu đều gắn hóa đơn nên "Đã thanh toán" luôn ≤ "Tổng
   // phải thu" (không có tiền dư trộn vào).
-  await prisma.payment.create({ data: { code: "PT-000001", customerId: kDangPD.id, invoiceId: invLinh.id, amount: 5_000_000, method: "TRANSFER", txnRef: "CK20260801", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đợt 1 hóa đơn nâng cơ", paidAt: new Date("2026-08-01T03:00:00Z") } });
-  await prisma.payment.create({ data: { code: "PT-000002", customerId: kDangPD.id, invoiceId: invLinh.id, amount: 3_000_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đợt 2 hóa đơn nâng cơ", paidAt: new Date("2026-08-08T03:00:00Z") } });
+  await prisma.payment.create({ data: { code: "PT-000001", customerId: kDangPD.id, invoiceId: invLinh.id, amount: 5_000_000, method: "TRANSFER", txnRef: "CK20260801", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đợt 1 hóa đơn nâng cơ", paidAt: vnts("2026-08-01T03:00:00") } });
+  await prisma.payment.create({ data: { code: "PT-000002", customerId: kDangPD.id, invoiceId: invLinh.id, amount: 3_000_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đợt 2 hóa đơn nâng cơ", paidAt: vnts("2026-08-08T03:00:00") } });
   // Phiếu thu ghi nhầm → HỦY (giữ vết, không xóa; KHÔNG tính vào "đã trả").
   // receivedBy = người THU ban đầu (Đỗ Thu Ngân); voidedBy/voidedAt/voidReason = người HỦY /
   // thời điểm / lý do — LƯU RIÊNG, không ghi đè người thu. Kèm bản ghi audit_logs như route ghi.
-  const pt3 = await prisma.payment.create({ data: { code: "PT-000003", customerId: kDangPD.id, invoiceId: invLinh.id, amount: 500_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thu nhầm — đã hủy", paidAt: new Date("2026-08-08T04:00:00Z"), voidedAt: new Date("2026-08-08T05:00:00Z"), voidReason: "Thu nhầm hóa đơn khác", voidedBy: "Trần Quản Lý" } });
+  const pt3 = await prisma.payment.create({ data: { code: "PT-000003", customerId: kDangPD.id, invoiceId: invLinh.id, amount: 500_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thu nhầm — đã hủy", paidAt: vnts("2026-08-08T04:00:00"), voidedAt: vnts("2026-08-08T05:00:00"), voidReason: "Thu nhầm hóa đơn khác", voidedBy: "Trần Quản Lý" } });
   await prisma.auditLog.create({ data: { action: "PAYMENT_VOID", entityType: "Payment", entityId: pt3.id, changes: { code: "PT-000003", reason: "Thu nhầm hóa đơn khác", voidedBy: "Trần Quản Lý", amount: 500_000 } as any } });
   // Tiền cọc lịch hẹn 1.000.000 — ĐANG GIỮ (ACTIVE), có thể phân bổ vào hóa đơn (mục 17).
-  await prisma.deposit.create({ data: { code: "DC-000001", customerId: kDangPD.id, amount: 1_000_000, method: "TRANSFER", txnRef: "CK-COC-01", status: "ACTIVE", receivedBy: "Nguyễn Lễ Tân", receivedAt: new Date("2026-08-05T02:00:00Z"), note: "Cọc giữ chỗ lịch hẹn HIFU" } });
+  await prisma.deposit.create({ data: { code: "DC-000001", customerId: kDangPD.id, amount: 1_000_000, method: "TRANSFER", txnRef: "CK-COC-01", status: "ACTIVE", receivedBy: "Nguyễn Lễ Tân", receivedAt: vnts("2026-08-05T02:00:00"), note: "Cọc giữ chỗ lịch hẹn HIFU" } });
   // Báo giá minh họa ĐỦ 8 TRẠNG THÁI lifecycle (mục 15): đã có SENT (PROP-000001) + CONVERTED
   // (PROP-100001); bổ sung DRAFT/VIEWING/ACCEPTED/REJECTED/EXPIRED/CANCELLED cho khách KH-100004.
   const lifecycleDemo: Array<{ code: string; status: string; title: string; extra?: any }> = [
     { code: "PROP-100002", status: "DRAFT", title: "Nháp gói dưỡng da" },
     { code: "PROP-100003", status: "VIEWING", title: "Khách đang xem gói trẻ hóa" },
-    { code: "PROP-100004", status: "ACCEPTED", title: "Đã chốt gói mụn (chưa lập HĐ)", extra: { acceptedAt: new Date("2026-08-12T02:00:00Z"), acceptedBy: "Đỗ Thùy Linh", agreedPrice: 4_000_000, acceptedSnapshot: { name: "Gói mụn", computedTotal: 4_000_000, items: [{ name: "Facial làm sạch sâu", quantity: 4, unitPrice: 1_000_000 }] } } },
+    { code: "PROP-100004", status: "ACCEPTED", title: "Đã chốt gói mụn (chưa lập HĐ)", extra: { acceptedAt: vnts("2026-08-12T02:00:00"), acceptedBy: "Đỗ Thùy Linh", agreedPrice: 4_000_000, acceptedSnapshot: { name: "Gói mụn", computedTotal: 4_000_000, items: [{ name: "Facial làm sạch sâu", quantity: 4, unitPrice: 1_000_000 }] } } },
     { code: "PROP-100005", status: "REJECTED", title: "Khách từ chối gói cao cấp" },
     { code: "PROP-100006", status: "EXPIRED", title: "Báo giá hết hiệu lực" },
     { code: "PROP-100007", status: "CANCELLED", title: "Báo giá đã hủy" },
@@ -695,22 +700,22 @@ async function main() {
     const s = await prisma.treatmentSession.create({ data: { planId: planChi.id, stageId: planChi.stages[0].id, customerId: kXong.id, sessionNumber: i, name: `Trị mụn buổi ${i}`, status: "COMPLETED", performedAt: new Date(`2026-06-${10 + i}T07:00:00Z`), performer: "Phạm Chuyên Viên", actualCost: 300_000, price: 1_500_000, checkedBy: "Trần Quản Lý" } });
     if (i === 1) sChi1 = s;
   }
-  await prisma.payment.create({ data: { customerId: kXong.id, planId: planChi.id, amount: 6_000_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đủ phác đồ trị mụn", paidAt: new Date("2026-06-11T09:00:00Z") } });
-  await prisma.crmActivity.create({ data: { customerId: kXong.id, type: "INTERNAL_NOTE", content: "Hoàn thành phác đồ, khách hài lòng, giới thiệu bạn.", result: "Rất hài lòng", performedBy: "Lê Thị CSKH", occurredAt: new Date("2026-07-01T03:00:00Z") } });
+  await prisma.payment.create({ data: { customerId: kXong.id, planId: planChi.id, amount: 6_000_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đủ phác đồ trị mụn", paidAt: vnts("2026-06-11T09:00:00") } });
+  await prisma.crmActivity.create({ data: { customerId: kXong.id, type: "INTERNAL_NOTE", content: "Hoàn thành phác đồ, khách hài lòng, giới thiệu bạn.", result: "Rất hài lòng", performedBy: "Lê Thị CSKH", occurredAt: vnts("2026-07-01T03:00:00") } });
 
   // 6) ĐANG FOLLOW-UP
   const kFollow = await prisma.customer.create({
     data: { code: "KH-100006", fullName: "Hoàng Yến Nhi", gender: "FEMALE", phone: "0900100006", source: "Facebook", group: "Thường", assignedTo: "Lê Thị CSKH", goals: "Duy trì sau trị nám" },
   });
-  await prisma.crmActivity.create({ data: { customerId: kFollow.id, type: "CALL", content: "Follow-up sau 1 tháng, da ổn định, tư vấn duy trì.", result: "Ổn định", performedBy: "Lê Thị CSKH", occurredAt: new Date("2026-08-08T03:00:00Z"), nextAction: "Mời gói duy trì", followUpDate: new Date("2026-08-22T02:00:00Z"), followUpOwner: "Lê Thị CSKH" } });
-  await prisma.task.create({ data: { title: "Mời khách Yến Nhi gói duy trì hằng tháng", customerId: kFollow.id, assignee: "Lê Thị CSKH", dueDate: new Date("2026-08-22T02:00:00Z"), priority: "LOW", status: "OPEN", createdBy: "Lê Thị CSKH" } });
+  await prisma.crmActivity.create({ data: { customerId: kFollow.id, type: "CALL", content: "Follow-up sau 1 tháng, da ổn định, tư vấn duy trì.", result: "Ổn định", performedBy: "Lê Thị CSKH", occurredAt: vnts("2026-08-08T03:00:00"), nextAction: "Mời gói duy trì", followUpDate: vnts("2026-08-22T02:00:00"), followUpOwner: "Lê Thị CSKH" } });
+  await prisma.task.create({ data: { title: "Mời khách Yến Nhi gói duy trì hằng tháng", customerId: kFollow.id, assignee: "Lê Thị CSKH", dueDate: vnts("2026-08-22T02:00:00"), priority: "LOW", status: "OPEN", createdBy: "Lê Thị CSKH" } });
 
   // 7) Khách nam — booking + đánh giá
   const kNam = await prisma.customer.create({
     data: { code: "KH-100007", fullName: "Bùi Tuấn Kiệt", gender: "MALE", phone: "0900100007", source: "Google", group: "Thường", assignedTo: "Nguyễn Lễ Tân", goals: "Trị sẹo rỗ" },
   });
   await prisma.assessment.create({ data: { customerId: kNam.id, name: "Sẹo rỗ hai bên má", area: "Má", severity: "Vừa", description: "Sẹo box/rolling nông", assessedBy: "Phạm Chuyên Viên" } });
-  await prisma.booking.create({ data: { code: "BK-100003", customerId: kNam.id, serviceId: svcRF.id, scheduledAt: new Date("2026-08-21T08:00:00Z"), durationMinutes: 45, room: "Phòng 3", machine: "Máy RF #2", technician: "Phạm Chuyên Viên", performer: "Phạm Chuyên Viên", status: "NEW", price: 1_800_000 } });
+  await prisma.booking.create({ data: { code: "BK-100003", customerId: kNam.id, serviceId: svcRF.id, scheduledAt: vnts("2026-08-21T08:00:00"), durationMinutes: 45, room: "Phòng 3", machine: "Máy RF #2", technician: "Phạm Chuyên Viên", performer: "Phạm Chuyên Viên", status: "NEW", price: 1_800_000 } });
 
   // ==========================================================================
   // DEMO VẬT TƯ — 2 trường hợp bắt buộc.

@@ -1,52 +1,63 @@
 // =============================================================================
-// MÚI GIỜ — hệ thống vận hành MỘT múi giờ: Asia/Ho_Chi_Minh (UTC+7, KHÔNG DST).
+// MÚI GIỜ — CHUẨN HIỂN THỊ NGHIỆP VỤ: Asia/Ho_Chi_Minh (UTC+7, KHÔNG DST).
 // -----------------------------------------------------------------------------
-// Quy ước lưu trữ (đồng nhất toàn app: Lịch hẹn / Buổi / Nghỉ phép / CRM):
-//   Thời gian NGƯỜI DÙNG NHẬP (giờ làm việc VN) được lưu dưới dạng "wall-clock VN"
-//   — tức đúng các chữ số giờ VN, đóng dấu UTC (Z). Ví dụ: khách nhập 08:00 (giờ VN)
-//   → lưu 08:00Z. Nhờ vậy nghiệp vụ (so lịch, phát hiện trùng, nghỉ phép) chỉ cần
-//   so sánh cùng một hệ quy chiếu, KHÔNG lệch ±7h giữa các thực thể.
-//
-//   ĐỂ ỔN ĐỊNH BẤT KỂ MÚI GIỜ TIẾN TRÌNH (container/CI có thể là UTC hay khác):
-//   - Hiển thị & định dạng: trích theo `timeZone: "UTC"` (đọc lại đúng wall-clock VN).
-//   - Logic lịch (thứ/giờ/phút): dùng `vnClock()` (getUTC*), KHÔNG dùng getHours()
-//     (vốn phụ thuộc TZ tiến trình → sai availability nếu container ≠ UTC).
-//   - Nhận input datetime-local (không kèm chỉ định múi): coi là giờ VN → đóng Z.
-//
-//   Vì VN cố định UTC+7 (không có giờ mùa hè), quy ước này chính xác và đơn giản;
-//   không cần thư viện tz. (Chuyển sang lưu true-UTC + convert Asia/Ho_Chi_Minh cho
-//   TOÀN BỘ module là refactor lớn — ghi ở technical debt, ngoài phạm vi hiện tại.)
+// MÔ HÌNH (thống nhất toàn app — layer dùng chung, KHÔNG vá từng màn):
+//   * LƯU TRỮ = true-UTC (instant thật). Prisma/`now()` lưu UTC; thời gian người
+//     dùng nhập (giờ VN) được CHUYỂN sang UTC trước khi lưu (trừ 7h).
+//   * HIỂN THỊ = luôn convert sang Asia/Ho_Chi_Minh. MỌI chỗ format ngày giờ
+//     (formatDate/formatDateTime/formatTime + mọi toLocale* trong UI) đều đặt
+//     `timeZone: "Asia/Ho_Chi_Minh"` → cùng một record hiển thị GIỐNG NHAU ở mọi
+//     màn, bất kể múi giờ trình duyệt/máy chủ.
+//   * LOGIC LỊCH (thứ/giờ/phút cho availability) qua `vnClock()` = convert UTC→VN.
+//   * NHẬP LIỆU datetime-local (giờ VN, không kèm offset) qua `parseVnLocal()` →
+//     true-UTC (trừ 7h). Chuỗi đã có offset/Z → tôn trọng; chuỗi chỉ-ngày giữ nguyên.
+// Vì VN cố định UTC+7 (không giờ mùa hè), dùng offset cố định — chính xác, không
+// cần thư viện tz.
 // =============================================================================
 
 export const VN_TZ = "Asia/Ho_Chi_Minh";
 export const VN_OFFSET_MINUTES = 7 * 60; // UTC+7, không DST
 
 /**
- * Chuẩn hóa input thời gian về Date "wall-clock VN" (đóng Z), ổn định bất kể TZ
- * tiến trình:
- *  - Date  → giữ nguyên.
- *  - Chuỗi chỉ có NGÀY ("yyyy-MM-dd") → JS parse là UTC 00:00 (đã là wall-clock).
- *  - Chuỗi ĐÃ có múi giờ (…Z / ±hh:mm) → tôn trọng nguyên trạng.
- *  - Chuỗi datetime-local ("yyyy-MM-ddTHH:mm[:ss]", giờ VN) → coi là VN, đóng Z.
+ * Chuẩn hóa input thời gian → true-UTC Date:
+ *  - Date → giữ nguyên.
+ *  - "yyyy-MM-dd" (chỉ ngày) → UTC 00:00 (dob / ngày kế hoạch — không có giờ).
+ *  - "…Z" / "…±hh:mm" (đã có múi giờ) → tôn trọng nguyên trạng.
+ *  - "yyyy-MM-ddTHH:mm[:ss]" (datetime-local, GIỜ VN) → true-UTC (trừ 7h).
  */
 export function parseVnLocal(input: string | Date): Date {
   if (input instanceof Date) return input;
   const s = String(input).trim();
-  if (!s.includes("T") && !s.includes(" ")) return new Date(s); // chỉ ngày
-  if (/[zZ]$|[+-]\d\d:?\d\d$/.test(s)) return new Date(s); // đã có múi giờ
-  return new Date(s.replace(" ", "T") + "Z"); // wall-clock VN → đóng Z
+  const m = s.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?\s*(Z|[+-]\d{2}:?\d{2})?$/
+  );
+  if (!m) return new Date(s); // định dạng lạ → để JS tự parse
+  const [, y, mo, d, hh, mi, ss, tz] = m;
+  if (tz) return new Date(s); // đã có múi giờ → tôn trọng
+  if (hh === undefined) return new Date(`${y}-${mo}-${d}T00:00:00.000Z`); // chỉ ngày
+  const utcMs =
+    Date.UTC(+y, +mo - 1, +d, +hh, +mi, ss ? +ss : 0) - VN_OFFSET_MINUTES * 60_000;
+  return new Date(utcMs);
 }
 
-/** Trích wall-clock VN (thứ 0–6, giờ, phút, ngày/tháng/năm) từ một Date đã lưu. */
+/** true-UTC instant → wall-clock VN (thứ 0–6, giờ, phút, ngày/tháng/năm). */
 export function vnClock(d: Date): {
   dow: number; hour: number; minute: number; year: number; month: number; day: number;
 } {
+  const v = new Date(d.getTime() + VN_OFFSET_MINUTES * 60_000);
   return {
-    dow: d.getUTCDay(),
-    hour: d.getUTCHours(),
-    minute: d.getUTCMinutes(),
-    year: d.getUTCFullYear(),
-    month: d.getUTCMonth() + 1,
-    day: d.getUTCDate(),
+    dow: v.getUTCDay(),
+    hour: v.getUTCHours(),
+    minute: v.getUTCMinutes(),
+    year: v.getUTCFullYear(),
+    month: v.getUTCMonth() + 1,
+    day: v.getUTCDate(),
   };
+}
+
+/** Giờ VN dạng HH:mm (dùng chung cho lịch/booking thay cho toLocaleTimeString thô). */
+export function formatVnTime(value: Date | string | null | undefined): string {
+  if (!value) return "—";
+  const d = typeof value === "string" ? new Date(value) : value;
+  return new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: VN_TZ }).format(d);
 }
