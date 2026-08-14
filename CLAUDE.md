@@ -1318,7 +1318,9 @@ năng lực/chứng nhận/ca/nghỉ). Chứng nhận hết hạn hiện badge �
 - **NV-000001 Phạm Chuyên Viên** (ACTIVE): KTV chính 250k + Hỗ trợ 100k; năng lực RF+HIFU; chứng nhận (1 còn
   hạn + 1 **hết hạn** → cảnh báo); lịch T2–T6 08:00–17:00; **nghỉ 20/08/2026 08:00–12:00**.
 - **NV-000002 Trần Quản Lý**: Master **500k đến 31/08/2026, 600k từ 01/09** (hiệu lực ngày); Kiểm tra 200k;
-  năng lực chỉ HIFU (để demo lọc năng lực).
+  năng lực HIFU.
+- **NV-000004 Đỗ Thu Ngân**: khai báo năng lực **chỉ RF (không HIFU)** → bị **loại** khỏi gợi ý Booking HIFU
+  (demo lọc theo năng lực); nhân sự chưa khai năng lực (NV-000003) thì không bị chặn.
 - **NV-000005 Ngô Nghỉ Việc**: RESIGNED (không được phân công mới; lịch sử giữ).
 
 ### Múi giờ (timezone) — `src/lib/timezone.ts` — CHUẨN: true-UTC + hiển thị Asia/Ho_Chi_Minh

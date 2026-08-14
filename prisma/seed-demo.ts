@@ -350,8 +350,11 @@ async function main() {
     { employeeId: nvKTV.id, kind: "TECHNOLOGY", refId: hrTechHIFU?.id ?? null, name: hrTechHIFU?.name ?? "HIFU" },
     { employeeId: nvKTV.id, kind: "SERVICE", refId: svcRF.id, name: "RF nâng cơ mặt" },
     { employeeId: nvKTV.id, kind: "SERVICE", refId: svcHIFU.id, name: "Nâng cơ HIFU" },
-    // Master chỉ có năng lực HIFU (để demo lọc năng lực khác nhau).
+    // Master có năng lực HIFU (công nghệ + dịch vụ) — để demo lọc năng lực khác nhau.
     { employeeId: nvMaster.id, kind: "TECHNOLOGY", refId: hrTechHIFU?.id ?? null, name: hrTechHIFU?.name ?? "HIFU" },
+    { employeeId: nvMaster.id, kind: "SERVICE", refId: svcHIFU.id, name: "Nâng cơ HIFU" },
+    // NV-000004 khai báo năng lực CHỈ RF (không HIFU) → bị LOẠI khỏi gợi ý HIFU (demo lọc năng lực).
+    { employeeId: nvSale.id, kind: "SERVICE", refId: svcRF.id, name: "RF nâng cơ mặt" },
   ] });
 
   // Chứng nhận (mục 7): 1 còn hạn + 1 đã hết hạn (để hiện cảnh báo).
