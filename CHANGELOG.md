@@ -3,6 +3,12 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.3.0 — 2026-08-14
+- **Xóa dữ liệu nghiệp vụ (dọn demo):** nút trong trang Sao lưu & Phục hồi (chỉ Quản trị, gõ
+  "XOA" để xác nhận) — xóa sạch sản phẩm, nhóm hàng, NCC, kho, tồn/lô, phiếu, kiểm kê, dịch vụ,
+  tài sản, tay cầm… nhưng **giữ nguyên người dùng, phân quyền và cài đặt công ty**.
+- Kèm lệnh `npm run db:clear-demo` cho ai thích dùng dòng lệnh.
+
 ## 1.2.0 — 2026-08-14
 - **Hủy ghi nhận dịch vụ:** trang Ghi nhận dịch vụ có nút **Hủy** (chỉ Quản trị/Quản lý) —
   tự **hoàn lại tồn kho** (hủy phiếu xuất tiêu hao liên quan, giữ phiếu ở trạng thái ĐÃ HỦY để

@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { Download, Upload, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Download, Upload, AlertTriangle, ShieldAlert, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,9 @@ export default function BackupPage() {
   const canManage = useCan(PERMISSIONS.USER_MANAGE);
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState<"backup" | "restore" | null>(null);
+  const [busy, setBusy] = useState<"backup" | "restore" | "clear" | null>(null);
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  const [clearConfirm, setClearConfirm] = useState("");
 
   if (!canManage) {
     return (
@@ -81,6 +82,39 @@ export default function BackupPage() {
       });
       setFile(null);
       if (fileRef.current) fileRef.current.value = "";
+    } catch (e) {
+      setMsg({ tone: "err", text: e instanceof Error ? e.message : "Lỗi" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function clearBusiness() {
+    if (clearConfirm !== "XOA") {
+      setMsg({ tone: "err", text: 'Vui lòng gõ đúng chữ "XOA" để xác nhận.' });
+      return;
+    }
+    if (
+      !window.confirm(
+        "XÓA TOÀN BỘ dữ liệu nghiệp vụ (sản phẩm, kho, phiếu, tồn kho, dịch vụ, tài sản…)? Người dùng và cài đặt công ty được giữ lại. Thao tác KHÔNG THỂ hoàn tác."
+      )
+    )
+      return;
+    setMsg(null);
+    setBusy("clear");
+    try {
+      const res = await fetch("/api/admin/clear-business", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: "XOA" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Xóa dữ liệu thất bại");
+      setClearConfirm("");
+      setMsg({
+        tone: "ok",
+        text: `Đã xóa ${json.data?.total ?? 0} bản ghi dữ liệu nghiệp vụ. Người dùng & cài đặt công ty được giữ nguyên. Giờ chị có thể bắt đầu nhập dữ liệu thật.`,
+      });
     } catch (e) {
       setMsg({ tone: "err", text: e instanceof Error ? e.message : "Lỗi" });
     } finally {
@@ -169,6 +203,43 @@ export default function BackupPage() {
               trên PostgreSQL để sao lưu nhị phân toàn bộ cơ sở dữ liệu.
             </li>
           </ul>
+        </CardContent>
+      </Card>
+
+      {/* Vùng nguy hiểm — Xóa dữ liệu nghiệp vụ */}
+      <Card className="mt-4 border-destructive/40">
+        <CardContent className="p-5">
+          <div className="mb-1 flex items-center gap-2">
+            <Trash2 className="h-5 w-5 text-destructive" />
+            <h3 className="font-semibold text-destructive">Vùng nguy hiểm — Xóa dữ liệu nghiệp vụ</h3>
+          </div>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Xóa toàn bộ dữ liệu demo/nghiệp vụ để bắt đầu nhập dữ liệu thật: sản phẩm, nhóm hàng, thương hiệu,
+            nhà cung cấp, kho, tồn kho &amp; lô, phiếu nhập–xuất–chuyển, kiểm kê, dịch vụ &amp; ghi nhận, tài
+            sản, tay cầm. <b>Giữ nguyên</b> phần Hệ thống: <b>người dùng, phân quyền và cài đặt công ty</b>.
+          </p>
+          <div className="mb-3 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
+            <span>
+              Thao tác này <b>KHÔNG THỂ hoàn tác</b>. Hãy bấm “Tải bản sao lưu” ở trên trước khi xóa.
+            </span>
+          </div>
+          <label className="mb-1 block text-sm font-medium">Gõ “XOA” để xác nhận</label>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={clearConfirm}
+              onChange={(e) => setClearConfirm(e.target.value)}
+              placeholder="XOA"
+              className="h-9 w-40 rounded-md border border-input bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <Button
+              variant="destructive"
+              onClick={clearBusiness}
+              disabled={busy !== null || clearConfirm !== "XOA"}
+            >
+              <Trash2 className="h-4 w-4" /> {busy === "clear" ? "Đang xóa…" : "Xóa dữ liệu nghiệp vụ"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

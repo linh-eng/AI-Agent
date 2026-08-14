@@ -1,6 +1,6 @@
 {
   "name": "sophia-wellness-warehouse",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "Webapp quản lý kho Sophia Wellness — Nhập/Xuất kho, tồn theo lô & hạn sử dụng, cảnh báo",
   "scripts": {
@@ -14,6 +14,7 @@
     "prisma:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:sync-rbac": "tsx prisma/sync-rbac.ts",
+    "db:clear-demo": "tsx prisma/clear-demo.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
