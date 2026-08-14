@@ -5,7 +5,7 @@
 import { prisma } from "./prisma";
 import { HttpError } from "./session";
 import { nextServiceUsageCode } from "./codes";
-import { createIssue } from "./outbound-service";
+import { createIssue, reverseAndCancelIssueTx } from "./outbound-service";
 
 export interface ServiceUsageInput {
   serviceId: string;
@@ -82,4 +82,36 @@ export async function recordServiceUsage(input: ServiceUsageInput, userId: strin
   });
 
   return { id: usage.id, code: usage.code, issueId: issue.id, issueCode: issue.code };
+}
+
+/**
+ * Hủy 1 ghi nhận dịch vụ: hoàn tồn kho bằng cách hủy phiếu xuất tiêu hao liên
+ * quan (đảo bút toán) rồi xóa bản ghi ghi nhận (để không còn tính vào doanh thu).
+ * Giữ phiếu xuất ở trạng thái ĐÃ HỦY để tra cứu. Bắt buộc lý do.
+ */
+export async function cancelServiceUsage(id: string, reason: string, userId: string) {
+  const usage = await prisma.serviceUsage.findUnique({ where: { id } });
+  if (!usage) throw new HttpError(404, "Không tìm thấy ghi nhận dịch vụ");
+
+  return prisma.$transaction(async (tx) => {
+    if (usage.issueId) {
+      await reverseAndCancelIssueTx(
+        tx,
+        usage.issueId,
+        `Hủy ghi nhận dịch vụ ${usage.code}: ${reason}`,
+        "Hủy ghi nhận dịch vụ"
+      );
+    }
+    await tx.serviceUsage.delete({ where: { id } });
+    await tx.auditLog.create({
+      data: {
+        userId,
+        action: "SERVICE_USAGE_CANCEL",
+        entityType: "ServiceUsage",
+        entityId: id,
+        detail: `${usage.code}${usage.issueCode ? ` → hủy ${usage.issueCode}` : ""} — ${reason}`,
+      },
+    });
+    return { id: usage.id, code: usage.code, issueCode: usage.issueCode };
+  });
 }

@@ -3,6 +3,12 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.2.0 — 2026-08-14
+- **Hủy ghi nhận dịch vụ:** trang Ghi nhận dịch vụ có nút **Hủy** (chỉ Quản trị/Quản lý) —
+  tự **hoàn lại tồn kho** (hủy phiếu xuất tiêu hao liên quan, giữ phiếu ở trạng thái ĐÃ HỦY để
+  tra cứu) và gỡ ghi nhận khỏi doanh thu; bắt buộc lý do, ghi `audit_logs`.
+- Thông báo khi cố hủy trực tiếp phiếu xuất sinh từ dịch vụ nay chỉ rõ đường xử lý đúng.
+
 ## 1.1.1 — 2026-08-14
 - **Sửa lỗi:** phiếu nhập/xuất nhiều dòng hàng đôi khi **không lưu được mà không báo lỗi**
   (do ô chọn gõ-tìm đặt `required` ẩn khiến trình duyệt chặn submit im lặng). Nay:

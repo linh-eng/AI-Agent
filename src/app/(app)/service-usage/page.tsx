@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Ban } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -41,6 +41,7 @@ interface Usage {
 
 export default function ServiceUsagePage() {
   const canUse = useCan(PERMISSIONS.SERVICE_USE);
+  const canManage = useCan(PERMISSIONS.SERVICE_WRITE);
   const [rows, setRows] = useState<Usage[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -49,6 +50,30 @@ export default function ServiceUsagePage() {
   const [error, setError] = useState<string | null>(null);
   const [inventory, setInventory] = useState<InvRow[]>([]);
   const [form, setForm] = useState({ serviceId: "", warehouseId: "", sessions: "1", customerName: "", note: "" });
+  // Hủy ghi nhận dịch vụ
+  const [cancelFor, setCancelFor] = useState<Usage | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  async function doCancel() {
+    if (!cancelFor) return;
+    setCancelError(null);
+    setCancelBusy(true);
+    try {
+      await apiFetch(`/api/service-usages/${cancelFor.id}`, {
+        method: "DELETE",
+        body: JSON.stringify({ reason: cancelReason }),
+      });
+      setCancelFor(null);
+      setCancelReason("");
+      load();
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "Lỗi");
+    } finally {
+      setCancelBusy(false);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -130,16 +155,17 @@ export default function ServiceUsagePage() {
                 <TH>Phiếu xuất</TH>
                 <TH>Người TH</TH>
                 <TH>Thời gian</TH>
+                {canManage && <TH className="text-right">Thao tác</TH>}
               </TR>
             </THead>
             <TBody>
               {loading ? (
                 <TR>
-                  <TD colSpan={8} className="py-8 text-center text-muted-foreground">Đang tải…</TD>
+                  <TD colSpan={canManage ? 9 : 8} className="py-8 text-center text-muted-foreground">Đang tải…</TD>
                 </TR>
               ) : rows.length === 0 ? (
                 <TR>
-                  <TD colSpan={8} className="py-8 text-center text-muted-foreground">Chưa có ghi nhận</TD>
+                  <TD colSpan={canManage ? 9 : 8} className="py-8 text-center text-muted-foreground">Chưa có ghi nhận</TD>
                 </TR>
               ) : (
                 rows.map((u) => (
@@ -160,6 +186,22 @@ export default function ServiceUsagePage() {
                     </TD>
                     <TD className="text-muted-foreground">{u.performedBy.name}</TD>
                     <TD>{formatDate(u.performedAt)}</TD>
+                    {canManage && (
+                      <TD className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive"
+                          onClick={() => {
+                            setCancelFor(u);
+                            setCancelReason("");
+                            setCancelError(null);
+                          }}
+                        >
+                          <Ban className="h-3.5 w-3.5" /> Hủy
+                        </Button>
+                      </TD>
+                    )}
                   </TR>
                 ))
               )}
@@ -167,6 +209,45 @@ export default function ServiceUsagePage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Hủy ghi nhận dịch vụ */}
+      <Modal
+        open={!!cancelFor}
+        onClose={() => setCancelFor(null)}
+        title={`Hủy ghi nhận ${cancelFor?.code ?? ""}`}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Hệ thống sẽ <b>hoàn lại tồn kho</b> đã tiêu hao (hủy phiếu xuất{" "}
+            {cancelFor?.issueCode ? <span className="font-mono">{cancelFor.issueCode}</span> : "liên quan"}) và xóa
+            ghi nhận này khỏi doanh thu. Thao tác cần lý do và không thể tự hoàn tác.
+          </p>
+          <div className="space-y-1.5">
+            <Label>Lý do hủy *</Label>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              rows={3}
+              maxLength={300}
+              placeholder="Ví dụ: ghi nhận nhầm dịch vụ / nhầm số lượt…"
+              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+          {cancelError && <p className="text-sm text-destructive">{cancelError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setCancelFor(null)} disabled={cancelBusy}>
+              Đóng
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={doCancel}
+              disabled={cancelBusy || cancelReason.trim().length < 3}
+            >
+              {cancelBusy ? "Đang hủy…" : "Xác nhận hủy"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Ghi nhận thực hiện dịch vụ">
         <form onSubmit={submit} onKeyDown={focusNextOnEnter} className="space-y-4">

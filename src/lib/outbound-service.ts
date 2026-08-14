@@ -151,7 +151,7 @@ async function assertNotServiceIssue(id: string) {
   if (usage)
     throw new HttpError(
       400,
-      `Phiếu xuất này phát sinh từ ghi nhận dịch vụ (${usage.code}) — hãy điều chỉnh ở phần ghi nhận dịch vụ, không sửa/hủy trực tiếp.`
+      `Phiếu xuất này phát sinh từ ghi nhận dịch vụ (${usage.code}) — hãy vào "Ghi nhận dịch vụ", tìm dòng ${usage.code} và bấm "Hủy" để hoàn tồn, không sửa/hủy trực tiếp tại đây.`
     );
 }
 
@@ -187,6 +187,25 @@ async function reverseIssueTx(
       },
     });
   }
+}
+
+/**
+ * Hoàn tồn + đánh dấu CANCELLED cho 1 phiếu xuất trong transaction đang mở —
+ * KHÔNG kiểm tra nguồn gốc dịch vụ. Dùng cho luồng hủy ghi nhận dịch vụ.
+ */
+export async function reverseAndCancelIssueTx(
+  tx: Tx,
+  id: string,
+  reason: string,
+  label: string
+) {
+  const issue = await tx.goodsIssue.findUnique({ where: { id } });
+  if (!issue || issue.status === "CANCELLED") return;
+  await reverseIssueTx(tx, id, reason, issue.code, label);
+  await tx.goodsIssue.update({
+    where: { id },
+    data: { status: "CANCELLED", cancelReason: reason, cancelledAt: new Date() },
+  });
 }
 
 /** Hủy phiếu xuất đã ghi sổ: hoàn tồn về lô đã xuất + đánh dấu CANCELLED. */
