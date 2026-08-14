@@ -551,9 +551,31 @@ async function main() {
   await prisma.payment.create({ data: { code: "PT-000001", customerId: kDangPD.id, invoiceId: invLinh.id, amount: 5_000_000, method: "TRANSFER", txnRef: "CK20260801", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đợt 1 hóa đơn nâng cơ", paidAt: new Date("2026-08-01T03:00:00Z") } });
   await prisma.payment.create({ data: { code: "PT-000002", customerId: kDangPD.id, invoiceId: invLinh.id, amount: 3_000_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thanh toán đợt 2 hóa đơn nâng cơ", paidAt: new Date("2026-08-08T03:00:00Z") } });
   // Phiếu thu ghi nhầm → HỦY (giữ vết, không xóa; KHÔNG tính vào "đã trả").
-  await prisma.payment.create({ data: { code: "PT-000003", customerId: kDangPD.id, invoiceId: invLinh.id, amount: 500_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thu nhầm — đã hủy", paidAt: new Date("2026-08-08T04:00:00Z"), voidedAt: new Date("2026-08-08T05:00:00Z"), voidReason: "Thu nhầm hóa đơn khác", voidedBy: "Trần Quản Lý" } });
+  // receivedBy = người THU ban đầu (Đỗ Thu Ngân); voidedBy/voidedAt/voidReason = người HỦY /
+  // thời điểm / lý do — LƯU RIÊNG, không ghi đè người thu. Kèm bản ghi audit_logs như route ghi.
+  const pt3 = await prisma.payment.create({ data: { code: "PT-000003", customerId: kDangPD.id, invoiceId: invLinh.id, amount: 500_000, method: "CASH", receivedBy: "Đỗ Thu Ngân", note: "Thu nhầm — đã hủy", paidAt: new Date("2026-08-08T04:00:00Z"), voidedAt: new Date("2026-08-08T05:00:00Z"), voidReason: "Thu nhầm hóa đơn khác", voidedBy: "Trần Quản Lý" } });
+  await prisma.auditLog.create({ data: { action: "PAYMENT_VOID", entityType: "Payment", entityId: pt3.id, changes: { code: "PT-000003", reason: "Thu nhầm hóa đơn khác", voidedBy: "Trần Quản Lý", amount: 500_000 } as any } });
   // Tiền cọc lịch hẹn 1.000.000 — ĐANG GIỮ (ACTIVE), có thể phân bổ vào hóa đơn (mục 17).
   await prisma.deposit.create({ data: { code: "DC-000001", customerId: kDangPD.id, amount: 1_000_000, method: "TRANSFER", txnRef: "CK-COC-01", status: "ACTIVE", receivedBy: "Nguyễn Lễ Tân", receivedAt: new Date("2026-08-05T02:00:00Z"), note: "Cọc giữ chỗ lịch hẹn HIFU" } });
+  // Báo giá minh họa ĐỦ 8 TRẠNG THÁI lifecycle (mục 15): đã có SENT (PROP-000001) + CONVERTED
+  // (PROP-100001); bổ sung DRAFT/VIEWING/ACCEPTED/REJECTED/EXPIRED/CANCELLED cho khách KH-100004.
+  const lifecycleDemo: Array<{ code: string; status: string; title: string; extra?: any }> = [
+    { code: "PROP-100002", status: "DRAFT", title: "Nháp gói dưỡng da" },
+    { code: "PROP-100003", status: "VIEWING", title: "Khách đang xem gói trẻ hóa" },
+    { code: "PROP-100004", status: "ACCEPTED", title: "Đã chốt gói mụn (chưa lập HĐ)", extra: { acceptedAt: new Date("2026-08-12T02:00:00Z"), acceptedBy: "Đỗ Thùy Linh", agreedPrice: 4_000_000, acceptedSnapshot: { name: "Gói mụn", computedTotal: 4_000_000, items: [{ name: "Facial làm sạch sâu", quantity: 4, unitPrice: 1_000_000 }] } } },
+    { code: "PROP-100005", status: "REJECTED", title: "Khách từ chối gói cao cấp" },
+    { code: "PROP-100006", status: "EXPIRED", title: "Báo giá hết hiệu lực" },
+    { code: "PROP-100007", status: "CANCELLED", title: "Báo giá đã hủy" },
+  ];
+  for (const bg of lifecycleDemo) {
+    await prisma.treatmentProposal.create({
+      data: {
+        code: bg.code, customerId: kDangPD.id, title: bg.title, status: bg.status as any, createdBy: "Phạm Chuyên Viên",
+        ...(bg.extra ?? {}),
+        options: { create: [{ kind: "RECOMMENDED", name: "Phương án 1", orderIndex: 0, items: { create: [{ itemType: "SERVICE", name: "Dịch vụ mẫu", quantity: 1, unitPrice: 4_000_000, orderIndex: 0 }] } }] },
+      },
+    });
+  }
   await prisma.customerPortalAccount.upsert({
     where: { customerId: kDangPD.id }, update: {},
     create: { customerId: kDangPD.id, email: "linh.do@example.com", passwordHash: await hashPassword("khach123") },
