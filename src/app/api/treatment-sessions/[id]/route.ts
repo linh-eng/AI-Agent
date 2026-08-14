@@ -5,8 +5,21 @@ import { ok, handle, fail } from "@/lib/api";
 import { requirePermission, getSession } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { sessionUpdateSchema } from "@/lib/clinic-validation";
-import { canSeeFinance, maskFinance } from "@/lib/clinic";
+import { canSeeFinance, maskFinance, auditLog } from "@/lib/clinic";
 import { deriveStageStatus, PRE_EXECUTION_PLAN_STATUSES } from "@/lib/treatment-plan";
+
+// Các trường "thực tế" được kiểm khi sửa buổi đã hoàn thành (để ghi diff audit).
+const AUDIT_FIELDS = [
+  "status", "serviceId", "technologyId", "brandProtocolId", "performer", "treatmentArea",
+  "conditionBefore", "conditionAfter", "customerFeedback", "postCare", "note",
+  "actualCost", "incident", "handledAction", "nextSuggestion",
+] as const;
+function scalarStr(v: unknown): string {
+  if (v == null) return "";
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === "object") { try { return JSON.stringify(v); } catch { return String(v); } }
+  return String(v);
+}
 
 export const GET = handle(async (_req, { params }) => {
   await requirePermission(PERMISSIONS.TREATMENT_READ);
@@ -14,31 +27,83 @@ export const GET = handle(async (_req, { params }) => {
   const item = await prisma.treatmentSession.findUnique({
     where: { id: params.id },
     include: {
-      service: { select: { name: true } },
-      plan: { select: { code: true, name: true } },
-      customer: { select: { code: true, fullName: true } },
+      service: { select: { id: true, name: true } },
+      technology: { select: { id: true, name: true } },
+      brandProtocol: { select: { id: true, name: true, code: true, steps: true, contraindications: true } },
+      plan: { select: { id: true, code: true, name: true, version: true, status: true } },
+      stage: { select: { id: true, name: true, plannedStartDate: true, plannedEndDate: true } },
+      booking: {
+        select: {
+          id: true, code: true, scheduledAt: true, status: true, durationMinutes: true,
+          technician: true, master: true, room: true, bed: true, machine: true,
+        },
+      },
+      customer: { select: { id: true, code: true, fullName: true, phone: true } },
     },
   });
   if (!item) return fail(404, "Không tìm thấy buổi thực hiện");
   return ok(maskFinance(item, canSeeFinance(session), ["plannedCost", "actualCost"]));
 });
 
-// Ghi nhận thông số/vật tư/before-after/chi phí thực tế của buổi (mục 16, 17, 20)
+// Ghi nhận thông số/vật tư/before-after/chi phí thực tế của buổi (mục 16, 17, 20) + hoàn thành/sửa (mục 5)
 export const PATCH = handle(async (req, { params }) => {
-  await requirePermission(PERMISSIONS.TREATMENT_WRITE);
-  const parsed = sessionUpdateSchema.parse(await req.json());
+  const session = await requirePermission(PERMISSIONS.TREATMENT_WRITE);
+  const { editReason, ...parsed } = sessionUpdateSchema.parse(await req.json());
   const data: Record<string, unknown> = { ...parsed };
-  // Tự đóng dấu thời điểm thực hiện + ghim version phác đồ khi chuyển sang COMPLETED (mục 13, 19)
-  if (parsed.status === "COMPLETED") {
-    const cur = await prisma.treatmentSession.findUnique({
-      where: { id: params.id },
-      select: { performedAt: true, versionAtExecution: true, plan: { select: { version: true } } },
-    });
-    if (!parsed.performedAt && !cur?.performedAt) data.performedAt = new Date();
-    // Ghim version thực hiện nếu chưa có — buổi đã hoàn thành thuộc đúng version tại thời điểm đó
-    if (cur?.versionAtExecution == null) data.versionAtExecution = cur?.plan?.version ?? undefined;
+
+  const cur = await prisma.treatmentSession.findUnique({
+    where: { id: params.id },
+    select: {
+      status: true, performedAt: true, versionAtExecution: true, serviceId: true,
+      technologyId: true, brandProtocolId: true, performer: true, treatmentArea: true,
+      conditionBefore: true, conditionAfter: true, customerFeedback: true, postCare: true,
+      note: true, actualCost: true, incident: true, handledAction: true, nextSuggestion: true,
+      editLog: true, plan: { select: { version: true } },
+    },
+  });
+  if (!cur) return fail(404, "Không tìm thấy buổi thực hiện");
+  const wasCompleted = cur.status === "COMPLETED";
+
+  // KHÓA SAU HOÀN THÀNH (mục 29): buổi đã COMPLETED chỉ sửa được khi có quyền + lý do; ghi audit diff.
+  if (wasCompleted) {
+    if (!session.permissions.includes(PERMISSIONS.TREATMENT_EDIT_COMPLETED)) {
+      return fail(403, "Buổi đã hoàn thành — bạn không có quyền sửa ghi nhận đã hoàn thành.");
+    }
+    if (!editReason || !editReason.trim()) {
+      return fail(422, "Cần nhập lý do khi sửa buổi đã hoàn thành.");
+    }
   }
+
+  // VALIDATE HOÀN THÀNH (mục 28): cần có dịch vụ thực tế trước khi đánh dấu Hoàn thành.
+  if (parsed.status === "COMPLETED" && !wasCompleted) {
+    const effectiveService = parsed.serviceId ?? cur.serviceId;
+    if (!effectiveService) {
+      return fail(422, "Cần chọn dịch vụ thực tế trước khi hoàn thành buổi.");
+    }
+    if (!parsed.performedAt && !cur.performedAt) data.performedAt = new Date();
+    // Ghim version thực hiện nếu chưa có — buổi đã hoàn thành thuộc đúng version tại thời điểm đó
+    if (cur.versionAtExecution == null) data.versionAtExecution = cur.plan?.version ?? undefined;
+  }
+
   const item = await prisma.treatmentSession.update({ where: { id: params.id }, data });
+
+  // Ghi AUDIT khi sửa buổi đã hoàn thành: field nào đổi (trước/sau) + ai/khi/lý do (mục 29).
+  if (wasCompleted) {
+    const changes: { field: string; before: string; after: string }[] = [];
+    for (const f of AUDIT_FIELDS) {
+      if (!(f in parsed)) continue;
+      const before = scalarStr((cur as any)[f]);
+      const after = scalarStr((parsed as any)[f]);
+      if (before !== after) changes.push({ field: f, before, after });
+    }
+    const log = Array.isArray(cur.editLog) ? (cur.editLog as any[]) : [];
+    log.push({ by: session.name, at: new Date().toISOString(), reason: editReason!.trim(), changes });
+    await prisma.treatmentSession.update({ where: { id: params.id }, data: { editLog: log as any } });
+    await auditLog({
+      userId: session.userId, action: "SESSION_EDIT_COMPLETED", entityType: "TreatmentSession",
+      entityId: params.id, changes: { reason: editReason!.trim(), fields: changes.map((c) => c.field) },
+    });
+  }
 
   // Tự cập nhật trạng thái GIAI ĐOẠN khi buổi đổi trạng thái (mục 2 — xử lý khi đủ buổi):
   // đủ buổi hoàn thành → COMPLETED; có buổi hoàn thành → IN_PROGRESS. Tôn trọng CANCELLED thủ công.

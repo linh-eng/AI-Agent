@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { sessionCreateSchema } from "@/lib/clinic-validation";
 import { resolveItemPricing } from "@/lib/pricing";
+import { sequentialCode } from "@/lib/clinic";
 
 export const GET = handle(async (req) => {
   await requirePermission(PERMISSIONS.TREATMENT_READ);
@@ -47,8 +48,10 @@ export const POST = handle(async (req) => {
     if (unitPrice !== null) price = unitPrice;
   }
 
+  const code = sequentialCode("SS", await prisma.treatmentSession.count());
   const session = await prisma.treatmentSession.create({
     data: {
+      code,
       planId: parsed.planId,
       customerId: plan.customerId,
       stageId: parsed.stageId ?? null,

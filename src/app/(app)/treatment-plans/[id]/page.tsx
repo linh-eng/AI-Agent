@@ -249,8 +249,8 @@ export default function TreatmentPlanDetailPage() {
           onAddStage={() => setAddStageOpen(true)}
           onEditStage={setEditStage}
           onAddSession={(stageId: string | null) => { setAddStageFor(stageId); setAddOpen(true); }}
-          onDetail={setDetail}
-          onRecord={setRecord}
+          onDetail={(s: any) => router.push(`/sessions/${s.id}`)}
+          onRecord={(s: any) => router.push(`/sessions/${s.id}`)}
           onCreateBooking={createBookingFromSession}
         />
       )}

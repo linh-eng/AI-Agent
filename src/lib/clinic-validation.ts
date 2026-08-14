@@ -358,6 +358,24 @@ export const sessionUpdateSchema = z.object({
   plannedStaff: z.any().optional().nullable(),
   plannedDate: dateOpt,
   intervalDays: z.coerce.number().int().nonnegative().optional().nullable(),
+  // --- SESSION = LẦN THỰC HIỆN (mục 5) ---
+  // B — Trước khi thực hiện
+  prevReaction: z.string().optional().nullable(),
+  todayWish: z.string().optional().nullable(),
+  contraindications: z.string().optional().nullable(),
+  warnings: z.string().optional().nullable(),
+  currentMeds: z.string().optional().nullable(),
+  // C — Thực hiện thực tế
+  actualStartAt: dateOpt,
+  actualEndAt: dateOpt,
+  treatmentArea: z.string().optional().nullable(),
+  // F — Sau khi thực hiện
+  incident: z.string().optional().nullable(),
+  handledAction: z.string().optional().nullable(),
+  nextSuggestion: z.string().optional().nullable(),
+  followUpDate: dateOpt,
+  // Sửa sau khi hoàn thành (mục 29): lý do bắt buộc khi Session đã COMPLETED
+  editReason: z.string().optional().nullable(),
 });
 // Tạo lịch hẹn từ 1 buổi dự kiến (mục 11) — trả về payload prefill cho form Lịch hẹn
 export const sessionToBookingSchema = z.object({

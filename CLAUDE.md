@@ -1068,6 +1068,60 @@ buổi·sau 14 ngày·08/10) · Duy trì (1 buổi·sau 1 tháng·08/11). 8 bu�
 minh họa Kế hoạch≠Thực tế**: KH RF·Protocol GLOW·5 ml → TT HIFU·Protocol LIFT·7 ml. **Buổi 4** có lịch hẹn
 BK-100020 (liên kết Buổi↔Booking). **Phiên bản V1→V2** (lý do "kéo dài phục hồi", buổi hoàn thành ghim V1).
 
+## Ghi nhận lần thực hiện — Session (v0.14.0) — màn 7 khối A–G, hoàn thành/khóa/sửa-có-audit
+
+Nâng cấp **module Session = Lần thực hiện thực tế** (khác Booking, khác Buổi dự kiến). Chỉ đụng Session +
+integration tối thiểu (Phác đồ/Lịch hẹn/Vật tư/Before-After/Nhân sự/Hướng dẫn). KHÔNG sửa Khách hàng/Lịch
+hẹn/Dịch vụ/Phác đồ đã nghiệm thu (chỉ đổi điều hướng nút ghi-nhận sang màn Session). Migration
+**`K_session_execution`** (additive, 0 DROP; tổng **21 migration**). **161 test pass** (thêm `test/session.test.ts` 6).
+
+### Migration & schema (`K_session_execution`)
+`TreatmentSession` +`code` (unique, SS-xxxxxx) · B: `prevReaction`/`todayWish`/`contraindications`/`warnings`/
+`currentMeds` · C: `actualStartAt`/`actualEndAt`/`treatmentArea` · F: `incident`/`handledAction`/`nextSuggestion`/
+`followUpDate` · `editLog` Json (audit sửa sau hoàn thành). Cặp planned/actual + versionAtExecution (mục 4) giữ nguyên.
+
+### RBAC
+Thêm `TREATMENT_EDIT_COMPLETED` (`treatment.editCompleted`) — gán MANAGER + BOD; ADMIN auto qua `ALL_PERMISSIONS`.
+SPECIALIST có `treatment.write` nhưng KHÔNG có editCompleted → ghi buổi được, KHÔNG sửa buổi đã hoàn thành.
+
+### Backend (`src/app/api/treatment-sessions`)
+- POST: **sinh mã** `SS-xxxxxx` (`sequentialCode`).
+- PATCH: **validate hoàn thành** (mục 28) — chuyển COMPLETED phải có **dịch vụ thực tế** (`serviceId`), else 422;
+  tự đóng `performedAt` + ghim `versionAtExecution`. **Khóa sau hoàn thành** (mục 29) — buổi đã COMPLETED chỉ sửa
+  khi có `treatment.editCompleted` (else 403) **+ lý do bắt buộc** (else 422); ghi **diff** (field/before/after) vào
+  `editLog` + `auditLog` `SESSION_EDIT_COMPLETED`. Giữ auto cập nhật trạng thái giai đoạn/phác đồ (mục 4).
+- GET `[id]`: trả đủ context (plan code/name/version/status, stage, booking, service/technology/brandProtocol
+  tên + `steps`/`contraindications` của protocol) cho màn Session; mask `plannedCost`/`actualCost` theo `finance.read`.
+- Không thêm endpoint mới cho care/follow-up: dùng sẵn `/api/care-instructions` (lọc `serviceId`), `/api/care-instances`
+  (snapshot title+content), `/api/tasks` (tạo việc follow-up). Timeline khách: buổi hoàn thành hiện **"Đã thực hiện [dịch vụ]"** (mục 31).
+
+### UI — màn `/sessions/[id]` (7 khối A–G)
+Header: mã Session · khách · trạng thái + nút theo trạng thái (**Bắt đầu thực hiện** → IN_PROGRESS · **Hoàn thành
+buổi** → validate · **Sửa ghi nhận** nếu có quyền). **A** Thông tin buổi (khách/dịch vụ dự kiến/phác đồ v.version/
+giai đoạn/buổi/booking/ngày/version thực hiện). **B** Trước khi thực hiện (+ **banner đỏ cảnh báo** chống chỉ định/
+nguy cơ từ field hoặc từ Protocol; ảnh Before). **C** Thực tế (dịch vụ/CN/protocol thực tế + vùng + thông số thiết
+bị + bước [nạp từ Protocol] + giờ bắt đầu/kết thúc + **Biểu mẫu chuyên môn động** gắn FormTemplate snapshot version
++ bảng **Kế hoạch vs Thực tế**). **D** Nhân sự (SessionStaff, phí snapshot, mask tài chính). **E** Vật tư dự kiến +
+thực tế (SpaMaterialConsume — trừ tồn khi ghi nhận, KHÔNG trừ ở Booking; nguồn Kho vật tư sử dụng | Vật tư khách
+hàng; chặn âm tồn ở server). **F** Sau khi thực hiện (tình trạng/sự cố/xử lý + ảnh After + chia sẻ khách + gợi ý
+Hướng dẫn chăm sóc theo dịch vụ + tạo việc follow-up). **G** Đánh giá & Báo cáo (SessionReview — điểm khách + báo cáo
+nội bộ KTV). **Chế độ chỉ-xem khi COMPLETED**; "Sửa ghi nhận" bật edit + ô lý do bắt buộc; **Lịch sử chỉnh sửa** hiển
+thị `editLog`. Nút ghi-nhận/xem-kết-quả ở trang Phác đồ nay **điều hướng sang `/sessions/[id]`**.
+
+### Demo (seed:demo) — 3 case + nhân sự + Before/After
+- Case 1 (khớp KH): buổi 1 `SS-100001` RF đúng kế hoạch. Case 2 (khác KH): buổi 3 `SS-100003` — KH RF/GLOW/5ml → TT
+  HIFU/LIFT/7ml (đủ B/C/F + bước + giờ). Case 3 (JetPeel): 1 lọ 100ml dùng qua 3 buổi (5+7+6) → **còn 82ml**, chỉ trừ
+  khi Session ghi nhận (không trừ ở Booking).
+- Buổi 3: **3 nhân sự** (KTV chính 250k + Master 500k + Hỗ trợ 100k, phí snapshot) · **Before/After 1 chia sẻ + 1
+  nội bộ** · đánh giá 5/5 + báo cáo nội bộ KTV.
+
+### Nợ kỹ thuật (Session)
+- Trang Phác đồ vẫn còn định nghĩa modal ghi-nhận/chi-tiết cũ (không mở nữa — đã chuyển sang `/sessions/[id]`); có thể
+  dọn ở phase sau.
+- Chưa auto map Protocol/Công nghệ → FormTemplate mặc định (schema chưa có link) — nhân viên chọn mẫu thủ công, snapshot version tự động.
+- Validate hoàn thành mới **chặn cứng** thiếu dịch vụ thực tế; các điều kiện khác (nhân sự chính, tình trạng sau) là
+  khuyến nghị UI. `treatmentArea`/thông số nền chuyên môn dựa Biểu mẫu (không hard-code field theo từng công nghệ).
+
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 
 Toàn bộ **giao diện người dùng** mặc định **Tiếng Việt (`vi-VN`)**. **Code/DB/API identifier giữ

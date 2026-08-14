@@ -124,7 +124,7 @@ export async function buildCustomerTimeline(customerId: string): Promise<Timelin
       prisma.treatmentPlan.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } }),
       prisma.treatmentSession.findMany({
         where: { customerId },
-        include: { staff: { orderBy: { createdAt: "asc" } }, review: true },
+        include: { staff: { orderBy: { createdAt: "asc" } }, review: true, service: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
       }),
       prisma.payment.findMany({ where: { customerId }, orderBy: { paidAt: "desc" } }),
@@ -193,11 +193,17 @@ export async function buildCustomerTimeline(customerId: string): Promise<Timelin
     const detail = [s.customerFeedback ?? s.objective ?? undefined, staffLine ? `Nhân sự: ${staffLine}` : undefined, reviewLine]
       .filter(Boolean)
       .join(" · ");
+    // Buổi đã thực hiện → "Đã thực hiện [dịch vụ]"; chưa thực hiện → "Buổi N" (mục 31).
+    const svcName = (s as any).service?.name as string | undefined;
+    const done = s.status === "COMPLETED" || !!s.performedAt;
+    const title = done
+      ? `Đã thực hiện${svcName ? " · " + svcName : ""} (Buổi ${s.sessionNumber})`
+      : `Buổi ${s.sessionNumber}${s.name ? " · " + s.name : ""}`;
     events.push({
       id: `se-${s.id}`,
       at: when.toISOString(),
       kind: "session",
-      title: `Buổi ${s.sessionNumber}${s.name ? " · " + s.name : ""}`,
+      title,
       detail: detail || undefined,
       status: s.status,
     });

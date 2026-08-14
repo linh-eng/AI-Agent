@@ -3,9 +3,9 @@
 // Khi phát hành bản mới: tăng APP_VERSION + đổi ngày + mô tả ngắn, rồi build lại.
 // (Giữ đồng bộ với "version" trong package.json.)
 // =============================================================================
-export const APP_VERSION = "0.13.0";
-export const APP_RELEASE_DATE = "2026-08-13";
-export const APP_RELEASE_NAME = "Phác đồ 4 lớp (Phác đồ → Giai đoạn → Buổi dự kiến → Lần thực hiện): giai đoạn có ngày/tần suất/tiến độ, tab Tổng quan/Kế hoạch giai đoạn/Timeline/Phiên bản, tách Kế hoạch vs Thực tế, tạo lịch hẹn từ buổi, phiên bản V1/V2 giữ lịch sử";
+export const APP_VERSION = "0.14.0";
+export const APP_RELEASE_DATE = "2026-08-14";
+export const APP_RELEASE_NAME = "Ghi nhận lần thực hiện (Session): màn 7 khối A–G, header liên kết Phác đồ/Version/Giai đoạn/Buổi/Booking, form chuyên môn động theo Protocol (snapshot), nhân sự+phí snapshot, vật tư dự kiến/thực tế, Before/After, hoàn thành có validate + khóa/sửa-có-audit theo quyền";
 
 /** Chuỗi hiển thị gọn: v0.2.0 · 13/08/2026 */
 export function versionLabel(): string {

@@ -205,14 +205,21 @@ describe("Phác đồ — HTTP: version, kế hoạch-vs-thực tế, liên kế
       include: { stages: true },
     });
   }
+  // Dịch vụ thực tế (FK) — cần có để HOÀN THÀNH buổi (validate mục 28).
+  async function makeSvcId() {
+    const cat = await prisma.serviceCategory.create({ data: { code: uniq("DM"), name: "N" } });
+    const svc = await prisma.service.create({ data: { code: uniq("DV"), name: "RF", categoryId: cat.id, standardPrice: 1_000_000 } });
+    return svc.id;
+  }
 
   it("ghi nhận thực tế KHÔNG ghi đè kế hoạch + ghim versionAtExecution khi hoàn thành (mục 13,14,19)", async () => {
     const c = await makeCustomer();
     const plan = await makePlan(c.id);
     // plannedServiceId/plannedProtocolId là String (soft ref, không FK) — snapshot kế hoạch.
+    const svcId = await makeSvcId();
     const s = await prisma.treatmentSession.create({
       data: {
-        planId: plan.id, customerId: c.id, sessionNumber: 1, status: "PLANNED",
+        planId: plan.id, customerId: c.id, sessionNumber: 1, status: "PLANNED", serviceId: svcId,
         plannedServiceId: "svcRF", plannedProtocolId: "protoA",
         plannedMaterials: { text: "5 ml" }, plannedParams: { text: "RF 42°C" },
       },
@@ -289,7 +296,7 @@ describe("Phác đồ — HTTP: version, kế hoạch-vs-thực tế, liên kế
     const plan = await makePlan(c.id);
     const bk = await prisma.booking.create({ data: { code: uniq("BK"), customerId: c.id, scheduledAt: new Date("2026-09-10T07:00:00Z"), status: "IN_PROGRESS" } });
     const s = await prisma.treatmentSession.create({
-      data: { planId: plan.id, stageId: plan.stages[0].id, customerId: c.id, bookingId: bk.id, sessionNumber: 1, status: "IN_PROGRESS" },
+      data: { planId: plan.id, stageId: plan.stages[0].id, customerId: c.id, bookingId: bk.id, sessionNumber: 1, status: "IN_PROGRESS", serviceId: await makeSvcId() },
     });
     auth(token);
     const res = await sessionPatch(req(`http://t/api/treatment-sessions/${s.id}`, "PATCH", { status: "COMPLETED" }), s.id);
@@ -309,7 +316,7 @@ describe("Phác đồ — HTTP: version, kế hoạch-vs-thực tế, liên kế
       include: { stages: true },
     });
     const s = await prisma.treatmentSession.create({
-      data: { planId: plan.id, stageId: plan.stages[0].id, customerId: c.id, sessionNumber: 1, status: "PLANNED" },
+      data: { planId: plan.id, stageId: plan.stages[0].id, customerId: c.id, sessionNumber: 1, status: "PLANNED", serviceId: await makeSvcId() },
     });
     // Trước khi ghi nhận: giai đoạn PENDING
     expect((await prisma.treatmentStage.findUnique({ where: { id: plan.stages[0].id } }))?.status).toBe("PENDING");
@@ -325,7 +332,7 @@ describe("Phác đồ — HTTP: version, kế hoạch-vs-thực tế, liên kế
     const plan = await prisma.treatmentPlan.create({
       data: { code: uniq("TP"), customerId: c.id, name: "PĐ", status: "PENDING_APPROVAL" },
     });
-    const s = await prisma.treatmentSession.create({ data: { planId: plan.id, customerId: c.id, sessionNumber: 1, status: "PLANNED" } });
+    const s = await prisma.treatmentSession.create({ data: { planId: plan.id, customerId: c.id, sessionNumber: 1, status: "PLANNED", serviceId: await makeSvcId() } });
     auth(token);
     await sessionPatch(req(`http://t/api/treatment-sessions/${s.id}`, "PATCH", { status: "COMPLETED" }), s.id);
     expect((await prisma.treatmentPlan.findUnique({ where: { id: plan.id } }))?.status).toBe("ACTIVE");

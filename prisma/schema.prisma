@@ -1370,6 +1370,25 @@ model TreatmentSession {
   steps                Json? // Các bước thực hiện của buổi (từ protocol hoặc tùy chỉnh)
   professionalProducts Json? // Sản phẩm chuyên nghiệp dùng trong buổi (khác vật tư)
   materialCost         Decimal?      @db.Decimal(18, 2) // chi phí vật tư tiêu hao (tự tính, mục 8)
+  // --- SESSION = LẦN THỰC HIỆN (mục 5) ---
+  code                 String?       @unique // Mã Session (SS-xxxxxx)
+  // B — Trước khi thực hiện
+  prevReaction         String? // Phản ứng sau buổi trước
+  todayWish            String? // Khách phản hồi/mong muốn hôm nay
+  contraindications    String? // Chống chỉ định (cảnh báo nổi bật)
+  warnings             String? // Cảnh báo chuyên môn/nguy cơ (cảnh báo nổi bật)
+  currentMeds          String? // Thuốc/sản phẩm đang dùng
+  // C — Thực hiện thực tế
+  actualStartAt        DateTime? // Thời gian bắt đầu thực tế
+  actualEndAt          DateTime? // Thời gian kết thúc thực tế
+  treatmentArea        String? // Vùng thực hiện
+  // F — Sau khi thực hiện
+  incident             String? // Sự cố/bất thường
+  handledAction        String? // Xử lý đã thực hiện
+  nextSuggestion       String? // Đề xuất buổi tiếp theo
+  followUpDate         DateTime? // Ngày follow-up đề xuất
+  // Sửa sau hoàn thành — audit (mục 29): [{by, at, reason, changes:[{field, before, after}]}]
+  editLog              Json?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 

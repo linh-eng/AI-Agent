@@ -277,6 +277,7 @@ async function main() {
   const bkLinh1 = await prisma.booking.create({ data: { code: "BK-100002", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: new Date("2026-07-25T07:00:00Z"), durationMinutes: 45, room: "Phòng 2", performer: "Phạm Chuyên Viên", status: "COMPLETED", price: 1_800_000 } });
   const sLinh1 = await prisma.treatmentSession.create({
     data: {
+      code: "SS-100001",
       planId: planLinh.id, stageId: planLinh.stages[0].id, customerId: kDangPD.id, bookingId: bkLinh1.id, serviceId: svcRF.id,
       sessionNumber: 1, name: "RF nâng cơ buổi 1", status: "COMPLETED", scheduledAt: new Date("2026-07-25T07:00:00Z"), performedAt: new Date("2026-07-25T07:15:00Z"),
       performer: "Phạm Chuyên Viên", objective: "RF vùng má", actualParams: { nang_luong: "làm ấm 42°C" }, conditionBefore: "Da chùng nhẹ", conditionAfter: "Săn hơn tức thì", customerFeedback: "Ưng ý", plannedCost: 500_000, actualCost: 480_000, price: 1_800_000, checkedBy: "Trần Quản Lý",
@@ -320,7 +321,7 @@ async function main() {
   const nvKTV = await prisma.employee.create({ data: { code: "NV-000001", fullName: "Phạm Chuyên Viên", phone: "0911000001", roles: ["Kỹ thuật viên", "Tư vấn"], defaultFee: 200_000 } });
   const nvMaster = await prisma.employee.create({ data: { code: "NV-000002", fullName: "Trần Quản Lý", phone: "0911000002", roles: ["Master", "Quản lý", "Kiểm tra"], defaultFee: 500_000 } });
   await prisma.employee.create({ data: { code: "NV-000003", fullName: "Lê Thị CSKH", phone: "0911000003", roles: ["CSKH", "Lễ tân"], defaultFee: 100_000 } });
-  await prisma.employee.create({ data: { code: "NV-000004", fullName: "Đỗ Thu Ngân", phone: "0911000004", roles: ["Sales", "Lễ tân"], defaultFee: 100_000 } });
+  const nvSale = await prisma.employee.create({ data: { code: "NV-000004", fullName: "Đỗ Thu Ngân", phone: "0911000004", roles: ["Sales", "Lễ tân"], defaultFee: 100_000 } });
   // Phân công buổi RF #1: KTV chính + Master kiểm tra (tổng phí 700k).
   await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvKTV.id, staffName: nvKTV.fullName, role: "PRIMARY", fee: 200_000 } });
   await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvMaster.id, staffName: nvMaster.fullName, role: "CHECKER", fee: 500_000 } });
@@ -336,6 +337,7 @@ async function main() {
   // Buổi 2 (Chuẩn bị) — hoàn thành, khớp kế hoạch (RF).
   const sLinh2 = await prisma.treatmentSession.create({
     data: {
+      code: "SS-100002",
       planId: planLinh.id, stageId: planLinh.stages[0].id, customerId: kDangPD.id, serviceId: svcRF.id,
       sessionNumber: 2, name: "RF làm sạch nền da buổi 2", status: "COMPLETED",
       plannedServiceId: svcRF.id, plannedTechnologyId: techRF.id, plannedProtocolId: protoDemo.id, technologyId: techRF.id, brandProtocolId: protoDemo.id,
@@ -343,23 +345,43 @@ async function main() {
       plannedMaterials: { text: "Gel RF 5 ml" }, actualMaterials: { text: "Gel RF 5 ml" }, plannedCost: 500_000, actualCost: 500_000, price: 1_800_000, checkedBy: "Trần Quản Lý", versionAtExecution: 1,
     },
   });
-  // Buổi 3 (Can thiệp) — MINH HỌA Kế hoạch ≠ Thực tế (mục 14–15):
+  // Buổi 3 (Can thiệp) — MINH HỌA Kế hoạch ≠ Thực tế (mục 14–15) + Session đầy đủ (mục 5):
   // Kế hoạch: RF · Protocol A (GLOW) · vật tư 5 ml. Thực tế: HIFU · Protocol B (LIFT) · vật tư 7 ml.
-  await prisma.treatmentSession.create({
+  const sLinh3 = await prisma.treatmentSession.create({
     data: {
+      code: "SS-100003",
       planId: planLinh.id, stageId: planLinh.stages[1].id, customerId: kDangPD.id,
       sessionNumber: 3, name: "Nâng cơ buổi 3", status: "COMPLETED",
       // Kế hoạch (snapshot, không đổi):
       plannedServiceId: svcRF.id, plannedTechnologyId: techRF.id, plannedProtocolId: protoDemo.id,
       plannedDate: new Date("2026-09-03"), plannedParams: { text: "RF 42°C, 3 line" }, plannedMaterials: { text: "Gel RF 5 ml" }, plannedCost: 500_000,
-      // Thực tế (đổi so với kế hoạch):
-      serviceId: svcHIFU.id, technologyId: techHIFU.id, brandProtocolId: protoLift.id,
+      // B — Trước khi thực hiện:
+      conditionBefore: "Đường hàm chưa gọn, da vùng má chùng nhẹ", prevReaction: "Sau buổi 2 da hơi ửng nhẹ, hết sau 1 ngày", todayWish: "Muốn gọn đường hàm rõ hơn",
+      warnings: "Da vùng má nhạy cảm nhẹ — giảm mức năng lượng, theo dõi phản ứng sau bắn", currentMeds: "Vitamin C uống",
+      // C — Thực tế (đổi so với kế hoạch):
+      serviceId: svcHIFU.id, technologyId: techHIFU.id, brandProtocolId: protoLift.id, treatmentArea: "Đường hàm 2 bên + dưới cằm",
+      actualStartAt: new Date("2026-09-03T07:00:00Z"), actualEndAt: new Date("2026-09-03T08:00:00Z"),
       scheduledAt: new Date("2026-09-03T07:00:00Z"), performedAt: new Date("2026-09-03T07:20:00Z"), performer: "Phạm Chuyên Viên",
-      objective: "Chuyển sang HIFU do da đáp ứng tốt", actualParams: { text: "HIFU 4.5mm, 3 line" }, actualMaterials: { text: "Gel siêu âm 7 ml" }, actualCost: 700_000,
-      conditionBefore: "Đường hàm chưa gọn", conditionAfter: "Gọn hơn rõ", customerFeedback: "Rất hài lòng", price: 6_000_000, checkedBy: "Trần Quản Lý",
-      versionAtExecution: 1,
+      objective: "Chuyển sang HIFU do da đáp ứng tốt", actualParams: { text: "HIFU 4.5mm, 3 line, mức 1.0J" }, actualMaterials: { text: "Gel siêu âm 7 ml" }, actualCost: 700_000,
+      steps: { items: [{ name: "Đánh dấu vùng" }, { name: "Bắn HIFU theo line" }, { name: "Làm dịu & dặn dò" }] },
+      // F — Sau khi thực hiện:
+      conditionAfter: "Gọn hơn rõ, không sưng", customerFeedback: "Rất hài lòng", nextSuggestion: "Buổi 4 RF củng cố sau 7 ngày", followUpDate: new Date("2026-09-05"),
+      price: 6_000_000, checkedBy: "Trần Quản Lý", versionAtExecution: 1,
     },
   });
+  // Nhân sự buổi 3 (mục 35): KTV chính + Master + Hỗ trợ (phí snapshot).
+  await prisma.sessionStaff.create({ data: { sessionId: sLinh3.id, employeeId: nvKTV.id, staffName: nvKTV.fullName, role: "PRIMARY", fee: 250_000 } });
+  await prisma.sessionStaff.create({ data: { sessionId: sLinh3.id, employeeId: nvMaster.id, staffName: nvMaster.fullName, role: "MASTER", fee: 500_000 } });
+  await prisma.sessionStaff.create({ data: { sessionId: sLinh3.id, employeeId: nvSale.id, staffName: nvSale.fullName, role: "ASSISTANT", fee: 100_000 } });
+  // Before/After buổi 3: 1 ảnh chia sẻ khách + 1 ảnh nội bộ (mục 36).
+  await writeBlob("demo/before-linh3.png", PNG_BEFORE);
+  await writeBlob("demo/after-linh3.png", PNG_AFTER);
+  await prisma.mediaAsset.createMany({ data: [
+    { storageKey: "demo/before-linh3.png", filename: "truoc-buoi3.png", contentType: "image/png", size: 70, kind: "BEFORE_IMAGE", customerId: kDangPD.id, sessionId: sLinh3.id, sharedWithCustomer: true, uploadedBy: "Phạm Chuyên Viên" },
+    { storageKey: "demo/after-linh3.png", filename: "sau-buoi3-noibo.png", contentType: "image/png", size: 70, kind: "AFTER_IMAGE", customerId: kDangPD.id, sessionId: sLinh3.id, sharedWithCustomer: false, uploadedBy: "Phạm Chuyên Viên" },
+  ] });
+  // Đánh giá + báo cáo nội bộ buổi 3 (mục 25-26).
+  await prisma.sessionReview.create({ data: { sessionId: sLinh3.id, customerId: kDangPD.id, satisfactionScore: 5, technicianScore: 5, technicianName: "Phạm Chuyên Viên", comment: "Rất ưng, đường hàm gọn.", wouldReturn: true, technicianReport: "Da đáp ứng tốt HIFU, đề xuất giữ HIFU cho buổi can thiệp còn lại.", reviewedBy: "Phạm Chuyên Viên" } });
   // Buổi 4 (Can thiệp) — buổi DỰ KIẾN đã có LỊCH HẸN (mục 12): minh họa liên kết Buổi ↔ Booking.
   const bkLinh3 = await prisma.booking.create({
     data: { code: "BK-100020", customerId: kDangPD.id, serviceId: svcRF.id, scheduledAt: new Date("2026-09-10T07:00:00Z"), durationMinutes: 60, room: "Phòng 2", technician: "Phạm Chuyên Viên", status: "CONFIRMED", confirmedAt: new Date("2026-09-05T02:00:00Z"), price: 1_800_000, createdBy: "Nguyễn Lễ Tân", planId: planLinh.id, stageId: planLinh.stages[1].id, sessionNumber: 4 },
