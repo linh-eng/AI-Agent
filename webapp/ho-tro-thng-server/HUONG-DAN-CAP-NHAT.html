@@ -1,0 +1,128 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8">
+<title>Hướng dẫn CẬP NHẬT không mất dữ liệu — Hệ thống Hỗ trợ THNG</title>
+<style>
+  @page{size:A4;margin:16mm}
+  *{box-sizing:border-box}
+  body{font-family:'Segoe UI',Arial,sans-serif;color:#17201c;font-size:13.5px;line-height:1.6;margin:0}
+  .doc{max-width:190mm;margin:0 auto;padding:6px}
+  h1{font-size:22px;color:#1a7a4f;margin:0 0 2px}
+  h2{font-size:16px;color:#0f6e4e;border-bottom:2px solid #cfe0d8;padding-bottom:5px;margin:26px 0 12px}
+  h3{font-size:14px;color:#1a5;margin:16px 0 6px}
+  .sub{color:#557;font-size:13px;margin:0 0 14px}
+  .tag{display:inline-block;background:#e7f5ee;color:#0f6e4e;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;margin-bottom:10px}
+  ol,ul{margin:6px 0 6px 22px;padding:0}
+  li{margin:5px 0}
+  code,.mono{font-family:Consolas,'Courier New',monospace;background:#f1f5f3;border:1px solid #e0e8e4;border-radius:5px;padding:1px 6px;font-size:12.5px}
+  pre{background:#0f241c;color:#dbeee5;border-radius:10px;padding:12px 14px;font-family:Consolas,'Courier New',monospace;font-size:12.5px;line-height:1.7;overflow:auto;margin:8px 0}
+  pre .c{color:#8fd0af}
+  .box{border:1px solid #d9e6df;border-radius:12px;padding:14px 16px;margin:12px 0;background:#fbfefc}
+  .warn{border-color:#f0c26b;background:#fdf6e7}
+  .warn b:first-child,.tip b:first-child,.bad b:first-child{display:block;margin-bottom:4px}
+  .tip{border-color:#8fd0af;background:#eefaf3}
+  .bad{border-color:#e6a5a5;background:#fdeeee}
+  .golden{border:2px solid #1a7a4f;background:#eefaf3;border-radius:12px;padding:14px 16px;margin:14px 0}
+  table{width:100%;border-collapse:collapse;margin:10px 0}
+  th,td{border:1px solid #cfe0d8;padding:7px 10px;text-align:left;vertical-align:top;font-size:12.8px}
+  th{background:#eef6f2;color:#0f6e4e}
+  .kw{color:#c0392b;font-weight:700}
+  .ok{color:#1a7a4f;font-weight:700}
+  .step{background:#1a7a4f;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-grid;place-items:center;font-size:12px;font-weight:700;margin-right:6px}
+  .foot{margin-top:26px;border-top:1px solid #cfe0d8;padding-top:8px;color:#789;font-size:11.5px;text-align:center}
+  .chk li{list-style:none;margin-left:-18px}
+  .chk li::before{content:"☐  ";color:#1a7a4f;font-weight:700}
+</style></head><body><div class="doc">
+
+<div class="tag">DÀNH CHO IT / QUẢN TRỊ MÁY CHỦ</div>
+<h1>Hướng dẫn CẬP NHẬT không mất dữ liệu</h1>
+<p class="sub">Hệ thống Hỗ trợ THNG · áp dụng cho mọi bản cập nhật <span class="mono">CAP-NHAT-vX.Y.Z.zip</span></p>
+
+<div class="golden">
+  <b>🔑 NGUYÊN TẮC VÀNG</b>
+  Mỗi gói cập nhật <b>chỉ chứa 2 file mã nguồn</b>: <code>server.js</code> và <code>public/index.html</code>.
+  Toàn bộ <b>dữ liệu</b> nằm ở nơi khác và <b>KHÔNG</b> có trong gói — nên chỉ cần <b>chép đè đúng 2 file này</b>
+  là cập nhật xong mà <b>không đụng tới dữ liệu</b>.
+</div>
+
+<h2>1. Dữ liệu nằm ở đâu? (TUYỆT ĐỐI không xóa/ghi đè)</h2>
+<table>
+  <tr><th>Thành phần</th><th>Vị trí (trong thư mục chạy app)</th><th>Là gì</th></tr>
+  <tr><td><span class="kw">data.db</span> (+ <span class="mono">data.db-wal</span>, <span class="mono">data.db-shm</span> nếu có)</td><td><code>./data.db</code></td><td>Toàn bộ ticket, người dùng, cấu hình…</td></tr>
+  <tr><td><span class="kw">uploads/</span></td><td><code>./uploads/</code></td><td>Tệp đính kèm người dùng tải lên</td></tr>
+  <tr><td><span class="kw">backups/</span></td><td><code>./backups/</code></td><td>Bản sao lưu tự động</td></tr>
+</table>
+<div class="bad"><b>⛔ Không bao giờ</b> xóa, di chuyển hay ghi đè 3 mục trên khi cập nhật. Gói cập nhật <b>không</b> chứa chúng.</div>
+
+<h2>2. Chuẩn bị — Sao lưu trước (2 phút)</h2>
+<p>Dù cập nhật không đụng dữ liệu, vẫn nên sao lưu để an tâm và có đường lùi:</p>
+<ol>
+  <li>Vào thư mục đang chạy app (ví dụ <code>C:\ho-tro-thng-server</code>).</li>
+  <li>Copy <b><span class="mono">data.db</span></b> và thư mục <b><span class="mono">uploads/</span></b> ra một nơi an toàn (USB / ổ khác), đặt tên kèm ngày, ví dụ <code>backup-2026-08-14</code>.</li>
+  <li><i>(Khuyến nghị)</i> Trong app, vào màn <b>Danh mục &amp; Cấu hình → Sao lưu</b>, bấm <b>“Sao lưu ngay”</b> rồi <b>“Tải data.db về máy”</b>.</li>
+</ol>
+
+<h2>3. Cách cập nhật</h2>
+<p>Giải nén gói <span class="mono">CAP-NHAT-vX.Y.Z.zip</span> — bên trong có: <code>server.js</code>, <code>public/index.html</code>, <code>CACH-CAP-NHAT.txt</code>. Chọn 1 trong 2 tình huống theo cách app đang chạy:</p>
+
+<h3>TÌNH HUỐNG A — App chạy bằng PM2 (khuyến nghị vận hành thật)</h3>
+<ol>
+  <li><span class="step">1</span> Tạm dừng: <pre>pm2 stop ho-tro-thng</pre></li>
+  <li><span class="step">2</span> Chép đè <b>đúng 2 file</b> vào thư mục đang chạy:
+    <ul>
+      <li><code>server.js</code> → đè <code>server.js</code> cũ</li>
+      <li><code>public\index.html</code> → đè <code>public\index.html</code> cũ</li>
+    </ul>
+    <span class="kw">KHÔNG</span> đụng: <span class="mono">data.db</span>, <span class="mono">uploads/</span>, <span class="mono">backups/</span>.</li>
+  <li><span class="step">3</span> Chạy lại: <pre>pm2 restart ho-tro-thng</pre></li>
+  <li><span class="step">4</span> Xem nhật ký để chắc chắn không lỗi: <pre>pm2 logs ho-tro-thng</pre></li>
+</ol>
+
+<h3>TÌNH HUỐNG B — App chạy bằng cửa sổ đen / start-windows.bat</h3>
+<ol>
+  <li><span class="step">1</span> Đóng cửa sổ đen đang chạy app (hoặc nhấn <code>Ctrl + C</code> trong cửa sổ đó) để tắt máy chủ.</li>
+  <li><span class="step">2</span> Chép đè <b>đúng 2 file</b> (như Tình huống A, bước 2).</li>
+  <li><span class="step">3</span> Khởi động lại: nhấp đúp <b><span class="mono">start-windows.bat</span></b> (Windows) hoặc chạy <code>node server.js</code>.</li>
+</ol>
+
+<h2>4. Trên trình duyệt của người dùng</h2>
+<ol>
+  <li>Bấm <b>Ctrl + F5</b> (tải lại, bỏ cache) để nhận giao diện mới.</li>
+  <li>Nếu vẫn thấy bản cũ: bấm <b>Ctrl + Shift + R</b>, hoặc xóa cache trình duyệt rồi mở lại.</li>
+</ol>
+
+<h2>5. Kiểm tra đã lên đúng bản mới</h2>
+<ul>
+  <li>Dưới logo (góc trên bên trái / màn đăng nhập) hiển thị đúng số bản, ví dụ <b>“Support Desk · vX.Y.Z”</b>.</li>
+  <li>Hoặc mở trực tiếp: <code>http://&lt;IP-máy-chủ&gt;:3000/api/version</code> → phải thấy <code>{"version":"vX.Y.Z", ...}</code>.</li>
+</ul>
+<div class="tip"><b>✅ Xong.</b> Dữ liệu (ticket, người dùng, cấu hình, tệp đính kèm) vẫn nguyên vẹn — chỉ phần mã nguồn được nâng cấp. Các trường/tính năng mới sẽ để trống trên dữ liệu cũ và tự có khi dùng.</div>
+
+<h2>6. Nếu có sự cố → Khôi phục (rollback)</h2>
+<ol>
+  <li>Tắt máy chủ (<code>pm2 stop ho-tro-thng</code> hoặc đóng cửa sổ đen).</li>
+  <li>Chép <b>lại 2 file cũ</b> (<code>server.js</code>, <code>public/index.html</code> của bản trước) đè vào — nên giữ 1 bản gói cũ để lùi nhanh.</li>
+  <li>Nếu cần khôi phục dữ liệu: chép <b>bản sao lưu</b> <span class="mono">data.db</span> + <span class="mono">uploads/</span> đè vào (xóa <span class="mono">data.db-wal</span>, <span class="mono">data.db-shm</span> nếu có), rồi bật lại.</li>
+</ol>
+<div class="warn"><b>⚠️ Lưu ý về nhiều bản cùng chạy</b> Chỉ để <b>một</b> tiến trình chạy trên cổng 3000. Nếu còn cửa sổ đen cũ chạy song song với PM2 → gõ địa chỉ vào có thể trúng bản cũ. Đóng hết bản thừa trước khi kiểm tra.</div>
+
+<h2>7. Câu hỏi thường gặp</h2>
+<table>
+  <tr><th>Câu hỏi</th><th>Trả lời</th></tr>
+  <tr><td>Cập nhật có mất ticket / cấu hình không?</td><td><span class="ok">Không.</span> Dữ liệu ở <code>data.db</code> &amp; <code>uploads/</code>, gói cập nhật không đụng tới.</td></tr>
+  <tr><td>Có cần internet để cập nhật?</td><td>Không. Chỉ chép file trên máy chủ.</td></tr>
+  <tr><td>Có cần chạy lệnh cài gói (npm install)?</td><td>Không. App không phụ thuộc gói ngoài — chỉ cần Node.js đã cài sẵn.</td></tr>
+  <tr><td>Bỏ qua vài bản (vd vX.5 → vX.9) được không?</td><td>Được. Cứ chép đè 2 file của bản mới nhất là đủ; các thay đổi tích hợp sẵn.</td></tr>
+  <tr><td>Người dùng vẫn thấy bản cũ?</td><td>Bấm <b>Ctrl + F5</b>. Nếu vẫn cũ: kiểm tra còn tiến trình cũ chạy song song không (mục 6).</td></tr>
+</table>
+
+<h2>8. Bảng kiểm nhanh (checklist)</h2>
+<ul class="chk">
+  <li>Đã sao lưu <span class="mono">data.db</span> + <span class="mono">uploads/</span></li>
+  <li>Đã tắt máy chủ (pm2 stop / đóng cửa sổ đen)</li>
+  <li>Đã chép đè <b>đúng 2 file</b>: <code>server.js</code> + <code>public/index.html</code></li>
+  <li>Đã <b>KHÔNG</b> đụng <span class="mono">data.db</span> / <span class="mono">uploads/</span> / <span class="mono">backups/</span></li>
+  <li>Đã bật lại máy chủ (pm2 restart / start-windows.bat)</li>
+  <li>Đã Ctrl + F5 và thấy đúng số bản mới</li>
+</ul>
+
+<div class="foot">Hệ thống Hỗ trợ THNG — Hướng dẫn cập nhật không mất dữ liệu · Bộ phận Hỗ trợ &amp; Triển khai</div>
+</div></body></html>
