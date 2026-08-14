@@ -166,3 +166,8 @@ console.log(j(out.G));
 console.log("\n\n##### EVIDENCE_JSON_BEGIN #####");
 console.log(j({ instanceA: instA.id, instanceB: instB?.id, targetTaskE: out.E.update.taskId, templateA: tplA.id }));
 console.log("##### EVIDENCE_JSON_END #####");
+
+// Ghi ra file để dựng phiếu bằng chứng.
+const fs = await import("node:fs");
+fs.writeFileSync(process.env.EV_OUT || "/tmp/m9-out.json", j(out));
+console.log("→ wrote", process.env.EV_OUT || "/tmp/m9-out.json");
