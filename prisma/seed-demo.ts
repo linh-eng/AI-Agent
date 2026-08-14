@@ -359,8 +359,9 @@ async function main() {
   await prisma.employeeSchedule.createMany({ data: [1, 2, 3, 4, 5].map((d) => ({ employeeId: nvKTV.id, dayOfWeek: d, startTime: "08:00", endTime: "17:00", shift: "Hành chính" })) });
   await prisma.employeeSchedule.createMany({ data: [1, 2, 3, 4, 5, 6].map((d) => ({ employeeId: nvMaster.id, dayOfWeek: d, startTime: "09:00", endTime: "18:00" })) });
 
-  // Nghỉ phép (mục 9,22): Phạm Chuyên Viên nghỉ 20/08/2026 08:00–12:00.
-  await prisma.employeeLeave.create({ data: { employeeId: nvKTV.id, type: "ANNUAL", fromAt: new Date("2026-08-20T01:00:00Z"), toAt: new Date("2026-08-20T05:00:00Z"), reason: "Nghỉ phép cá nhân buổi sáng", createdBy: "Trần Quản Lý" } });
+  // Nghỉ phép (mục 9,22): Phạm Chuyên Viên nghỉ 20/08/2026 08:00–12:00 (giờ VN).
+  // Lưu wall-clock VN (đóng Z) đồng nhất với Lịch hẹn/Buổi — xem src/lib/timezone.ts.
+  await prisma.employeeLeave.create({ data: { employeeId: nvKTV.id, type: "ANNUAL", fromAt: new Date("2026-08-20T08:00:00Z"), toAt: new Date("2026-08-20T12:00:00Z"), reason: "Nghỉ phép cá nhân buổi sáng", createdBy: "Trần Quản Lý" } });
 
   // Phân công buổi RF #1: KTV chính + Master kiểm tra (fee SNAPSHOT — buổi cũ không đổi khi phí master đổi).
   await prisma.sessionStaff.create({ data: { sessionId: sLinh1.id, employeeId: nvKTV.id, staffName: nvKTV.fullName, role: "PRIMARY", fee: 250_000 } });

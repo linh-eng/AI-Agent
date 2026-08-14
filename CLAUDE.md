@@ -1321,11 +1321,23 @@ năng lực/chứng nhận/ca/nghỉ). Chứng nhận hết hạn hiện badge �
   năng lực chỉ HIFU (để demo lọc năng lực).
 - **NV-000005 Ngô Nghỉ Việc**: RESIGNED (không được phân công mới; lịch sử giữ).
 
+### Múi giờ (timezone) — `src/lib/timezone.ts` (chuẩn hóa khi rà soát Mục 8)
+Hệ thống vận hành **một múi giờ Asia/Ho_Chi_Minh (UTC+7, không DST)**. Thời gian NGƯỜI DÙNG NHẬP (giờ làm
+việc VN) lưu dạng **wall-clock VN** (đúng chữ số giờ VN, đóng dấu Z) — đồng nhất Lịch hẹn/Buổi/Nghỉ phép để
+so lịch/trùng lịch/nghỉ phép cùng một hệ quy chiếu, không lệch ±7h giữa các thực thể. Để **ổn định bất kể TZ
+tiến trình** (container/CI): (a) `formatDate/formatDateTime` trích theo `timeZone: "UTC"` → hiển thị đúng giờ
+VN đã nhập (sửa bug nghỉ phép hiện 01:00–05:00 thay vì 08:00–12:00); (b) logic lịch dùng `vnClock()` (getUTC*)
+thay `getHours()` → availability Booking đúng; (c) input datetime-local qua `parseVnLocal()` (đóng Z). Chuyển
+sang lưu true-UTC + convert Asia/Ho_Chi_Minh cho TOÀN BỘ module là refactor lớn → ghi technical debt.
+
 ### Nợ kỹ thuật (Nhân sự)
 - Booking lưu nhân sự bằng **tên (String)** — validate/suggest so theo tên; chưa đổi sang FK employeeId (giữ
   tương thích mục Lịch hẹn đã nghiệm thu). Gợi ý slot của Booking chưa nhúng suggestEmployees (mới có API).
 - File chứng nhận: mới lưu `mediaId` (chưa gắn upload trong UI). KPI đọc theo tên performer/technicianName +
   SessionStaff.employeeId (chưa chuẩn hoá hoàn toàn về employeeId).
+- **Timezone**: mô hình hiện tại là "wall-clock VN đóng Z" (xem trên) — đúng cho input người dùng & availability;
+  dấu thời gian máy sinh (`audit_logs.createdAt = now()`) là true-UTC nên hiển thị lệch −7h so giờ VN. Refactor
+  true-UTC toàn hệ thống (convert Asia/Ho_Chi_Minh khi hiển thị + đổi input parse + reseed) để phase riêng.
 
 ## Ngôn ngữ giao diện — MẶC ĐỊNH TIẾNG VIỆT (bắt buộc)
 

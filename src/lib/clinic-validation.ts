@@ -3,6 +3,7 @@
 // (Khách hàng · CSKH · Dịch vụ · Booking · Phác đồ · Buổi thực hiện · Thanh toán · Task)
 // =============================================================================
 import { z } from "zod";
+import { parseVnLocal } from "./timezone";
 
 // ----- Enums -----
 export const genderEnum = z.enum(["MALE", "FEMALE", "OTHER"]);
@@ -52,12 +53,14 @@ export const taskStatusEnum = z.enum(["OPEN", "IN_PROGRESS", "DONE", "CANCELLED"
 // Giữ `undefined` khi client KHÔNG gửi field (Prisma bỏ qua → không ghi đè),
 // chỉ set `null` khi client gửi null tường minh (xóa giá trị). Tránh bug PATCH
 // một phần vô tình xóa cột ngày không kèm theo.
+// Nhận input datetime-local (giờ VN) lưu wall-clock ổn định bất kể TZ tiến trình
+// (xem `src/lib/timezone.ts`). date-only & chuỗi có múi giờ vẫn xử lý như cũ.
 const dateOpt = z
   .union([z.string(), z.date()])
   .optional()
   .nullable()
-  .transform((v) => (v === undefined ? undefined : v ? new Date(v) : null));
-const dateReq = z.union([z.string(), z.date()]).transform((v) => new Date(v));
+  .transform((v) => (v === undefined ? undefined : v ? parseVnLocal(v) : null));
+const dateReq = z.union([z.string(), z.date()]).transform((v) => parseVnLocal(v));
 const money = z.coerce.number().nonnegative().optional().nullable();
 // Prisma Json không nhận `null` (chỉ Json/undefined) -> chuyển null thành undefined
 const jsonOpt = z
@@ -505,8 +508,8 @@ export const scheduleCreateSchema = z.object({
 });
 export const leaveCreateSchema = z.object({
   type: z.enum(["ANNUAL", "SICK", "EMERGENCY", "UNAVAILABLE", "OTHER"]).default("ANNUAL"),
-  fromAt: z.coerce.date(),
-  toAt: z.coerce.date(),
+  fromAt: dateReq,
+  toAt: dateReq,
   reason: z.string().optional().nullable(),
 });
 

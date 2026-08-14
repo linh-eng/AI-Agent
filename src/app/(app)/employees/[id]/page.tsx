@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input, Label, Select } from "@/components/ui/input";
 import { apiFetch } from "@/lib/client";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import { EMPLOYEE_ROLE_OPTIONS, EMPLOYEE_STATUS_LABEL, EMPLOYEE_STATUS_TONE, LEAVE_TYPE_LABEL, COMPETENCE_KIND_LABEL, DOW_LABEL } from "@/lib/clinic-labels";
@@ -155,7 +155,7 @@ export default function EmployeeDetailPage() {
           {e.leaves.map((l: any) => (
             <Card key={l.id}><CardContent className="flex items-center justify-between p-3 text-sm">
               <div>
-                <div className="font-medium"><Badge tone="warning">{LEAVE_TYPE_LABEL[l.type]}</Badge> {new Date(l.fromAt).toLocaleString("vi-VN")} → {new Date(l.toAt).toLocaleString("vi-VN")}</div>
+                <div className="font-medium"><Badge tone="warning">{LEAVE_TYPE_LABEL[l.type]}</Badge> {formatDateTime(l.fromAt)} → {formatDateTime(l.toAt)}</div>
                 {l.reason && <div className="text-xs text-muted-foreground">Lý do: {l.reason}{l.createdBy ? ` · ${l.createdBy}` : ""}</div>}
               </div>
               {canSched && <Button size="icon" variant="ghost" onClick={() => post(`/api/employees/${id}/leaves?lid=${l.id}`, null, "DELETE")}><Trash2 className="h-3.5 w-3.5" /></Button>}

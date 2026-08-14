@@ -6,6 +6,7 @@
 // =============================================================================
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
+import { vnClock } from "./timezone";
 
 function num(v: unknown): number { return v == null ? 0 : Number(v); }
 
@@ -40,9 +41,12 @@ export function isWithinSchedule(
   schedules: Array<{ dayOfWeek: number; startTime: string; endTime: string; effectiveFrom?: Date | null; effectiveTo?: Date | null }>,
   from: Date, to: Date
 ): boolean {
-  const dow = from.getDay();
-  const startMin = from.getHours() * 60 + from.getMinutes();
-  const endMin = to.getHours() * 60 + to.getMinutes();
+  // Trích wall-clock VN (KHÔNG dùng getHours/getDay — phụ thuộc TZ tiến trình).
+  const f = vnClock(from);
+  const t = vnClock(to);
+  const dow = f.dow;
+  const startMin = f.hour * 60 + f.minute;
+  const endMin = t.hour * 60 + t.minute;
   return schedules.some((s) => {
     if (s.dayOfWeek !== dow) return false;
     if (s.effectiveFrom && new Date(s.effectiveFrom).getTime() > from.getTime()) return false;
