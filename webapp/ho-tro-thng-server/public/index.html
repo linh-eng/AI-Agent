@@ -242,7 +242,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <aside class="side">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.2</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.3</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="userbox" id="userbox"></div>
@@ -270,7 +270,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <div class="login-card">
     <div class="login-top">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.2</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.3</span></div>
     </div>
     <div class="login-body">
       <h2>Đăng nhập hệ thống</h2>
@@ -1264,7 +1264,7 @@ function drawForm(){
     <div class="f full"><label>Ghi chú</label>${ta("ghichu")}</div>
   </div>`;
   // ---------- Nhóm 5H: Thông tin dự án & triển khai (chỉ hiện với loại việc triển khai/giao nhận/bảo hành) ----------
-  const multiChk=(k,opts)=>{const cur=Array.isArray(t.site[k])?t.site[k]:[];return `<div style="display:flex;flex-wrap:wrap;gap:14px;padding:2px 0">${opts.map(o=>`<label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-weight:500;font-size:13px"><input type="checkbox" style="width:auto;flex:none" ${cur.includes(o)?'checked':''} onchange="siteToggle('${k}',${JSON.stringify(o)})">${esc(o)}</label>`).join("")}</div>`;};
+  const multiChk=(k,opts)=>{const cur=Array.isArray(t.site[k])?t.site[k]:[];return `<div style="display:flex;flex-wrap:wrap;gap:14px;padding:2px 0">${opts.map(o=>`<label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-weight:500;font-size:13px"><input type="checkbox" style="width:auto;flex:none" value="${esc(o)}" ${cur.includes(o)?'checked':''} onchange="siteToggle('${k}',this.value)">${esc(o)}</label>`).join("")}</div>`;};
   const devRows=(t.site.dmThietBi||[]).map((r,i)=>`<tr>
       <td style="text-align:center;font-weight:600;color:var(--ink-2)">${i+1}</td>
       <td><input value="${esc(r.ma||'')}" style="width:90px" oninput="EDIT.site.dmThietBi[${i}].ma=this.value"></td>
