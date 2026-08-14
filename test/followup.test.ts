@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { resetDb, uniq, makeCustomer } from "./helpers";
-import { applyFollowUpTemplate, cancelCareInstance, upcomingBirthdays, FollowUpDuplicateError } from "@/lib/followup";
+import { applyFollowUpTemplate, cancelCareInstance, recomputeCareInstanceStatus, upcomingBirthdays, FollowUpDuplicateError } from "@/lib/followup";
 
 async function template(steps: { dayOffset: number; channel?: string; title: string; script?: string; checklist?: string[] }[], over: Partial<{ name: string; trigger: string; version: number }> = {}) {
   return prisma.followUpTemplate.create({
@@ -135,6 +135,24 @@ describe("CSKH follow-up (mục 9)", () => {
     expect(after.find((x) => x.id === tasks[0].id)?.status).toBe("DONE"); // giữ
     expect(after.find((x) => x.id === tasks[1].id)?.status).toBe("CANCELLED"); // hủy, không xóa
     expect(after.length).toBe(2); // KHÔNG hard-delete
+  });
+
+  // --- Trạng thái instance đồng bộ 2 chiều theo task ------------------------
+  it("instance COMPLETED khi mọi task DONE; mở lại 1 task → instance quay về ACTIVE", async () => {
+    const c = await makeCustomer();
+    const t = await template([{ dayOffset: 0, title: "duy nhất" }]);
+    const res = await applyFollowUpTemplate({ templateId: t.id, customerId: c.id, anchorDate: new Date("2026-08-14T00:00:00Z") });
+    const task = (await prisma.task.findMany({ where: { careProcessInstanceId: res.instance.id } }))[0];
+
+    // Hoàn thành task → recompute → COMPLETED
+    await prisma.task.update({ where: { id: task.id }, data: { status: "DONE", completedAt: new Date(), completedBy: "NV" } });
+    await recomputeCareInstanceStatus(res.instance.id);
+    expect((await prisma.careProcessInstance.findUnique({ where: { id: res.instance.id } }))?.status).toBe("COMPLETED");
+
+    // Mở lại task → recompute → ACTIVE trở lại
+    await prisma.task.update({ where: { id: task.id }, data: { status: "OPEN", completedAt: null, completedBy: null } });
+    await recomputeCareInstanceStatus(res.instance.id);
+    expect((await prisma.careProcessInstance.findUnique({ where: { id: res.instance.id } }))?.status).toBe("ACTIVE");
   });
 
   // --- Sinh nhật ------------------------------------------------------------

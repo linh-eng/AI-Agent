@@ -198,19 +198,26 @@ export async function cancelCareInstance(params: {
   });
 }
 
-/** Cập nhật trạng thái instance khi mọi task đã kết thúc (DONE/CANCELLED) → COMPLETED. */
+/**
+ * Đồng bộ trạng thái instance theo task (2 chiều, không đụng instance đã CANCELLED):
+ *  - Mọi task đã kết thúc + có ≥1 DONE → COMPLETED.
+ *  - Còn task chưa xong (OPEN/IN_PROGRESS) mà instance đang COMPLETED → quay lại ACTIVE
+ *    (vd mở lại một task đã hoàn thành).
+ */
 export async function recomputeCareInstanceStatus(instanceId: string): Promise<void> {
   const inst = await prisma.careProcessInstance.findUnique({ where: { id: instanceId }, select: { status: true } });
-  if (!inst || inst.status !== "ACTIVE") return; // chỉ tự chuyển từ ACTIVE
+  if (!inst || inst.status === "CANCELLED") return; // hủy là quyết định thủ công, không tự đổi
   const remaining = await prisma.task.count({
     where: { careProcessInstanceId: instanceId, status: { in: ["OPEN", "IN_PROGRESS"] } },
   });
   if (remaining === 0) {
     const anyDone = await prisma.task.count({ where: { careProcessInstanceId: instanceId, status: "DONE" } });
-    // Tất cả task đã kết thúc: nếu có ít nhất 1 DONE → COMPLETED (đã đi hết quy trình).
-    if (anyDone > 0) {
+    if (anyDone > 0 && inst.status === "ACTIVE") {
       await prisma.careProcessInstance.update({ where: { id: instanceId }, data: { status: "COMPLETED" } });
     }
+  } else if (inst.status === "COMPLETED") {
+    // Có task mở lại → instance chưa hoàn tất, đưa về ACTIVE.
+    await prisma.careProcessInstance.update({ where: { id: instanceId }, data: { status: "ACTIVE" } });
   }
 }
 

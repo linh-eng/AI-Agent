@@ -89,6 +89,7 @@ export const PATCH = handle(async (req, { params }) => {
         userId: session?.userId, action: "TASK_REOPENED", entityType: "Task", entityId: task.id,
         changes: { reason: parsed.reason, previousCompletedBy: current.completedBy, previousCompletedAt: current.completedAt },
       });
+      if (current.careProcessInstanceId) await recomputeCareInstanceStatus(current.careProcessInstanceId);
       return ok(task);
     }
     case "cancel": {
