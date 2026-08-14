@@ -6,7 +6,7 @@ import { requirePermission, getSession } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { sessionUpdateSchema } from "@/lib/clinic-validation";
 import { canSeeFinance, maskFinance } from "@/lib/clinic";
-import { deriveStageStatus } from "@/lib/treatment-plan";
+import { deriveStageStatus, PRE_EXECUTION_PLAN_STATUSES } from "@/lib/treatment-plan";
 
 export const GET = handle(async (_req, { params }) => {
   await requirePermission(PERMISSIONS.TREATMENT_READ);
@@ -56,6 +56,19 @@ export const PATCH = handle(async (req, { params }) => {
       }
     } catch {
       // không chặn ghi nhận buổi nếu cập nhật trạng thái giai đoạn lỗi
+    }
+  }
+
+  // Tự tiến trạng thái PHÁC ĐỒ khi buổi bắt đầu/hoàn thành (tránh mâu thuẫn):
+  // nếu phác đồ còn ở trạng thái tiền-thực-hiện (Bản nháp/Chờ duyệt/Đã duyệt) → nâng lên ĐANG THỰC HIỆN.
+  if (parsed.status === "COMPLETED" || parsed.status === "IN_PROGRESS") {
+    try {
+      const plan = await prisma.treatmentPlan.findUnique({ where: { id: item.planId }, select: { status: true } });
+      if (plan && PRE_EXECUTION_PLAN_STATUSES.includes(plan.status as any)) {
+        await prisma.treatmentPlan.update({ where: { id: item.planId }, data: { status: "ACTIVE" } });
+      }
+    } catch {
+      // không chặn ghi nhận buổi nếu cập nhật trạng thái phác đồ lỗi
     }
   }
   return ok(item);

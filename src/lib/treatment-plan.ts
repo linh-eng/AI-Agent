@@ -7,6 +7,14 @@ import { FREQUENCY_UNIT_LABEL } from "./clinic-labels";
 
 export type FrequencyUnit = "DAY" | "WEEK" | "MONTH";
 
+// Trạng thái phác đồ "tiền-thực-hiện" — chưa được phép tồn tại khi đã có buổi hoàn thành.
+export const PRE_EXECUTION_PLAN_STATUSES = ["DRAFT", "PENDING_APPROVAL", "APPROVED"] as const;
+
+/** Đặt trạng thái phác đồ này có mâu thuẫn với buổi đã hoàn thành không? (không được lùi về tiền-thực-hiện) */
+export function isPlanStatusConflicting(nextStatus: string, hasCompletedSession: boolean): boolean {
+  return hasCompletedSession && (PRE_EXECUTION_PLAN_STATUSES as readonly string[]).includes(nextStatus);
+}
+
 /** "7 ngày/lần", "2 tuần/lần", "1 tháng/lần"; null khi thiếu cấu hình. */
 export function frequencyLabel(value?: number | null, unit?: string | null): string | null {
   if (!value || !unit) return null;

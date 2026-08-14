@@ -1057,6 +1057,10 @@ DROP; tổng **20 migration**). **158 test pass** (thêm `test/treatment-plan.te
   dù ngoài khoảng" — nút Lưu **khóa** cho tới khi xác nhận.
 - **Buổi đã hoàn thành**: action đổi từ "Ghi nhận" → **Xem kết quả** (mở chi tiết) + **Sửa ghi nhận** (theo
   `treatment.write`); modal chi tiết cũng đổi nhãn "Ghi nhận lần thực hiện" → "Sửa ghi nhận".
+- **Trạng thái PHÁC ĐỒ không mâu thuẫn buổi** (`PRE_EXECUTION_PLAN_STATUSES`, `isPlanStatusConflicting`):
+  ghi nhận buổi khi phác đồ còn Bản nháp/Chờ duyệt/Đã duyệt → **tự nâng lên Đang thực hiện**; **chặn** đưa phác
+  đồ về các trạng thái tiền-thực-hiện khi đã có buổi hoàn thành (server trả **409**; UI khóa các option đó
+  trong dropdown). Có test.
 
 ### Demo (seed:demo) — TP-100001 "Phác đồ trẻ hóa 8 buổi" (Đỗ Thùy Linh), **V2**
 4 giai đoạn: Chuẩn bị (2 buổi·7 ngày/lần·20–27/08) · Can thiệp (4 buổi·7 ngày/lần·03–24/09) · Phục hồi (1

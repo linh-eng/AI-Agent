@@ -6,6 +6,7 @@ import { requirePermission, getSession } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { treatmentPlanUpdateSchema } from "@/lib/clinic-validation";
 import { canSeeFinance, maskFinance, auditLog } from "@/lib/clinic";
+import { isPlanStatusConflicting } from "@/lib/treatment-plan";
 
 export const GET = handle(async (_req, { params }) => {
   await requirePermission(PERMISSIONS.TREATMENT_READ);
@@ -58,6 +59,14 @@ export const PATCH = handle(async (req, { params }) => {
 
   const current = await prisma.treatmentPlan.findUnique({ where: { id: params.id } });
   if (!current) return fail(404, "Không tìm thấy phác đồ");
+
+  // CHẶN hạ cấp mâu thuẫn: không cho lùi về Bản nháp/Chờ duyệt/Đã duyệt khi đã có buổi hoàn thành.
+  if (rest.status) {
+    const doneCount = await prisma.treatmentSession.count({ where: { planId: params.id, status: "COMPLETED" } });
+    if (isPlanStatusConflicting(rest.status, doneCount > 0)) {
+      return fail(409, "Không thể đưa phác đồ về trạng thái chưa thực hiện vì đã có buổi hoàn thành.", { doneCount });
+    }
+  }
 
   const data: Record<string, unknown> = { ...rest };
 

@@ -27,8 +27,11 @@ import {
   deriveStageStatus,
   isSessionDateInStage,
   isSessionDone,
+  isPlanStatusConflicting,
   comparePlannedActual,
 } from "@/lib/treatment-plan";
+import { PATCH as planPatchRaw } from "@/app/api/treatment-plans/[id]/route";
+const planPatch = (r: Request, id: string) => planPatchRaw(r, { params: { id } } as any);
 
 import { POST as versionPostRaw } from "@/app/api/treatment-plans/[id]/version/route";
 import { PATCH as sessionPatchRaw } from "@/app/api/treatment-sessions/[id]/route";
@@ -137,6 +140,18 @@ describe("Phác đồ — trạng thái giai đoạn tự suy (mục 2 chỉnh)"
   });
   it("tôn trọng CANCELLED thủ công", () => {
     expect(deriveStageStatus({ status: "CANCELLED", plannedSessions: 2 }, [{ status: "COMPLETED" }, { status: "COMPLETED" }])).toBe("CANCELLED");
+  });
+});
+
+describe("Phác đồ — trạng thái tổng thể không mâu thuẫn buổi", () => {
+  it("không cho lùi về tiền-thực-hiện khi đã có buổi hoàn thành", () => {
+    expect(isPlanStatusConflicting("PENDING_APPROVAL", true)).toBe(true);
+    expect(isPlanStatusConflicting("DRAFT", true)).toBe(true);
+    expect(isPlanStatusConflicting("APPROVED", true)).toBe(true);
+    expect(isPlanStatusConflicting("ACTIVE", true)).toBe(false);
+  });
+  it("khi chưa có buổi hoàn thành thì không chặn", () => {
+    expect(isPlanStatusConflicting("PENDING_APPROVAL", false)).toBe(false);
   });
 });
 
@@ -303,5 +318,27 @@ describe("Phác đồ — HTTP: version, kế hoạch-vs-thực tế, liên kế
     expect(res.status).toBe(200);
     // Sau khi hoàn thành đủ buổi: giai đoạn COMPLETED
     expect((await prisma.treatmentStage.findUnique({ where: { id: plan.stages[0].id } }))?.status).toBe("COMPLETED");
+  });
+
+  it("ghi nhận buổi khi phác đồ ở 'Chờ duyệt' → tự nâng lên 'Đang thực hiện' (không mâu thuẫn)", async () => {
+    const c = await makeCustomer();
+    const plan = await prisma.treatmentPlan.create({
+      data: { code: uniq("TP"), customerId: c.id, name: "PĐ", status: "PENDING_APPROVAL" },
+    });
+    const s = await prisma.treatmentSession.create({ data: { planId: plan.id, customerId: c.id, sessionNumber: 1, status: "PLANNED" } });
+    auth(token);
+    await sessionPatch(req(`http://t/api/treatment-sessions/${s.id}`, "PATCH", { status: "COMPLETED" }), s.id);
+    expect((await prisma.treatmentPlan.findUnique({ where: { id: plan.id } }))?.status).toBe("ACTIVE");
+  });
+
+  it("chặn đưa phác đồ về 'Chờ duyệt' khi đã có buổi hoàn thành → 409", async () => {
+    const c = await makeCustomer();
+    const plan = await prisma.treatmentPlan.create({ data: { code: uniq("TP"), customerId: c.id, name: "PĐ", status: "ACTIVE" } });
+    await prisma.treatmentSession.create({ data: { planId: plan.id, customerId: c.id, sessionNumber: 1, status: "COMPLETED", performedAt: new Date() } });
+    auth(token);
+    const res = await planPatch(req(`http://t/api/treatment-plans/${plan.id}`, "PATCH", { status: "PENDING_APPROVAL" }), plan.id);
+    expect(res.status).toBe(409);
+    // Trạng thái giữ nguyên ACTIVE
+    expect((await prisma.treatmentPlan.findUnique({ where: { id: plan.id } }))?.status).toBe("ACTIVE");
   });
 });

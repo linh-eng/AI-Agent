@@ -64,6 +64,7 @@ interface Plan {
 }
 
 const PLAN_STATUSES = ["DRAFT", "PENDING_APPROVAL", "APPROVED", "ACTIVE", "PAUSED", "COMPLETED", "CANCELLED"];
+const PRE_EXECUTION_STATUSES = ["DRAFT", "PENDING_APPROVAL", "APPROVED"]; // khóa khi đã có buổi hoàn thành
 const SESSION_STATUSES = ["PLANNED", "IN_PROGRESS", "COMPLETED", "SKIPPED", "CANCELLED"];
 const STAGE_STATUSES = ["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
 const FREQ_UNITS = ["DAY", "WEEK", "MONTH"];
@@ -163,8 +164,14 @@ export default function TreatmentPlanDetailPage() {
   }
 
   async function setStatus(status: string) {
-    await apiFetch(`/api/treatment-plans/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }).catch(() => {});
-    load();
+    try {
+      await apiFetch(`/api/treatment-plans/${id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      load();
+    } catch (e) {
+      // Chặn hạ cấp mâu thuẫn (409) — báo cho người dùng, không đổi trạng thái.
+      alert(e instanceof Error ? e.message : "Không đổi được trạng thái phác đồ.");
+      load();
+    }
   }
 
   // Tạo lịch hẹn từ 1 buổi (mục 11): mở form Lịch hẹn đã nghiệm thu, prefill sẵn.
@@ -210,7 +217,9 @@ export default function TreatmentPlanDetailPage() {
       <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
         {canWrite ? (
           <Select className="h-8 w-44" value={p.status} onChange={(e) => setStatus(e.target.value)}>
-            {PLAN_STATUSES.map((s) => <option key={s} value={s}>{PLAN_STATUS_LABEL[s]}</option>)}
+            {PLAN_STATUSES.map((s) => (
+              <option key={s} value={s} disabled={progress.doneSessions > 0 && PRE_EXECUTION_STATUSES.includes(s) && s !== p.status}>{PLAN_STATUS_LABEL[s]}</option>
+            ))}
           </Select>
         ) : (
           <Badge tone={PLAN_STATUS_TONE[p.status]}>{PLAN_STATUS_LABEL[p.status]}</Badge>
