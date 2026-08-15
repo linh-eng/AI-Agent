@@ -959,6 +959,29 @@ Xác minh cuối bằng session thật + DB `role_permissions` + direct API (kh�
   `claude/customer-treatment-management-system-ozcn03`). Backend RBAC là source of truth; UI phản ánh permission,
   không hard-code tên role; không sửa business rule/schema/permission matrix Mục 2–14.
 
+### Nghiệm thu Mục 16 (Cập nhật phần mềm KHÔNG mất dữ liệu) — PASS toàn bộ A–P
+Kiểm tra **update/upgrade path** (không thêm feature). Baseline Mục 2–15 bất biến; **KHÔNG sửa code**
+(script update + migration đã an toàn) → working tree sạch, không commit code. Trên Linux không chạy `.bat`
+trực tiếp → **equivalent execution** trên **DB copy** (`thng_upd`), KHÔNG đụng source `thng_warehouse`.
+- **Script (`windows/`):** `update-windows.bat` = dừng cổng 9500 → `git pull` → `npm install` → `prisma
+  migrate deploy` → `next build` (có `|| goto :err` + `exit /b 1`; **KHÔNG** `db:seed`/DROP/reset/.env overwrite).
+  `start-windows.bat` = `npm run start:lan` (không DB command). `setup-windows.bat` có `db:seed` nhưng là **cài
+  lần đầu**, KHÔNG thuộc update flow.
+- **Backup/restore (B/P):** `pg_dump` exit 0 (298 KB > 0); restore vào DB temp `thng_upd` exit 0, 0 error,
+  counts khớp source → backup usable.
+- **Migration (E):** 27 migration additive — DROP TABLE/COLUMN=0, TRUNCATE=0, DELETE=0, SET NOT NULL=0,
+  DROP CONSTRAINT=0. `migrate deploy` = "No pending migrations" (idempotent, chạy 2 lần no-op).
+- **.env (D):** `sha256(.env)` before == after; key set không đổi; update không ghi đè.
+- **Data preservation (I/J):** 21/21 bảng count before==after; sentinel `KH-000001`/`HD-000001` 11.9tr
+  PARTIAL/`PT-000001` 5tr TRANSFER/`NV-000001`/brand giữ nguyên; **md5 customers không đổi** (`2cff14e3…`);
+  source DB không bị đụng (md5 giữ nguyên — chỉ pg_dump đọc).
+- **RBAC Mục 15 sau update (K):** CSKH revenue/cost/profit=null + price-floors/users 403; Thu ngân
+  revenue=3.5tr + price-floors 200 + users 403; Quản lý users 403. Financial privacy + sidebar permission-based
+  **không regression**.
+- **Version (L):** `package.json` 0.20.0 == `APP_VERSION` (single-source); sidebar + Cài đặt cùng `versionLabel()`.
+- **Regression (N):** **281 test / 36 file PASS**; tsc 0 lỗi; build OK; health check 10 route = 200/401 đúng.
+- **Chốt:** Mục 16 **PASS toàn bộ A–P**; 0 migration mới, 0 DROP; không CONFLICT với baseline Mục 15.
+
 ## Hồ sơ khách hàng 360° (v0.10.0) — danh sách + hồ sơ trung tâm khách
 
 Tổ chức lại & bổ sung dữ liệu/UX cho **module Khách hàng** (KHÔNG đổi engine Booking/Phác đồ/Giá/Vật tư/
