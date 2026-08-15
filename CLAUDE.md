@@ -882,6 +882,32 @@ migration** (dùng `User`/`Role`/`UserRole` sẵn có; 0 DROP). Chỉ sửa **ad
   **K2** PATCH gỡ-role/khóa admin cuối→409, có 2 admin thì cho phép · M audit before/after không rò rỉ. Login
   route (`api/auth/login`) từ chối `!user.isActive` (chứng minh G/H). **255 test pass** (baseline 248 + 7).
 
+### Nghiệm thu Mục 15 (Phân quyền theo vai trò / RBAC toàn hệ thống) — enforce BACKEND, không dựa ẩn menu
+Xác thực RBAC toàn hệ thống trên **7 vai trò** (ADMIN/MANAGER/RECEPTION/CUSTOMER_CARE/SPECIALIST/CASHIER/
+MARKETING). **KHÔNG sửa business rule/schema/RBAC** — baseline (`src/lib/rbac.ts`) đã đúng; chỉ **THÊM**
+`test/rbac-matrix.test.ts` (15 test HTTP thật) để chứng minh. **0 migration · 0 DROP · 0 thay đổi mã nguồn
+nghiệp vụ.**
+- **Enforce ở server (không ẩn menu):** audit 164 route API — 6 route không guard đúng là whitelist hợp lệ
+  (auth login/logout/me, storage/blob [signed token], portal login/logout); còn lại đều `require*`. Financial
+  privacy qua `maskFinance`/`canSeeFinance` ở SERVER (đặt field=null), 21 route tài chính áp mask.
+- **Bằng chứng A–P (test HTTP thật + live 7 vai trò + SQL):** A persistence (session.permissions suy từ
+  `ROLE_PERMISSIONS`) · B anonymous→401 · C Admin toàn quyền + `/users` 200 · D Quản lý nghiệp vụ+tài chính,
+  KHÔNG tự nhận user.manage (→403) · E Lễ tân khách/booking/thu tiền, treatment.write+user.manage→403, giá
+  vốn=null · F CSKH CRM/task, price-floors→403, giá vốn/SP.cost/fee/dashboard.cost+profit=null · G Chuyên
+  viên treatment, finance/user DENY · H Thu ngân thanh toán/giá sàn+tài chính, user/protocol DENY · I
+  Marketing chiến dịch, treatment/payment/user DENY (MARKETING có finance.read cho ROI) · J **financial
+  privacy kiểm JSON trực tiếp** (non-finance null, finance có giá trị) · K direct-API-attack (role thấp→route
+  cao→403/redacted) · L multi-role **UNION** quyền (SPECIALIST+CASHIER) + role rác→0 quyền · M đổi vai trò →
+  **đăng nhập lại** phản ánh quyền mới · N UI (Admin có thẻ Chi phí/Lợi nhuận, CSKH không) · O audit
+  USER_UPDATED before/after + LOGIN, không log secret · P regression.
+- **Ghi chú baseline (KHÔNG phải lỗi — không tự đổi):** (1) mọi vai trò spa chia sẻ `CLINIC_READ` → đọc rộng,
+  khác biệt ở **WRITE + field tài chính**; (2) RECEPTION có `pricefloor.read` = chỉ thấy **NGƯỠNG** giá sàn
+  (`floorPrice`), còn cost breakdown/biên vẫn mask theo `finance.read` (baseline Mục 7); (3) MARKETING có
+  `finance.read` phục vụ ROI (baseline Mục 10). Menu có thể hiện module read-only nhưng **backend chặn** (403)
+  khi thiếu quyền → quyết định bằng server, không bằng UI.
+- **Regression:** baseline 255/34 → **270 test / 35 file** (+15 rbac-matrix, +1 file); Mục 2–14 xanh; tsc 0
+  lỗi; next build OK.
+
 ## Hồ sơ khách hàng 360° (v0.10.0) — danh sách + hồ sơ trung tâm khách
 
 Tổ chức lại & bổ sung dữ liệu/UX cho **module Khách hàng** (KHÔNG đổi engine Booking/Phác đồ/Giá/Vật tư/
