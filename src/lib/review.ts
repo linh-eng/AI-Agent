@@ -23,9 +23,33 @@ function avg(nums: number[]): number | null {
   return Math.round((nums.reduce((s, n) => s + n, 0) / nums.length) * 100) / 100;
 }
 
-/** Tổng hợp đánh giá: điểm hài lòng chung, điểm KTV, tỷ lệ quay lại, theo từng KTV. */
-export async function reviewSummary(): Promise<ReviewSummary> {
+/**
+ * Tổng hợp đánh giá: điểm hài lòng chung, điểm KTV, tỷ lệ quay lại, theo từng KTV.
+ * Nhận CÙNG bộ lọc với gallery (khách/dịch vụ/khoảng ngày) → KPI và lưới ảnh luôn
+ * cùng phạm vi dữ liệu (mục F). Lọc dịch vụ/ngày qua quan hệ session (performedAt).
+ */
+export async function reviewSummary(filter: {
+  customerId?: string;
+  serviceId?: string;
+  from?: Date;
+  to?: Date;
+} = {}): Promise<ReviewSummary> {
+  const sessionFilter =
+    filter.serviceId || filter.from || filter.to
+      ? {
+          session: {
+            ...(filter.serviceId ? { serviceId: filter.serviceId } : {}),
+            ...(filter.from || filter.to
+              ? { performedAt: { ...(filter.from ? { gte: filter.from } : {}), ...(filter.to ? { lte: filter.to } : {}) } }
+              : {}),
+          },
+        }
+      : {};
   const reviews = await prisma.sessionReview.findMany({
+    where: {
+      ...(filter.customerId ? { customerId: filter.customerId } : {}),
+      ...sessionFilter,
+    },
     select: { satisfactionScore: true, technicianScore: true, technicianName: true, wouldReturn: true },
   });
   const sat = reviews.map((r) => r.satisfactionScore).filter((n): n is number => n != null);

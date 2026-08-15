@@ -33,13 +33,21 @@ export default function BeforeAfterPage() {
     if (filter.serviceId) q.set("serviceId", filter.serviceId);
     if (filter.from) q.set("from", new Date(filter.from).toISOString());
     if (filter.to) q.set("to", new Date(filter.to + "T23:59:59").toISOString());
-    try { setGroups(await apiFetch<Group[]>(`/api/before-after?${q.toString()}`)); } finally { setLoading(false); }
+    const qs = q.toString();
+    try {
+      // Gallery + KPI dùng CÙNG bộ lọc → luôn khớp phạm vi dữ liệu.
+      const [g, s] = await Promise.all([
+        apiFetch<Group[]>(`/api/before-after?${qs}`),
+        apiFetch<Summary>(`/api/session-reviews/summary?${qs}`),
+      ]);
+      setGroups(g);
+      setSummary(s);
+    } finally { setLoading(false); }
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
   useEffect(() => {
     apiFetch<Opt[]>("/api/services").then(setServices).catch(() => {});
     apiFetch<Opt[]>("/api/customers").then(setCustomers).catch(() => {});
-    apiFetch<Summary>("/api/session-reviews/summary").then(setSummary).catch(() => {});
   }, []);
 
   return (

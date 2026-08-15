@@ -747,9 +747,23 @@ qua route kiểm quyền, không public). Báo cáo KTV là nội bộ (không l
 Buổi RF #1 (KH-100004): đánh giá hài lòng 5/5, KTV 5/5, "sẽ quay lại", báo cáo KTV; kèm 2 ảnh Before/After đã
 seed (đã chia sẻ cho khách). Trang `/before-after` hiển thị cặp ảnh + tổng hợp điểm.
 
-### Còn lại (phase sau)
-Khách tự đánh giá qua **Cổng khách** (hiện nhân viên ghi hộ); nhãn/mốc thời gian trên ảnh; so sánh trượt
-(slider) trước–sau; báo cáo hiệu suất KTV theo kỳ; gắn KTV được đánh giá từ danh sách nhân sự (hiện nhập tên).
+### Nghiệm thu Mục 10 (v0.19.0) — KPI khớp bộ lọc gallery + bằng chứng A–L
+- **Fix VII.F (filter consistency):** `reviewSummary(filter)` nhận CÙNG bộ lọc với gallery
+  (khách/dịch vụ/khoảng ngày, lọc dịch vụ/ngày qua quan hệ `session.performedAt`); `/api/session-reviews/
+  summary` đọc `customerId/serviceId/from/to`; trang `/before-after` nạp KPI + gallery bằng cùng query →
+  KPI KHÔNG còn global khi lưới ảnh đã lọc. (Trước đó KPI luôn toàn cục — đã sửa.)
+- **Đồng bộ trạng thái instance** không liên quan (đây là Mục 10). Lineage giữ nguyên: ảnh Before/After →
+  `MediaAsset.sessionId` → `TreatmentSession`(customerId/serviceId/planId/stageId/bookingId/performer).
+  KTV hiển thị = `session.performer` (snapshot buổi); điểm KTV theo `SessionReview.technicianName` (snapshot).
+- **Privacy (đã có từ SEC, tái xác nhận):** ảnh mới `sharedWithCustomer=false` mặc định; portal chỉ trả ảnh
+  của chính khách + đã chia sẻ + chưa archive (else 404, chống lộ chéo); tắt chia sẻ → portal 404, nội bộ giữ.
+- **Tỷ lệ quay lại — công thức rõ:** `#review(wouldReturn=true) / #review(wouldReturn≠null) × 100` — là **ý
+  định quay lại** từ đánh giá, KHÔNG phải lượt tái khám thực tế (nếu sau này cần "khách quay lại thực tế" =
+  #khách≥2 buổi / #khách có buổi thì phải định nghĩa riêng — hiện ngoài phạm vi).
+- **Test:** `test/before-after.test.ts` (5) — lineage, filter, privacy default/toggle/portal/cross-customer,
+  RBAC (403/401), KPI đúng DB + isolation ≥2 KTV + filter-consistency. **229 test pass** (không regression).
+- **Nợ:** demo chỉ có 1 KTV được đánh giá (cô lập ≥2 KTV chứng minh ở test); slider so sánh & khách tự đánh
+  giá qua portal vẫn để phase sau.
 
 ## Import khách hàng (mục 41) — MySpa/CSV: preview → mapping → validate → trùng → báo cáo
 
