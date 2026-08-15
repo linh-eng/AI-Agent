@@ -29,10 +29,23 @@ export const GET = handle(async () => {
   return ok(await getBrand());
 });
 
+// So sánh trước/sau để ghi audit (rút gọn logo — chỉ đánh dấu có/không, không log base64).
+function brandDiff(before: Record<string, unknown>, after: Record<string, unknown>) {
+  const fields = ["name", "tagline", "primaryColor"] as const;
+  const diff: Record<string, { before: unknown; after: unknown }> = {};
+  for (const f of fields) {
+    if ((before[f] ?? null) !== (after[f] ?? null)) diff[f] = { before: before[f] ?? null, after: after[f] ?? null };
+  }
+  const hadLogo = !!before.logoDataUrl, hasLogo = !!after.logoDataUrl;
+  if (hadLogo !== hasLogo) diff.logo = { before: hadLogo ? "(có)" : null, after: hasLogo ? "(có)" : null };
+  return diff;
+}
+
 // Chỉ vai trò có quyền cấu hình mới được sửa.
 export const PUT = handle(async (req) => {
   const session = await requirePermission(PERMISSIONS.SETTING_WRITE);
   const parsed = brandSchema.parse(await req.json());
+  const before = await getBrand(); // trạng thái trước để ghi diff (mục 13 J)
   const brand = await setBrand(
     {
       name: parsed.name,
@@ -47,7 +60,7 @@ export const PUT = handle(async (req) => {
     action: "SETTING_UPDATED",
     entityType: "AppSetting",
     entityId: "brand",
-    changes: { name: brand.name },
+    changes: { diff: brandDiff(before as any, brand as any) },
   });
   return ok(brand);
 });

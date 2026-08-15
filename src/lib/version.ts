@@ -1,13 +1,17 @@
 // =============================================================================
-// Phiên bản ứng dụng — hiển thị trong Webapp để tiện theo dõi khi cập nhật.
-// Khi phát hành bản mới: tăng APP_VERSION + đổi ngày + mô tả ngắn, rồi build lại.
-// (Giữ đồng bộ với "version" trong package.json.)
+// Phiên bản ứng dụng — hiển thị trong Webapp (trang Cài đặt + chân menu trái).
+// NGUỒN DUY NHẤT: `version` trong package.json → KHÔNG hard-code hai giá trị độc
+// lập (trang Cài đặt và sidebar cùng đọc APP_VERSION này). Khi phát hành bản mới
+// chỉ cần `npm version` / sửa package.json — version hiển thị tự khớp.
 // =============================================================================
-export const APP_VERSION = "0.14.0";
-export const APP_RELEASE_DATE = "2026-08-14";
-export const APP_RELEASE_NAME = "Ghi nhận lần thực hiện (Session): màn 7 khối A–G, header liên kết Phác đồ/Version/Giai đoạn/Buổi/Booking, form chuyên môn động theo Protocol (snapshot), nhân sự+phí snapshot, vật tư dự kiến/thực tế, Before/After, hoàn thành có validate + khóa/sửa-có-audit theo quyền";
+import pkg from "../../package.json";
 
-/** Chuỗi hiển thị gọn: v0.2.0 · 13/08/2026 */
+export const APP_VERSION: string = pkg.version;
+export const APP_RELEASE_DATE = "2026-08-15";
+export const APP_RELEASE_NAME =
+  "Cài đặt & Thương hiệu: tên/khẩu hiệu/màu nhấn/logo lưu DB (AppSetting) áp toàn hệ thống; phiên bản đồng bộ package.json (Cài đặt + chân menu); nhập khách hàng, thư viện Spa, Before/After & Đánh giá, CSKH/Follow-up đã nghiệm thu.";
+
+/** Chuỗi hiển thị gọn: v0.20.0 · 15/08/2026 */
 export function versionLabel(): string {
   const [y, m, d] = APP_RELEASE_DATE.split("-");
   return `v${APP_VERSION} · ${d}/${m}/${y}`;

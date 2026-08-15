@@ -812,7 +812,7 @@ số đếm; **(4)** **Nhập** → báo cáo (đã tạo/bỏ qua trùng/lỗi 
 KHÔNG bị ghi đè.
 
 ### Nâng cấp Mục 12 (v0.20.0) — normalize · dup ưu tiên · update-merge · ImportBatch · audit
-Migration **`Q_import_batch`** (additive, 0 DROP; tổng **27 migration**). **249 test pass** (import-customers 7
+Migration **`Q_import_batch`** (additive, 0 DROP; tổng **27 migration**). **241 test pass** (import-customers 7
 + import-http 1, thay cho 4 test cũ).
 - **Chuẩn hóa (`import-customers.ts`):** `normalizePhone` (+84/0084/84→0, bỏ khoảng trắng/dấu chấm/gạch —
   KHÔNG bịa số); `normalizeEmail` (trim+lowercase). Ngày sinh mơ hồ/sai → ERROR (không đảo ngày/tháng).
