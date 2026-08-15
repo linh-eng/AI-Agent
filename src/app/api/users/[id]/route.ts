@@ -24,7 +24,10 @@ export const GET = handle(async (_req, { params }) => {
 export const PATCH = handle(async (req, { params }) => {
   const session = await requirePermission(PERMISSIONS.USER_MANAGE);
   const parsed = userUpdateSchema.parse(await req.json());
-  const current = await prisma.user.findUnique({ where: { id: params.id } });
+  const current = await prisma.user.findUnique({
+    where: { id: params.id },
+    include: { roles: { include: { role: { select: { code: true } } } } },
+  });
   if (!current) return fail(404, "Không tìm thấy người dùng");
 
   // Không cho tự vô hiệu hóa chính mình (tránh khóa mất tài khoản admin đang dùng).
@@ -32,17 +35,38 @@ export const PATCH = handle(async (req, { params }) => {
     return fail(409, "Không thể vô hiệu hóa chính tài khoản đang đăng nhập");
   }
 
+  // BẤT BIẾN "Admin cuối cùng": chặn CẢ hai đường bypass qua PATCH —
+  // (a) gỡ vai trò ADMIN khỏi admin cuối, (b) khóa (isActive=false) admin cuối.
+  const currentIsActiveAdmin = current.isActive && current.roles.some((r) => r.role.code === ROLES.ADMIN);
+  if (currentIsActiveAdmin) {
+    const willBeActive = parsed.isActive !== undefined ? parsed.isActive : current.isActive;
+    const willHaveAdmin = parsed.roleCodes !== undefined ? parsed.roleCodes.includes(ROLES.ADMIN) : true;
+    const willRemainActiveAdmin = willBeActive && willHaveAdmin;
+    if (!willRemainActiveAdmin) {
+      const otherActiveAdmins = await prisma.user.count({
+        where: { id: { not: params.id }, isActive: true, roles: { some: { role: { code: ROLES.ADMIN } } } },
+      });
+      if (otherActiveAdmins === 0) {
+        return fail(409, "Không thể gỡ quyền Admin hoặc khóa tài khoản Admin cuối cùng");
+      }
+    }
+  }
+
+  const beforeRoles = current.roles.map((r) => r.role.code).sort();
+
   const data: Record<string, unknown> = {};
   if (parsed.name !== undefined) data.name = parsed.name;
   if (parsed.isActive !== undefined) data.isActive = parsed.isActive;
   if (parsed.password) data.passwordHash = await hashPassword(parsed.password);
 
   // Thay toàn bộ vai trò nếu gửi roleCodes.
+  let afterRoles = beforeRoles;
   if (parsed.roleCodes) {
     const roleCodes = parsed.roleCodes.filter((c) => VALID_ROLE_CODES.has(c));
     const roles = await prisma.role.findMany({ where: { code: { in: roleCodes } }, select: { id: true } });
     await prisma.userRole.deleteMany({ where: { userId: params.id } });
     data.roles = { create: roles.map((r) => ({ roleId: r.id })) };
+    afterRoles = roleCodes.slice().sort();
   }
 
   const user = await prisma.user.update({ where: { id: params.id }, data });
@@ -51,7 +75,11 @@ export const PATCH = handle(async (req, { params }) => {
     action: "USER_UPDATED",
     entityType: "User",
     entityId: user.id,
-    changes: { isActive: user.isActive, resetPassword: !!parsed.password, roles: parsed.roleCodes },
+    changes: {
+      resetPassword: !!parsed.password, // KHÔNG log mật khẩu/hash
+      ...(parsed.isActive !== undefined ? { isActive: { before: current.isActive, after: user.isActive } } : {}),
+      ...(parsed.roleCodes ? { roles: { before: beforeRoles, after: afterRoles } } : {}),
+    },
   });
   return ok({ id: user.id, email: user.email, name: user.name, isActive: user.isActive });
 });

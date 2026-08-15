@@ -866,6 +866,22 @@ request (hợp nhất với quyền trong token cho vai trò lạ). Token cũ v�
 nguồn ngay, **không cần đăng xuất/đăng nhập lại**. Áp cho cả server (`requirePermission`) lẫn client
 (`useCan` qua layout `getSession()` + `/api/auth/me`).
 
+### Nghiệm thu Mục 14 (Quản trị người dùng) — bất biến "Admin cuối" + audit before/after
+Nghiệm thu tài khoản đăng nhập (khác **Nhân sự/Employee** — hai thực thể tách biệt, không merge). **KHÔNG
+migration** (dùng `User`/`Role`/`UserRole` sẵn có; 0 DROP). Chỉ sửa **additive** ở `api/users/[id]` PATCH.
+- **Vá lỗ bypass "Admin cuối" qua PATCH:** trước đây chỉ DELETE chặn xóa admin active cuối; PATCH vẫn cho
+  **(a) gỡ vai trò ADMIN** hoặc **(b) khóa `isActive=false`** admin cuối → mất quyền quản trị. Nay PATCH tính
+  `willRemainActiveAdmin`; nếu thao tác làm admin active cuối không còn là admin-active và `otherActiveAdmins==0`
+  → **409**. DELETE giữ nguyên guard cũ. Self-guard giữ nguyên (không tự xóa/khóa chính mình → 409).
+- **Audit giàu hơn:** `USER_UPDATED` ghi `changes` before/after cho `isActive` và `roles` (mảng code sắp xếp) +
+  cờ `resetPassword` (KHÔNG log mật khẩu/hash). `USER_CREATED`/`USER_DELETED` giữ actor `userId`+target `entityId`.
+- **Bằng chứng (test `test/users.test.ts`, 12 test HTTP thật trên Postgres):** A không lộ passwordHash · B/L RBAC
+  401/403/200 · C bcrypt + trùng 409 · D đa vai trò + loại role rác · E đổi role → quyền hiệu lực (login lại) ·
+  F reset pw (cũ fail/mới ok/không lộ hash) · G/H khóa-mở ảnh hưởng login · I hard delete + audit userId→null ·
+  J self-guard · **K** DELETE admin cuối (actor super-role user.manage KHÔNG phải ADMIN → tránh vướng self) ·
+  **K2** PATCH gỡ-role/khóa admin cuối→409, có 2 admin thì cho phép · M audit before/after không rò rỉ. Login
+  route (`api/auth/login`) từ chối `!user.isActive` (chứng minh G/H). **255 test pass** (baseline 248 + 7).
+
 ## Hồ sơ khách hàng 360° (v0.10.0) — danh sách + hồ sơ trung tâm khách
 
 Tổ chức lại & bổ sung dữ liệu/UX cho **module Khách hàng** (KHÔNG đổi engine Booking/Phác đồ/Giá/Vật tư/
