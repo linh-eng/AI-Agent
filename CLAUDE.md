@@ -924,6 +924,28 @@ Theo quyết định nghiệm thu: **KPI/dữ liệu doanh thu là dữ liệu t
   =null; finance (Quản lý/Thu ngân/Marketing) = 3.500.000; cost/profit/floorPrice/staffFee giữ nguyên privacy.
   **271 test / 35 file** (270 + 1). Live before/after + ảnh CSKH (không thẻ Doanh thu) vs Quản lý (có).
 
+#### Bổ sung Mục 15 (N) — Sidebar/menu render theo PERMISSION (permission-based, không tên role)
+Lỗi UI-RBAC: sidebar trước đây render **mọi menu** cho mọi phiên (chỉ `/users` có gate) → CSKH vẫn thấy
+Hóa đơn/Thanh toán/Bảng giá/Giá sàn/Marketing dù không có quyền. Backend đã chặn 403/redact (source of truth),
+nhưng menu gây hiểu nhầm. **KHÔNG sửa backend/permission matrix.**
+- **`src/lib/nav.ts` (mới):** cấu hình nav + `canSeeNavItem`/`visibleNavGroups(permissions)`. Mỗi mục gắn
+  `perm` = permission code (hoặc **mảng any-of**) mà module CẦN. Nhóm rỗng bị loại. `app-shell.tsx` gọi
+  `visibleNavGroups(session.permissions)` (không tự lọc, không map theo tên role).
+- **Mapping menu→permission (permission-based):** Hóa đơn=`invoice.write` · Thanh toán=`payment.write` ·
+  Bảng giá=`price.write` · Giá sàn=`[pricefloor.read, finance.read]` · Marketing=`marketing.read` ·
+  Chăm sóc=`[followup.apply, followup.write, task.write]` · Công việc=`task.write` · Quản trị user=`user.manage` ·
+  Cài đặt=`setting.write` · Nhân sự=`staff.read` · Nhập khách=`customer.write` · Thư viện=`library.read` ·
+  Vật tư=`customer.read` · cụm Kho THNG=warehouse perms (vai trò spa không có → ẩn cả cụm). Khách/Lịch hẹn/
+  Dịch vụ/Phác đồ/Báo giá/Hình ảnh = read tương ứng (đọc chung — mọi vai trò spa giữ).
+- **Kết quả:** CSKH ẩn Hóa đơn/Thanh toán/Bảng giá/Giá sàn/Marketing/Quản trị user/Cài đặt; Thu ngân hiện
+  Hóa đơn/Thanh toán/Bảng giá/Giá sàn; Marketing hiện Marketing+Giá sàn (finance.read/ROI); Admin hiện Quản trị
+  user; mọi vai trò spa ẩn cụm Kho THNG.
+- **Test:** `test/nav-rbac.test.ts` (10 test, unit trên `ROLE_PERMISSIONS` — nguồn sự thật). Backend guard vẫn
+  giữ 401/403/redaction (rbac-matrix). **281 test / 36 file** (271 + 10). tsc + build sạch. Ảnh 6 vai trò.
+- **Ghi chú:** menu đọc-chung (Nhân sự `staff.read`, Nhập khách `customer.write`, Thư viện `library.read`,
+  Vật tư `customer.read`) vẫn hiện cho vai trò có quyền đọc — đúng nguyên tắc "có quyền đọc → có thể giữ";
+  dữ liệu tài chính trong các trang này vẫn mask ở server.
+
 ## Hồ sơ khách hàng 360° (v0.10.0) — danh sách + hồ sơ trung tâm khách
 
 Tổ chức lại & bổ sung dữ liệu/UX cho **module Khách hàng** (KHÔNG đổi engine Booking/Phác đồ/Giá/Vật tư/

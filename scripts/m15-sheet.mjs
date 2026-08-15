@@ -20,9 +20,9 @@ const AP = [
   ["K", "Direct API attack (role thấp gọi route cao)", "RECEPTION→/users 403; CSKH→price-floors 403; SPECIALIST→session-staff.fee null; MARKETING→payment 403 (test K + live)", "PASS"],
   ["L", "Multi-role UNION quyền (không chỉ role đầu)", "SPECIALIST+CASHIER → có treatment.write ∪ finance.read ∪ payment.write; cả 2 route hoạt động; KHÔNG có user.manage; role rác → 0 quyền (test L/L2)", "PASS"],
   ["M", "Đổi vai trò → phiên MỚI phản ánh quyền mới", "CSKH→MANAGER: trước price-floors 403; Admin PATCH role; đăng nhập lại → 200 + thấy giá vốn (test M)", "PASS"],
-  ["N", "UI visibility theo vai trò (bổ sung)", "Admin có thẻ Chi phí/Lợi nhuận + menu Quản trị user; CSKH KHÔNG có thẻ Chi phí/Lợi nhuận (ảnh 7 vai trò)", "PASS"],
+  ["N", "UI visibility theo PERMISSION (sidebar + thẻ)", "Sidebar render theo session.permissions (lib/nav.ts, KHÔNG theo tên role): CSKH ẨN Hóa đơn/Thanh toán/Bảng giá/Giá sàn/Marketing/Quản trị user; Thu ngân HIỆN Hóa đơn/Thanh toán/Bảng giá/Giá sàn; Marketing HIỆN Marketing; vai trò spa ẨN cụm Kho THNG. Nhóm rỗng bị bỏ. Admin có thẻ Chi phí/LN; CSKH không (test nav-rbac 10 + ảnh 6 vai trò)", "PASS"],
   ["O", "Audit thao tác nhạy cảm (actor/before-after; không secret)", "Đổi vai trò → USER_UPDATED {roles:{before,after}} + actor; LOGIN ghi actor; 0 log mật khẩu/hash (test O + SQL)", "PASS"],
-  ["P", "Regression", "Baseline 270/35 → 271/35 (+1 test J2 revenue); Mục 2–14 xanh; tsc + build sạch", "PASS"],
+  ["P", "Regression", "Baseline 271/35 → 281/36 (+10 nav-rbac); Mục 2–14 xanh; tsc + build sạch", "PASS"],
 ];
 
 // Ma trận quyền 7 vai trò (map tới permission code / guard thật).
@@ -83,7 +83,7 @@ td.a{background:#f0fdf4}td.d{background:#fef2f2}td.l{background:#fffbeb}
 <div class="foot">
 <b>KHÔNG sửa business rule/schema</b> — RBAC baseline (Mục 2–14) đã đúng: chỉ THÊM <code>test/rbac-matrix.test.ts</code> (16 test HTTP) để chứng minh. 0 migration, 0 DROP, 0 thay đổi mã nguồn nghiệp vụ. ·
 <b>Ghi chú baseline (không phải lỗi):</b> (1) mọi vai trò spa chia sẻ CLINIC_READ → đọc rộng, khác biệt ở WRITE + field tài chính; (2) RECEPTION có pricefloor.read = chỉ thấy NGƯỠNG giá sàn (floorPrice), cost breakdown/biên vẫn mask theo finance.read; (3) MARKETING có finance.read phục vụ ROI. ·
-<b>Regression:</b> 271/271 test · 35/35 file · tsc 0 lỗi · next build OK.
+<b>Regression:</b> 281/281 test · 36/36 file · tsc 0 lỗi · next build OK.
 </div>`;
 
 fs.writeFileSync("/tmp/m15-sheet.html", html);
