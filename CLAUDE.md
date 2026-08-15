@@ -811,9 +811,25 @@ cáo). Cả hai cần `customer.write`. Giới hạn 5000 dòng/lần.
 số đếm; **(4)** **Nhập** → báo cáo (đã tạo/bỏ qua trùng/lỗi + danh sách mã KH). Cảnh báo rõ: khách trùng
 KHÔNG bị ghi đè.
 
-### Còn lại (phase sau)
-Import lịch sử giao dịch/phác đồ/ảnh (hiện chỉ hồ sơ khách); chế độ "cập nhật khách trùng" (hiện chỉ bỏ qua);
-tải file Excel `.xlsx` trực tiếp (hiện CSV); lưu lịch sử các lần import.
+### Nâng cấp Mục 12 (v0.20.0) — normalize · dup ưu tiên · update-merge · ImportBatch · audit
+Migration **`Q_import_batch`** (additive, 0 DROP; tổng **27 migration**). **249 test pass** (import-customers 7
++ import-http 1, thay cho 4 test cũ).
+- **Chuẩn hóa (`import-customers.ts`):** `normalizePhone` (+84/0084/84→0, bỏ khoảng trắng/dấu chấm/gạch —
+  KHÔNG bịa số); `normalizeEmail` (trim+lowercase). Ngày sinh mơ hồ/sai → ERROR (không đảo ngày/tháng).
+- **Duplicate ưu tiên rõ:** externalId(`legacyId`+`legacySource`) → **phone chuẩn hóa** → **email chuẩn hóa**
+  → trùng trong lô. **KHÔNG merge theo tên đơn thuần** (trùng tên khác key → tạo mới). Trả `matchedCustomerId`.
+- **Chiến lược trùng (`strategy`):** `skip` (mặc định — không đổi khách cũ) | `update` (**merge "chỉ điền
+  field đang trống"**: KHÔNG ghi đè dữ liệu đang có; audit `CUSTOMER_IMPORT_UPDATED` `source=IMPORT`+`batchCode`
+  + diff từng field cũ→mới).
+- **Lưu vết:** model **`ImportBatch`** (IMP-xxxxxx): source/filename/strategy/mapping snapshot/total/created/
+  updated/skipped/errorRows/createdCodes/updatedCodes/**errors[{index,reason,data}]**/importedBy. Báo cáo trả
+  `batchCode`+`errors[]` (tải CSV lỗi ở UI). Audit `CUSTOMERS_IMPORTED` gắn `entityId=batchId`.
+- **Preview** thêm `willCreate/willUpdate/willSkip` (khớp chiến lược). **Idempotency:** import lại cùng file →
+  created 0 (dedup theo externalId/phone/email nhất quán).
+- **UI:** thêm dropdown **Xử lý dòng trùng** (Bỏ qua | Cập nhật), badge Sẽ tạo/Sẽ cập nhật/Sẽ bỏ qua, mã lô
+  + danh sách lỗi + **tải CSV lỗi**. RBAC: `customer.write` (test HTTP 401/403/200).
+- **Nợ:** import lịch sử giao dịch/phác đồ/ảnh vẫn phase sau; `.xlsx` trực tiếp chưa (hiện CSV); merge rule
+  hiện chỉ "điền chỗ trống" (chưa có chế độ ghi đè có xác nhận).
 
 ## Quản trị người dùng (Admin) — tài khoản đăng nhập + gán vai trò
 

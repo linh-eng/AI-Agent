@@ -552,6 +552,9 @@ export const importCustomerRowSchema = z.object({
 });
 export const importCustomersSchema = z.object({
   legacySource: z.string().max(60).default("MySpa"),
+  strategy: z.enum(["skip", "update"]).default("skip"), // xử lý dòng trùng (mục 12)
+  filename: z.string().max(260).optional().nullable(),
+  mapping: z.record(z.any()).optional().nullable(), // snapshot cột nguồn → trường chuẩn
   rows: z.array(importCustomerRowSchema).min(1, "Không có dòng nào").max(5000, "Tối đa 5000 dòng/lần"),
 });
 

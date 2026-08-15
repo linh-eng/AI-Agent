@@ -2845,6 +2845,29 @@ model CareProcessInstance {
   @@map("care_process_instances")
 }
 
+/// Một LẦN NHẬP khách hàng (import CSV/MySpa) — lưu vết để truy nguồn (mục 12).
+/// Giữ snapshot mapping cột + chiến lược + tổng kết + danh sách mã tạo + lỗi.
+model ImportBatch {
+  id           String   @id @default(cuid())
+  code         String   @unique // IMP-xxxxxx
+  source       String // nguồn (MySpa/CSV...)
+  filename     String?
+  strategy     String // SKIP | UPDATE (xử lý dòng trùng)
+  mapping      Json? // snapshot cột nguồn → trường chuẩn
+  total        Int      @default(0)
+  created      Int      @default(0)
+  updated      Int      @default(0)
+  skipped      Int      @default(0)
+  errorRows    Int      @default(0)
+  createdCodes Json? // mã KH đã tạo
+  updatedCodes Json? // mã KH đã cập nhật
+  errors       Json? // [{index, reason, data}] cho báo cáo lỗi
+  importedBy   String?
+  createdAt    DateTime @default(now())
+
+  @@map("import_batches")
+}
+
 model FollowUpStep {
   id         String          @id @default(cuid())
   templateId String

@@ -7,17 +7,24 @@ import { importCustomersSchema } from "@/lib/clinic-validation";
 import { commitImport } from "@/lib/import-customers";
 import { auditLog } from "@/lib/clinic";
 
-// Ghi các dòng NEW (bỏ qua trùng & lỗi). Trả BÁO CÁO import.
+// Ghi import: tạo mới + (tùy chọn) cập nhật khách trùng theo merge rule. Lưu vết
+// ImportBatch + audit. Trả BÁO CÁO import (batch, tạo/cập nhật/bỏ qua/lỗi).
 export const POST = handle(async (req) => {
   const session = await requirePermission(PERMISSIONS.CUSTOMER_WRITE);
   const parsed = importCustomersSchema.parse(await req.json());
-  const report = await commitImport(parsed.rows, parsed.legacySource, session.name);
+  const report = await commitImport(parsed.rows, {
+    legacySource: parsed.legacySource,
+    strategy: parsed.strategy,
+    filename: parsed.filename ?? null,
+    mapping: parsed.mapping ?? null,
+    createdBy: session.name,
+  });
   await auditLog({
     userId: session.userId,
     action: "CUSTOMERS_IMPORTED",
-    entityType: "Customer",
-    entityId: "import",
-    changes: { source: parsed.legacySource, created: report.created, skipped: report.skippedDuplicate, errors: report.errorRows },
+    entityType: "ImportBatch",
+    entityId: report.batchId,
+    changes: { batchCode: report.batchCode, source: parsed.legacySource, strategy: parsed.strategy, created: report.created, updated: report.updated, skipped: report.skippedDuplicate, errors: report.errorRows },
   });
   return ok(report);
 });
