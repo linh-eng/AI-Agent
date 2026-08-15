@@ -946,6 +946,19 @@ nhưng menu gây hiểu nhầm. **KHÔNG sửa backend/permission matrix.**
   Vật tư `customer.read`) vẫn hiện cho vai trò có quyền đọc — đúng nguyên tắc "có quyền đọc → có thể giữ";
   dữ liệu tài chính trong các trang này vẫn mask ở server.
 
+#### CHỐT Mục 15 = PASS TOÀN BỘ (A–P + J2 + N)
+Xác minh cuối bằng session thật + DB `role_permissions` + direct API (không sửa code):
+- **N (UI visibility):** ảnh sidebar Thu ngân = `CASHIER`/Đỗ Thu Ngân (session thật); menu khớp `ROLE_PERMISSIONS`
+  (hiện Hóa đơn/Thanh toán/Bảng giá/Giá sàn; ẩn Marketing/Chăm sóc/Công việc/Nhập khách/Quản trị user). Menu
+  "Nhân sự" hợp lệ: `staff.read` có trong **DB `role_permissions` (`CASHIER|staff.read`)** + session; backend
+  `GET /api/employees` = 200. Direct API khớp matrix: price-floors/invoices 200, payment gate 422,
+  user/marketing/treatment 403. Menu ẩn ⇔ API cũng chặn.
+- **A–M, O–P + financial privacy + regression:** giữ PASS (271→281 test / 36 file; tsc + build sạch;
+  0 migration, 0 DROP). Quyết định doanh thu = dữ liệu tài chính (J2) đã áp dụng.
+- **Chốt:** Mục 15 nghiệm thu **PASS toàn bộ** tại commit nav permission-based (branch
+  `claude/customer-treatment-management-system-ozcn03`). Backend RBAC là source of truth; UI phản ánh permission,
+  không hard-code tên role; không sửa business rule/schema/permission matrix Mục 2–14.
+
 ## Hồ sơ khách hàng 360° (v0.10.0) — danh sách + hồ sơ trung tâm khách
 
 Tổ chức lại & bổ sung dữ liệu/UX cho **module Khách hàng** (KHÔNG đổi engine Booking/Phác đồ/Giá/Vật tư/
