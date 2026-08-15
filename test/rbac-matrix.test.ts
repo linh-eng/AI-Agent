@@ -39,6 +39,7 @@ import { POST as _paymentsPost } from "@/app/api/payments/route";
 import { POST as _campaignsPost } from "@/app/api/marketing-campaigns/route";
 import { POST as _crmPost } from "@/app/api/crm-activities/route";
 import { GET as _employeeGet } from "@/app/api/employees/[id]/route";
+import { GET as _dashboardGet } from "@/app/api/clinic/dashboard/route";
 
 const wrap = (fn: (req: Request, ctx: any) => Promise<Response>) => (req: Request) => fn(req, {} as any);
 const usersGet = wrap(_usersGet);
@@ -54,6 +55,11 @@ const protocolsPost = wrap(_protocolsPost);
 const paymentsPost = wrap(_paymentsPost);
 const campaignsPost = wrap(_campaignsPost);
 const crmPost = wrap(_crmPost);
+const dashboardGet = wrap(_dashboardGet);
+async function dashboardFinance() {
+  const d = (await rj(await dashboardGet(jr("http://t/api/clinic/dashboard")))).data as any;
+  return { revenue: d?.revenue ?? null, cost: d?.cost ?? null, profit: d?.profit ?? null, revenueSeries: d?.revenueSeries ?? null, canSeeFinance: d?.canSeeFinance };
+}
 
 let ip = 0;
 function jr(url: string, method = "GET", body?: unknown) {
@@ -98,6 +104,8 @@ async function seedFixtures() {
   const plan = await prisma.treatmentPlan.create({ data: { code: uniq("TP"), customerId: customer.id, name: "PĐ" } });
   const session = await prisma.treatmentSession.create({ data: { code: uniq("SS"), planId: plan.id, customerId: customer.id, sessionNumber: 1, name: "Buổi 1" } });
   await prisma.sessionStaff.create({ data: { sessionId: session.id, employeeId: emp.id, staffName: "KTV Test", role: "PRIMARY", fee: 250000 } });
+  // Payment tháng này → dashboard.revenue > 0 (để phân biệt finance thấy số vs non-finance null).
+  await prisma.payment.create({ data: { customerId: customer.id, amount: 3500000, method: "CASH" } });
   fx = { customerId: customer.id, serviceId: service.id, sessionId: session.id, employeeId: emp.id };
 }
 const employeeGet = (id: string) => _employeeGet(jr(`http://t/api/employees/${id}`), { params: { id } } as any);
@@ -244,6 +252,34 @@ describe("Mục 15 · RBAC toàn hệ thống (HTTP thật)", () => {
     expect((await serviceCostSeen()).expectedCost).not.toBeNull();
     expect((await sessionStaffFeeSeen()).fee).not.toBeNull();
     expect(await employeeFeeSeen()).not.toBeNull();
+  });
+
+  it("J2 · DOANH THU là dữ liệu tài chính (mục 15): non-finance revenue=null; finance có giá trị", async () => {
+    // non-finance: CSKH, Chuyên viên, Lễ tân → revenue + revenueSeries null (redact ở SERVER)
+    for (const role of [ROLES.CUSTOMER_CARE, ROLES.SPECIALIST, ROLES.RECEPTION]) {
+      await loginAs([role]);
+      const d = await dashboardFinance();
+      expect(d.canSeeFinance).toBe(false);
+      expect(d.revenue).toBeNull();       // e · gọi API trực tiếp KHÔNG lấy được doanh thu
+      expect(d.revenueSeries).toBeNull();
+      expect(d.cost).toBeNull();          // h · cost/profit privacy giữ nguyên
+      expect(d.profit).toBeNull();
+    }
+    // finance: Quản lý + Thu ngân → revenue đúng (số), cost/profit đúng
+    for (const role of [ROLES.MANAGER, ROLES.CASHIER]) {
+      await loginAs([role]);
+      const d = await dashboardFinance();
+      expect(d.canSeeFinance).toBe(true);
+      expect(d.revenue).toBe(3500000);    // d · role finance nhận revenue đúng
+      expect(Array.isArray(d.revenueSeries)).toBe(true);
+      expect(d.cost).not.toBeNull();
+      expect(d.profit).not.toBeNull();
+    }
+    // Marketing: theo permission thực tế (baseline có finance.read cho ROI) → được xem
+    await loginAs([ROLES.MARKETING]);
+    const dm = await dashboardFinance();
+    expect(dm.canSeeFinance).toBe(true);
+    expect(dm.revenue).toBe(3500000);
   });
 
   it("K · Direct API attack: role thấp gọi thẳng route cao → 403/redacted (không dựa menu)", async () => {

@@ -15,13 +15,14 @@ const AP = [
   ["G", "Chuyên viên: treatment ALLOW; finance/user DENY", "sessions POST qua gate; services 200 nhưng expectedCost+floorPrice=null; fee=null; price-floors 403; /users 403 (test G + live)", "PASS"],
   ["H", "Thu ngân: thanh toán/hóa đơn/giá sàn + tài chính ALLOW; user/protocol DENY", "payment qua gate; price-floors 200 + thấy giá vốn; /users 403; protocol POST 403 (test H + live)", "PASS"],
   ["I", "Marketing: chiến dịch ALLOW; treatment/payment/user DENY", "campaign qua gate; sessions/payment POST 403; /users 403 (test I + live). MARKETING có finance.read cho ROI (baseline).", "PASS"],
-  ["J", "FINANCIAL PRIVACY (JSON trực tiếp)", "non-finance (CSKH/Chuyên viên): SP.cost/service.expectedCost/floorPrice/session-staff.fee/employee.defaultFee/dashboard.cost+profit = null; finance (Quản lý/Thu ngân) = giá trị (test J + live)", "PASS"],
+  ["J", "FINANCIAL PRIVACY (JSON trực tiếp)", "non-finance (CSKH/Chuyên viên/Lễ tân): SP.cost/service.expectedCost/floorPrice/session-staff.fee/employee.defaultFee/dashboard.<b>revenue</b>+cost+profit+revenueSeries = null; finance (Quản lý/Thu ngân) = giá trị (test J+J2 + live)", "PASS"],
+  ["J2", "DOANH THU = dữ liệu tài chính (quyết định Mục 15)", "clinic/dashboard: revenue+revenueSeries redact ở SERVER theo finance.read → non-finance=null, finance=3.500.000 (test J2 + live before/after). UI CSKH KHÔNG có thẻ Doanh thu; Quản lý CÓ.", "PASS"],
   ["K", "Direct API attack (role thấp gọi route cao)", "RECEPTION→/users 403; CSKH→price-floors 403; SPECIALIST→session-staff.fee null; MARKETING→payment 403 (test K + live)", "PASS"],
   ["L", "Multi-role UNION quyền (không chỉ role đầu)", "SPECIALIST+CASHIER → có treatment.write ∪ finance.read ∪ payment.write; cả 2 route hoạt động; KHÔNG có user.manage; role rác → 0 quyền (test L/L2)", "PASS"],
   ["M", "Đổi vai trò → phiên MỚI phản ánh quyền mới", "CSKH→MANAGER: trước price-floors 403; Admin PATCH role; đăng nhập lại → 200 + thấy giá vốn (test M)", "PASS"],
   ["N", "UI visibility theo vai trò (bổ sung)", "Admin có thẻ Chi phí/Lợi nhuận + menu Quản trị user; CSKH KHÔNG có thẻ Chi phí/Lợi nhuận (ảnh 7 vai trò)", "PASS"],
   ["O", "Audit thao tác nhạy cảm (actor/before-after; không secret)", "Đổi vai trò → USER_UPDATED {roles:{before,after}} + actor; LOGIN ghi actor; 0 log mật khẩu/hash (test O + SQL)", "PASS"],
-  ["P", "Regression", "Baseline 255/34 → 270/35 (+15 test rbac-matrix, +1 file); Mục 2–14 xanh; tsc + build sạch", "PASS"],
+  ["P", "Regression", "Baseline 270/35 → 271/35 (+1 test J2 revenue); Mục 2–14 xanh; tsc + build sạch", "PASS"],
 ];
 
 // Ma trận quyền 7 vai trò (map tới permission code / guard thật).
@@ -37,6 +38,7 @@ const MATRIX = [
   ["Hóa đơn (invoice.write)", A, A, A, D, D, A, D],
   ["Thanh toán (payment.write)", A, A, A, D, D, A, D],
   ["Giá sàn — ngưỡng (pricefloor.read)", A, A, A, D, D, A, A],
+  ["Doanh thu KPI dashboard (finance.read)", A, A, D, D, D, A, A],
   ["Giá vốn/CP/LN (finance.read)", A, A, D, D, D, A, A],
   ["Phí nhân sự (staff.fee.read/finance)", A, A, D, D, D, A, A],
   ["Catalog SP (catalog.write)", A, A, D, D, D, D, A],
@@ -68,7 +70,8 @@ td.a{background:#f0fdf4}td.d{background:#fef2f2}td.l{background:#fffbeb}
 .leg{font-size:12px;color:#475569;margin:6px 0}
 </style>
 <h1>Nghiệm thu Mục 15 — Phân quyền theo vai trò / RBAC toàn hệ thống</h1>
-<p class="sub">Sophia Care · Bằng chứng THẬT: HTTP route + session/auth thật + DB role/permission + field privacy (JSON) + audit + regression · <span class="badge">16/16 TIÊU CHÍ A–P PASS</span></p>
+<p class="sub">Sophia Care · Bằng chứng THẬT: HTTP route + session/auth thật + DB role/permission + field privacy (JSON) + audit + regression · <span class="badge">A–P PASS · +J2 Doanh thu</span></p>
+<p class="sub" style="color:#b45309"><b>Cập nhật theo quyết định:</b> DOANH THU (revenue KPI) nay là dữ liệu tài chính — redact ở SERVER theo <code>finance.read</code> (permission-based, KHÔNG hard-code tên role). Vá: <code>api/clinic/dashboard</code> (revenue/revenueSeries=null khi thiếu finance.read) + <code>crm/page.tsx</code> (chỉ render khi có quyền). 0 migration.</p>
 
 <h2>Phiếu bằng chứng A–P</h2>
 <table><thead><tr><th style="width:44px">Mã</th><th style="width:26%">Yêu cầu</th><th>Bằng chứng (test + live + SQL)</th><th style="width:52px">KQ</th></tr></thead><tbody>${apRows}</tbody></table>
@@ -78,9 +81,9 @@ td.a{background:#f0fdf4}td.d{background:#fef2f2}td.l{background:#fffbeb}
 <table><thead>${head}</thead><tbody>${mRows}</tbody></table>
 
 <div class="foot">
-<b>KHÔNG sửa business rule/schema</b> — RBAC baseline (Mục 2–14) đã đúng: chỉ THÊM <code>test/rbac-matrix.test.ts</code> (15 test HTTP) để chứng minh. 0 migration, 0 DROP, 0 thay đổi mã nguồn nghiệp vụ. ·
+<b>KHÔNG sửa business rule/schema</b> — RBAC baseline (Mục 2–14) đã đúng: chỉ THÊM <code>test/rbac-matrix.test.ts</code> (16 test HTTP) để chứng minh. 0 migration, 0 DROP, 0 thay đổi mã nguồn nghiệp vụ. ·
 <b>Ghi chú baseline (không phải lỗi):</b> (1) mọi vai trò spa chia sẻ CLINIC_READ → đọc rộng, khác biệt ở WRITE + field tài chính; (2) RECEPTION có pricefloor.read = chỉ thấy NGƯỠNG giá sàn (floorPrice), cost breakdown/biên vẫn mask theo finance.read; (3) MARKETING có finance.read phục vụ ROI. ·
-<b>Regression:</b> 270/270 test · 35/35 file · tsc 0 lỗi · next build OK.
+<b>Regression:</b> 271/271 test · 35/35 file · tsc 0 lỗi · next build OK.
 </div>`;
 
 fs.writeFileSync("/tmp/m15-sheet.html", html);

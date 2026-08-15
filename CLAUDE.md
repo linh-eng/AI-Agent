@@ -908,6 +908,22 @@ nghiệp vụ.**
 - **Regression:** baseline 255/34 → **270 test / 35 file** (+15 rbac-matrix, +1 file); Mục 2–14 xanh; tsc 0
   lỗi; next build OK.
 
+#### Bổ sung Mục 15 — DOANH THU (revenue KPI) = dữ liệu tài chính (quyết định chính thức)
+Theo quyết định nghiệm thu: **KPI/dữ liệu doanh thu là dữ liệu tài chính**, chỉ user có `finance.read` mới
+được xem — **permission-based, KHÔNG hard-code theo tên role**.
+- **Nguyên nhân trước đây:** `GET /api/clinic/dashboard` trả `revenue` + `revenueSeries` **vô điều kiện** (chỉ
+  `cost/profit` gated theo `finance.read`) → mọi role có `booking.read` (gồm CSKH/Chuyên viên/Lễ tân) đều nhận
+  số doanh thu.
+- **Đã vá (additive, 0 migration):** `src/app/api/clinic/dashboard/route.ts` — `revenue: canFinance ? … : null`
+  và `revenueSeries: canFinance ? … : null` (redact ở SERVER, cùng cơ chế cost/profit). `src/app/(app)/crm/
+  page.tsx` — thẻ **Doanh thu** + biểu đồ 6 tháng chỉ render khi `canSeeFinance` (không để giá trị thật trong
+  HTML rồi ẩn bằng CSS).
+- **Mapping thực tế (revenue theo `finance.read`):** ✅ Admin, Quản lý, Thu ngân, **Marketing** (có
+  `finance.read` phục vụ ROI — theo permission, không hard-code) · ❌ Lễ tân, CSKH, Chuyên viên (revenue=null).
+- **Test:** `test/rbac-matrix.test.ts` thêm **J2** — non-finance (CSKH/Chuyên viên/Lễ tân) revenue+revenueSeries
+  =null; finance (Quản lý/Thu ngân/Marketing) = 3.500.000; cost/profit/floorPrice/staffFee giữ nguyên privacy.
+  **271 test / 35 file** (270 + 1). Live before/after + ảnh CSKH (không thẻ Doanh thu) vs Quản lý (có).
+
 ## Hồ sơ khách hàng 360° (v0.10.0) — danh sách + hồ sơ trung tâm khách
 
 Tổ chức lại & bổ sung dữ liệu/UX cho **module Khách hàng** (KHÔNG đổi engine Booking/Phác đồ/Giá/Vật tư/

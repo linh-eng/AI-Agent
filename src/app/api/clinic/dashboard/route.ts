@@ -78,10 +78,12 @@ export const GET = handle(async () => {
     newCustomers,
     activePlans,
     overdueTasks,
-    revenue,
+    // DOANH THU là dữ liệu tài chính (mục 15): chỉ trả khi có finance.read — redact ở SERVER
+    // (không để giá trị thật trong JSON rồi ẩn ở UI). Áp cùng cơ chế với cost/profit.
+    revenue: canFinance ? revenue : null,
     cost: canFinance ? cost : null,
     profit: canFinance ? revenue - cost : null,
-    revenueSeries,
+    revenueSeries: canFinance ? revenueSeries : null,
     canSeeFinance: canFinance,
   });
 });

@@ -23,10 +23,10 @@ interface Dash {
   newCustomers: number;
   activePlans: number;
   overdueTasks: number;
-  revenue: number;
+  revenue: number | null;
   cost: number | null;
   profit: number | null;
-  revenueSeries: { month: string; value: number }[];
+  revenueSeries: { month: string; value: number }[] | null;
   canSeeFinance: boolean;
 }
 
@@ -72,7 +72,7 @@ export default function CrmDashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const maxRev = d ? Math.max(1, ...d.revenueSeries.map((s) => s.value)) : 1;
+  const maxRev = d?.revenueSeries ? Math.max(1, ...d.revenueSeries.map((s) => s.value)) : 1;
 
   return (
     <div>
@@ -94,12 +94,13 @@ export default function CrmDashboardPage() {
             <Stat icon={UserPlus} label="Khách mới (tháng)" value={formatNumber(d.newCustomers)} tone="success" />
             <Stat icon={HeartPulse} label="Phác đồ đang chạy" value={formatNumber(d.activePlans)} />
             <Stat icon={AlertTriangle} label="Công việc quá hạn" value={formatNumber(d.overdueTasks)} tone="warning" />
-            <Stat icon={Wallet} label="Doanh thu (tháng)" value={formatNumber(d.revenue) + " ₫"} tone="success" />
           </div>
 
+          {/* DOANH THU / Chi phí / Lợi nhuận là dữ liệu tài chính (mục 15): chỉ render khi
+              finance.read. Backend đã redact (revenue=null) nên UI không có giá trị thật để lộ. */}
           {d.canSeeFinance && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <Stat icon={Wallet} label="Doanh thu (tháng)" value={formatNumber(d.revenue) + " ₫"} tone="success" />
+              <Stat icon={Wallet} label="Doanh thu (tháng)" value={formatNumber(d.revenue ?? 0) + " ₫"} tone="success" />
               <Stat icon={TrendingUp} label="Chi phí (tháng)" value={formatNumber(d.cost ?? 0) + " ₫"} tone="warning" />
               <Stat
                 icon={TrendingUp}
@@ -110,6 +111,7 @@ export default function CrmDashboardPage() {
             </div>
           )}
 
+          {d.canSeeFinance && d.revenueSeries && (
           <Card>
             <CardContent className="p-5">
               <h3 className="mb-4 text-sm font-semibold text-muted-foreground">
@@ -131,6 +133,7 @@ export default function CrmDashboardPage() {
               </div>
             </CardContent>
           </Card>
+          )}
         </div>
       )}
     </div>
