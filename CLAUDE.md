@@ -765,6 +765,23 @@ seed (đã chia sẻ cho khách). Trang `/before-after` hiển thị cặp ảnh
 - **Nợ:** demo chỉ có 1 KTV được đánh giá (cô lập ≥2 KTV chứng minh ở test); slider so sánh & khách tự đánh
   giá qua portal vẫn để phase sau.
 
+### Nghiệm thu Mục 11 (Dịch vụ & Thư viện Spa) — master data dùng xuyên hệ thống
+- **KHÔNG đổi code nghiệp vụ** — các thư viện (Service/Brand/Technology/Protocol/SpaProduct/FormTemplate/
+  CareInstruction) đã đủ: danh sách + chi tiết + tạo/sửa theo quyền + trạng thái active/inactive + **soft-delete
+  mọi DELETE** (không hard-delete → không orphan). RBAC enforce backend từng route (LIBRARY_READ đọc; BRAND_/
+  TECHNOLOGY_/PROTOCOL_/CATALOG_/FORM_/CARE_WRITE ghi).
+- **Bất biến lịch sử:** FormInstance `schemaSnapshot`+`templateVersion`; CareInstance snapshot content+
+  `templateVersion`; Protocol `bumpVersion` append-only (`changeLog`). Session cũ giữ `serviceId/technologyId/
+  brandProtocolId/versionAtExecution` — sửa master KHÔNG rewrite.
+- **Một master, không duplicate:** demo có đúng 5 dịch vụ (RF `DV-RF-01` được **13 booking + 7 session** tham
+  chiếu cùng serviceId); SpaProduct phân loại bằng **field `productType`** (PROFESSIONAL/HOME_CARE), không theo
+  tên (Klapp có cả 2 loại trên cùng brand). Technology dùng xuyên service.technologyIds + employee competence +
+  session.technologyId. Dropdown master lọc **active-only**.
+- **Test:** `test/library.test.ts` (8) — RBAC 403/401, soft-delete integrity + active-only, snapshot Form/Care/
+  Protocol, quan hệ Brand→Product + Technology cross-use. **237 test pass** (không regression).
+- **Nợ:** mẫu Hướng dẫn chăm sóc demo chưa gắn `serviceId` (general POST_CARE) → gợi ý theo dịch vụ trả rỗng
+  ("chưa có mẫu phù hợp"); matching logic đúng (test chứng minh với template có serviceId).
+
 ## Import khách hàng (mục 41) — MySpa/CSV: preview → mapping → validate → trùng → báo cáo
 
 Phase sau MASTER PROMPT, ưu tiên #6 (mục cuối lộ trình). **Đã xác thực PostgreSQL 16 thật**: tsc sạch · lint
