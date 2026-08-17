@@ -2,14 +2,71 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { LogOut, Menu, Sparkles } from "lucide-react";
+import { LogOut, Menu, Sparkles, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
 import type { SessionPayload } from "@/lib/auth";
 import { ROLE_LABELS, type RoleCode } from "@/lib/rbac";
 import { SessionProvider } from "@/components/session-provider";
 import { versionLabel } from "@/lib/version";
-import { visibleNavGroups } from "@/lib/nav";
+import { visibleNavGroups, type NavItem } from "@/lib/nav";
+
+/** Active khi trùng href hoặc là tiền tố của route con (giữ nguyên logic cũ). */
+function isActivePath(href: string | undefined, pathname: string): boolean {
+  if (!href) return false;
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
+/** Một mục leaf. */
+function NavLink({ item, pathname, onNavigate }: { item: NavItem; pathname: string; onNavigate: () => void }) {
+  const active = isActivePath(item.href, pathname);
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href!}
+      onClick={onNavigate}
+      className={cn(
+        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+        active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+      )}
+    >
+      <Icon className="h-4 w-4" />
+      {item.label}
+    </Link>
+  );
+}
+
+/** Mục cha lồng cấp (IA-PH2) — toggle mở/đóng; tự mở khi có child đang active. */
+function NavParent({ item, pathname, onNavigate }: { item: NavItem; pathname: string; onNavigate: () => void }) {
+  const children = item.children ?? [];
+  const hasActiveChild = children.some((c) => isActivePath(c.href, pathname));
+  const [open, setOpen] = useState(hasActiveChild);
+  const Icon = item.icon;
+  const expanded = open || hasActiveChild;
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+          "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        )}
+      >
+        <Icon className="h-4 w-4" />
+        <span className="flex-1 text-left">{item.label}</span>
+        <ChevronDown className={cn("h-4 w-4 transition-transform", expanded ? "rotate-180" : "")} />
+      </button>
+      {expanded && (
+        <div className="ml-4 space-y-1 border-l pl-2">
+          {children.map((c) => (
+            <NavLink key={c.href} item={c} pathname={pathname} onNavigate={onNavigate} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function AppShell({
   session,
@@ -66,27 +123,13 @@ export function AppShell({
               <div className="px-3 pb-1 pt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
                 {group.title}
               </div>
-              {group.items.map((item) => {
-                const active =
-                  pathname === item.href || pathname.startsWith(item.href + "/");
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                      active
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
+              {group.items.map((item) =>
+                item.children && item.children.length > 0 ? (
+                  <NavParent key={item.label} item={item} pathname={pathname} onNavigate={() => setOpen(false)} />
+                ) : (
+                  <NavLink key={item.href} item={item} pathname={pathname} onNavigate={() => setOpen(false)} />
+                )
+              )}
             </div>
           ))}
           {/* Phiên bản — tiện theo dõi khi cập nhật */}

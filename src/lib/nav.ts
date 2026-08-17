@@ -10,16 +10,19 @@ import {
   ShieldCheck, Hammer, BarChart3, CalendarDays, HeartPulse, ListTodo, Building2,
   Cpu, ScrollText, ShoppingBag, FileText, FileSpreadsheet, BookOpen, Tag,
   Megaphone, Receipt, Wallet, Settings, MessageCircleHeart, Images, Upload,
-  Sparkles,
+  Sparkles, Calculator, TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 
 export interface NavItem {
-  href: string;
+  /** href của leaf. Parent CÓ children có thể bỏ trống (chỉ toggle mở/đóng). */
+  href?: string;
   label: string;
   icon: LucideIcon;
   /** Quyền cần để THẤY & DÙNG module. Mảng = any-of (có 1 quyền là đủ). Bỏ trống = mọi phiên. */
   perm?: string | string[];
+  /** IA-PH2 — mục con lồng cấp (nested). Parent hiện khi có ÍT NHẤT 1 child hiện. */
+  children?: NavItem[];
 }
 export interface NavGroup {
   title: string;
@@ -50,9 +53,15 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/treatment-plans", label: "Kế hoạch điều trị", icon: HeartPulse, perm: "treatment.read" },
       { href: "/before-after", label: "Thư viện ảnh & Đánh giá", icon: Images, perm: "customer.read" },
       { href: "/proposals", label: "Báo giá", icon: FileSpreadsheet, perm: "proposal.read" },
-      // Tài chính / lập hóa đơn — gate theo quyền NGHIỆP VỤ (write), không theo read chung.
-      { href: "/invoices", label: "Hóa đơn", icon: Receipt, perm: "invoice.write" },
-      { href: "/payments", label: "Thanh toán", icon: Wallet, perm: "payment.write" },
+      // IA-PH2 — nhóm nested "Hóa đơn & Thanh toán" (parent KHÔNG có href, chỉ toggle).
+      // Parent hiện khi có ÍT NHẤT 1 child hiện theo quyền (không thêm permission mới).
+      {
+        label: "Hóa đơn & Thanh toán", icon: Receipt,
+        children: [
+          { href: "/invoices", label: "Hóa đơn", icon: Receipt, perm: "invoice.write" },
+          { href: "/payments", label: "Thanh toán", icon: Wallet, perm: "payment.write" },
+        ],
+      },
       { href: "/followups", label: "CSKH & Follow-up", icon: MessageCircleHeart, perm: ["followup.apply", "followup.write", "task.write"] },
       { href: "/tasks", label: "Công việc", icon: ListTodo, perm: "task.write" },
     ],
@@ -74,6 +83,9 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/pricing", label: "Bảng giá", icon: Tag, perm: "price.write" },
       { href: "/price-floor", label: "Giá sàn", icon: Gauge, perm: ["pricefloor.read", "finance.read"] },
+      // IA-PH2 — workspace giá toàn cục (tổng hợp read-only; server đã mask theo finance.read).
+      { href: "/service-costings", label: "Giá vốn & biên", icon: Calculator, perm: ["pricefloor.read", "finance.read"] },
+      { href: "/recommended-prices", label: "Giá bán đề xuất", icon: TrendingUp, perm: ["pricefloor.read", "finance.read"] },
     ],
   },
   {
@@ -122,22 +134,44 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-/** Phiên có được thấy 1 mục không: bỏ trống perm → luôn thấy; mảng → any-of. */
+/**
+ * Phiên có được thấy 1 mục không:
+ *  - Parent CÓ children: hiện khi có ÍT NHẤT 1 child hiện (đệ quy) — parent KHÔNG
+ *    tự khai permission riêng (tránh thêm permission mới).
+ *  - Leaf: bỏ trống perm → luôn thấy; mảng → any-of (có 1 quyền là đủ).
+ */
 export function canSeeNavItem(item: NavItem, permissions: Iterable<string>): boolean {
-  if (!item.perm) return true;
   const set = permissions instanceof Set ? permissions : new Set(permissions);
+  if (item.children && item.children.length > 0) {
+    return item.children.some((c) => canSeeNavItem(c, set));
+  }
+  if (!item.perm) return true;
   const req = Array.isArray(item.perm) ? item.perm : [item.perm];
   return req.some((p) => set.has(p));
+}
+
+/** Lọc 1 item theo quyền: parent giữ lại children hiện; ẩn hoàn toàn nếu không child nào hiện. */
+function filterNavItem(item: NavItem, set: Set<string>): NavItem | null {
+  if (item.children && item.children.length > 0) {
+    const kids = item.children.map((c) => filterNavItem(c, set)).filter((c): c is NavItem => c !== null);
+    if (kids.length === 0) return null;
+    return { ...item, children: kids };
+  }
+  return canSeeNavItem(item, set) ? item : null;
 }
 
 /**
  * Lọc nav theo quyền của phiên. Nhóm không còn mục nào → bỏ khỏi kết quả
  * (không render tiêu đề nhóm rỗng). `hideWarehouse` ẩn cả nhóm Kho THNG (env).
+ * Parent nested chỉ giữ children mà phiên có quyền; parent rỗng bị ẩn.
  */
 export function visibleNavGroups(permissions: Iterable<string>, opts?: { hideWarehouse?: boolean }): NavGroup[] {
   const set = permissions instanceof Set ? permissions : new Set(permissions);
   return NAV_GROUPS
     .filter((g) => !(g.title === "Kho THNG" && opts?.hideWarehouse))
-    .map((g) => ({ title: g.title, items: g.items.filter((it) => canSeeNavItem(it, set)) }))
+    .map((g) => ({
+      title: g.title,
+      items: g.items.map((it) => filterNavItem(it, set)).filter((it): it is NavItem => it !== null),
+    }))
     .filter((g) => g.items.length > 0);
 }

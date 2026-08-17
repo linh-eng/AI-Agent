@@ -9,8 +9,13 @@ import { describe, it, expect } from "vitest";
 import { NAV_GROUPS, visibleNavGroups, canSeeNavItem } from "@/lib/nav";
 import { ROLE_PERMISSIONS, ROLES } from "@/lib/rbac";
 
-const byHref = new Map(NAV_GROUPS.flatMap((g) => g.items.map((it) => [it.href, it] as const)));
-const groupOf = (href: string) => NAV_GROUPS.find((g) => g.items.some((it) => it.href === href))?.title;
+// IA-PH2 — nav có thể lồng cấp (parent.children). Duyệt đệ quy để lấy leaf.
+type Item = (typeof NAV_GROUPS)[number]["items"][number];
+const flatten = (items: readonly Item[]): Item[] =>
+  items.flatMap((it) => (it.children ? flatten(it.children as readonly Item[]) : [it]));
+const allItems = NAV_GROUPS.flatMap((g) => flatten(g.items));
+const byHref = new Map(allItems.map((it) => [it.href, it] as const));
+const groupOf = (href: string) => NAV_GROUPS.find((g) => flatten(g.items).some((it) => it.href === href))?.title;
 
 // BASELINE (trước IA-PH1) — route → permission. IA-PH1 KHÔNG được đổi các cặp này.
 const BASELINE_PERM: Record<string, string | string[]> = {
@@ -67,9 +72,15 @@ describe("IA-PH1 · Regroup + rename (LOW-RISK nav-only)", () => {
     }
   });
 
-  it("K · ROUTE (tập href) BẤT BIẾN — không thêm/xóa/đổi URL spa", () => {
-    const spaHrefs = NAV_GROUPS.filter((g) => g.title !== "Kho THNG").flatMap((g) => g.items.map((i) => i.href)).sort();
-    expect(spaHrefs).toEqual(Object.keys(BASELINE_PERM).sort());
+  it("K · ROUTE bất biến cho item IA-PH1 + CHỈ thêm 2 route workspace IA-PH2", () => {
+    // Leaf href (đệ quy children) của các nhóm spa. IA-PH2 chỉ THÊM 2 route pricing
+    // toàn cục; mọi route IA-PH1 (kể cả /invoices, /payments nay lồng cấp) giữ nguyên.
+    const spaHrefs = NAV_GROUPS.filter((g) => g.title !== "Kho THNG")
+      .flatMap((g) => flatten(g.items).map((i) => i.href))
+      .filter((h): h is string => !!h)
+      .sort();
+    const expected = [...Object.keys(BASELINE_PERM), "/service-costings", "/recommended-prices"].sort();
+    expect(spaHrefs).toEqual(expected);
   });
 
   it("L · warehouse env gating BẤT BIẾN: hideWarehouse ẩn nhóm Kho THNG", () => {
@@ -89,9 +100,10 @@ describe("IA-PH1 · Regroup + rename (LOW-RISK nav-only)", () => {
 
   it("N · multi-role UNION: quyền hợp nhất → thấy đủ item của mọi vai trò", () => {
     const union = new Set<string>([...ROLE_PERMISSIONS[ROLES.SPECIALIST], ...ROLE_PERMISSIONS[ROLES.CASHIER]]);
-    const labels = new Set(visibleNavGroups(union).flatMap((g) => g.items.map((i) => i.label)));
+    // Thu nhãn đệ quy (parent nested "Hóa đơn & Thanh toán" → children Hóa đơn/Thanh toán).
+    const labels = new Set(visibleNavGroups(union).flatMap((g) => flatten(g.items as any).map((i) => i.label)));
     expect(labels.has("Kế hoạch điều trị")).toBe(true); // SPECIALIST (treatment.read)
-    expect(labels.has("Hóa đơn")).toBe(true);           // CASHIER (invoice.write)
+    expect(labels.has("Hóa đơn")).toBe(true);           // CASHIER (invoice.write) — nested child
     expect(labels.has("Giá sàn")).toBe(true);           // CASHIER (pricefloor.read)
   });
 

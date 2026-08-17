@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
-import { ok, created, handle, fail } from "@/lib/api";
+import { ok, created, handle } from "@/lib/api";
 import { requirePermission, getSession } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { auditLog, canSeeFinance } from "@/lib/clinic";
@@ -16,9 +16,34 @@ export const GET = handle(async (req) => {
   const canSee = canSeeFinance(session);
   const { searchParams } = new URL(req.url);
   const serviceId = searchParams.get("serviceId");
-  if (!serviceId) return fail(400, "Thiếu serviceId");
-  const versions = await prisma.serviceRecommendedPriceVersion.findMany({ where: { serviceId }, orderBy: { version: "desc" } });
-  return ok(versions.map((v) => maskRecommended(v as any, canSee)));
+  if (serviceId) {
+    const versions = await prisma.serviceRecommendedPriceVersion.findMany({ where: { serviceId }, orderBy: { version: "desc" } });
+    return ok(versions.map((v) => maskRecommended(v as any, canSee)));
+  }
+  // IA-PH2 — chế độ TỔNG HỢP TOÀN CỤC (read-only): mỗi dịch vụ + version giá đề xuất.
+  // Chỉ COMPOSE/ĐỌC (không thêm entity/logic); targetMargin/costSnapshot mask theo finance.read.
+  const services = await prisma.service.findMany({
+    where: { recommendedPriceVersions: { some: {} } },
+    orderBy: { name: "asc" },
+    select: {
+      id: true, code: true, name: true, standardPrice: true,
+      recommendedPriceVersions: { orderBy: { version: "desc" } },
+    },
+  });
+  const rows = services.map((s) => {
+    const published = s.recommendedPriceVersions.find((v) => v.status === "PUBLISHED") ?? null;
+    const latest = s.recommendedPriceVersions[0] ?? null;
+    return {
+      serviceId: s.id,
+      serviceCode: s.code,
+      serviceName: s.name,
+      standardPrice: s.standardPrice == null ? null : Number(s.standardPrice),
+      versionCount: s.recommendedPriceVersions.length,
+      publishedVersion: published ? maskRecommended(published as any, canSee) : null,
+      latestVersion: latest ? maskRecommended(latest as any, canSee) : null,
+    };
+  });
+  return ok(rows);
 });
 
 // POST /api/recommended-prices → tạo DRAFT từ ServiceCostingVersion PUBLISHED (pricefloor.write).

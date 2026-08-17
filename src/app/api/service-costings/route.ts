@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
-import { ok, created, handle, fail } from "@/lib/api";
+import { ok, created, handle } from "@/lib/api";
 import { requirePermission, getSession } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { auditLog, canSeeFinance } from "@/lib/clinic";
@@ -16,12 +16,37 @@ export const GET = handle(async (req) => {
   const canSee = canSeeFinance(session);
   const { searchParams } = new URL(req.url);
   const serviceId = searchParams.get("serviceId");
-  if (!serviceId) return fail(400, "Thiếu serviceId");
-  const versions = await prisma.serviceCostingVersion.findMany({
-    where: { serviceId },
-    orderBy: { version: "desc" },
+  if (serviceId) {
+    const versions = await prisma.serviceCostingVersion.findMany({
+      where: { serviceId },
+      orderBy: { version: "desc" },
+    });
+    return ok(versions.map((v) => maskCosting(v as any, canSee)));
+  }
+  // IA-PH2 — chế độ TỔNG HỢP TOÀN CỤC (read-only): mỗi dịch vụ + version giá vốn.
+  // Chỉ COMPOSE/ĐỌC dữ liệu sẵn có (không thêm entity/logic); mask theo finance.read.
+  const services = await prisma.service.findMany({
+    where: { costingVersions: { some: {} } },
+    orderBy: { name: "asc" },
+    select: {
+      id: true, code: true, name: true, standardPrice: true,
+      costingVersions: { orderBy: { version: "desc" } },
+    },
   });
-  return ok(versions.map((v) => maskCosting(v as any, canSee)));
+  const rows = services.map((s) => {
+    const published = s.costingVersions.find((v) => v.status === "PUBLISHED") ?? null;
+    const latest = s.costingVersions[0] ?? null;
+    return {
+      serviceId: s.id,
+      serviceCode: s.code,
+      serviceName: s.name,
+      standardPrice: s.standardPrice == null ? null : Number(s.standardPrice),
+      versionCount: s.costingVersions.length,
+      publishedVersion: published ? maskCosting(published as any, canSee) : null,
+      latestVersion: latest ? maskCosting(latest as any, canSee) : null,
+    };
+  });
+  return ok(rows);
 });
 
 // POST /api/service-costings  → tạo version DRAFT (tính từ nguồn LIVE).

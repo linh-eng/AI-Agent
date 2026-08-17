@@ -7,11 +7,15 @@ import { describe, it, expect } from "vitest";
 import { ROLE_PERMISSIONS, ROLES } from "@/lib/rbac";
 import { visibleNavGroups, canSeeNavItem, NAV_GROUPS } from "@/lib/nav";
 
+/** Thu nhãn đệ quy (parent nested + leaf) — IA-PH2 có "Hóa đơn & Thanh toán" lồng cấp. */
+function labelsDeep(items: { label: string; children?: { label: string; children?: unknown[] }[] }[]): string[] {
+  return items.flatMap((it) => (it.children ? labelsDeep(it.children as never) : [it.label]));
+}
 /** Tập nhãn menu mà 1 vai trò nhìn thấy (không ẩn nhóm Kho THNG để kiểm cả cluster). */
 function menuFor(role: string): Set<string> {
   const perms = ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS];
   const groups = visibleNavGroups(perms);
-  return new Set(groups.flatMap((g) => g.items.map((i) => i.label)));
+  return new Set(groups.flatMap((g) => labelsDeep(g.items as never)));
 }
 function groupsFor(role: string): string[] {
   const perms = ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS];

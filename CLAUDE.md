@@ -2282,10 +2282,60 @@ A thứ tự 8 nhóm · B+C Dịch vụ↔Protocol sibling · D+G+I nhãn rename
 group riêng · H Công việc global · **J permission byte-for-byte bất biến** · **K route (href) bất biến** · L
 warehouse env gating · M unauthorized ẩn · N multi-role union · O active-route detail. Full regression 394/47.
 
-### IA-PH2 (chưa làm — để phase sau)
-Nested children "Hóa đơn & Thanh toán" (cần mở rộng nav.ts hỗ trợ `children`); thêm entry global "Giá vốn &
-biên" / "Giá bán đề xuất" vào Giá & Chính sách; rà evidence "Thư viện ảnh & Đánh giá" vs tab 360 (IA-PH3).
-**KHÔNG CONFLICT** — mọi thay đổi IA-PH1 là nav presentation.
+### IA-PH3 (chưa làm — để phase sau)
+Rà evidence "Thư viện ảnh & Đánh giá" (/before-after) vs tab Customer 360; hàng đợi Session toàn cục; gộp
+Task/CSKH; menu giá GÓI (Protocol pricing) toàn cục; đổi tên route; đổi permission. Đều là MEDIUM/HIGH —
+để phase riêng, KHÔNG làm trong IA-PH2.
+
+## IA-PH2: NESTED BILLING + GLOBAL PRICING WORKSPACE (v0.29.2) — nav + read-mode, 0 backend logic
+
+2 thay đổi MEDIUM (nav lồng cấp + trang workspace read-only). **0 migration · 0 DROP · KHÔNG đổi
+ROLE_PERMISSIONS/permission matrix/business logic Pricing PH1–5/Invoice-Payment/Proposal semantics/Customer
+360/warehouse.** **412 test / 48 file PASS** (394 + `test/nav-ph2.test.ts` 18). tsc sạch · lint 0 lỗi · build OK.
+
+### A. Nested "Hóa đơn & Thanh toán" (nav lồng cấp)
+- `nav.ts`: `NavItem` thêm `children?: NavItem[]` + `href` optional (parent CÓ children bỏ trống href, chỉ
+  toggle). Trong "Khách hàng & Hành trình": 2 mục phẳng **Hóa đơn** (invoice.write) + **Thanh toán**
+  (payment.write) → **1 parent nested "Hóa đơn & Thanh toán"** (icon Receipt, KHÔNG href, **KHÔNG khai
+  permission mới**) chứa 2 child GIỮ NGUYÊN permission.
+- **Visibility parent = có ÍT NHẤT 1 child hiện** theo quyền: `canSeeNavItem` (đệ quy children) +
+  `visibleNavGroups`/`filterNavItem` (giữ children được phép; parent rỗng → ẩn). RECEPTION/CASHIER (có cả
+  invoice.write+payment.write) thấy đủ 2 child; MARKETING/CSKH/Chuyên viên (0 quyền billing) → parent ẩn hẳn.
+- `app-shell.tsx`: tách `NavLink` (leaf) + `NavParent` (nút toggle, chevron, **tự mở khi có child active**,
+  children thụt lề + border-l). Logic active leaf giữ nguyên `pathname===href || startsWith(href+"/")`.
+
+### B. Workspace giá toàn cục — "Giá & Chính sách" thêm 2 mục
+- Nav thêm **"Giá vốn & biên"** (`/service-costings`) + **"Giá bán đề xuất"** (`/recommended-prices`), perm
+  any-of `["pricefloor.read", "finance.read"]` (KHÔNG permission mới). Nhãn đúng **"Giá bán đề xuất"** (không
+  phải "Giá đề xuất").
+- **API read-mode TỔNG HỢP (additive):** `GET /api/service-costings` và `/api/recommended-prices` khi **VẮNG
+  `serviceId`** trả danh sách **mỗi dịch vụ + version PUBLISHED/mới nhất** (compose/đọc dữ liệu sẵn có, KHÔNG
+  thêm entity/logic). Có `serviceId` → giữ nguyên hành vi per-service (regression). Guard `PRICEFLOOR_READ`;
+  **số cost/margin mask theo `finance.read` ở SERVER** (BLOCKER) — non-finance nhận `totalEstimatedCost`/
+  `directCost`/`targetMarginPercent`/`costSnapshot` = null; trang không tự suy giá vốn.
+- **Trang** `/service-costings` + `/recommended-prices` (read-only): bảng dịch vụ (mã/tên/giá chuẩn/giá vốn
+  hoặc giá đề xuất phát hành/version/trạng thái) + tìm kiếm + link **Chi tiết** sang trang per-service đã có
+  (`/services/[id]/costing` · `/services/[id]/recommended-price`) để tạo/sửa/phát hành. Thiếu `finance.read`
+  → banner cảnh báo + số liệu ẩn.
+
+### Active-route (quyết định ghi rõ — KHÔNG pathname hack)
+`/services/[id]/costing` & `/recommended-price` **giữ Dịch vụ active** (logic prefix hiện có); mục workspace
+mới `/service-costings` KHÔNG kích Dịch vụ (khác chuỗi tiền tố). **Limitation chấp nhận:** trang chi tiết giá
+vốn mở từ workspace vẫn highlight "Dịch vụ" ở sidebar — không đổi để tránh churn/pathname đặc biệt.
+
+### Chứng minh (test/nav-ph2.test.ts, 18 test → A–R)
+NAV unit A–K: A parent nested (children Hóa đơn/Thanh toán, KHÔNG href) · B parent hiện khi ≥1 child · C ẩn
+khi 0 child · D parent KHÔNG permission mới · E+F+G entry pricing + nhãn "Giá bán đề xuất" + perm any-of ·
+H filter children · I active-route (Dịch vụ vs workspace) · J CASHIER 2 child / MARKETING ẩn · K children
+giữ permission. HTTP L–R (Postgres thật): L aggregate finance có totalEstimatedCost · M compose khớp
+per-service · N non-finance cost=null · O RBAC 401/403 · P recommended finance/mask · Q per-service GET
+regression · R aggregate CHỈ đọc (count bất biến).
+
+### Coexistence & CONFLICT
+**KHÔNG CONFLICT.** Chỉ nav presentation + read-mode compose. KHÔNG đụng: backend business logic Pricing
+PH1–PH5, Invoice/Payment/Proposal semantics, ROLE_PERMISSIONS/permission matrix (Mục 15), Customer 360 tabs,
+warehouse, schema/migration. Package pricing (Protocol) **KHÔNG** có menu toàn cục (đúng ranh giới — để phase
+sau). Deep-link mọi route cũ giữ nguyên.
 
 ## Tech stack
 
