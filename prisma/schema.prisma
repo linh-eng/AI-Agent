@@ -1808,11 +1808,15 @@ model BrandProtocol {
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
 
-  brand        Brand?                    @relation(fields: [brandId], references: [id])
-  technologies BrandProtocolTechnology[]
-  products     BrandProtocolProduct[]
-  sessions     TreatmentSession[]
-  services     ProtocolService[] // Redesign P2 — compose nhiều Service (coexist với steps Json cũ)
+  brand               Brand?                            @relation(fields: [brandId], references: [id])
+  technologies        BrandProtocolTechnology[]
+  products            BrandProtocolProduct[]
+  sessions            TreatmentSession[]
+  services            ProtocolService[] // Redesign P2 — compose nhiều Service (coexist với steps Json cũ)
+  // Pricing PH5 — giá gói (chỉ dùng khi compositionMode=SERVICES)
+  costingVersions     ProtocolCostingVersion[]
+  floorVersions       ProtocolFloorPriceVersion[]
+  recommendedVersions ProtocolRecommendedPriceVersion[]
 
   @@index([brandId])
   @@index([status])
@@ -3146,6 +3150,106 @@ model ServiceRecommendedPriceVersion {
   @@index([serviceId, status])
   @@index([serviceCostingVersionId])
   @@map("service_recommended_price_versions")
+}
+
+// =============================================================================
+// PRICING / COSTING — PH5: PROTOCOL / PACKAGE PRICING (v0.29.0)
+// Giá vốn / giá sàn / giá đề xuất cấp GÓI cho Protocol compositionMode = SERVICES.
+//  * Package cost = Σ ServiceCostingVersion PUBLISHED của các Service THÀNH PHẦN
+//    (BẮT BUỘC — required only) + packageSpecificCost (chi phí riêng khi chạy combo).
+//  * Package Floor / Recommended dùng công thức MARGIN như cấp Service (tách nguồn).
+//  * Package selling price = PriceRule targetType=PACKAGE, targetId=protocolId (PriceBook).
+//  * Additive, độc lập: KHÔNG ghi ngược ServiceCosting/Floor/Recommended/PriceRule/Service.
+//  * Chỉ áp cho SERVICES protocol; LEGACY_STEPS giữ nguyên. Dùng lại enum CostingStatus.
+// =============================================================================
+model ProtocolCostingVersion {
+  id         String        @id @default(cuid())
+  protocolId String
+  version    Int
+  status     CostingStatus @default(DRAFT)
+
+  compositionModeSnapshot String? // "SERVICES" tại thời điểm tính
+  protocolVersionSnapshot Int? // BrandProtocol.version lúc tính
+
+  serviceCostTotal      Decimal @default(0) @db.Decimal(18, 2) // Σ component ServiceCostingVersion.totalEstimatedCost (required)
+  packageSpecificCost   Decimal @default(0) @db.Decimal(18, 2) // chi phí riêng của gói (kit/prep chung)
+  packageSpecificReason String? // bắt buộc khi packageSpecificCost > 0
+  totalEstimatedCost    Decimal @default(0) @db.Decimal(18, 2) // = serviceCostTotal + packageSpecificCost
+
+  sourceSnapshot Json? // {protocolId, protocolVersion, compositionMode, components:[{protocolServiceId, serviceId, serviceNameSnapshot, required, serviceCostingVersionId, costSnapshot}], packageSpecificCost, capturedAt}
+  note           String?
+  createdBy      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  publishedBy    String?
+  publishedAt    DateTime?
+  supersedesId   String?
+
+  protocol            BrandProtocol                     @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+  floorVersions       ProtocolFloorPriceVersion[]
+  recommendedVersions ProtocolRecommendedPriceVersion[]
+
+  @@unique([protocolId, version])
+  @@index([protocolId, status])
+  @@map("protocol_costing_versions")
+}
+
+model ProtocolFloorPriceVersion {
+  id                       String        @id @default(cuid())
+  protocolId               String
+  protocolCostingVersionId String
+  version                  Int
+  status                   CostingStatus @default(DRAFT)
+
+  minMarginPercent Decimal @db.Decimal(6, 2)
+  costSnapshot     Decimal @default(0) @db.Decimal(18, 2) // = costing.totalEstimatedCost
+  roundingUnit     Int     @default(1000)
+  floorPrice       Decimal @default(0) @db.Decimal(18, 2) // = cost / (1 − margin%)
+
+  note         String?
+  createdBy    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  publishedBy  String?
+  publishedAt  DateTime?
+  supersedesId String?
+
+  protocol       BrandProtocol          @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+  costingVersion ProtocolCostingVersion @relation(fields: [protocolCostingVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([protocolId, version])
+  @@index([protocolId, status])
+  @@map("protocol_floor_price_versions")
+}
+
+model ProtocolRecommendedPriceVersion {
+  id                       String        @id @default(cuid())
+  protocolId               String
+  protocolCostingVersionId String
+  version                  Int
+  status                   CostingStatus @default(DRAFT)
+
+  targetMarginPercent        Decimal  @db.Decimal(6, 2)
+  costSnapshot               Decimal  @default(0) @db.Decimal(18, 2)
+  roundingUnit               Int      @default(1000)
+  calculatedRecommendedPrice Decimal  @default(0) @db.Decimal(18, 2)
+  floorVersionId             String?
+  floorPriceSnapshot         Decimal? @db.Decimal(18, 2)
+
+  note         String?
+  createdBy    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  publishedBy  String?
+  publishedAt  DateTime?
+  supersedesId String?
+
+  protocol       BrandProtocol          @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+  costingVersion ProtocolCostingVersion @relation(fields: [protocolCostingVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([protocolId, version])
+  @@index([protocolId, status])
+  @@map("protocol_recommended_price_versions")
 }
 
 // =============================================================================

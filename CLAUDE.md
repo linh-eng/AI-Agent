@@ -2184,6 +2184,75 @@ PriceRule VIP: DMK 2.100.000₫, Laser Pico 1.500.000₫. Khách `KH-100010` (VI
   membership" là feature riêng — OUT OF SCOPE. **Chưa làm**: Package/Protocol pricing, Recommended→PriceRule,
   reprice action toàn booking, VAT.
 
+## PRICING / COSTING — PH5: PROTOCOL / PACKAGE PRICING (v0.29.0)
+
+Giá vốn / giá sàn / giá đề xuất cấp **GÓI** cho Protocol `compositionMode = SERVICES`. Package cost ≠ tổng
+retail; package selling price ở PriceBook (PriceRule PACKAGE). Thuần **additive, 0 DROP**. Migration
+**`Z_protocol_pricing`** (3 bảng; 0 destructive; tổng **36 migration**). **382 test / 46 file PASS** (371 +
+`test/protocol-pricing.test.ts` 11). tsc sạch · lint 0 lỗi · build OK.
+
+### Audit gap (đã xác nhận bằng code)
+`PriceRule.targetType=PACKAGE` tồn tại nhưng `targetId` là **soft-string** (UI `/pricing` nhập tay — CHƯA link
+Protocol). `ProposalItem BRAND_PROTOCOL` map `null` target → không auto giá. Chưa có floor/costing cấp gói.
+**Quyết định (additive, không đổi schema PriceRule):** dùng `targetId = protocolId` cho PACKAGE rule.
+
+### Migration & schema (`Z_protocol_pricing`) — dùng lại enum `CostingStatus`
+- **`ProtocolCostingVersion`**: serviceCostTotal (Σ required), packageSpecificCost (+reason), totalEstimatedCost,
+  sourceSnapshot (components[] có serviceCostingVersionId), version/status/publish.
+- **`ProtocolFloorPriceVersion`**: FK costing, minMarginPercent, costSnapshot, floorPrice (MARGIN), version.
+- **`ProtocolRecommendedPriceVersion`**: FK costing, targetMarginPercent, calculatedRecommendedPrice,
+  floorVersionId?/floorPriceSnapshot? (ràng buộc). Cả 3 FK costing **onDelete Restrict**; @@unique[protocolId, version].
+
+### Lib `src/lib/protocol-pricing.ts`
+- **Component cost (§3,§4):** mỗi ProtocolService resolve **ServiceCostingVersion PUBLISHED** (activeCostingVersion,
+  PH1). Required thiếu costing PUBLISHED → **422**. `serviceCostTotal = Σ required components`.
+- **Optional (§16 owner decision):** base = **required only**; optional ghi trong snapshot `included:false`,
+  KHÔNG cộng (warning). Chưa có package-variant model (báo limitation).
+- **Package-specific (§5):** manual + lý do bắt buộc khi >0 + audit.
+- **Total (§6):** `totalEstimatedCost = serviceCostTotal + packageSpecificCost`.
+- **Floor (§8) / Recommended (§9):** MARGIN `cost/(1−margin%)` từ ProtocolCostingVersion PUBLISHED; recommended
+  ràng buộc target ≥ floor minMargin + recommended ≥ floor (422). Versioning DRAFT→PUBLISHED→SUPERSEDED, bất biến.
+- **Selling (§10,§11):** `resolvePackagePrice` = `resolvePrice("PACKAGE", protocolId, {types})` (reuse resolver).
+  `packageRetailComparison` = Σ retail dịch vụ required vs giá gói (derived, không sửa PriceRule).
+- Finance mask: cost/margin/sourceSnapshot/components che theo `finance.read`.
+
+### Proposal integration (additive — §12,§13,§28)
+- `resolveItemPricing`: **BRAND_PROTOCOL** → selling = PriceRule PACKAGE (targetId=protocolId), cost =
+  ProtocolCostingVersion PUBLISHED total. KHÔNG fallback retail cho gói. (Trước null → nay resolve nếu có rule;
+  không rule = giữ null → tương thích.)
+- `proposalOptionFloorTotal`: thêm nhánh **BRAND_PROTOCOL** dùng ProtocolFloorPriceVersion PUBLISHED (inline,
+  tránh vòng import). Below-floor gói đi qua BelowFloorApproval hiện có — **KHÔNG đổi acceptedSnapshot/Invoice**.
+
+### API / UI
+- API: `/api/protocol-costings` (GET/POST, [id] GET/PATCH, /publish, /recalculate) · `/api/protocol-floor-prices`
+  (GET/POST, [id]/publish) · `/api/protocol-recommended-prices` (GET/POST, [id]/publish) ·
+  `/api/protocol-pricing/[protocolId]` (tổng hợp cho UI). Audit `PROTOCOL_COSTING_*`/`PROTOCOL_FLOOR_*`/
+  `PROTOCOL_RECOMMENDED_*`. Reuse `pricefloor.read/write` + `finance.read` — **KHÔNG thêm permission**.
+- UI nội bộ `/protocols/[id]/pricing` (chỉ SERVICES + finance.read): so sánh **Giá vốn/Floor/Recommended/
+  PriceBook + Σ retail + tiết kiệm** + tạo/phát hành 3 domain. Entry link header Protocol. Không sửa sidebar/nav.
+
+### Chứng minh (test/protocol-pricing.test.ts, 11 test → A–X)
+A+B+C+D+E costing (required 2.7M, optional bỏ, package-specific 0.1M, total 2.8M) · **F** required thiếu
+ServiceCosting PUBLISHED→422 · **G+H** publish immutable (đổi ServiceCosting sau → package v1 KHÔNG đổi;
+snapshot component) · **I** floor MARGIN 2.8M/0.7=4.0M · **J+K** recommended 2.8/0.6 + target<floorMargin→422 ·
+**L+M** PriceRule PACKAGE STANDARD/VIP theo segment · **N** Σ retail ≠ package · **O+P** proposal BRAND_PROTOCOL
+dùng package price + package floor below-floor · **S** legacy LEGACY_STEPS→422 (không ép) · **T+U** finance mask
++ RBAC 401/403 · **V** audit 6 sự kiện. **W/X** (PH1–PH4 + P1–P4) không regression qua full suite 382/46.
+
+### Demo (seed-demo.ts) — PROTO-PIGMENT-COMBO
+Required DMK (1.113M) + Laser Pico (0.9M) + package-specific 0.1M = **giá vốn gói 2.113.000₫** → **sàn
+3.019.000₫** (30%) → **đề xuất 3.522.000₫** (40%). Recovery optional (không cộng). PriceBook gói: Standard
+5.000.000₫ / VIP 4.700.000₫ (PriceRule PACKAGE, targetId=protocolId).
+
+### Coexistence & OUT OF SCOPE (đúng ranh giới PH5)
+- **KHÔNG đụng** (regression xanh): ServiceCosting/Floor/Recommended (PH1–PH3), PriceRule model/precedence
+  semantics (reuse resolver), BookingItem snapshot (PH4), Proposal acceptedSnapshot / Invoice freeze, permission
+  matrix (Mục 15), sidebar/nav, ProtocolLoop, Service SOP. **KHÔNG double-write**.
+- **Chỉ SERVICES protocol**; LEGACY_STEPS giữ nguyên (422 khi tạo giá gói — không migrate/ép).
+- **Chưa làm (phase sau)**: allocation package price → BookingItem (P5 KHÔNG auto chia); package-variant engine
+  (optional-in-base) — base = required only; auto-write Recommended → PriceRule; VAT. Package-below-floor ở
+  Booking chưa mở (mới ở Proposal). Service chưa có bảng lịch sử SOP → serviceVersionMarker chỉ đối chiếu.
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript

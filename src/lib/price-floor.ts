@@ -292,14 +292,25 @@ export async function proposalOptionFloorTotal(
   let floorApplicable = false;
   const details: ProposalFloorDetail[] = [];
   for (const it of items) {
-    if (it.itemType !== "SERVICE" || !it.refId) continue;
-    const fc = await checkServicePriceFloor(it.refId, 0);
-    if (!fc.hasFloor) continue;
+    if (!it.refId) continue;
+    let floorPrice: number | null = null;
+    let floorVersionId: string | null = null;
+    let version: number | null = null;
+    if (it.itemType === "SERVICE") {
+      const fc = await checkServicePriceFloor(it.refId, 0);
+      if (!fc.hasFloor) continue;
+      floorPrice = fc.floorPrice; floorVersionId = fc.floorVersionId ?? null; version = fc.version ?? null;
+    } else if (it.itemType === "BRAND_PROTOCOL") {
+      // PH5 — giá sàn GÓI (ProtocolFloorPriceVersion PUBLISHED mới nhất). Inline để tránh vòng import.
+      const pf = await prisma.protocolFloorPriceVersion.findFirst({ where: { protocolId: it.refId, status: "PUBLISHED" }, orderBy: { version: "desc" }, select: { id: true, version: true, floorPrice: true } });
+      if (!pf) continue;
+      floorPrice = num(pf.floorPrice); floorVersionId = pf.id; version = pf.version;
+    } else continue;
     floorApplicable = true;
     const times = num(it.sessions ?? it.quantity ?? 1) || 1;
-    const lineFloor = fc.floorPrice * times;
+    const lineFloor = (floorPrice ?? 0) * times;
     floorTotal += lineFloor;
-    details.push({ serviceId: it.refId, name: it.name ?? null, floorPrice: fc.floorPrice, times, lineFloor, floorVersionId: fc.floorVersionId, version: fc.version });
+    details.push({ serviceId: it.refId, name: it.name ?? null, floorPrice: floorPrice ?? 0, times, lineFloor, floorVersionId, version });
   }
   const below = floorApplicable && agreedPrice + 1e-6 < floorTotal;
   return { floorApplicable, floorTotal, below, shortfall: below ? floorTotal - agreedPrice : 0, details };

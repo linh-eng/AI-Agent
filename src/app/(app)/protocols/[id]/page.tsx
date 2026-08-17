@@ -46,6 +46,7 @@ const STATUSES = ["DRAFT", "REVIEW", "APPROVED", "ACTIVE", "ARCHIVED"];
 export default function ProtocolDetailPage() {
   const { id } = useParams<{ id: string }>();
   const canWrite = useCan(PERMISSIONS.PROTOCOL_WRITE);
+  const canFinance = useCan(PERMISSIONS.FINANCE_READ);
   const [p, setP] = useState<Protocol | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -141,6 +142,9 @@ export default function ProtocolDetailPage() {
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={LIBRARY_STATUS_TONE[p.status]}>{LIBRARY_STATUS_LABEL[p.status]}</Badge>
+            {p.compositionMode === "SERVICES" && canFinance && (
+              <Link href={`/protocols/${p.id}/pricing`} className="inline-flex items-center gap-1 text-sm text-primary hover:underline">Giá &amp; chi phí gói →</Link>
+            )}
             {canWrite && (
               <>
                 <Select className="h-9 w-36" value={p.status} onChange={(e) => setStatus(e.target.value)}>

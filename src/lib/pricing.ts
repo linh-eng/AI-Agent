@@ -75,7 +75,8 @@ const ITEM_TO_TARGET: Record<string, string | null> = {
   SERVICE: "SERVICE",
   PRODUCT: "PRODUCT",
   TECHNOLOGY: "TECHNOLOGY",
-  BRAND_PROTOCOL: null, // protocol không có giá độc lập
+  // PH5 — Protocol GÓI: giá bán qua PriceRule targetType=PACKAGE (targetId=protocolId).
+  BRAND_PROTOCOL: "PACKAGE",
   CUSTOM: null,
 };
 
@@ -110,6 +111,12 @@ export async function resolveItemPricing(
     const p = await prisma.spaProduct.findUnique({ where: { id: refId }, select: { sellingPrice: true, cost: true } });
     if (unitPrice === null && p?.sellingPrice != null) unitPrice = Number(p.sellingPrice);
     if (p?.cost != null) unitCost = Number(p.cost);
+  } else if (itemType === "BRAND_PROTOCOL") {
+    // PH5 — giá bán = PriceRule PACKAGE (đã resolve ở trên); giá vốn = ProtocolCostingVersion
+    // PUBLISHED mới nhất (không fallback — protocol chưa khai giá vốn gói thì cost=null).
+    const pc = await prisma.protocolCostingVersion.findFirst({ where: { protocolId: refId, status: "PUBLISHED" }, orderBy: { version: "desc" }, select: { totalEstimatedCost: true } });
+    if (pc?.totalEstimatedCost != null) unitCost = Number(pc.totalEstimatedCost);
+    // KHÔNG fallback giá bán về retail/standard cho gói — giữ null nếu chưa có PriceRule PACKAGE.
   }
   return { unitPrice, unitCost };
 }

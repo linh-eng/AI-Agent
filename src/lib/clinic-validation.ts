@@ -868,3 +868,30 @@ export const recommendedUpdateSchema = z.object({
   roundingUnit: z.coerce.number().int().min(1).optional(),
   note: z.string().optional().nullable(),
 });
+
+// =============================================================================
+// PRICING / COSTING — PH5: Protocol / Package pricing.
+// =============================================================================
+export const protocolCostingCreateSchema = z.object({
+  protocolId: z.string().min(1),
+  packageSpecificCost: z.coerce.number().min(0).optional(),
+  packageSpecificReason: z.string().trim().min(1).optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export const protocolCostingUpdateSchema = z.object({
+  packageSpecificCost: z.coerce.number().min(0).optional(),
+  packageSpecificReason: z.string().trim().min(1).optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export const protocolFloorCreateSchema = z.object({
+  protocolCostingVersionId: z.string().min(1),
+  minMarginPercent: z.coerce.number().min(0).max(99.99),
+  roundingUnit: z.coerce.number().int().min(1).default(1000),
+  note: z.string().optional().nullable(),
+});
+export const protocolRecommendedCreateSchema = z.object({
+  protocolCostingVersionId: z.string().min(1),
+  targetMarginPercent: z.coerce.number().min(0).max(99.99),
+  roundingUnit: z.coerce.number().int().min(1).default(1000),
+  note: z.string().optional().nullable(),
+});

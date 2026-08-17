@@ -989,6 +989,35 @@ async function main() {
     console.log("   Giá booking PH4: BK-100040 (KH VIP) DMK 2.100.000₫ + Laser Pico 1.500.000₫ = tổng 3.600.000₫ (item theo giá VIP; Booking.price=DMK).");
   }
 
+  // --- Pricing PH5 — giá GÓI cho protocol SERVICES (PROTO-PIGMENT-COMBO) ---
+  const protoP5 = await prisma.brandProtocol.findUnique({ where: { code: "PROTO-PIGMENT-COMBO" }, select: { id: true, compositionMode: true } });
+  if (protoP5 && protoP5.compositionMode === "SERVICES" && (await prisma.protocolCostingVersion.count({ where: { protocolId: protoP5.id } })) === 0) {
+    try {
+      // Bảo đảm dịch vụ thành phần BẮT BUỘC (Laser Pico) có giá vốn phát hành.
+      const { createCostingVersion, publishCostingVersion } = await import("../src/lib/service-costing");
+      const svcPico = await prisma.service.findUnique({ where: { code: "DV-PICO-01" }, select: { id: true } });
+      if (svcPico && (await prisma.serviceCostingVersion.count({ where: { serviceId: svcPico.id, status: "PUBLISHED" } })) === 0) {
+        const { version } = await createCostingVersion({ serviceId: svcPico.id, equipmentCost: 900_000, note: "Giá vốn Laser Pico (demo PH5)", createdBy: "Trần Quản Lý" });
+        await publishCostingVersion(version.id, "Trần Quản Lý");
+      }
+      const { createProtocolCostingVersion, publishProtocolCostingVersion, createProtocolFloorVersion, publishProtocolFloorVersion, createProtocolRecommendedVersion, publishProtocolRecommendedVersion } = await import("../src/lib/protocol-pricing");
+      const { version: pc } = await createProtocolCostingVersion({ protocolId: protoP5.id, packageSpecificCost: 100_000, packageSpecificReason: "Bộ kit dùng chung cho combo", createdBy: "Trần Quản Lý" });
+      const pcPub = await publishProtocolCostingVersion(pc.id, "Trần Quản Lý");
+      const pf = await createProtocolFloorVersion({ protocolId: protoP5.id, protocolCostingVersionId: pcPub.id, minMarginPercent: 30, createdBy: "Trần Quản Lý" });
+      await publishProtocolFloorVersion(pf.id, "Ban giám đốc");
+      const pr = await createProtocolRecommendedVersion({ protocolId: protoP5.id, protocolCostingVersionId: pcPub.id, targetMarginPercent: 40, createdBy: "Trần Quản Lý" });
+      await publishProtocolRecommendedVersion(pr.id, "Trần Quản Lý");
+      // Giá bán gói qua PriceBook (PriceRule PACKAGE, targetId=protocolId).
+      for (const [pt, price] of [["STANDARD", 5_000_000], ["VIP", 4_700_000]] as const) {
+        const has = await prisma.priceRule.findFirst({ where: { targetType: "PACKAGE", targetId: protoP5.id, priceType: pt } });
+        if (!has) await prisma.priceRule.create({ data: { targetType: "PACKAGE", targetId: protoP5.id, targetName: "Điều trị sắc tố kết hợp", priceType: pt, price, isActive: true, createdBy: "Trần Quản Lý" } });
+      }
+      console.log(`   Giá gói PH5 (PROTO-PIGMENT-COMBO): giá vốn ${Number(pcPub.totalEstimatedCost).toLocaleString("vi-VN")}₫ → sàn ${Number(pf.floorPrice).toLocaleString("vi-VN")}₫ (30%) → đề xuất ${Number(pr.calculatedRecommendedPrice).toLocaleString("vi-VN")}₫ (40%); PriceBook gói Standard 5.000.000₫ / VIP 4.700.000₫.`);
+    } catch (e) {
+      console.log("   ⚠️  Bỏ qua giá gói PH5 (dịch vụ thành phần chưa có giá vốn phát hành):", (e as Error).message);
+    }
+  }
+
   console.log("   Vật tư demo: JetPeel 100ml (còn 82ml), Vật tư khách hàng 10đv (còn 5).");
   console.log("✅ Seed DEMO hoàn tất: 7 khách (KH-100001..007), brand Klapp, CN RF/HIFU,");
   console.log("   protocol DEMO có version, kho vật tư spa, 2 chiến dịch, báo giá 3 phương án.");
