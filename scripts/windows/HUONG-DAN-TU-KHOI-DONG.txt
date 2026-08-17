@@ -1,0 +1,41 @@
+========================================================================
+ HƯỚNG DẪN: TỰ KHỞI ĐỘNG WEBAPP KHI BẬT MÁY (Windows)
+========================================================================
+
+MỤC ĐÍCH
+  Bật máy lên là webapp tự chạy sẵn ở nền, các máy khác trong tiệm truy
+  cập được ngay qua http://[IP-máy-chủ]:9000 mà không cần gõ lệnh.
+
+YÊU CẦU
+  - Đã cài Node.js và PostgreSQL trên máy này (máy làm "máy chủ").
+  - PostgreSQL để ở chế độ tự chạy khi bật máy (mặc định đã vậy).
+
+CÀI ĐẶT (làm 1 lần)
+  1. Mở thư mục dự án > scripts > windows
+  2. CHUỘT PHẢI vào file "install-autostart.bat" > chọn "Run as administrator".
+  3. Chờ báo "HOAN TAT". Xong.
+
+  Từ lần bật máy sau, webapp tự chạy (ẩn). Muốn chạy thử ngay mà không
+  khởi động lại máy: nháy đúp file "run-hidden.vbs".
+
+TRUY CẬP
+  - Ngay trên máy chủ:  http://localhost:9000
+  - Máy/điện thoại khác cùng mạng:  http://[IP-máy-chủ]:9000
+    (Xem IP: mở Command Prompt, gõ  ipconfig  -> dòng "IPv4 Address")
+
+CÁC FILE KÈM THEO
+  - start-server.bat        : chạy webapp (có cửa sổ - để xem log/chạy tay).
+  - run-hidden.vbs          : chạy webapp ẩn (không cửa sổ) - dùng tự khởi động.
+  - install-autostart.bat   : cài tự khởi động + mở cổng 9000 (chạy admin).
+  - uninstall-autostart.bat : gỡ tự khởi động + đóng cổng 9000 (chạy admin).
+  - stop-server.bat         : tắt webapp đang chạy.
+
+SAU KHI CẬP NHẬT BẢN MỚI (giải nén đè)
+  Không cần cài lại. Máy đang bật thì chạy "stop-server.bat" rồi nháy đúp
+  "run-hidden.vbs" để nạp bản mới; hoặc đơn giản là khởi động lại máy.
+
+LƯU Ý
+  - Đây là chế độ dev (tự biên dịch, tiện khi cập nhật). Chạy tốt cho mạng
+    nội bộ tiệm. Nếu cần tối ưu tốc độ (bản production), báo kỹ thuật hỗ trợ.
+  - Đừng tắt máy chủ trong giờ làm việc, nếu không các máy khác sẽ mất kết nối.
+========================================================================
