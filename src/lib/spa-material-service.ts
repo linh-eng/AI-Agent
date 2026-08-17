@@ -31,12 +31,25 @@ interface ConsumeInput {
   quantity: number;
   note?: string | null;
   occurredAt?: Date;
+  idempotencyKey?: string | null; // Redesign P4 — chống double-deduct khi POST trùng
+}
+
+/**
+ * Redesign P4 — nếu idempotencyKey đã tồn tại, trả lại usage cũ (KHÔNG trừ kho lần 2).
+ * Trả về `{ usage, duplicate:true }` để caller phản hồi an toàn; null nếu chưa có.
+ */
+async function findByIdempotencyKey(key: string | null | undefined) {
+  if (!key) return null;
+  return prisma.materialUsage.findUnique({ where: { idempotencyKey: key } });
 }
 
 /** Tiêu hao từ 1 CONTAINER (Kho vật tư sử dụng). */
 export async function consumeFromContainer(containerId: string, input: ConsumeInput) {
   const qty = Number(input.quantity);
   if (!(qty > 0)) throw new MaterialError("Số lượng sử dụng phải lớn hơn 0.");
+
+  const existing = await findByIdempotencyKey(input.idempotencyKey);
+  if (existing) return existing; // idempotent: không trừ kho lần 2
 
   return prisma.$transaction(async (tx) => {
     // Khóa dòng container để tránh dùng vượt khi đồng thời.
@@ -82,6 +95,8 @@ export async function consumeFromContainer(containerId: string, input: ConsumeIn
     const usage = await tx.materialUsage.create({
       data: {
         source: "SHARED_STOCK",
+        usageType: "CONSUMPTION",
+        idempotencyKey: input.idempotencyKey ?? null,
         containerId,
         sessionId: input.sessionId ?? null,
         customerId,
@@ -101,6 +116,13 @@ export async function consumeFromContainer(containerId: string, input: ConsumeIn
 
     if (input.sessionId) await recomputeSessionMaterialCost(tx, input.sessionId);
     return usage;
+  }).catch(async (e) => {
+    // Race: cùng idempotencyKey chèn đồng thời → unique violation → trả bản đã có.
+    if ((e as any)?.code === "P2002" && input.idempotencyKey) {
+      const dup = await findByIdempotencyKey(input.idempotencyKey);
+      if (dup) return dup;
+    }
+    throw e;
   });
 }
 
@@ -108,6 +130,9 @@ export async function consumeFromContainer(containerId: string, input: ConsumeIn
 export async function consumeFromCustomerMaterial(customerMaterialId: string, input: ConsumeInput) {
   const qty = Number(input.quantity);
   if (!(qty > 0)) throw new MaterialError("Số lượng sử dụng phải lớn hơn 0.");
+
+  const existing = await findByIdempotencyKey(input.idempotencyKey);
+  if (existing) return existing; // idempotent
 
   return prisma.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<
@@ -148,6 +173,8 @@ export async function consumeFromCustomerMaterial(customerMaterialId: string, in
     const usage = await tx.materialUsage.create({
       data: {
         source: "CUSTOMER_OWNED",
+        usageType: "CONSUMPTION",
+        idempotencyKey: input.idempotencyKey ?? null,
         customerMaterialId,
         sessionId: input.sessionId ?? null,
         customerId: m.customerId,
@@ -164,6 +191,12 @@ export async function consumeFromCustomerMaterial(customerMaterialId: string, in
 
     if (input.sessionId) await recomputeSessionMaterialCost(tx, input.sessionId);
     return usage;
+  }).catch(async (e) => {
+    if ((e as any)?.code === "P2002" && input.idempotencyKey) {
+      const dup = await findByIdempotencyKey(input.idempotencyKey);
+      if (dup) return dup;
+    }
+    throw e;
   });
 }
 
@@ -189,27 +222,71 @@ export async function recomputeSessionMaterialCost(
   return total;
 }
 
-/** Hủy 1 lần dùng (hoàn tác) — cộng lại tồn/def used, ghi âm không giữ; dùng cho sửa nhầm. */
-export async function reverseUsage(usageId: string) {
+/**
+ * Redesign P4 — HOÀN TÁC không phá hủy (compensating record). Giữ NGUYÊN bản CONSUMPTION gốc,
+ * tạo bản REVERSAL cộng tồn lại, liên kết reversalOfUsageId, đánh dấu bản gốc reversedAt/By/reason.
+ *  - Chỉ hoàn tác được CONSUMPTION (không hoàn tác REVERSAL/ADJUSTMENT).
+ *  - Chặn hoàn tác 2 lần (reversedAt đã set → lỗi).
+ *  - Lý do BẮT BUỘC. costAllocated của REVERSAL = âm để net chi phí buổi.
+ */
+export async function reverseUsage(usageId: string, opts: { reason: string; performedBy?: string | null }) {
+  if (!opts?.reason?.trim()) throw new MaterialError("Cần nhập lý do hoàn tác.");
   return prisma.$transaction(async (tx) => {
     const u = await tx.materialUsage.findUnique({ where: { id: usageId } });
     if (!u) throw new MaterialError("Không tìm thấy lần sử dụng.");
+    if (u.usageType !== "CONSUMPTION") throw new MaterialError("Chỉ hoàn tác được giao dịch tiêu hao (CONSUMPTION).");
+    if (u.reversedAt) throw new MaterialError("Lần dùng này đã được hoàn tác trước đó.");
     const qty = toNum(u.quantity);
+
+    let remBefore: number | null = null;
+    let remAfter: number | null = null;
     if (u.source === "SHARED_STOCK" && u.containerId) {
-      const c = await tx.materialContainer.findUnique({ where: { id: u.containerId } });
+      const rows = await tx.$queryRaw<{ id: string; remainingQty: Prisma.Decimal; status: string }[]>`SELECT id, "remainingQty", status FROM material_containers WHERE id = ${u.containerId} FOR UPDATE`;
+      const c = rows[0];
       if (c) {
-        const newRem = toNum(c.remainingQty) + qty;
-        await tx.materialContainer.update({ where: { id: c.id }, data: { remainingQty: new Prisma.Decimal(newRem), status: c.status === "DISPOSED" ? "DISPOSED" : newRem > 0 ? "IN_USE" : "EMPTY" } });
+        remBefore = toNum(c.remainingQty);
+        remAfter = remBefore + qty;
+        await tx.materialContainer.update({ where: { id: c.id }, data: { remainingQty: new Prisma.Decimal(remAfter), status: c.status === "DISPOSED" ? "DISPOSED" : remAfter > 0 ? "IN_USE" : "EMPTY" } });
       }
     } else if (u.source === "CUSTOMER_OWNED" && u.customerMaterialId) {
-      const m = await tx.customerMaterial.findUnique({ where: { id: u.customerMaterialId } });
+      const rows = await tx.$queryRaw<{ id: string; usedQty: Prisma.Decimal; allocatedQty: Prisma.Decimal }[]>`SELECT id, "usedQty", "allocatedQty" FROM customer_materials WHERE id = ${u.customerMaterialId} FOR UPDATE`;
+      const m = rows[0];
       if (m) {
-        const newUsed = Math.max(0, toNum(m.usedQty) - qty);
+        const used = toNum(m.usedQty);
+        const newUsed = Math.max(0, used - qty);
+        remBefore = toNum(m.allocatedQty) - used;
+        remAfter = toNum(m.allocatedQty) - newUsed;
         await tx.customerMaterial.update({ where: { id: m.id }, data: { usedQty: new Prisma.Decimal(newUsed), status: newUsed >= toNum(m.allocatedQty) ? "USED_UP" : "ACTIVE" } });
       }
     }
-    await tx.materialUsage.delete({ where: { id: usageId } });
+
+    // Record REVERSAL bù — GIỮ bản gốc.
+    const reversal = await tx.materialUsage.create({
+      data: {
+        source: u.source,
+        usageType: "REVERSAL",
+        reversalOfUsageId: u.id,
+        containerId: u.containerId,
+        customerMaterialId: u.customerMaterialId,
+        sessionId: u.sessionId,
+        customerId: u.customerId,
+        performedBy: opts.performedBy ?? null,
+        quantity: new Prisma.Decimal(qty),
+        remainingBefore: remBefore != null ? new Prisma.Decimal(remBefore) : null,
+        remainingAfter: remAfter != null ? new Prisma.Decimal(remAfter) : null,
+        unitCost: u.unitCost,
+        costAllocated: u.costAllocated != null ? new Prisma.Decimal(-toNum(u.costAllocated)) : null,
+        serviceId: u.serviceId,
+        technologyId: u.technologyId,
+        brandProtocolId: u.brandProtocolId,
+        reversalReason: opts.reason.trim(),
+        note: `Hoàn tác cho ${u.id}`,
+      },
+    });
+    // Đánh dấu bản gốc đã hoàn tác (chặn hoàn tác lần 2).
+    await tx.materialUsage.update({ where: { id: u.id }, data: { reversedAt: new Date(), reversedBy: opts.performedBy ?? null, reversalReason: opts.reason.trim() } });
+
     if (u.sessionId) await recomputeSessionMaterialCost(tx, u.sessionId);
-    return { id: usageId, reversed: true };
+    return { originalId: u.id, reversalId: reversal.id, reversed: true };
   });
 }

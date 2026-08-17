@@ -769,6 +769,37 @@ async function main() {
         },
       },
     });
+
+    // === Redesign P4 · WALK-IN session (planId NULL) + 3 execution items + snapshot đông cứng ===
+    const bk30 = await prisma.booking.findUnique({ where: { code: "BK-100030" }, include: { items: { orderBy: { sortOrder: "asc" } } } });
+    if (bk30 && !(await prisma.treatmentSession.findFirst({ where: { code: "SS-100030" } }))) {
+      const wsess = await prisma.treatmentSession.create({
+        data: {
+          code: "SS-100030", planId: null, customerId: kDangPD.id, bookingId: bk30.id, sessionNumber: 1,
+          name: "Walk-in điều trị sắc tố kết hợp", status: "COMPLETED", performer: KTV, performedAt: day(17),
+          serviceId: svcDmkForCompose.id, executionFrozenAt: day(17),
+          executionSnapshot: { frozenAt: day(17).toISOString(), itemCount: 3, note: "Walk-in 3 dịch vụ" } as any,
+        },
+      });
+      // 3 execution item (thực tế đã làm) — mỗi item đông cứng snapshot riêng
+      for (const [i, it] of bk30.items.entries()) {
+        const svc = items[i];
+        await prisma.sessionExecutionItem.create({
+          data: {
+            sessionId: wsess.id, bookingItemId: it.id, serviceId: it.serviceId, sortOrder: i,
+            selectedOptionSource: i === 0 ? "SERVICE_SOP_OPTION" : "PRACTITIONER_ADHOC",
+            selectedOptionName: i === 0 ? "Enzyme #1 (thực tế, khác đề xuất #2)" : null,
+            sourceVersion: svc?.version ?? 1,
+            executionSnapshot: {
+              capturedAt: day(17).toISOString(),
+              source: { kind: "SERVICE", id: it.serviceId, code: svc?.code, name: svc?.name, version: svc?.version ?? 1 },
+              option: { source: i === 0 ? "SERVICE_SOP_OPTION" : "PRACTITIONER_ADHOC", name: i === 0 ? "Enzyme #1" : null, classification: null },
+              actualValues: i === 0 ? [{ stepName: "Đắp Enzyme", productName: "Enzyme #1", qtyStd: 5, qtyActual: 4, unit: "g" }] : [],
+            } as any,
+          },
+        });
+      }
+    }
   }
   // --- Biểu mẫu đã áp cho khách (snapshot schema, không đổi mẫu gốc) ---
   const skinForm = await prisma.formTemplate.findUnique({ where: { code: "FORM-SKIN-ASSESS" } });

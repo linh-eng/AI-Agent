@@ -7,6 +7,7 @@ import { PERMISSIONS } from "@/lib/rbac";
 import { sessionUpdateSchema } from "@/lib/clinic-validation";
 import { canSeeFinance, maskFinance, auditLog } from "@/lib/clinic";
 import { deriveStageStatus, PRE_EXECUTION_PLAN_STATUSES } from "@/lib/treatment-plan";
+import { buildSessionSnapshot } from "@/lib/session-execution";
 
 // Các trường "thực tế" được kiểm khi sửa buổi đã hoàn thành (để ghi diff audit).
 const AUDIT_FIELDS = [
@@ -39,6 +40,11 @@ export const GET = handle(async (_req, { params }) => {
         },
       },
       customer: { select: { id: true, code: true, fullName: true, phone: true } },
+      // Redesign P4 — dịch vụ thực tế đã làm (execution items) + snapshot cấp buổi.
+      executionItems: {
+        orderBy: { sortOrder: "asc" },
+        include: { service: { select: { id: true, code: true, name: true, version: true } }, bookingItem: { select: { id: true, serviceId: true } } },
+      },
     },
   });
   if (!item) return fail(404, "Không tìm thấy buổi thực hiện");
@@ -58,7 +64,7 @@ export const PATCH = handle(async (req, { params }) => {
       technologyId: true, brandProtocolId: true, performer: true, treatmentArea: true,
       conditionBefore: true, conditionAfter: true, customerFeedback: true, postCare: true,
       note: true, actualCost: true, incident: true, handledAction: true, nextSuggestion: true,
-      editLog: true, plan: { select: { version: true } },
+      editLog: true, executionFrozenAt: true, plan: { select: { version: true } },
     },
   });
   if (!cur) return fail(404, "Không tìm thấy buổi thực hiện");
@@ -83,9 +89,21 @@ export const PATCH = handle(async (req, { params }) => {
     if (!parsed.performedAt && !cur.performedAt) data.performedAt = new Date();
     // Ghim version thực hiện nếu chưa có — buổi đã hoàn thành thuộc đúng version tại thời điểm đó
     if (cur.versionAtExecution == null) data.versionAtExecution = cur.plan?.version ?? undefined;
+    // Redesign P4 — ĐÔNG CỨNG snapshot cấp buổi khi hoàn thành (idempotent: chỉ freeze nếu chưa).
+    // KHÔNG auto-deduct vật tư (chỉ usage đã POST mới trừ kho). freeze = metadata, không double-effect.
+    if (cur.executionFrozenAt == null) {
+      const execItems = await prisma.sessionExecutionItem.findMany({ where: { sessionId: params.id }, orderBy: { sortOrder: "asc" }, select: { serviceId: true, selectedOptionName: true, executionSnapshot: true } });
+      data.executionFrozenAt = new Date();
+      data.executionSnapshot = buildSessionSnapshot(execItems as any) as any;
+    }
   }
 
   const item = await prisma.treatmentSession.update({ where: { id: params.id }, data });
+
+  // Audit hoàn thành buổi (P4) — không log secret.
+  if (parsed.status === "COMPLETED" && !wasCompleted) {
+    await auditLog({ userId: session.userId, action: "SESSION_COMPLETED", entityType: "TreatmentSession", entityId: params.id, changes: { frozenAt: (data.executionFrozenAt as any) ?? cur.performedAt } });
+  }
 
   // Ghi AUDIT khi sửa buổi đã hoàn thành: field nào đổi (trước/sau) + ai/khi/lý do (mục 29).
   if (wasCompleted) {
@@ -126,7 +144,7 @@ export const PATCH = handle(async (req, { params }) => {
 
   // Tự tiến trạng thái PHÁC ĐỒ khi buổi bắt đầu/hoàn thành (tránh mâu thuẫn):
   // nếu phác đồ còn ở trạng thái tiền-thực-hiện (Bản nháp/Chờ duyệt/Đã duyệt) → nâng lên ĐANG THỰC HIỆN.
-  if (parsed.status === "COMPLETED" || parsed.status === "IN_PROGRESS") {
+  if ((parsed.status === "COMPLETED" || parsed.status === "IN_PROGRESS") && item.planId) {
     try {
       const plan = await prisma.treatmentPlan.findUnique({ where: { id: item.planId }, select: { status: true } });
       if (plan && PRE_EXECUTION_PLAN_STATUSES.includes(plan.status as any)) {

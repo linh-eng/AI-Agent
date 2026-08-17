@@ -1802,6 +1802,70 @@ list 1 booking = 1 card kèm items · J backfill idempotent (2 lần không trù
 - **Chưa làm (P4):** Actual Session chọn phương án SOP + snapshot + trừ tồn theo phương án; song song
   (parallel) nhiều dịch vụ; tách buổi từ protocol nhiều dịch vụ (thuộc phase Plan).
 
+## BUSINESS REDESIGN — Phase 4 · Actual Treatment Session (execution + snapshot + inventory) (v0.24.0)
+
+Khi khách ĐẾN thực hiện: tạo/tiếp tục `TreatmentSession`, chọn **phương án thực tế**, **đông cứng
+snapshot bất biến**, ghi **tiêu hao vật tư THỰC TẾ** (idempotent + reversal ledger). Giữ 1:1 Booking↔Session;
+multi-service visit → 1 Session + N `SessionExecutionItem`. Thuần **additive**. Migration
+**`U_session_execution`** (0 phá hủy; `ALTER planId DROP NOT NULL` là relax-constraint an toàn; tổng **31
+migration**). tsc sạch · build OK.
+
+### 4 quyết định người dùng đã chốt
+1. **`TreatmentSession.planId` NULLABLE** (walk-in/dịch vụ lẻ không cần phác đồ; KHÔNG auto-tạo ad-hoc plan).
+2. **ProtocolLoop classification DEFER** — repo chưa có `STANDARD/WITHIN_ALLOWED_VARIATION/OUTSIDE_STANDARD_
+   REVIEW_REQUIRED`; **KHÔNG build policy**, chỉ để field `classification=null` trong snapshot (không tự tính).
+3. **Inventory reversal/idempotency additive fix** — KHÔNG hard-delete: idempotencyKey (unique) + ledger
+   REVERSAL/ADJUSTMENT + reversalOfUsageId + reversedAt/By/reason.
+4. **KHÔNG thêm permission mới** (dùng lại treatment.write/editCompleted/material.write/finance.read).
+
+### Migration & schema (`U_session_execution`)
+- `TreatmentSession`: `planId String?` (nullable) + `executionFrozenAt DateTime?` + `executionSnapshot Json?`
+  + quan hệ `executionItems`. Relation `plan TreatmentPlan?`.
+- Model **`SessionExecutionItem`** (`session_execution_items`): sessionId, bookingItemId?(soft), serviceId,
+  sortOrder, `selectedOptionSource` (enum **ExecutionOptionSource** SERVICE_SOP_OPTION/PROTOCOL_VARIANT/
+  PRACTITIONER_ADHOC), selectedOptionId?, selectedOptionName?, sourceVersion?, `executionSnapshot Json?`
+  (BẤT BIẾN), actualStartAt?/actualEndAt?, note?. FK session Cascade, service Restrict, bookingItem SetNull.
+- `MaterialUsage` +`usageType` (enum **MaterialUsageType** CONSUMPTION/REVERSAL/ADJUSTMENT) +`idempotencyKey`
+  (@unique) +`reversalOfUsageId` (self-rel) +`reversedAt/reversedBy/reversalReason`. Back-relations
+  `Service.executionItems`, `BookingItem.executions`.
+
+### Backend
+- **`src/lib/session-execution.ts`**: `buildExecutionSnapshot` (reuse `sopSnapshot` P1 + phương án + qtyStd
+  vs qtyActual; `classification=null`), `buildSessionSnapshot` (roll-up khi freeze), include helpers.
+- **`spa-material-service.ts`**: `consumeFrom*` nhận `idempotencyKey` → **idempotent** (POST trùng key trả
+  usage cũ, không trừ kho lần 2; race → unique-violation → trả bản đã có). `reverseUsage(id,{reason})` **viết
+  lại KHÔNG phá hủy**: giữ CONSUMPTION gốc, tạo record REVERSAL (costAllocated âm để net), cộng tồn (FOR
+  UPDATE), set `reversedAt` (chặn hoàn tác 2 lần), lý do bắt buộc.
+- API: `POST/GET /api/session-executions` (+`[id]` PATCH metadata/DELETE — snapshot BẤT BIẾN, sửa completed
+  cần editCompleted+lý do) · `/api/treatment-sessions` POST (walk-in: planId null + customerId/bookingId,
+  KHÔNG auto-plan) · `[id]` PATCH freeze `executionSnapshot` khi COMPLETED (idempotent, KHÔNG auto-deduct) ·
+  `/api/material-usages` POST (+idempotencyKey) · **`/api/material-usages/[id]/reverse`** POST.
+- Audit: `SESSION_OPTION_SELECTED`, `SESSION_SNAPSHOT_FROZEN`, `SESSION_EXECUTION_CHANGED`, `SESSION_COMPLETED`,
+  `MATERIAL_USAGE_POSTED`, `MATERIAL_USAGE_REVERSED`. Giá vốn/`costAllocated` mask theo `finance.read`.
+
+### UI — `/sessions/[id]` khối C
+`components/session-executions.tsx`: liệt kê **dịch vụ thực tế đã làm** (phương án + version snapshot + qty
+**chuẩn nguồn → thực tế**) + form thêm (chọn dịch vụ → phương án SOP → qtyStd/qtyActual) → đông cứng snapshot.
+Nhãn phân biệt **Đã đặt** (BookingItem) vs **Thực hiện thực tế**.
+
+### Chứng minh (test/session-execution.test.ts, 10 test HTTP thật → 20 tiêu chí A–T)
+A legacy read (không fabricate snapshot) · B walk-in planId null (không auto-plan) · C+D 1 Booking/3 item →
+1 Session/3 exec, BookingItem KHÔNG mutate · E+F+G+H actual≠recommended + snapshot frozen + Service bump
+v1→v2 KHÔNG đổi snapshot cũ + qtyStd≠qtyActual · J+K trừ theo actual + idempotency chống double-deduct ·
+L+M reversal ledger (giữ bản gốc, có REVERSAL) + chặn hoàn tác 2 lần · N completion retry no double-effect +
+freeze · O sửa completed cần lý do+audit · P+Q RBAC 401/403 · R finance mask · S plan session regression.
+
+### Demo (seed-demo.ts) — `SS-100030` walk-in
+Từ `BK-100030` (P3, 3 dịch vụ) → 1 TreatmentSession **planId NULL** (walk-in) + 3 `SessionExecutionItem`
+đông cứng; item DMK chọn **Enzyme #1 thực tế (khác đề xuất #2)**, **qtyStd 5g → qtyActual 4g**.
+
+### Coexistence & giới hạn (đúng ranh giới)
+- **KHÔNG đụng:** Pricing/Invoice/Deposit/Booking.price semantics (per-item priceSnapshot vẫn chỉ là metadata),
+  conflict engine/resource allocation, RBAC matrix/nav, Booking↔Session 1:1, không auto-expand Protocol→BookingItems,
+  không rewrite legacy session. **KHÔNG CONFLICT mới** ngoài 4 đã quyết.
+- **Giới hạn còn lại:** classification/policy engine (defer); ADJUSTMENT enum có sẵn nhưng chưa mở UI; snapshot
+  media/chữ ký vẫn theo cơ chế cũ; song song nhiều dịch vụ chưa hỗ trợ (P3 sequential).
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript

@@ -13,6 +13,7 @@ import { formatDate, formatDateTime, mediaSrc } from "@/lib/utils";
 import { MediaUpload } from "@/components/media-upload";
 import { SessionMediaShare } from "@/components/session-media-share";
 import { SpaMaterialConsume } from "@/components/spa-material-consume";
+import { SessionExecutions } from "@/components/session-executions";
 import { SessionStaff } from "@/components/session-staff";
 import { SessionReview } from "@/components/session-review";
 import { useCan } from "@/components/session-provider";
@@ -281,6 +282,12 @@ export default function SessionExecutionPage() {
             <div className="space-y-1.5"><Label>Protocol thực tế</Label>
               {editable ? <Select value={f.brandProtocolId} onChange={(e) => setF({ ...f, brandProtocolId: e.target.value })}><option value="">—</option>{protocols.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select> : <div className="text-sm">{nameOf("protocol", f.brandProtocolId)}</div>}
             </div>
+          </div>
+
+          {/* Redesign P4 — dịch vụ thực tế đã làm (execution items) + phương án + đông cứng snapshot */}
+          <div className="rounded-lg border bg-muted/20 p-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dịch vụ thực hiện thực tế · phương án · snapshot</div>
+            <SessionExecutions sessionId={id} canWrite={canWrite && (!completed || edit)} bookingItems={(s as any).executionItems} />
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <F label="Vùng thực hiện" value={f.treatmentArea} edit={editable} onChange={(v: string) => setF({ ...f, treatmentArea: v })} />

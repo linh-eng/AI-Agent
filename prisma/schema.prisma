@@ -991,6 +991,13 @@ enum SessionStatus {
   CANCELLED // Hủy
 }
 
+/// Redesign P4 — nguồn phương án thực tế đã chọn khi thực hiện (KHÔNG có policy classification).
+enum ExecutionOptionSource {
+  SERVICE_SOP_OPTION // phương án của bước SOP (ServiceStepOption)
+  PROTOCOL_VARIANT // biến thể gợi ý từ Protocol (ProtocolService.recommendedVariants)
+  PRACTITIONER_ADHOC // kỹ thuật viên tự chọn/tùy biến tại chỗ
+}
+
 /// Hình thức thanh toán
 enum PaymentMethod {
   CASH
@@ -1145,6 +1152,7 @@ model Service {
   steps             ServiceStep[]
   protocolServices  ProtocolService[] // Redesign P2 — Service được compose vào các Protocol
   bookingItems      BookingItem[] // Redesign P3 — Service là 1 hạng mục trong Booking nhiều dịch vụ
+  executionItems    SessionExecutionItem[] // Redesign P4 — Service được thực hiện thực tế trong buổi
 
   @@map("services")
 }
@@ -1337,8 +1345,9 @@ model BookingItem {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  service Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  booking    Booking                @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  service    Service                @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  executions SessionExecutionItem[] // Redesign P4 — hạng mục đã đặt được thực hiện thực tế
 
   @@index([bookingId, sortOrder])
   @@index([serviceId])
@@ -1453,7 +1462,8 @@ model TreatmentStage {
 /// Mỗi buổi thực hiện là một record độc lập (mục 16) — không ghi đè buổi trước
 model TreatmentSession {
   id                   String        @id @default(cuid())
-  planId               String
+  // Redesign P4 — planId NULLABLE: session walk-in/dịch vụ lẻ KHÔNG bắt buộc có phác đồ.
+  planId               String?
   stageId              String?
   customerId           String
   bookingId            String?       @unique
@@ -1515,10 +1525,13 @@ model TreatmentSession {
   followUpDate         DateTime? // Ngày follow-up đề xuất
   // Sửa sau hoàn thành — audit (mục 29): [{by, at, reason, changes:[{field, before, after}]}]
   editLog              Json?
+  // --- Redesign P4 — Actual execution (đông cứng snapshot khi thực hiện) ---
+  executionFrozenAt    DateTime? // Thời điểm đông cứng snapshot thực hiện (null = chưa freeze / legacy)
+  executionSnapshot    Json? // Snapshot cấp buổi (roll-up); bất biến sau freeze
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
-  plan           TreatmentPlan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  plan           TreatmentPlan?            @relation(fields: [planId], references: [id], onDelete: Cascade)
   stage          TreatmentStage?           @relation(fields: [stageId], references: [id])
   customer       Customer                  @relation(fields: [customerId], references: [id])
   booking        Booking?                  @relation(fields: [bookingId], references: [id])
@@ -1533,10 +1546,42 @@ model TreatmentSession {
   mediaAssets    MediaAsset[]
   staff          SessionStaff[]
   review         SessionReview?
+  executionItems SessionExecutionItem[] // Redesign P4 — mỗi dịch vụ thực tế đã làm
 
   @@index([planId, sessionNumber])
   @@index([customerId])
   @@map("treatment_sessions")
+}
+
+/// Redesign P4 — MỘT dịch vụ THỰC TẾ đã thực hiện trong 1 buổi (1 Session = N execution items).
+/// Giữ 1:1 Booking↔Session; multi-service visit → 1 Session + N SessionExecutionItem.
+/// BookingItem = "đã đặt" (intent); SessionExecutionItem = "đã thực hiện" (truth) — KHÔNG mutate BookingItem.
+model SessionExecutionItem {
+  id                   String                @id @default(cuid())
+  sessionId            String
+  bookingItemId        String? // soft link tới hạng mục đã đặt (intent)
+  serviceId            String
+  sortOrder            Int                   @default(0)
+  // Phương án thực tế đã chọn (KHÔNG invent classification — Decision 2 defer)
+  selectedOptionSource ExecutionOptionSource @default(PRACTITIONER_ADHOC)
+  selectedOptionId     String? // id ServiceStepOption / tham chiếu variant (nếu có)
+  selectedOptionName   String? // snapshot tên phương án
+  sourceVersion        Int? // version Service/SOP lúc thực hiện (đối chiếu)
+  // Snapshot BẤT BIẾN đủ tái dựng thực tế; classification để null (chưa build policy — Decision 2)
+  executionSnapshot    Json?
+  actualStartAt        DateTime?
+  actualEndAt          DateTime?
+  note                 String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  session     TreatmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  service     Service          @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  bookingItem BookingItem?     @relation(fields: [bookingItemId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, sortOrder])
+  @@index([serviceId])
+  @@map("session_execution_items")
 }
 
 // ----------------------------------------------------------------------------
@@ -2381,6 +2426,13 @@ enum MaterialSource {
   CUSTOMER_OWNED // Vật tư khách hàng
 }
 
+/// Redesign P4 — loại giao dịch vật tư (ledger append-only, không hard-delete).
+enum MaterialUsageType {
+  CONSUMPTION // tiêu hao thực tế (trừ tồn)
+  REVERSAL // hoàn tác một CONSUMPTION (cộng tồn lại) — record bù, giữ bản gốc
+  ADJUSTMENT // điều chỉnh thủ công (dự phòng)
+}
+
 enum ContainerStatus {
   IN_USE // Đang sử dụng
   LOW // Sắp hết
@@ -2485,12 +2537,21 @@ model MaterialUsage {
   technologyId       String? // snapshot (báo cáo theo công nghệ)
   brandProtocolId    String? // snapshot (báo cáo theo protocol)
   note               String?
+  // --- Redesign P4 — ledger append-only: idempotency + reversal (KHÔNG hard-delete) ---
+  usageType          MaterialUsageType @default(CONSUMPTION)
+  idempotencyKey     String?           @unique // chống double-deduct khi POST trùng
+  reversalOfUsageId  String? // record REVERSAL trỏ tới CONSUMPTION gốc
+  reversedAt         DateTime? // set trên bản GỐC khi đã bị hoàn tác (chặn hoàn tác 2 lần)
+  reversedBy         String?
+  reversalReason     String?
   occurredAt         DateTime       @default(now())
   createdAt          DateTime       @default(now())
 
   container        MaterialContainer? @relation(fields: [containerId], references: [id])
   customerMaterial CustomerMaterial?  @relation(fields: [customerMaterialId], references: [id])
   session          TreatmentSession?  @relation(fields: [sessionId], references: [id])
+  reversalOf       MaterialUsage?     @relation("UsageReversal", fields: [reversalOfUsageId], references: [id])
+  reversals        MaterialUsage[]    @relation("UsageReversal")
 
   @@index([sessionId])
   @@index([customerId])

@@ -348,11 +348,14 @@ export const stageCreateSchema = stageInputSchema.extend({
 });
 
 export const sessionCreateSchema = z.object({
-  planId: z.string().min(1),
+  // Redesign P4 (Decision 1) — planId TÙY CHỌN: walk-in/dịch vụ lẻ không cần phác đồ.
+  // Khi không có planId thì phải có customerId (hoặc bookingId để suy ra khách).
+  planId: z.string().min(1).optional().nullable(),
+  customerId: z.string().optional().nullable(),
   stageId: z.string().optional().nullable(),
   bookingId: z.string().optional().nullable(),
   serviceId: z.string().optional().nullable(),
-  sessionNumber: z.coerce.number().int().positive(),
+  sessionNumber: z.coerce.number().int().positive().optional().default(1),
   name: z.string().optional().nullable(),
   status: sessionStatusEnum.default("PLANNED"),
   scheduledAt: dateOpt,
@@ -376,6 +379,46 @@ export const sessionCreateSchema = z.object({
   plannedStaff: z.any().optional().nullable(),
   plannedDate: dateOpt,
   intervalDays: z.coerce.number().int().nonnegative().optional().nullable(),
+});
+
+// --- Redesign P4 — Actual execution items ---
+export const executionOptionSourceEnum = z.enum(["SERVICE_SOP_OPTION", "PROTOCOL_VARIANT", "PRACTITIONER_ADHOC"]);
+export const actualValueSchema = z.object({
+  stepName: z.string().optional().nullable(),
+  productName: z.string().optional().nullable(),
+  qtyStd: z.coerce.number().optional().nullable(),
+  qtyActual: z.coerce.number().optional().nullable(),
+  unit: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export const sessionExecutionCreateSchema = z.object({
+  sessionId: z.string().min(1),
+  serviceId: z.string().min(1, "Chọn dịch vụ thực hiện"),
+  bookingItemId: z.string().optional().nullable(),
+  selectedOptionSource: executionOptionSourceEnum.default("PRACTITIONER_ADHOC"),
+  selectedOptionId: z.string().optional().nullable(),
+  selectedOptionName: z.string().optional().nullable(),
+  actualValues: z.array(actualValueSchema).optional(),
+  instructions: z.string().optional().nullable(),
+  actualStartAt: dateOpt,
+  actualEndAt: dateOpt,
+  note: z.string().optional().nullable(),
+});
+export const sessionExecutionUpdateSchema = z.object({
+  selectedOptionSource: executionOptionSourceEnum.optional(),
+  selectedOptionId: z.string().optional().nullable(),
+  selectedOptionName: z.string().optional().nullable(),
+  actualValues: z.array(actualValueSchema).optional(),
+  instructions: z.string().optional().nullable(),
+  actualStartAt: dateOpt,
+  actualEndAt: dateOpt,
+  note: z.string().optional().nullable(),
+  reason: z.string().optional().nullable(), // bắt buộc khi sửa sau completed (kiểm ở route)
+});
+
+// --- Redesign P4 — material usage idempotency + reversal ---
+export const materialUsageReverseSchema = z.object({
+  reason: z.string().min(1, "Nhập lý do hoàn tác"),
 });
 export const sessionUpdateSchema = z.object({
   stageId: z.string().optional().nullable(),

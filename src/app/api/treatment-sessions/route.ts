@@ -26,11 +26,28 @@ export const POST = handle(async (req) => {
   await requirePermission(PERMISSIONS.TREATMENT_WRITE);
   const parsed = sessionCreateSchema.parse(await req.json());
 
-  const plan = await prisma.treatmentPlan.findUnique({
-    where: { id: parsed.planId },
-    select: { customerId: true, customer: { select: { group: true } } },
-  });
-  if (!plan) return fail(404, "Không tìm thấy phác đồ");
+  // Redesign P4 (Decision 1) — hai đường: (a) plan-based như cũ; (b) WALK-IN (planId null).
+  let customerId: string | null = null;
+  let customerGroup: string | null | undefined = undefined;
+  if (parsed.planId) {
+    const plan = await prisma.treatmentPlan.findUnique({
+      where: { id: parsed.planId },
+      select: { customerId: true, customer: { select: { group: true } } },
+    });
+    if (!plan) return fail(404, "Không tìm thấy phác đồ");
+    customerId = plan.customerId;
+    customerGroup = plan.customer?.group;
+  } else {
+    // Walk-in: khách lấy từ customerId truyền vào, hoặc suy từ booking. KHÔNG auto-tạo plan.
+    customerId = parsed.customerId ?? null;
+    if (!customerId && parsed.bookingId) {
+      const bk = await prisma.booking.findUnique({ where: { id: parsed.bookingId }, select: { customerId: true } });
+      customerId = bk?.customerId ?? null;
+    }
+    if (!customerId) return fail(422, "Buổi walk-in cần customerId hoặc bookingId để xác định khách.");
+    const c = await prisma.customer.findUnique({ where: { id: customerId }, select: { group: true } });
+    customerGroup = c?.group;
+  }
 
   // orderIndex mặc định = sessionNumber nếu không truyền
   const orderIndex = parsed.orderIndex ?? parsed.sessionNumber;
@@ -42,7 +59,7 @@ export const POST = handle(async (req) => {
     const { unitPrice } = await resolveItemPricing(
       "SERVICE",
       parsed.serviceId,
-      plan.customer?.group,
+      customerGroup,
       parsed.scheduledAt ?? undefined
     );
     if (unitPrice !== null) price = unitPrice;
@@ -52,8 +69,8 @@ export const POST = handle(async (req) => {
   const session = await prisma.treatmentSession.create({
     data: {
       code,
-      planId: parsed.planId,
-      customerId: plan.customerId,
+      planId: parsed.planId ?? null,
+      customerId: customerId!,
       stageId: parsed.stageId ?? null,
       bookingId: parsed.bookingId ?? null,
       serviceId: parsed.serviceId ?? null,
