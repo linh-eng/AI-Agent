@@ -78,10 +78,12 @@ beforeEach(() => { jar.clear(); });
 describe("P1–P4 CLOSURE · end-to-end acceptance", () => {
   it("A · Service SOP: DMK 1 bước · 2 phương án (Enzyme #1/#2 default) · persistence", async () => {
     await login(admin.email, admin.password);
+    // SpaProduct catalog liên kết vào step product (để test bất biến khi sửa Product metadata ở K)
+    S.prod = (await prisma.spaProduct.create({ data: { sku: uniq("SP"), name: "DMK Enzyme", cost: 1_000_000 } })).id;
     const created = await rj(await svcPost(jreq("http://t/api/services", "POST", {
       name: "DMK Enzyme Treatment", standardPrice: 2_500_000, durationMinutes: 83,
       steps: [{ name: "Đắp Enzyme", durationMinutes: 40, isRequired: true, warnings: "Chống chỉ định: da viêm cấp",
-        products: [{ name: "DMK Enzyme", quantity: 5, unit: "g", isRequired: true }],
+        products: [{ spaProductId: S.prod, name: "DMK Enzyme", quantity: 5, unit: "g", isRequired: true }],
         options: [
           { name: "Enzyme #1", selectMode: "SINGLE_SELECT", isDefault: false, quantity: 5, unit: "g" },
           { name: "Enzyme #2", selectMode: "SINGLE_SELECT", isDefault: true, quantity: 5, unit: "g" },
@@ -181,20 +183,22 @@ describe("P1–P4 CLOSURE · end-to-end acceptance", () => {
     S.snap1Json = JSON.stringify(snap);
   });
 
-  it("K · Snapshot BẤT BIẾN: sửa Service name + SOP + option + product → snapshot cũ KHÔNG đổi (DB)", async () => {
+  it("K · Snapshot BẤT BIẾN: sửa Service name + SOP + option + Product metadata → snapshot cũ KHÔNG đổi (DB)", async () => {
     await login(admin.email, admin.password);
-    // Sửa toàn diện Service DMK: đổi tên + thay SOP (option/product khác) → version bump
+    // (1) Sửa toàn diện Service DMK: đổi tên + thay SOP (option/product khác) → version bump
     await svcPatch(jreq(`http://t/api/services/${S.dmk}`, "PATCH", {
       name: "DMK Enzyme Treatment RENAMED",
       steps: [{ name: "Bước mới", durationMinutes: 99, products: [{ name: "Sản phẩm mới", quantity: 99, unit: "ml" }], options: [{ name: "Option mới", quantity: 99, unit: "ml" }] }],
     }), { params: { id: S.dmk } } as any);
+    // (2) Sửa Product metadata (SpaProduct catalog): đổi tên + giá vốn + đơn vị
+    await prisma.spaProduct.update({ where: { id: S.prod }, data: { name: "SP ĐỔI TÊN", cost: 9_999_999 } });
     const svcNow = await prisma.service.findUnique({ where: { id: S.dmk }, select: { version: true, name: true } });
     expect(svcNow!.version).toBe(2);
     expect(svcNow!.name).toContain("RENAMED");
-    // executionSnapshot cũ trong DB KHÔNG đổi (byte-for-byte)
+    // executionSnapshot cũ trong DB KHÔNG đổi (byte-for-byte) sau CẢ 2 thay đổi
     const reread = await prisma.sessionExecutionItem.findUnique({ where: { id: S.exec1 } });
     expect(JSON.stringify(reread!.executionSnapshot)).toBe(S.snap1Json);
-    expect((reread!.executionSnapshot as any).source.name).toBe("DMK Enzyme Treatment"); // tên CŨ
+    expect((reread!.executionSnapshot as any).source.name).toBe("DMK Enzyme Treatment"); // tên Service CŨ
     expect((reread!.executionSnapshot as any).source.version).toBe(1);
     expect(reread!.sourceVersion).toBe(1);
   });
