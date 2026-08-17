@@ -2123,6 +2123,67 @@ PUBLISHED) · Giá chuẩn 2.500.000₫. Minh họa 4 mức giá tách bạch.
   fix (segment vs list — PH4); Proposal/Invoice redesign; VAT; pricing-psychology rounding. Comparison band là
   derived display, không thành policy/permission.
 
+## PRICING / COSTING — PH4: BOOKINGITEM PRICE SNAPSHOT CONSISTENCY (v0.28.0)
+
+Sửa inconsistency đã audit (**owner-approved**): trước đây `Booking.price` = `resolvePrice(segment)` nhưng
+`BookingItem.priceSnapshot` = `Service.standardPrice` (list) → multi-service lệch nguồn. PH4: **mỗi
+BookingItem snapshot giá theo CÙNG bối cảnh segment khách** với Booking. Thuần **additive, 0 DROP**. Migration
+**`Y_booking_item_price_source`** (3 cột nullable; tổng **35 migration**). **371 test / 45 file PASS** (360 +
+`test/booking-item-pricing.test.ts` 11). tsc sạch · lint 0 lỗi · build OK.
+
+### Migration & schema (`Y_booking_item_price_source`)
+- `BookingItem` +`priceSource String?` (PRICE_RULE | STANDARD_FALLBACK | EXPLICIT) +`priceRuleId String?`
+  +`priceTypeSnapshot String?` (STANDARD/BRANCH/MEMBER/VIP/CAMPAIGN/CUSTOM). Nullable → legacy null.
+  `priceSnapshot` giữ nguyên cột (nay = giá bán resolve theo segment, bất biến). **KHÔNG** đụng model khác.
+
+### Bối cảnh giá thống nhất — `src/lib/booking-items.ts`
+- `BookingPricingContext {at, branch, customerGroup}` dùng CHUNG cho Booking.price và mọi BookingItem.
+- **`snapshotBookingItems(items, ctx)`**: mỗi item — nếu input có `priceSnapshot` (client gửi lại giá item
+  CŨ) → **GIỮ nguyên** (bất biến, priceSource=EXPLICIT); ngược lại `resolvePrice("SERVICE", serviceId,
+  {at, branch, types: priceTypesForCustomer(group)})` → PRICE_RULE (+ruleId+priceType); không có rule →
+  `Service.standardPrice` (STANDARD_FALLBACK). **Reuse resolver hiện có** (KHÔNG viết resolver thứ hai).
+- **`bookingItemsTotal(items)`** = Σ priceSnapshot (derived §5) — GET trả `itemsTotal`. **KHÔNG** ghi đè Booking.price.
+
+### Routes
+- `POST /api/bookings`: fetch `customer.group` → `pricingCtx`; `snapshotBookingItems(items, ctx)`;
+  **Booking.price cũng resolve theo cùng segment** (thêm `types`) → Booking.price = item[0] khớp nhau (§11).
+  Booking.price GIỮ semantics = giá dịch vụ CHÍNH (KHÔNG phải tổng, §4). Audit **`BOOKING_ITEM_PRICE_SNAPSHOTTED`**
+  (per-item priceSnapshot/priceType/priceSource/ruleId — **không log cost**).
+- `PATCH /api/bookings/[id]`: replace-all items dùng ctx segment; item CŨ mang `priceSnapshot` (client gửi
+  lại) → giữ; item MỚI/đổi service → resolve hiện tại. **Đổi customer KHÔNG auto-reprice** item cũ (preserve —
+  option A an toàn §10/§26). Audit `BOOKING_ITEMS_CHANGED` kèm provenance.
+- `GET /api/bookings/[id]`: trả `itemsTotal` (derived). Legacy dual-read (`itemsForRead`) giữ Booking.price,
+  **KHÔNG re-resolve live** (§16/§M).
+
+### Chứng minh (test/booking-item-pricing.test.ts, 11 test → A–W)
+A khách thường → STANDARD rule (resolver, không lấy standardPrice khi có rule) · B VIP → VIP rule · **C+D+F**
+1 Booking 3 dịch vụ VIP: mọi item cùng context VIP (2.1/1.5/0.5M), `itemsTotal`=Σ=4.1M, **Booking.price=item[0]
+2.1M ≠ tổng** · E không rule → STANDARD_FALLBACK=standardPrice · **G+H+K** đổi PriceRule sau → item cũ BẤT
+BIẾN, booking mới lấy giá mới, GET không re-resolve · **I** add item sau (item cũ gửi lại giá → giữ; item mới
+resolve hiện tại) · **J** đổi service item → reprice · **L+M** legacy booking (không item) dual-read dùng
+Booking.price không re-resolve, không ghi DB · **N** PriceRule precedence VIP>STANDARD không đổi · **P**
+RecommendedPrice KHÔNG dùng làm fallback bán (item=standardPrice, không phải recommended) · **T+U** RBAC
+401/403 + audit. **Q/R/S/V/W** (Proposal/Invoice/finance-privacy/PH1–PH3/P1–P4) không regression qua full suite.
+
+### UI — `/bookings` (không sửa sidebar/nav)
+Chi tiết lịch (multi-service): mỗi item hiện **tên + badge loại giá (VIP/MEMBER…) + giá snapshot** + dòng
+**Tổng dịch vụ** (= Σ item). Booking.price vẫn là giá dịch vụ chính (legacy). Không hiển thị cost/margin.
+
+### Demo (seed-demo.ts) — BK-100040 (khách VIP)
+PriceRule VIP: DMK 2.100.000₫, Laser Pico 1.500.000₫. Khách `KH-100010` (VIP) → booking 2 dịch vụ: item DMK
+2.1M + Laser 1.5M = **tổng 3.600.000₫** (item theo giá VIP); `Booking.price` = DMK 2.1M (dịch vụ chính).
+
+### Coexistence & OUT OF SCOPE (đúng ranh giới PH4)
+- **KHÔNG đụng** (đã regression): PriceRule model/precedence semantics (reuse resolver), PriceBook, Proposal
+  `acceptedSnapshot`, Invoice freeze, Floor/Recommended, permission matrix/finance privacy (Mục 15), Booking
+  resources/staff, sidebar/nav, ProtocolLoop. RecommendedPrice KHÔNG làm fallback bán.
+- **Consequence được ghi rõ**: `Booking.price` nay resolve theo segment (thêm `types`) để nhất quán với item —
+  chỉ đổi hành vi khi trước đây một rule segment bị áp sai cho khách không đủ điều kiện (correctness fix trong
+  phạm vi thống nhất được duyệt). Semantics "Booking.price = giá dịch vụ chính, không phải tổng" GIỮ NGUYÊN.
+- **Customer-change**: quyết định **preserve** (không auto-reprice item cũ); "reprice toàn bộ khi đổi khách/
+  membership" là feature riêng — OUT OF SCOPE. **Chưa làm**: Package/Protocol pricing, Recommended→PriceRule,
+  reprice action toàn booking, VAT.
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript

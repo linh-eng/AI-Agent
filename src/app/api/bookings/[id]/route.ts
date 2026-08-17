@@ -7,7 +7,7 @@ import { PERMISSIONS } from "@/lib/rbac";
 import { bookingUpdateSchema } from "@/lib/clinic-validation";
 import { detectBookingConflicts, suggestAlternativeSlots } from "@/lib/booking";
 import { auditLog } from "@/lib/clinic";
-import { bookingItemInclude, snapshotBookingItems, totalItemsDuration, missingServiceIds, itemsForRead } from "@/lib/booking-items";
+import { bookingItemInclude, snapshotBookingItems, totalItemsDuration, missingServiceIds, itemsForRead, bookingItemsTotal } from "@/lib/booking-items";
 
 export const GET = handle(async (_req, { params }) => {
   await requirePermission(PERMISSIONS.BOOKING_READ);
@@ -35,7 +35,9 @@ export const GET = handle(async (_req, { params }) => {
   // Dual-read: booking cũ chưa có item → tổng hợp 1 item ảo từ serviceId (không ghi DB).
   const items = itemsForRead(booking);
   const totalDuration = (booking as any).items?.length ? totalItemsDuration((booking as any).items) : (booking.durationMinutes ?? totalItemsDuration(items));
-  return ok({ ...booking, plan, stage, items, totalDuration });
+  // PH4 — tổng giá dịch vụ (derived) = Σ item.priceSnapshot; KHÔNG ghi đè Booking.price.
+  const itemsTotal = bookingItemsTotal(items);
+  return ok({ ...booking, plan, stage, items, totalDuration, itemsTotal });
 });
 
 export const PATCH = handle(async (req, { params }) => {
@@ -56,7 +58,11 @@ export const PATCH = handle(async (req, { params }) => {
   if (items !== undefined) {
     const missing = await missingServiceIds(items.map((i) => i.serviceId));
     if (missing.length) return fail(422, `Dịch vụ không tồn tại: ${missing.join(", ")}`);
-    itemsSnap = await snapshotBookingItems(items);
+    // PH4 — bối cảnh giá theo segment khách (item CŨ mang priceSnapshot → GIỮ nguyên;
+    // item MỚI không có giá → resolve theo segment hiện tại). Không auto-reprice khách đổi.
+    const custId = (rest as any).customerId ?? current.customerId;
+    const cust = custId ? await prisma.customer.findUnique({ where: { id: custId }, select: { group: true } }) : null;
+    itemsSnap = await snapshotBookingItems(items, { at: (rest.scheduledAt ?? current.scheduledAt) as any, branch: (rest as any).branch ?? (current as any).branch ?? null, customerGroup: cust?.group ?? null });
     // Dịch vụ chính = item đầu; tổng thời lượng = Σ item (trừ khi có durationMinutes thủ công).
     if (items.length > 0) {
       data.serviceId = rest.serviceId ?? items[0].serviceId;
@@ -103,7 +109,7 @@ export const PATCH = handle(async (req, { params }) => {
       action: "BOOKING_ITEMS_CHANGED",
       entityType: "Booking",
       entityId: params.id,
-      changes: { after: (items ?? []).map((it, i) => ({ sortOrder: i, serviceId: it.serviceId })), count: items?.length ?? 0 },
+      changes: { after: (itemsSnap ?? []).map((it, i) => ({ sortOrder: i, serviceId: (it.service as any)?.connect?.id, priceSnapshot: it.priceSnapshot, priceType: it.priceTypeSnapshot, priceSource: it.priceSource })), count: items?.length ?? 0 },
     });
   }
   return ok(booking);

@@ -5,6 +5,7 @@
 // =============================================================================
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { resolvePrice, priceTypesForCustomer } from "@/lib/pricing";
 
 export const bookingItemInclude = {
   items: { orderBy: { sortOrder: "asc" }, include: { service: { select: { id: true, code: true, name: true, durationMinutes: true, standardPrice: true } } } },
@@ -19,28 +20,72 @@ export type BookingItemInput = {
 };
 
 /**
- * Chuẩn hóa danh sách item: snapshot thời lượng (từ input ?? Service.durationMinutes) và
- * giá (từ input ?? Service.standardPrice) TẠI THỜI ĐIỂM tạo — đổi Service về sau KHÔNG đổi.
- * Trả về mảng đã gán sortOrder theo thứ tự truyền vào.
+ * Bối cảnh giá THỐNG NHẤT của một Booking (PH4): dùng CHUNG cho Booking.price và mọi
+ * BookingItem — đảm bảo cùng khách/segment/thời điểm/chi nhánh → cùng kết quả giá.
+ */
+export interface BookingPricingContext {
+  at?: Date | null;
+  branch?: string | null;
+  customerGroup?: string | null; // Customer.group → suy ra loại giá được hưởng
+}
+
+/**
+ * Chuẩn hóa danh sách item + SNAPSHOT giá bán TẠI THỜI ĐIỂM tạo (PH4):
+ *  - Nếu input có `priceSnapshot` (client gửi lại giá item CŨ) → GIỮ NGUYÊN (bất biến).
+ *  - Ngược lại: `resolvePrice(SERVICE, serviceId, {at, branch, types})` theo cùng bối cảnh
+ *    khách/segment với Booking; fallback Service.standardPrice khi không có PriceRule.
+ *  - Ghi provenance: priceSource / priceRuleId / priceTypeSnapshot.
+ * Đổi Service/PriceRule về sau KHÔNG đổi snapshot. `ctx` không truyền → fallback standard (tương thích cũ).
  */
 export async function snapshotBookingItems(
   items: BookingItemInput[],
+  ctx: BookingPricingContext = {},
   db: Pick<PrismaClient, "service"> = prisma,
 ): Promise<Prisma.BookingItemCreateWithoutBookingInput[]> {
   const ids = Array.from(new Set(items.map((i) => i.serviceId)));
   const svcs = ids.length ? await db.service.findMany({ where: { id: { in: ids } }, select: { id: true, durationMinutes: true, standardPrice: true } }) : [];
   const byId = new Map(svcs.map((s) => [s.id, s]));
-  return items.map((it, idx) => {
+  const at = ctx.at ?? undefined;
+  const branch = ctx.branch ?? undefined;
+  const types = priceTypesForCustomer(ctx.customerGroup);
+
+  const out: Prisma.BookingItemCreateWithoutBookingInput[] = [];
+  for (let idx = 0; idx < items.length; idx++) {
+    const it = items[idx];
     const svc = byId.get(it.serviceId);
-    return {
+    let priceSnapshot: number | null;
+    let priceSource: string | null;
+    let priceRuleId: string | null = null;
+    let priceTypeSnapshot: string | null = null;
+
+    if (it.priceSnapshot != null) {
+      // Item CŨ (client gửi lại giá đã snapshot) — giữ bất biến.
+      priceSnapshot = Number(it.priceSnapshot);
+      priceSource = "EXPLICIT";
+    } else {
+      const resolved = await resolvePrice("SERVICE", it.serviceId, { at, branch, types });
+      if (resolved) {
+        priceSnapshot = resolved.price; priceSource = "PRICE_RULE"; priceRuleId = resolved.ruleId; priceTypeSnapshot = resolved.priceType;
+      } else {
+        priceSnapshot = svc?.standardPrice != null ? Number(svc.standardPrice) : null;
+        priceSource = "STANDARD_FALLBACK"; priceTypeSnapshot = "STANDARD";
+      }
+    }
+    out.push({
       sortOrder: idx,
       service: { connect: { id: it.serviceId } },
       durationSnapshot: it.durationSnapshot ?? svc?.durationMinutes ?? null,
-      priceSnapshot: it.priceSnapshot ?? (svc?.standardPrice != null ? Number(svc.standardPrice) : null),
+      priceSnapshot, priceSource, priceRuleId, priceTypeSnapshot,
       plannedSessionId: it.plannedSessionId ?? null,
       note: it.note ?? null,
-    };
-  });
+    });
+  }
+  return out;
+}
+
+/** Tổng giá dịch vụ (derived) = Σ BookingItem.priceSnapshot (PH4 §5). KHÔNG ghi đè Booking.price. */
+export function bookingItemsTotal(items: { priceSnapshot?: number | null | { toString(): string } }[] | undefined): number {
+  return (items ?? []).reduce((s, i) => s + (i.priceSnapshot != null ? Number(i.priceSnapshot) : 0), 0);
 }
 
 /** Tổng thời lượng tuần tự = Σ durationSnapshot (bỏ qua null). */

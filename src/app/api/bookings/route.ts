@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { bookingCreateSchema } from "@/lib/clinic-validation";
 import { sequentialCode, auditLog } from "@/lib/clinic";
-import { resolvePrice } from "@/lib/pricing";
+import { resolvePrice, priceTypesForCustomer } from "@/lib/pricing";
 import { detectBookingConflicts, suggestAlternativeSlots, logBookingActivity } from "@/lib/booking";
 import { checkServicePriceFloor } from "@/lib/price-floor";
 import { createDeposit } from "@/lib/deposit";
@@ -62,12 +62,17 @@ export const POST = handle(async (req) => {
   );
   const code = parsed.code ?? sequentialCode("BK", await prisma.booking.count());
 
+  // PH4 — BỐI CẢNH GIÁ THỐNG NHẤT (khách/segment/thời điểm/chi nhánh). Dùng CHUNG cho
+  // Booking.price và mọi BookingItem để giá nhất quán theo phân khúc khách.
+  const customer = parsed.customerId ? await prisma.customer.findUnique({ where: { id: parsed.customerId }, select: { group: true } }) : null;
+  const pricingCtx = { at: parsed.scheduledAt, branch: parsed.branch ?? null, customerGroup: customer?.group ?? null };
+
   // Redesign P3 — nhiều dịch vụ. Snapshot thời lượng/giá; dịch vụ CHÍNH = item đầu (tương thích ngược).
   let itemsSnap: Awaited<ReturnType<typeof snapshotBookingItems>> = [];
   if (items && items.length > 0) {
     const missing = await missingServiceIds(items.map((i) => i.serviceId));
     if (missing.length) return fail(422, `Dịch vụ không tồn tại: ${missing.join(", ")}`);
-    itemsSnap = await snapshotBookingItems(items);
+    itemsSnap = await snapshotBookingItems(items, pricingCtx); // PH4 — resolve theo segment khách
   }
   // Dịch vụ chính giữ ở Booking.serviceId để conflict/giá/tương thích cũ hoạt động nguyên vẹn.
   const primaryServiceId = parsed.serviceId ?? (items && items.length > 0 ? items[0].serviceId : undefined) ?? null;
@@ -132,10 +137,11 @@ export const POST = handle(async (req) => {
   }
 
   // Chốt giá tại thời điểm booking (snapshot). Ưu tiên bảng giá có hiệu lực.
-  // (Giữ nguyên semantics: Booking.price = giá dịch vụ CHÍNH; per-item giá ở BookingItem.priceSnapshot.)
+  // Semantics GIỮ NGUYÊN: Booking.price = giá dịch vụ CHÍNH (KHÔNG phải tổng). PH4: resolve
+  // theo CÙNG bối cảnh segment với item → Booking.price và item[0] khớp nhau (không lệch nguồn).
   let price = parsed.price ?? undefined;
   if (price === undefined && primaryServiceId) {
-    const resolved = await resolvePrice("SERVICE", primaryServiceId, { at: parsed.scheduledAt, branch: parsed.branch ?? undefined });
+    const resolved = await resolvePrice("SERVICE", primaryServiceId, { at: parsed.scheduledAt, branch: parsed.branch ?? undefined, types: priceTypesForCustomer(pricingCtx.customerGroup) });
     if (resolved) price = resolved.price;
     else {
       const svc = await prisma.service.findUnique({ where: { id: primaryServiceId }, select: { standardPrice: true } });
@@ -212,6 +218,13 @@ export const POST = handle(async (req) => {
     await logBookingActivity(booking.customerId, `Đặt đè lịch trùng ${booking.code} (lý do: ${overrideReason!.trim()}; đụng: ${summarizeConflicts(conflicts).join(", ")})`, session.name);
   }
   await auditLog({ userId: session.userId, action: "CREATE", entityType: "Booking", entityId: booking.id, changes: { code, scheduledAt: booking.scheduledAt, items: itemsSnap.map((it, i) => ({ sortOrder: i, serviceId: (it.service as any)?.connect?.id, durationSnapshot: it.durationSnapshot })) } });
+  // PH4 — audit snapshot giá từng item (nguồn/loại giá/priceRule) — không log cost.
+  if (itemsSnap.length > 0) {
+    await auditLog({
+      userId: session.userId, action: "BOOKING_ITEM_PRICE_SNAPSHOTTED", entityType: "Booking", entityId: booking.id,
+      changes: { customerGroup: pricingCtx.customerGroup, items: itemsSnap.map((it, i) => ({ sortOrder: i, serviceId: (it.service as any)?.connect?.id, priceSnapshot: it.priceSnapshot, priceType: it.priceTypeSnapshot, priceSource: it.priceSource, priceRuleId: it.priceRuleId })) },
+    });
+  }
 
   return created(booking);
 });

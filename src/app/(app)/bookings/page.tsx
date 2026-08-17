@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
-import { formatNumber, formatDate, formatDateTime } from "@/lib/utils";
+import { formatNumber, formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
 import { VN_TZ, formatVnTime, parseVnLocal } from "@/lib/timezone";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
@@ -816,9 +816,13 @@ function BookingDetailModal({ id, onClose, canWrite, canOverride, employees, res
                 <div className="text-xs text-muted-foreground">Dịch vụ ({b.items.length}) · tổng {b.totalDuration ?? dur}′</div>
                 <ol className="mt-0.5 space-y-0.5">
                   {b.items.map((it: any, i: number) => (
-                    <li key={it.id} className="text-sm">{i + 1}. {it.service?.name ?? it.serviceId}{it.durationSnapshot ? ` — ${it.durationSnapshot}′` : ""}</li>
+                    <li key={it.id} className="flex justify-between gap-2 text-sm">
+                      <span>{i + 1}. {it.service?.name ?? it.serviceId}{it.durationSnapshot ? ` — ${it.durationSnapshot}′` : ""}{it.priceTypeSnapshot && it.priceTypeSnapshot !== "STANDARD" ? <span className="ml-1 rounded bg-primary/10 px-1 text-[10px] text-primary">{it.priceTypeSnapshot}</span> : null}</span>
+                      {it.priceSnapshot != null && <span className="text-muted-foreground">{formatCurrency(Number(it.priceSnapshot))}</span>}
+                    </li>
                   ))}
                 </ol>
+                {b.itemsTotal != null && <div className="mt-1 flex justify-between border-t pt-1 text-sm font-medium"><span>Tổng dịch vụ</span><span>{formatCurrency(Number(b.itemsTotal))}</span></div>}
               </div>
             ) : (
               <Field label="Dịch vụ" value={b.items?.[0]?.service?.name ?? b.service?.name ?? "—"} />

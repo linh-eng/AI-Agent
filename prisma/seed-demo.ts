@@ -971,6 +971,24 @@ async function main() {
     console.log(`   Giá đề xuất DMK: biên mục tiêu 40% → ${Number(recPub.calculatedRecommendedPrice).toLocaleString("vi-VN")}₫ (PUBLISHED; giá chuẩn 2.500.000₫).`);
   }
 
+  // --- Pricing PH4 — BookingItem snapshot theo segment khách (VIP) ---
+  const svcDmkP4 = await prisma.service.findUnique({ where: { code: "DV-DMK-ENZ" }, select: { id: true, standardPrice: true } });
+  const svcPicoP4 = await prisma.service.findUnique({ where: { code: "DV-PICO-01" }, select: { id: true, standardPrice: true } });
+  if (svcDmkP4 && svcPicoP4 && !(await prisma.booking.findUnique({ where: { code: "BK-100040" } }))) {
+    const { snapshotBookingItems } = await import("../src/lib/booking-items");
+    // Bảng giá VIP (thấp hơn giá chuẩn) cho 2 dịch vụ.
+    for (const [sid, vip] of [[svcDmkP4.id, 2_100_000], [svcPicoP4.id, 1_500_000]] as const) {
+      const has = await prisma.priceRule.findFirst({ where: { targetType: "SERVICE", targetId: sid, priceType: "VIP" } });
+      if (!has) await prisma.priceRule.create({ data: { targetType: "SERVICE", targetId: sid, priceType: "VIP", price: vip, isActive: true, createdBy: "Trần Quản Lý" } });
+    }
+    // Khách VIP + booking 2 dịch vụ → item snapshot theo giá VIP.
+    const kVip = await prisma.customer.upsert({ where: { code: "KH-100010" }, update: { group: "VIP" }, create: { code: "KH-100010", fullName: "Ngô Khách VIP", group: "VIP", phone: "0977000010" } });
+    const at = new Date("2026-08-20T02:00:00.000Z");
+    const itemsSnap = await snapshotBookingItems([{ serviceId: svcDmkP4.id }, { serviceId: svcPicoP4.id }], { at, customerGroup: "VIP" });
+    await prisma.booking.create({ data: { code: "BK-100040", customerId: kVip.id, serviceId: svcDmkP4.id, scheduledAt: at, durationMinutes: 113, price: Number(itemsSnap[0].priceSnapshot ?? 0), status: "CONFIRMED", createdBy: "Trần Quản Lý", items: { create: itemsSnap } } });
+    console.log("   Giá booking PH4: BK-100040 (KH VIP) DMK 2.100.000₫ + Laser Pico 1.500.000₫ = tổng 3.600.000₫ (item theo giá VIP; Booking.price=DMK).");
+  }
+
   console.log("   Vật tư demo: JetPeel 100ml (còn 82ml), Vật tư khách hàng 10đv (còn 5).");
   console.log("✅ Seed DEMO hoàn tất: 7 khách (KH-100001..007), brand Klapp, CN RF/HIFU,");
   console.log("   protocol DEMO có version, kho vật tư spa, 2 chiến dịch, báo giá 3 phương án.");

@@ -1336,16 +1336,20 @@ model Booking {
 /// Tài nguyên/nhân sự vẫn ở cấp Booking (1 lần đến dùng chung phòng/KTV) — KHÔNG xuống item.
 /// Snapshot thời lượng/giá tại thời điểm thêm — đổi Service về sau KHÔNG đổi Booking cũ.
 model BookingItem {
-  id               String   @id @default(cuid())
-  bookingId        String
-  serviceId        String
-  sortOrder        Int      @default(0)
-  durationSnapshot Int? // Thời lượng snapshot (phút) tại thời điểm thêm
-  priceSnapshot    Decimal? @db.Decimal(18, 2) // Giá snapshot (không mở Pricing redesign)
-  plannedSessionId String? // Soft ref buổi dự kiến của phác đồ (không rebuild Plan)
-  note             String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                String   @id @default(cuid())
+  bookingId         String
+  serviceId         String
+  sortOrder         Int      @default(0)
+  durationSnapshot  Int? // Thời lượng snapshot (phút) tại thời điểm thêm
+  priceSnapshot     Decimal? @db.Decimal(18, 2) // Giá bán snapshot (PH4: resolvePrice theo segment khách; bất biến)
+  // --- Pricing PH4: provenance giá (additive, nullable — legacy null) ---
+  priceSource       String? // PRICE_RULE | STANDARD_FALLBACK | EXPLICIT (nguồn giá snapshot)
+  priceRuleId       String? // PriceRule đã áp (nếu PRICE_RULE)
+  priceTypeSnapshot String? // STANDARD | BRANCH | MEMBER | VIP | CAMPAIGN | CUSTOM (loại giá đã áp)
+  plannedSessionId  String? // Soft ref buổi dự kiến của phác đồ (không rebuild Plan)
+  note              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   booking    Booking                @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   service    Service                @relation(fields: [serviceId], references: [id], onDelete: Restrict)
