@@ -11,6 +11,7 @@ import { detectBookingConflicts, suggestAlternativeSlots, logBookingActivity } f
 import { checkServicePriceFloor } from "@/lib/price-floor";
 import { createDeposit } from "@/lib/deposit";
 import { employeeAvailability } from "@/lib/hr";
+import { snapshotBookingItems, totalItemsDuration, missingServiceIds } from "@/lib/booking-items";
 
 export const GET = handle(async (req) => {
   await requirePermission(PERMISSIONS.BOOKING_READ);
@@ -40,6 +41,8 @@ export const GET = handle(async (req) => {
     include: {
       customer: { select: { code: true, fullName: true, phone: true } },
       service: { select: { name: true } },
+      // Redesign P3 — kèm hạng mục để lịch hiển thị "dịch vụ đầu + N" (vẫn 1 card/booking).
+      items: { orderBy: { sortOrder: "asc" }, select: { id: true, serviceId: true, sortOrder: true, durationSnapshot: true, service: { select: { name: true } } } },
     },
     orderBy: { scheduledAt: "desc" },
     take: 500,
@@ -54,15 +57,29 @@ function summarizeConflicts(conflicts: { label: string; value: string; bookingCo
 
 export const POST = handle(async (req) => {
   const session = await requirePermission(PERMISSIONS.BOOKING_WRITE);
-  const { allowConflict, allowBelowFloor, overrideReason, sessionId, ...parsed } = bookingCreateSchema.parse(
+  const { allowConflict, allowBelowFloor, overrideReason, sessionId, items, ...parsed } = bookingCreateSchema.parse(
     await req.json(),
   );
   const code = parsed.code ?? sequentialCode("BK", await prisma.booking.count());
 
-  // Tự lấy thời lượng chuẩn từ dịch vụ nếu chưa nhập (mục 5).
+  // Redesign P3 — nhiều dịch vụ. Snapshot thời lượng/giá; dịch vụ CHÍNH = item đầu (tương thích ngược).
+  let itemsSnap: Awaited<ReturnType<typeof snapshotBookingItems>> = [];
+  if (items && items.length > 0) {
+    const missing = await missingServiceIds(items.map((i) => i.serviceId));
+    if (missing.length) return fail(422, `Dịch vụ không tồn tại: ${missing.join(", ")}`);
+    itemsSnap = await snapshotBookingItems(items);
+  }
+  // Dịch vụ chính giữ ở Booking.serviceId để conflict/giá/tương thích cũ hoạt động nguyên vẹn.
+  const primaryServiceId = parsed.serviceId ?? (items && items.length > 0 ? items[0].serviceId : undefined) ?? null;
+
+  // Tự lấy thời lượng chuẩn (mục 5). Nhiều dịch vụ tuần tự → tổng = Σ item.durationSnapshot,
+  // trừ khi người dùng nhập durationMinutes thủ công (giữ compatibility override).
   let durationMinutes = parsed.durationMinutes ?? undefined;
-  if ((durationMinutes == null || durationMinutes <= 0) && parsed.serviceId) {
-    const svc = await prisma.service.findUnique({ where: { id: parsed.serviceId }, select: { durationMinutes: true } });
+  if ((durationMinutes == null || durationMinutes <= 0) && itemsSnap.length > 0) {
+    durationMinutes = totalItemsDuration(itemsSnap);
+  }
+  if ((durationMinutes == null || durationMinutes <= 0) && primaryServiceId) {
+    const svc = await prisma.service.findUnique({ where: { id: primaryServiceId }, select: { durationMinutes: true } });
     if (svc?.durationMinutes) durationMinutes = svc.durationMinutes;
   }
 
@@ -115,19 +132,20 @@ export const POST = handle(async (req) => {
   }
 
   // Chốt giá tại thời điểm booking (snapshot). Ưu tiên bảng giá có hiệu lực.
+  // (Giữ nguyên semantics: Booking.price = giá dịch vụ CHÍNH; per-item giá ở BookingItem.priceSnapshot.)
   let price = parsed.price ?? undefined;
-  if (price === undefined && parsed.serviceId) {
-    const resolved = await resolvePrice("SERVICE", parsed.serviceId, { at: parsed.scheduledAt, branch: parsed.branch ?? undefined });
+  if (price === undefined && primaryServiceId) {
+    const resolved = await resolvePrice("SERVICE", primaryServiceId, { at: parsed.scheduledAt, branch: parsed.branch ?? undefined });
     if (resolved) price = resolved.price;
     else {
-      const svc = await prisma.service.findUnique({ where: { id: parsed.serviceId }, select: { standardPrice: true } });
+      const svc = await prisma.service.findUnique({ where: { id: primaryServiceId }, select: { standardPrice: true } });
       if (svc) price = Number(svc.standardPrice);
     }
   }
 
   // Giá sàn (mục 26): bán dưới sàn cần quyền override + xác nhận riêng.
-  if (parsed.serviceId && price != null) {
-    const check = await checkServicePriceFloor(parsed.serviceId, Number(price));
+  if (primaryServiceId && price != null) {
+    const check = await checkServicePriceFloor(primaryServiceId, Number(price));
     if (check.below) {
       const canOverride = session.permissions.includes(PERMISSIONS.PRICEFLOOR_OVERRIDE);
       if (!allowBelowFloor || !canOverride) {
@@ -141,11 +159,13 @@ export const POST = handle(async (req) => {
   const booking = await prisma.booking.create({
     data: {
       ...parsed,
+      serviceId: primaryServiceId, // dịch vụ chính = item đầu (tương thích ngược)
       code,
       durationMinutes: durationMinutes ?? null,
       price: price ?? null,
       createdBy: session.name,
       overrideLog: overrideLog as any,
+      items: itemsSnap.length > 0 ? { create: itemsSnap } : undefined, // Redesign P3
     },
     include: { customer: { select: { fullName: true } }, service: { select: { name: true } } },
   });
@@ -191,7 +211,7 @@ export const POST = handle(async (req) => {
     await auditLog({ userId: session.userId, action: "BOOKING_OVERRIDE", entityType: "Booking", entityId: booking.id, changes: { reason: overrideReason, conflicts: summarizeConflicts(conflicts) } });
     await logBookingActivity(booking.customerId, `Đặt đè lịch trùng ${booking.code} (lý do: ${overrideReason!.trim()}; đụng: ${summarizeConflicts(conflicts).join(", ")})`, session.name);
   }
-  await auditLog({ userId: session.userId, action: "CREATE", entityType: "Booking", entityId: booking.id, changes: { code, scheduledAt: booking.scheduledAt } });
+  await auditLog({ userId: session.userId, action: "CREATE", entityType: "Booking", entityId: booking.id, changes: { code, scheduledAt: booking.scheduledAt, items: itemsSnap.map((it, i) => ({ sortOrder: i, serviceId: (it.service as any)?.connect?.id, durationSnapshot: it.durationSnapshot })) } });
 
   return created(booking);
 });

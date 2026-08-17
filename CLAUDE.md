@@ -1742,6 +1742,66 @@ validation serviceId sai→422.
   — khi chọn protocol SERVICES (nhiều dịch vụ) hệ thống CHƯA tự tách thành nhiều buổi (mới phân tích, chưa đổi
   rule — thuộc phase Plan). `sopSnapshot`/`composeTotalDuration` đã sẵn cho các phase đó.
 
+## BUSINESS REDESIGN — Phase 3 · Booking NHIỀU dịch vụ (BookingItem) (v0.23.0)
+
+1 Booking (1 lần khách đến) chứa **NHIỀU dịch vụ tuần tự** (BookingItem), thay vì phải tạo nhiều lịch
+riêng. Thuần **additive, 0 DROP**. Migration **`T_booking_items`** (0 phá hủy, 5 additive; tổng **30
+migration**). **303 test pass** (baseline 296 + `test/booking-multiservice.test.ts` 7). tsc sạch · build OK.
+
+### Audit trước khi code (kết luận)
+`Booking` (bookings): `serviceId` **đã nullable**; tài nguyên/nhân sự (technician/master/assistants/room/
+bed/machine) + giá/cọc ở **cấp Booking**; conflict engine `detectBookingConflicts` theo tài nguyên
+Booking-level; 1-1 với `TreatmentSession`; soft ref planId/stageId/sessionNumber. → **Multi-service tuần
+tự trong 1 lần đến dùng CHUNG tài nguyên** ⇒ KHÔNG cần đưa resource/staff xuống item ⇒ **KHÔNG CONFLICT**.
+
+### Migration & schema (`T_booking_items`)
+- `BookingItem` (`booking_items`): `bookingId`, `serviceId`, `sortOrder`, `durationSnapshot?`,
+  `priceSnapshot?`, `plannedSessionId?` (soft), `note?`. FK booking **Cascade**, service **Restrict**.
+- `Booking` +quan hệ `items`; **`Booking.serviceId` GIỮ NGUYÊN** = dịch vụ CHÍNH = item[0] (tương thích ngược).
+
+### Backend — `src/lib/booking-items.ts`
+- `snapshotBookingItems` (snapshot thời lượng/giá từ Service **tại thời điểm thêm** — đổi Service về sau
+  KHÔNG đổi booking cũ) · `totalItemsDuration` (Σ, tuần tự) · `missingServiceIds` (→422) · `itemsForRead`
+  (**dual-read**: booking cũ chưa có item → tổng hợp 1 item "ảo" từ serviceId, không ghi DB) ·
+  `backfillBookingItems` (**idempotent**: legacy booking → 1 item, chạy lại không trùng).
+- **`POST /api/bookings`**: nhận `items[]` → xác thực (422) + snapshot; `Booking.serviceId` = item đầu;
+  `durationMinutes` = Σ item (trừ khi nhập tay). Conflict/giá/giá sàn/cọc vẫn theo **dịch vụ chính +
+  tài nguyên Booking-level** (không đổi engine). Audit CREATE kèm items.
+- **`PATCH /api/bookings/[id]`**: gửi `items` → **thay toàn bộ** (add/remove/reorder) trong transaction +
+  tính lại serviceId/duration + audit **`BOOKING_ITEMS_CHANGED`**. Giữ khóa COMPLETED.
+- **`GET /api/bookings/[id]`**: trả `items` (+dual-read) + `totalDuration`. **List** kèm `items` để lịch
+  hiển thị "dịch vụ đầu + N" (vẫn **1 card/booking**).
+
+### UI — `/bookings`
+Form: **Dịch vụ chính** + khối **"Dịch vụ bổ sung trong lần đến này"** (thêm/xóa/**↑↓ đổi thứ tự** dịch vụ
++ tổng thời lượng ~N′ + ghi chú "tài nguyên/nhân sự dùng chung"). Lịch (List/chip): nhãn **"Dịch vụ đầu
++N dịch vụ"** (`bookingServiceLabel`). Chi tiết lịch: liệt kê **Dịch vụ (n) · tổng N′** + từng hạng mục
+kèm thời lượng. Booking 1 dịch vụ / booking cũ hiển thị như trước (dual-read).
+
+### Nguyên tắc P3 (đúng ranh giới)
+- **Sequential only:** tổng thời lượng = Σ item (chưa hỗ trợ song song). Tài nguyên/nhân sự ở cấp Booking
+  (1 lần đến dùng chung) — KHÔNG xuống item.
+- **Snapshot bất biến:** durationSnapshot/priceSnapshot chốt lúc thêm; đổi Service sau KHÔNG đổi booking.
+- **Giá/cọc/billing giữ nguyên:** Booking.price = giá dịch vụ chính; per-item chỉ snapshot (KHÔNG mở
+  Pricing/Invoice/Deposit redesign). **Booking.serviceId KHÔNG bị DROP.**
+
+### Demo (seed-demo.ts) — `BK-100030` (3 dịch vụ)
+1 Booking · DMK Enzyme (83′) + Laser Pico (30′) + Recovery (20′, ghi chú tùy chọn) = **tổng 133′**, KTV
+Phạm Chuyên Viên · Phòng 1 (dùng chung). Guard idempotent `if (svcDmk && !BK-100030)`.
+
+### Chứng minh (test/booking-multiservice.test.ts, 7 test HTTP thật)
+A legacy 1 dịch vụ (dual-read → 1 item ảo, totalDuration đúng) · B 1 Booking→3 item đúng sortOrder + DB +
+serviceId=item đầu + duration=Σ + priceSnapshot · D+E reorder + add/remove (thay toàn bộ) · G đổi
+Service.duration sau → durationSnapshot KHÔNG đổi · H RBAC (thiếu booking.write→403, ẩn danh→401) · I
+list 1 booking = 1 card kèm items · J backfill idempotent (2 lần không trùng) + validation serviceId→422.
+
+### Coexistence & CHƯA làm (đúng ranh giới)
+- **KHÔNG đụng:** conflict engine, resource/staff model, RBAC/finance (Mục 15), Pricing/Invoice/Deposit,
+  TreatmentPlan, Session, sidebar, nav. **KHÔNG auto-expand Protocol SERVICES → BookingItems** (P3 chỉ
+  dịch vụ lẻ). Không CONFLICT với baseline Mục 2–16 + P1 + P2.
+- **Chưa làm (P4):** Actual Session chọn phương án SOP + snapshot + trừ tồn theo phương án; song song
+  (parallel) nhiều dịch vụ; tách buổi từ protocol nhiều dịch vụ (thuộc phase Plan).
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript

@@ -1144,6 +1144,7 @@ model Service {
   materialStandards ServiceMaterialStandard[]
   steps             ServiceStep[]
   protocolServices  ProtocolService[] // Redesign P2 — Service được compose vào các Protocol
+  bookingItems      BookingItem[] // Redesign P3 — Service là 1 hạng mục trong Booking nhiều dịch vụ
 
   @@map("services")
 }
@@ -1313,10 +1314,35 @@ model Booking {
   deposits          Deposit[]
   tasks             Task[]
   marketingCampaign MarketingCampaign? @relation(fields: [campaignId], references: [id])
+  items             BookingItem[] // Redesign P3 — 1 Booking chứa N dịch vụ (BookingItem)
 
   @@index([scheduledAt])
   @@index([customerId])
   @@map("bookings")
+}
+
+/// Redesign P3 — 1 Booking (1 lần khách đến) chứa NHIỀU dịch vụ tuần tự.
+/// Additive: `Booking.serviceId` GIỮ NGUYÊN (= dịch vụ chính = item đầu, tương thích ngược).
+/// Tài nguyên/nhân sự vẫn ở cấp Booking (1 lần đến dùng chung phòng/KTV) — KHÔNG xuống item.
+/// Snapshot thời lượng/giá tại thời điểm thêm — đổi Service về sau KHÔNG đổi Booking cũ.
+model BookingItem {
+  id               String   @id @default(cuid())
+  bookingId        String
+  serviceId        String
+  sortOrder        Int      @default(0)
+  durationSnapshot Int? // Thời lượng snapshot (phút) tại thời điểm thêm
+  priceSnapshot    Decimal? @db.Decimal(18, 2) // Giá snapshot (không mở Pricing redesign)
+  plannedSessionId String? // Soft ref buổi dự kiến của phác đồ (không rebuild Plan)
+  note             String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId, sortOrder])
+  @@index([serviceId])
+  @@map("booking_items")
 }
 
 // ----------------------------------------------------------------------------

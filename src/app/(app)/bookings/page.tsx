@@ -25,6 +25,15 @@ interface Booking {
   planId?: string | null; stageId?: string | null; sessionNumber?: number | null;
   customer: { code: string; fullName: string; phone?: string | null };
   service?: { name: string } | null;
+  items?: { id: string; serviceId: string; sortOrder: number; service?: { name: string } | null }[]; // Redesign P3
+}
+// Redesign P3 — nhãn dịch vụ cho lịch: "Dịch vụ đầu + N" khi nhiều dịch vụ.
+function bookingServiceLabel(b: Booking): string {
+  if (b.items && b.items.length > 1) {
+    const first = b.items[0]?.service?.name ?? b.service?.name ?? "Dịch vụ";
+    return `${first} +${b.items.length - 1} dịch vụ`;
+  }
+  return b.service?.name ?? (b.items?.[0]?.service?.name ?? "—");
 }
 interface Customer { id: string; code: string; fullName: string; phone?: string | null }
 interface Service { id: string; name: string; durationMinutes?: number | null; standardPrice?: number | string }
@@ -347,7 +356,7 @@ function ListView({ rows, onOpen }: { rows: Booking[]; onOpen: (id: string) => v
             <TD className="font-mono font-medium">{b.code}</TD>
             <TD><div>{formatDate(b.scheduledAt)}</div><div className="text-xs text-muted-foreground">{timeRange(b)}</div></TD>
             <TD>{b.customer.fullName}<div className="text-xs text-muted-foreground">{b.customer.phone ?? b.customer.code}</div></TD>
-            <TD>{b.service?.name ?? "—"}</TD>
+            <TD>{bookingServiceLabel(b)}</TD>
             <TD className="text-xs">{resourceLine(b) || "—"}</TD>
             <TD className="text-right">{b.price ? formatNumber(Number(b.price)) + " ₫" : "—"}</TD>
             <TD><Badge tone={BOOKING_STATUS_TONE[b.status]}>{BOOKING_STATUS_LABEL[b.status]}</Badge></TD>
@@ -362,7 +371,7 @@ function BookingChip({ b, onOpen }: { b: Booking; onOpen: (id: string) => void }
   return (
     <button onClick={() => onOpen(b.id)} className="w-full rounded-md border-l-2 border-primary bg-primary/5 px-2 py-1 text-left text-xs hover:bg-primary/10">
       <div className="font-medium">{timeRange(b)} · {b.customer.fullName}</div>
-      {b.service?.name && <div className="text-muted-foreground">{b.service.name}</div>}
+      {(b.service?.name || (b.items && b.items.length > 0)) && <div className="text-muted-foreground">{bookingServiceLabel(b)}</div>}
       {b.technician && <div className="text-[11px] text-muted-foreground">KTV: {b.technician}</div>}
       <Badge tone={BOOKING_STATUS_TONE[b.status]} className="mt-0.5">{BOOKING_STATUS_LABEL[b.status]}</Badge>
     </button>
@@ -512,6 +521,7 @@ const EMPTY = { customerId: "", serviceId: "", scheduledAt: "", durationMinutes:
 function BookingFormModal({ open, prefill, onClose, customers, services, employees, resources, canOverride, onSaved }: { open: boolean; prefill?: Record<string, string> | null; onClose: () => void; customers: Customer[]; services: Service[]; employees: Employee[]; resources: Resource[]; canOverride: boolean; onSaved: () => void }) {
   const [form, setForm] = useState({ ...EMPTY });
   const [assistants, setAssistants] = useState<string[]>([]);
+  const [extraItems, setExtraItems] = useState<string[]>([]); // Redesign P3 — dịch vụ bổ sung (item[0] = form.serviceId)
   const [linkSessionId, setLinkSessionId] = useState<string | null>(null);
   const opts = useResourceOptions(employees, resources);
   const [error, setError] = useState<string | null>(null);
@@ -528,7 +538,7 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
   const resetWarn = () => { setConflicts(null); setSuggestions([]); setFloor(null); setStaffIssues(null); setOverrideReason(""); };
   useEffect(() => {
     if (!open) return;
-    setAssistants([]); setError(null); resetWarn(); setPlans([]); setStages([]);
+    setAssistants([]); setExtraItems([]); setError(null); resetWarn(); setPlans([]); setStages([]);
     if (prefill && Object.keys(prefill).length) {
       // Prefill từ màn Phác đồ (mục 11) — điền sẵn khách/dịch vụ/phác đồ/giai đoạn/buổi.
       setForm({ ...EMPTY, customerId: prefill.customerId ?? "", serviceId: prefill.serviceId ?? "", planId: prefill.planId ?? "", stageId: prefill.stageId ?? "", sessionNumber: prefill.sessionNumber ?? "" });
@@ -588,11 +598,24 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
     const body: any = { ...form, ...extra };
     body.assistants = assistants.length ? assistants : undefined;
     if (linkSessionId) body.sessionId = linkSessionId; // gắn ngược buổi dự kiến (mục 11–12)
+    // Redesign P3 — nếu có dịch vụ bổ sung: gửi items = [dịch vụ chính, ...bổ sung]. Server
+    // tự snapshot thời lượng/giá + đặt Booking.serviceId = item đầu (tương thích ngược).
+    const allItems = [form.serviceId, ...extraItems].filter(Boolean);
+    if (extraItems.length > 0 && allItems.length > 0) {
+      body.items = allItems.map((serviceId) => ({ serviceId }));
+    }
     ["serviceId", "durationMinutes", "technician", "master", "room", "bed", "machine", "planId", "stageId", "sessionNumber", "price", "deposit", "note"].forEach((k) => { if (!body[k]) delete body[k]; });
     if (!body.assistants) delete body.assistants;
     ["durationMinutes", "sessionNumber", "price", "deposit"].forEach((k) => { if (body[k]) body[k] = Number(body[k]); });
     return body;
   }
+
+  // Tổng thời lượng dự kiến khi nhiều dịch vụ (tuần tự) = Σ thời lượng từng dịch vụ.
+  const multiTotalDuration = useMemo(() => {
+    if (extraItems.length === 0) return null;
+    const ids = [form.serviceId, ...extraItems].filter(Boolean);
+    return ids.reduce((s, id) => s + (services.find((x) => x.id === id)?.durationMinutes ?? 0), 0);
+  }, [extraItems, form.serviceId, services]);
 
   async function submit(opts: { allowConflict?: boolean; allowBelowFloor?: boolean } = {}) {
     setSaving(true); setError(null);
@@ -625,8 +648,31 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
           </Select>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5"><Label>Dịch vụ</Label><Select value={form.serviceId} onChange={(e) => onService(e.target.value)}><option value="">—</option>{services.map((s) => <option key={s.id} value={s.id}>{s.name}{s.durationMinutes ? ` (${s.durationMinutes}′)` : ""}</option>)}</Select></div>
+          <div className="space-y-1.5"><Label>Dịch vụ chính</Label><Select value={form.serviceId} onChange={(e) => onService(e.target.value)}><option value="">—</option>{services.map((s) => <option key={s.id} value={s.id}>{s.name}{s.durationMinutes ? ` (${s.durationMinutes}′)` : ""}</option>)}</Select></div>
           <div className="space-y-1.5"><Label>Bắt đầu *</Label><Input type="datetime-local" value={form.scheduledAt} onChange={(e) => set({ scheduledAt: e.target.value })} required /></div>
+        </div>
+
+        {/* Redesign P3 — nhiều dịch vụ trong 1 lần đến (1 booking) */}
+        <div className="rounded-md border border-dashed p-3">
+          <div className="mb-2 text-xs font-medium text-muted-foreground">Dịch vụ bổ sung trong lần đến này (1 lịch = nhiều dịch vụ){multiTotalDuration != null ? ` · tổng ~${multiTotalDuration}′` : ""}</div>
+          {extraItems.length > 0 && (
+            <div className="mb-2 space-y-1.5">
+              {extraItems.map((sid, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">{i + 2}</span>
+                  <Select className="flex-1" value={sid} onChange={(e) => setExtraItems(extraItems.map((x, j) => (j === i ? e.target.value : x)))}>
+                    <option value="">— Chọn dịch vụ —</option>
+                    {services.map((s) => <option key={s.id} value={s.id}>{s.name}{s.durationMinutes ? ` (${s.durationMinutes}′)` : ""}</option>)}
+                  </Select>
+                  <Button type="button" size="icon" variant="ghost" disabled={i === 0} onClick={() => { const n = [...extraItems]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; setExtraItems(n); }} title="Lên">↑</Button>
+                  <Button type="button" size="icon" variant="ghost" disabled={i === extraItems.length - 1} onClick={() => { const n = [...extraItems]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; setExtraItems(n); }} title="Xuống">↓</Button>
+                  <Button type="button" size="icon" variant="ghost" onClick={() => setExtraItems(extraItems.filter((_, j) => j !== i))}><X className="h-4 w-4 text-destructive" /></Button>
+                </div>
+              ))}
+            </div>
+          )}
+          <Button type="button" size="sm" variant="outline" onClick={() => setExtraItems([...extraItems, ""])}><Plus className="h-3.5 w-3.5" /> Thêm dịch vụ</Button>
+          {extraItems.length > 0 && <p className="mt-1 text-[11px] text-muted-foreground">Dịch vụ #1 = &quot;Dịch vụ chính&quot; ở trên. Thời lượng = tổng các dịch vụ (tuần tự); tài nguyên/nhân sự dùng chung cho cả lần đến.</p>}
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1.5"><Label>Thời lượng (phút)</Label><Input type="number" placeholder="60" value={form.durationMinutes} onChange={(e) => set({ durationMinutes: e.target.value })} /></div>
@@ -765,7 +811,18 @@ function BookingDetailModal({ id, onClose, canWrite, canOverride, employees, res
             <Field label="Mã khách" value={b.customer?.code} />
           </Section>
           <Section title="Dịch vụ">
-            <Field label="Dịch vụ" value={b.service?.name ?? "—"} />
+            {b.items && b.items.length > 1 ? (
+              <div>
+                <div className="text-xs text-muted-foreground">Dịch vụ ({b.items.length}) · tổng {b.totalDuration ?? dur}′</div>
+                <ol className="mt-0.5 space-y-0.5">
+                  {b.items.map((it: any, i: number) => (
+                    <li key={it.id} className="text-sm">{i + 1}. {it.service?.name ?? it.serviceId}{it.durationSnapshot ? ` — ${it.durationSnapshot}′` : ""}</li>
+                  ))}
+                </ol>
+              </div>
+            ) : (
+              <Field label="Dịch vụ" value={b.items?.[0]?.service?.name ?? b.service?.name ?? "—"} />
+            )}
             <Field label="Phác đồ" value={b.plan ? b.plan.name : "—"} />
             <Field label="Buổi / giai đoạn" value={b.plan ? `${b.stage ? b.stage.name + " · " : ""}${b.sessionNumber ? "Buổi " + b.sessionNumber : ""}` || "—" : "—"} />
           </Section>

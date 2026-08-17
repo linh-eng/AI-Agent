@@ -201,10 +201,21 @@ export const serviceCreateSchema = z.object({
 export const serviceUpdateSchema = serviceCreateSchema.partial().omit({ code: true });
 
 // ----- Booking -----
+// Redesign P3 — hạng mục dịch vụ trong 1 booking (nhiều dịch vụ tuần tự).
+export const bookingItemSchema = z.object({
+  serviceId: z.string().min(1, "Chọn dịch vụ"),
+  durationSnapshot: z.coerce.number().int().positive().optional().nullable(),
+  priceSnapshot: money,
+  plannedSessionId: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export const bookingItemsSchema = z.array(bookingItemSchema).max(20);
+
 export const bookingCreateSchema = z.object({
   code: z.string().min(1).optional(),
   customerId: z.string().min(1, "Chọn khách hàng"),
   serviceId: z.string().optional().nullable(),
+  items: bookingItemsSchema.optional(), // Redesign P3 — nhiều dịch vụ; item[0] = dịch vụ chính
   scheduledAt: dateReq,
   durationMinutes: z.coerce.number().int().positive().optional().nullable(),
   branch: z.string().optional().nullable(),
