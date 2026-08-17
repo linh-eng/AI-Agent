@@ -7,6 +7,7 @@ import { PERMISSIONS } from "@/lib/rbac";
 import { serviceCreateSchema } from "@/lib/clinic-validation";
 import { sequentialCode, canSeeFinance, maskFinance } from "@/lib/clinic";
 import { splitServiceInput, materialCreateRows } from "@/lib/service";
+import { buildStepsCreate } from "@/lib/service-sop";
 import { computeFloor } from "@/lib/price-floor";
 
 export const GET = handle(async (req) => {
@@ -54,12 +55,14 @@ export const POST = handle(async (req) => {
   await requirePermission(PERMISSIONS.SERVICE_WRITE);
   const parsed = serviceCreateSchema.parse(await req.json());
   const { data, materials } = splitServiceInput(parsed);
+  const { steps } = parsed as any;
   const code = data.code ?? sequentialCode("DV", await prisma.service.count());
   const service = await prisma.service.create({
     data: {
       ...data,
       code,
       materialStandards: materials ? { create: materialCreateRows(materials) } : undefined,
+      steps: steps ? { create: buildStepsCreate(steps) } : undefined, // SOP chuẩn hóa (Redesign P1)
     } as any,
   });
   return created(service);

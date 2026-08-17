@@ -109,6 +109,60 @@ async function main() {
     create: { code: "DV-FACIAL-01", name: "Facial làm sạch sâu", categoryId: catFacial.id, durationMinutes: 60, standardPrice: 900_000, expectedCost: 300_000 },
   });
 
+  // === Redesign P1 · SOP chuẩn hóa: DMK Enzyme Treatment (5 bước · sản phẩm/định mức · công nghệ · phương án) ===
+  const brDMK = await prisma.brand.upsert({ where: { code: "BR-DMK" }, update: {}, create: { code: "BR-DMK", name: "DMK", description: "Danné Montague-King — enzyme therapy (Úc/Mỹ)" } });
+  const techLED = await prisma.technology.upsert({
+    where: { code: "CN-LED" }, update: {},
+    create: { code: "CN-LED", name: "Ánh sáng LED sinh học", group: "LED", deviceModel: "Bio-LED", area: "Mặt", durationMinutes: 10, indications: "Kháng viêm, phục hồi", contraindications: "Nhạy sáng" },
+  });
+  const spDmkCleanser = await prisma.spaProduct.upsert({ where: { sku: "SP-DMK-CLEANSER" }, update: {}, create: { sku: "SP-DMK-CLEANSER", name: "DMK Deep Pore Cleanser", brandId: brDMK.id, category: "Làm sạch", productType: "PROFESSIONAL", sellingPrice: 0, cost: 100_000 } });
+  const spDmkEnzyme1 = await prisma.spaProduct.upsert({ where: { sku: "SP-DMK-ENZ1" }, update: {}, create: { sku: "SP-DMK-ENZ1", name: "DMK Enzyme Masque #1", brandId: brDMK.id, category: "Enzyme", productType: "PROFESSIONAL", sellingPrice: 0, cost: 200_000 } });
+  const spDmkEnzyme2 = await prisma.spaProduct.upsert({ where: { sku: "SP-DMK-ENZ2" }, update: {}, create: { sku: "SP-DMK-ENZ2", name: "DMK Enzyme Masque #2", brandId: brDMK.id, category: "Enzyme", productType: "PROFESSIONAL", sellingPrice: 0, cost: 250_000 } });
+  const spDmkMist = await prisma.spaProduct.upsert({ where: { sku: "SP-DMK-MIST" }, update: {}, create: { sku: "SP-DMK-MIST", name: "DMK Herb & Mineral Mist", brandId: brDMK.id, category: "Toner", productType: "PROFESSIONAL", sellingPrice: 0, cost: 60_000 } });
+
+  const svcDMK = await prisma.service.findUnique({ where: { code: "DV-DMK-ENZ" } });
+  if (!svcDMK) {
+    await prisma.service.create({
+      data: {
+        code: "DV-DMK-ENZ", name: "DMK Enzyme Treatment", categoryId: catFacial.id, status: "ACTIVE",
+        durationMinutes: 83, standardPrice: 2_500_000, expectedCost: 700_000, version: 1,
+        technologyIds: [techLED.id], defaultTechnologyId: techLED.id,
+        steps: {
+          create: [
+            {
+              sortOrder: 0, name: "Làm sạch da", durationMinutes: 10, technique: "Massage làm sạch 2 lần", isRequired: true,
+              products: { create: [{ spaProductId: spDmkCleanser.id, name: "DMK Deep Pore Cleanser", quantity: 5, unit: "ml", isRequired: true, sortOrder: 0 }] },
+            },
+            {
+              sortOrder: 1, name: "Detox (LED)", durationMinutes: 15, technique: "Chiếu LED sinh học kháng viêm", isRequired: true,
+              technologies: { create: [{ technologyId: techLED.id, notes: "Bước sóng đỏ 630nm, 10–15 phút" }] },
+            },
+            {
+              sortOrder: 2, name: "Build (xịt khoáng)", durationMinutes: 8, technique: "Xịt khoáng cân bằng ẩm", isRequired: true,
+              products: { create: [{ spaProductId: spDmkMist.id, name: "DMK Herb & Mineral Mist", quantity: 3, unit: "ml", isRequired: true, sortOrder: 0 }] },
+            },
+            {
+              sortOrder: 3, name: "Đắp Enzyme Masque", durationMinutes: 40, technique: "Đắp enzyme, giữ 40 phút (plasmatic effect)", isRequired: true,
+              warnings: "Chống chỉ định: da đang viêm cấp, dị ứng enzyme. Không dùng cho phụ nữ có thai 3 tháng đầu.",
+              conditionText: "Chọn loại enzyme theo tình trạng da",
+              options: {
+                create: [
+                  { sortOrder: 0, name: "Enzyme #1 (da thường/nhạy cảm)", selectMode: "SINGLE_SELECT", isDefault: false, spaProductId: spDmkEnzyme1.id, quantity: 5, unit: "g", durationMinutes: 40 },
+                  { sortOrder: 1, name: "Enzyme #2 (da dày/nhiều dầu)", selectMode: "SINGLE_SELECT", isDefault: true, spaProductId: spDmkEnzyme2.id, quantity: 5, unit: "g", durationMinutes: 40 },
+                  { sortOrder: 2, name: "Không đắp enzyme (da quá nhạy cảm)", selectMode: "OPTIONAL", isDefault: false, conditionText: "Bỏ qua khi da phản ứng" },
+                ],
+              },
+            },
+            {
+              sortOrder: 4, name: "Phục hồi & bảo vệ", durationMinutes: 10, technique: "Thoa serum phục hồi + kem chống nắng", isRequired: true,
+              products: { create: [{ name: "Serum phục hồi + kem chống nắng", quantity: 2, unit: "ml", isRequired: false, sortOrder: 0 }] },
+            },
+          ],
+        },
+      } as any,
+    });
+  }
+
   const spKlappSerum = await prisma.spaProduct.upsert({
     where: { sku: "SP-KLAPP-CSERUM" }, update: {},
     create: { sku: "SP-KLAPP-CSERUM", name: "Klapp Vitamin C Serum", brandId: klapp.id, category: "Serum", productType: "HOME_CARE", sellingPrice: 1_500_000, cost: 520_000, benefits: "Chống oxy hóa, làm sáng" },

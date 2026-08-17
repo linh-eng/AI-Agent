@@ -1123,7 +1123,8 @@ model Service {
   roomMinutes          Int? // Thời gian chiếm dụng phòng/giường (nếu cần)
   standardPrice        Decimal       @default(0) @db.Decimal(18, 2) // Giá chuẩn
   expectedCost         Decimal?      @db.Decimal(18, 2) // Giá vốn dự kiến (nhạy cảm)
-  process              String? // Quy trình thực hiện
+  process              String? // Quy trình thực hiện (mô tả tự do — giữ tương thích; SOP chuẩn hóa ở ServiceStep)
+  version              Int           @default(1) // Phiên bản SOP — tăng khi sửa bước/định mức (mục redesign P1)
   // --- Chuyên môn (gợi ý — không ép buộc; soft ref sang thư viện) ---
   technologyIds        String[]      @default([]) // công nghệ liên quan
   protocolIds          String[]      @default([]) // protocol liên quan
@@ -1141,6 +1142,7 @@ model Service {
   priceFloor        ServicePriceFloor?
   floorVersions     ServicePriceFloorVersion[]
   materialStandards ServiceMaterialStandard[]
+  steps             ServiceStep[]
 
   @@map("services")
 }
@@ -1162,6 +1164,99 @@ model ServiceMaterialStandard {
 
   @@index([serviceId])
   @@map("service_material_standards")
+}
+
+// ============================================================================
+// SOP CHUẨN HÓA (Redesign P1) — Service → ServiceStep → (Product · Technology · Option)
+// Thuần additive: mô tả QUY TRÌNH THỰC HIỆN của một dịch vụ dưới dạng bước
+// chuẩn hóa (thay cho ô text `process`). Đây là ĐỊNH MỨC/SOP — KHÔNG trừ kho;
+// kho chỉ trừ khi Actual Session ghi nhận (giữ nguyên baseline mục 8/P1 kho).
+// ============================================================================
+enum ServiceStepSelectMode {
+  SINGLE_SELECT // chọn đúng 1 phương án (VD: chọn 1 loại Enzyme theo tình trạng da)
+  OPTIONAL // có thể chọn 0..n
+}
+
+model ServiceStep {
+  id              String   @id @default(cuid())
+  serviceId       String
+  sortOrder       Int      @default(0)
+  name            String // Tên bước (VD: Làm sạch, Enzyme, Recovery)
+  description     String? // Mục tiêu/mô tả bước
+  durationMinutes Int? // Thời lượng bước
+  technique       String? // Cách thực hiện (how-to)
+  notes           String?
+  warnings        String? // Cảnh báo/chống chỉ định riêng của bước (mục 8B)
+  isRequired      Boolean  @default(true)
+  conditionText   String? // Điều kiện áp dụng bước (nếu có)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  service      Service                 @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  products     ServiceStepProduct[]
+  technologies ServiceStepTechnology[]
+  options      ServiceStepOption[]
+
+  @@index([serviceId, sortOrder])
+  @@map("service_steps")
+}
+
+/// Vật tư/sản phẩm định mức của một bước — link Catalog (SpaProduct). Quantity > 0.
+model ServiceStepProduct {
+  id            String   @id @default(cuid())
+  serviceStepId String
+  spaProductId  String? // liên kết Catalog (nếu chọn từ danh mục)
+  name          String // nhãn/hiển thị (fallback khi không gắn catalog)
+  quantity      Decimal  @default(1) @db.Decimal(14, 3)
+  unit          String
+  isRequired    Boolean  @default(true)
+  notes         String?
+  sortOrder     Int      @default(0)
+
+  step    ServiceStep @relation(fields: [serviceStepId], references: [id], onDelete: Cascade)
+  product SpaProduct? @relation(fields: [spaProductId], references: [id])
+
+  @@index([serviceStepId])
+  @@map("service_step_products")
+}
+
+/// Công nghệ/thiết bị dùng ở một bước + thông số gợi ý (mục 6). Không hard-code.
+model ServiceStepTechnology {
+  id                  String  @id @default(cuid())
+  serviceStepId       String
+  technologyId        String
+  suggestedParameters Json? // thông số/settings gợi ý
+  notes               String?
+
+  step       ServiceStep @relation(fields: [serviceStepId], references: [id], onDelete: Cascade)
+  technology Technology  @relation(fields: [technologyId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceStepId, technologyId])
+  @@map("service_step_technologies")
+}
+
+/// Lựa chọn/biến thể của một bước (mục 7) — VD bước Enzyme có #1/#2/#3.
+/// Mỗi option có thể override product/quantity/technique/duration/notes/condition.
+model ServiceStepOption {
+  id              String                @id @default(cuid())
+  serviceStepId   String
+  name            String // Tên phương án (VD: Enzyme #1)
+  selectMode      ServiceStepSelectMode @default(SINGLE_SELECT)
+  isDefault       Boolean               @default(false) // phương án mặc định
+  spaProductId    String? // override sản phẩm
+  quantity        Decimal?              @db.Decimal(14, 3) // override định mức
+  unit            String?
+  technique       String? // override cách thực hiện
+  durationMinutes Int? // override thời lượng
+  notes           String?
+  conditionText   String? // "chọn theo tình trạng da"
+  sortOrder       Int                   @default(0)
+
+  step    ServiceStep @relation(fields: [serviceStepId], references: [id], onDelete: Cascade)
+  product SpaProduct? @relation(fields: [spaProductId], references: [id])
+
+  @@index([serviceStepId])
+  @@map("service_step_options")
 }
 
 // ----------------------------------------------------------------------------
@@ -1585,9 +1680,10 @@ model Technology {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  brand     Brand?                    @relation(fields: [brandId], references: [id])
-  protocols BrandProtocolTechnology[]
-  sessions  TreatmentSession[]
+  brand            Brand?                    @relation(fields: [brandId], references: [id])
+  protocols        BrandProtocolTechnology[]
+  sessions         TreatmentSession[]
+  stepTechnologies ServiceStepTechnology[]
 
   @@map("technologies")
 }
@@ -1682,6 +1778,8 @@ model SpaProduct {
   protocols        BrandProtocolProduct[]
   recommendations  ProductRecommendation[]
   sessionMaterials SessionMaterial[]
+  stepProducts     ServiceStepProduct[]
+  stepOptions      ServiceStepOption[]
 
   @@map("spa_products")
 }

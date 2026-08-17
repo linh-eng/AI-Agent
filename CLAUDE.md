@@ -1605,6 +1605,73 @@ tiếng Anh** (không dịch tên model/enum/biến). Áp dụng cho **toàn b�
 - **Thông báo lỗi**: hiển thị tiếng Việt dễ hiểu, **không** lộ raw DB/API error (server trả thông
   báo chung; chi tiết chỉ vào log đã redact).
 
+## BUSINESS REDESIGN — Phase 1 · SOP chuẩn hóa của Dịch vụ (ServiceStep) (v0.21.0)
+
+Chuẩn hóa mô hình **DỊCH VỤ → CÁC BƯỚC (SOP)** theo bản redesign (SERVICE → SERVICE STEPS → … → PROTOCOL
+COMPOSE → BOOKING MULTI-SERVICE → ACTUAL SESSION). **Quyết định người dùng:** (a) **Coexistence** — giữ
+protocol theo-bước cũ hợp lệ, CHỈ **THÊM** khả năng chuẩn hóa SOP ở Dịch vụ; (b) bắt đầu **P1 — Service
+Steps trước**. Thuần **additive, 0 DROP**. Migration **`R_service_steps`** (0 lệnh phá hủy, 17 lệnh additive;
+tổng **28 migration**). **288 test pass** (baseline 281 + `test/service-sop.test.ts` 7). tsc sạch · build OK.
+
+### Migration & schema (`R_service_steps`)
+- `Service` +`version Int @default(1)` (bump khi sửa SOP — bất biến cho buổi đã ghi nhận) + quan hệ `steps`.
+- Enum mới `ServiceStepSelectMode` (SINGLE_SELECT/OPTIONAL).
+- 4 model mới (đều `@@map` snake_case, FK cascade theo Service/Step):
+  - **`ServiceStep`** (`service_steps`): `serviceId`, `sortOrder`, `name`, `description?`, `durationMinutes?`,
+    `technique?`, `notes?`, `warnings?` (chống chỉ định), `isRequired`, `conditionText?` (điều kiện áp dụng).
+  - **`ServiceStepProduct`** (`service_step_products`): sản phẩm/định mức của bước — `spaProductId?` (soft link
+    catalog), `name`, `quantity Decimal(14,3)`, `unit`, `isRequired`, `notes?`, `sortOrder`.
+  - **`ServiceStepTechnology`** (`service_step_technologies`): công nghệ áp dụng — `technologyId`,
+    `suggestedParameters Json?`, `notes?`; `@@unique([serviceStepId, technologyId])`.
+  - **`ServiceStepOption`** (`service_step_options`): phương án/biến thể (chọn 1 khi thực hiện) — `name`,
+    `selectMode`, `isDefault`, `spaProductId?`, `quantity?`, `unit?`, `technique?`, `durationMinutes?`,
+    `notes?`, `conditionText?`, `sortOrder`.
+- Back-relations thêm vào `SpaProduct` (`stepProducts`/`stepOptions`) và `Technology` (`stepTechnologies`).
+
+### Lib & validation
+- **`src/lib/service-sop.ts`** (mới): `stepInclude`/`serviceStepsInclude` (đọc SOP theo `sortOrder`);
+  `buildStepsCreate(steps)` (nested-create, tự gán `sortOrder` theo index); `sopTotalDuration`;
+  **`sopSnapshot(service)`** (deep-clone bất biến version+bước+SP/CN/PA — cho Actual Session P4 & mục 9);
+  `expectedMaterialCost(steps, costById)` (Σ qty×giá vốn cho SP có link catalog — nhạy cảm).
+- **`src/lib/clinic-validation.ts`**: `stepProductSchema`/`stepTechnologySchema`/`stepOptionSchema`/
+  `serviceStepSchema`/`serviceStepsSchema`; `quantity` **coerce > 0** (≤0 → 422), `unit` bắt buộc;
+  `serviceCreateSchema` (và `serviceUpdateSchema` kế thừa qua `.partial()`) thêm `steps?`.
+
+### API (additive — không đổi hành vi khi vắng `steps`)
+- `POST /api/services`: nhận `steps` → nested-create SOP.
+- `GET /api/services/[id]`: trả `steps` (đã include SP/CN/PA) + `sopDuration` + `sopMaterialCost`
+  (**mask theo `finance.read`** — non-finance = null).
+- `PATCH /api/services/[id]`: gửi `steps` → **thay toàn bộ SOP** (cascade xóa cũ) + **`version` +1** + audit
+  **`SERVICE_SOP_CHANGED`** (`{version:{before,after}, stepCount:{before,after}}`). Không gửi `steps` → SOP
+  giữ nguyên (không bump version).
+
+### UI — `/services` form khối **D. Quy trình thực hiện (các bước)**
+Trong `ServiceFormModal` (chèn giữa C Chuyên môn và E Vật tư định mức; đổi nhãn Vật tư→**E**, Giá→**F**):
+`StepEditor` — thẻ mỗi bước (STT · tên · thời lượng · Bắt buộc · **↑/↓ đổi thứ tự** · xóa), kỹ thuật/điều
+kiện/mô tả/**cảnh báo**, `StepProducts` (SP dropdown catalog + SL/ĐVT/BB), `StepTechs` (công nghệ + thông
+số), `StepOptions` (phương án + **radio 1 mặc định**). Hiện **tổng thời lượng SOP**. Modal chi tiết dịch vụ
+render read-only SOP (STT/thời lượng/thao tác/cảnh báo/SP/CN/PA + số bước + tổng thời lượng + **phiên bản v**).
+
+### Demo (seed-demo.ts) — DV-DMK-ENZ "DMK Enzyme Treatment" (5 bước, 83′, version 1)
+1 Làm sạch (SP DMK Cleanser 5ml) · 2 Detox-LED (công nghệ LED) · 3 Build (SP Mist 3ml) · 4 Đắp Enzyme
+(**3 phương án**: Enzyme#1 / **Enzyme#2 mặc định** / Không đắp; **cảnh báo chống chỉ định**) · 5 Phục hồi.
+Thêm brand DMK + công nghệ LED + 4 SpaProduct DMK. Guard `if (!svcDMK)` idempotent.
+
+### Chứng minh (test/service-sop.test.ts, 7 test HTTP thật trên Postgres)
+§25 create persistence (version 1, sortOrder 0..4, product link + quantity/unit, technology, 3 option 1
+default, warnings) · §25 read (sopDuration=83) · §25 edit+reorder (version 1→2, sortOrder reindex,
+`SERVICE_SOP_CHANGED` audit) · §9 snapshot bất biến (chụp v1 → sửa v2 → snapshot v1 KHÔNG đổi) · validation
+qty>0 & unit bắt buộc → 422 · §19 finance mask (`sopMaterialCost` null non-finance / >0 finance) · RBAC
+(create `service.write`→403, read `service.read`→403).
+
+### Coexistence & nợ kỹ thuật (P1)
+- **Không đụng** Protocol (bước cũ), Booking, Session, RBAC/finance đã nghiệm thu (Mục 15) — chỉ thêm bảng +
+  cột `Service.version` + route additive. SOP để trống thì Dịch vụ hoạt động y như cũ (tương thích dữ liệu).
+- **Chưa** làm: P2 Protocol compose nhiều Service (coexistence), P3 Booking multi-service (BookingItem),
+  P4 Actual Session chọn phương án + snapshot SOP + trừ tồn theo phương án. `sopSnapshot` đã sẵn cho P4.
+- `ServiceMaterialStandard` (khối E) **giữ nguyên** song song SOP; có thể hợp nhất "vật tư định mức" vào bước
+  SOP ở phase sau nếu muốn một nguồn duy nhất.
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript

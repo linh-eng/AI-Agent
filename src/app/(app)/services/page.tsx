@@ -212,7 +212,7 @@ function ServiceFormModal({ service, cats, techs, protos, resources, products, o
     standardPrice: "", expectedCost: "",
     technologyIds: [], protocolIds: [], defaultTechnologyId: "", defaultProtocolId: "",
     staffRequirements: [], resourceRequirements: { room: { required: false, default: "" }, bed: { required: false, default: "" }, machine: { required: false, default: "" } },
-    materials: [],
+    materials: [], steps: [],
   });
   const [floorSummary, setFloorSummary] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -235,6 +235,13 @@ function ServiceFormModal({ service, cats, techs, protos, resources, products, o
         staffRequirements: d.staffRequirements ?? [],
         resourceRequirements: d.resourceRequirements ?? { room: { required: false, default: "" }, bed: { required: false, default: "" }, machine: { required: false, default: "" } },
         materials: (d.materialStandards ?? []).map((m: any) => ({ name: m.name, quantity: Number(m.quantity), unit: m.unit, note: m.note ?? "", required: m.required, spaProductId: m.spaProductId ?? "" })),
+        steps: (d.steps ?? []).map((s: any) => ({
+          name: s.name ?? "", description: s.description ?? "", durationMinutes: s.durationMinutes ?? "", technique: s.technique ?? "",
+          notes: s.notes ?? "", warnings: s.warnings ?? "", isRequired: s.isRequired ?? true, conditionText: s.conditionText ?? "",
+          products: (s.products ?? []).map((p: any) => ({ spaProductId: p.spaProductId ?? "", name: p.name ?? "", quantity: Number(p.quantity ?? 1), unit: p.unit ?? "", isRequired: p.isRequired ?? true, notes: p.notes ?? "" })),
+          technologies: (s.technologies ?? []).map((t: any) => ({ technologyId: t.technologyId, notes: t.notes ?? "" })),
+          options: (s.options ?? []).map((o: any) => ({ name: o.name ?? "", selectMode: o.selectMode ?? "SINGLE_SELECT", isDefault: o.isDefault ?? false, spaProductId: o.spaProductId ?? "", quantity: o.quantity != null ? Number(o.quantity) : "", unit: o.unit ?? "", technique: o.technique ?? "", durationMinutes: o.durationMinutes ?? "", notes: o.notes ?? "", conditionText: o.conditionText ?? "" })),
+        })),
       });
       setFloorSummary(d.floorSummary ?? null);
     }).catch(() => {});
@@ -267,6 +274,28 @@ function ServiceFormModal({ service, cats, techs, protos, resources, products, o
       standardPrice: Number(f.standardPrice) || 0,
     };
     ["durationMinutes", "machineMinutes", "roomMinutes", "expectedCost"].forEach((k) => { if (f[k] !== "" && f[k] != null) body[k] = Number(f[k]); });
+    // SOP chuẩn hóa (Redesign P1) — chỉ gửi `steps` khi có bước hợp lệ (tên không rỗng).
+    const cleanSteps = (f.steps as any[]).filter((s) => s.name?.trim()).map((s) => ({
+      name: s.name.trim(),
+      description: s.description || null,
+      durationMinutes: s.durationMinutes !== "" && s.durationMinutes != null ? Number(s.durationMinutes) : null,
+      technique: s.technique || null,
+      notes: s.notes || null,
+      warnings: s.warnings || null,
+      isRequired: !!s.isRequired,
+      conditionText: s.conditionText || null,
+      products: (s.products ?? []).filter((p: any) => p.name?.trim() && p.unit?.trim()).map((p: any) => ({
+        spaProductId: p.spaProductId || null, name: p.name.trim(), quantity: Number(p.quantity) || 1, unit: p.unit.trim(), isRequired: !!p.isRequired, notes: p.notes || null,
+      })),
+      technologies: (s.technologies ?? []).filter((t: any) => t.technologyId).map((t: any) => ({ technologyId: t.technologyId, notes: t.notes || null })),
+      options: (s.options ?? []).filter((o: any) => o.name?.trim()).map((o: any) => ({
+        name: o.name.trim(), selectMode: o.selectMode || "SINGLE_SELECT", isDefault: !!o.isDefault, spaProductId: o.spaProductId || null,
+        quantity: o.quantity !== "" && o.quantity != null ? Number(o.quantity) : null, unit: o.unit || null, technique: o.technique || null,
+        durationMinutes: o.durationMinutes !== "" && o.durationMinutes != null ? Number(o.durationMinutes) : null, notes: o.notes || null, conditionText: o.conditionText || null,
+      })),
+    }));
+    // Gửi steps khi: đang sửa (cho phép xóa hết = []) hoặc tạo mới có bước. Không gửi khi tạo mới rỗng.
+    if (editing || cleanSteps.length) body.steps = cleanSteps;
     return body;
   }
 
@@ -339,13 +368,18 @@ function ServiceFormModal({ service, cats, techs, protos, resources, products, o
           <StaffReqEditor value={f.staffRequirements} onChange={(v) => setF({ ...f, staffRequirements: v })} />
         </Block>
 
-        {/* D. Vật tư định mức */}
-        <Block letter="D" title="Vật tư định mức">
+        {/* D. Quy trình thực hiện (SOP chuẩn hóa — Redesign P1) */}
+        <Block letter="D" title="Quy trình thực hiện (các bước)">
+          <StepEditor value={f.steps} onChange={(v) => setF({ ...f, steps: v })} products={products} techs={techs} />
+        </Block>
+
+        {/* E. Vật tư định mức */}
+        <Block letter="E" title="Vật tư định mức">
           <MaterialEditor value={f.materials} onChange={(v) => setF({ ...f, materials: v })} products={products} />
         </Block>
 
-        {/* E. Giá & chi phí */}
-        <Block letter="E" title="Giá & chi phí">
+        {/* F. Giá & chi phí */}
+        <Block letter="F" title="Giá & chi phí">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5"><Label>Giá chuẩn (₫) *</Label><Input type="number" value={f.standardPrice} onChange={(e) => setF({ ...f, standardPrice: e.target.value })} required /></div>
             <div className="space-y-1.5"><Label>Giá vốn dự kiến (₫)</Label><Input type="number" value={f.expectedCost} onChange={(e) => setF({ ...f, expectedCost: e.target.value })} placeholder="Ước tính" /></div>
@@ -417,6 +451,117 @@ function MaterialEditor({ value, onChange, products }: { value: any[]; onChange:
   );
 }
 
+/* ============================ SOP StepEditor (Redesign P1 · §20) ============================ */
+function StepEditor({ value, onChange, products, techs }: { value: any[]; onChange: (v: any[]) => void; products: any[]; techs: Tech[] }) {
+  const totalDuration = value.reduce((s, x) => s + (Number(x.durationMinutes) || 0), 0);
+  const addStep = () => onChange([...value, { name: "", description: "", durationMinutes: "", technique: "", notes: "", warnings: "", isRequired: true, conditionText: "", products: [], technologies: [], options: [] }]);
+  const updStep = (i: number, patch: any) => onChange(value.map((s, j) => (j === i ? { ...s, ...patch } : s)));
+  const delStep = (i: number) => onChange(value.filter((_, j) => j !== i));
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir; if (j < 0 || j >= value.length) return;
+    const next = [...value];[next[i], next[j]] = [next[j], next[i]]; onChange(next);
+  };
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">Các bước chuẩn (SOP) của dịch vụ: thứ tự · thời lượng · thao tác · sản phẩm/định mức · công nghệ · phương án. Sửa quy trình sẽ tăng phiên bản dịch vụ (buổi đã ghi nhận giữ nguyên).</span>
+        <Button type="button" size="sm" variant="outline" onClick={addStep}><Plus className="h-3.5 w-3.5" /> Thêm bước</Button>
+      </div>
+      {value.length === 0 ? <p className="text-xs text-muted-foreground">Chưa có bước nào. Dịch vụ có thể để trống SOP (tương thích dữ liệu cũ).</p> : (
+        <>
+          {value.map((s, i) => (
+            <div key={i} className="rounded-md border bg-muted/20 p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{i + 1}</span>
+                <Input className="flex-1" value={s.name} onChange={(e) => updStep(i, { name: e.target.value })} placeholder="Tên bước *" />
+                <Input type="number" className="w-24" value={s.durationMinutes} onChange={(e) => updStep(i, { durationMinutes: e.target.value })} placeholder="Phút" />
+                <label className="flex w-24 items-center gap-1 text-xs"><Checkbox checked={s.isRequired} onChange={(e) => updStep(i, { isRequired: e.target.checked })} /> Bắt buộc</label>
+                <Button type="button" size="icon" variant="ghost" disabled={i === 0} onClick={() => move(i, -1)} title="Lên">↑</Button>
+                <Button type="button" size="icon" variant="ghost" disabled={i === value.length - 1} onClick={() => move(i, 1)} title="Xuống">↓</Button>
+                <Button type="button" size="icon" variant="ghost" onClick={() => delStep(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Input value={s.technique} onChange={(e) => updStep(i, { technique: e.target.value })} placeholder="Kỹ thuật/thao tác" />
+                <Input value={s.conditionText} onChange={(e) => updStep(i, { conditionText: e.target.value })} placeholder="Điều kiện áp dụng (nếu có)" />
+              </div>
+              <Input value={s.description} onChange={(e) => updStep(i, { description: e.target.value })} placeholder="Mô tả" />
+              <Input value={s.warnings} onChange={(e) => updStep(i, { warnings: e.target.value })} placeholder="⚠ Cảnh báo / chống chỉ định (nếu có)" />
+              <StepProducts value={s.products} onChange={(v) => updStep(i, { products: v })} products={products} />
+              <StepTechs value={s.technologies} onChange={(v) => updStep(i, { technologies: v })} techs={techs} />
+              <StepOptions value={s.options} onChange={(v) => updStep(i, { options: v })} products={products} />
+            </div>
+          ))}
+          <div className="text-right text-sm">Tổng thời lượng SOP: <b>{totalDuration}′</b> ({value.length} bước)</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function StepProducts({ value, onChange, products }: { value: any[]; onChange: (v: any[]) => void; products: any[] }) {
+  const add = () => onChange([...value, { spaProductId: "", name: "", quantity: 1, unit: "", isRequired: true, notes: "" }]);
+  const upd = (i: number, patch: any) => onChange(value.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const del = (i: number) => onChange(value.filter((_, j) => j !== i));
+  return (
+    <div className="space-y-1 rounded border border-dashed p-2">
+      <div className="flex items-center justify-between"><span className="text-xs font-medium text-muted-foreground">Sản phẩm / định mức</span><Button type="button" size="sm" variant="ghost" onClick={add}><Plus className="h-3 w-3" /> Thêm SP</Button></div>
+      {value.map((p, i) => (
+        <div key={i} className="grid grid-cols-[1.3fr_.5fr_.5fr_1fr_auto_auto] items-center gap-1.5">
+          <Select value={p.spaProductId} onChange={(e) => { const prod = products.find((x) => x.id === e.target.value); upd(i, { spaProductId: e.target.value, name: prod?.name ?? p.name, unit: p.unit || prod?.unit || "" }); }}>
+            <option value="">— Sản phẩm (hoặc gõ tên) —</option>{products.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          </Select>
+          <Input type="number" value={p.quantity} onChange={(e) => upd(i, { quantity: Number(e.target.value) })} placeholder="SL" />
+          <Input value={p.unit} onChange={(e) => upd(i, { unit: e.target.value })} placeholder="ĐVT" />
+          <Input value={p.name} onChange={(e) => upd(i, { name: e.target.value })} placeholder="Tên hiển thị *" />
+          <label className="flex items-center gap-1 text-xs"><Checkbox checked={p.isRequired} onChange={(e) => upd(i, { isRequired: e.target.checked })} /> BB</label>
+          <Button type="button" size="icon" variant="ghost" onClick={() => del(i)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StepTechs({ value, onChange, techs }: { value: any[]; onChange: (v: any[]) => void; techs: Tech[] }) {
+  const add = () => onChange([...value, { technologyId: "", notes: "" }]);
+  const upd = (i: number, patch: any) => onChange(value.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const del = (i: number) => onChange(value.filter((_, j) => j !== i));
+  return (
+    <div className="space-y-1 rounded border border-dashed p-2">
+      <div className="flex items-center justify-between"><span className="text-xs font-medium text-muted-foreground">Công nghệ áp dụng</span><Button type="button" size="sm" variant="ghost" onClick={add}><Plus className="h-3 w-3" /> Thêm CN</Button></div>
+      {value.map((t, i) => (
+        <div key={i} className="grid grid-cols-[1fr_1.4fr_auto] items-center gap-1.5">
+          <Select value={t.technologyId} onChange={(e) => upd(i, { technologyId: e.target.value })}><option value="">— Chọn công nghệ —</option>{techs.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select>
+          <Input value={t.notes} onChange={(e) => upd(i, { notes: e.target.value })} placeholder="Thông số gợi ý / ghi chú" />
+          <Button type="button" size="icon" variant="ghost" onClick={() => del(i)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StepOptions({ value, onChange, products }: { value: any[]; onChange: (v: any[]) => void; products: any[] }) {
+  const add = () => onChange([...value, { name: "", selectMode: "SINGLE_SELECT", isDefault: value.length === 0, spaProductId: "", quantity: "", unit: "", technique: "", durationMinutes: "", notes: "", conditionText: "" }]);
+  const upd = (i: number, patch: any) => onChange(value.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  // Chỉ 1 phương án mặc định.
+  const setDefault = (i: number) => onChange(value.map((r, j) => ({ ...r, isDefault: j === i })));
+  const del = (i: number) => onChange(value.filter((_, j) => j !== i));
+  return (
+    <div className="space-y-1 rounded border border-dashed p-2">
+      <div className="flex items-center justify-between"><span className="text-xs font-medium text-muted-foreground">Phương án / biến thể (chọn 1 khi thực hiện)</span><Button type="button" size="sm" variant="ghost" onClick={add}><Plus className="h-3 w-3" /> Thêm phương án</Button></div>
+      {value.map((o, i) => (
+        <div key={i} className="grid grid-cols-[1.2fr_1fr_.5fr_.5fr_auto_auto] items-center gap-1.5">
+          <Input value={o.name} onChange={(e) => upd(i, { name: e.target.value })} placeholder="Tên phương án *" />
+          <Select value={o.spaProductId} onChange={(e) => { const prod = products.find((x) => x.id === e.target.value); upd(i, { spaProductId: e.target.value, unit: o.unit || prod?.unit || "" }); }}><option value="">— Sản phẩm —</option>{products.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select>
+          <Input type="number" value={o.quantity} onChange={(e) => upd(i, { quantity: e.target.value })} placeholder="SL" />
+          <Input value={o.unit} onChange={(e) => upd(i, { unit: e.target.value })} placeholder="ĐVT" />
+          <label className="flex items-center gap-1 text-xs" title="Mặc định"><input type="radio" checked={!!o.isDefault} onChange={() => setDefault(i)} /> MĐ</label>
+          <Button type="button" size="icon" variant="ghost" onClick={() => del(i)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ============================ Detail ============================ */
 function ServiceDetailModal({ id, canFinance, canWrite, onClose, onEdit }: { id: string; canFinance: boolean; canWrite: boolean; onClose: () => void; onEdit: (s: Service) => void }) {
   const [d, setD] = useState<any | null>(null);
@@ -449,6 +594,22 @@ function ServiceDetailModal({ id, canFinance, canWrite, onClose, onEdit }: { id:
             <Row k="Nhân sự" v={(d.staffRequirements ?? []).map((s: any) => `${s.role}${s.quantity ? " ×" + s.quantity : ""}${s.required ? "" : " (tùy chọn)"}`).join(", ") || "—"} />
           </Sect>
         </div>
+        {(d.steps ?? []).length > 0 && (
+          <Sect title={`Quy trình thực hiện · ${d.steps.length} bước${d.sopDuration ? ` · ${d.sopDuration}′` : ""} (phiên bản v${d.version ?? 1})`}>
+            <ol className="space-y-1.5">
+              {d.steps.map((s: any, i: number) => (
+                <li key={s.id} className="rounded border bg-muted/20 p-2">
+                  <div className="font-medium">{i + 1}. {s.name}{s.durationMinutes ? ` — ${s.durationMinutes}′` : ""}{!s.isRequired ? " (tùy chọn)" : ""}</div>
+                  {s.technique && <div className="text-xs text-muted-foreground">Thao tác: {s.technique}</div>}
+                  {s.warnings && <div className="text-xs text-amber-600">⚠ {s.warnings}</div>}
+                  {(s.products ?? []).length > 0 && <div className="text-xs">Sản phẩm: {s.products.map((p: any) => `${p.name} ${Number(p.quantity)}${p.unit}`).join(", ")}</div>}
+                  {(s.technologies ?? []).length > 0 && <div className="text-xs">Công nghệ: {s.technologies.map((t: any) => t.technology?.name ?? t.technologyId).join(", ")}</div>}
+                  {(s.options ?? []).length > 0 && <div className="text-xs">Phương án: {s.options.map((o: any) => `${o.name}${o.isDefault ? " (mặc định)" : ""}`).join(" · ")}</div>}
+                </li>
+              ))}
+            </ol>
+          </Sect>
+        )}
         <Sect title="Vật tư định mức">
           {(d.materialStandards ?? []).length === 0 ? <p className="text-muted-foreground">—</p> : (
             <ul className="space-y-0.5">{d.materialStandards.map((m: any) => <li key={m.id}>• {m.name} — {Number(m.quantity)} {m.unit}{m.required ? " (bắt buộc)" : ""}{m.note ? ` · ${m.note}` : ""}</li>)}</ul>

@@ -135,6 +135,48 @@ export const serviceMaterialStandardSchema = z.array(
     usageMaterialId: z.string().optional().nullable(),
   })
 );
+
+// ----- SOP chuẩn hóa: ServiceStep + Product/Technology/Option (Redesign P1) -----
+const stepProductSchema = z.object({
+  spaProductId: z.string().optional().nullable(),
+  name: z.string().min(1, "Nhập tên vật tư"),
+  quantity: z.coerce.number().positive("Định mức phải > 0"),
+  unit: z.string().min(1, "Nhập đơn vị"),
+  isRequired: z.boolean().default(true),
+  notes: z.string().optional().nullable(),
+});
+const stepTechnologySchema = z.object({
+  technologyId: z.string().min(1),
+  suggestedParameters: z.any().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+const stepOptionSchema = z.object({
+  name: z.string().min(1, "Nhập tên phương án"),
+  selectMode: z.enum(["SINGLE_SELECT", "OPTIONAL"]).default("SINGLE_SELECT"),
+  isDefault: z.boolean().default(false),
+  spaProductId: z.string().optional().nullable(),
+  quantity: z.coerce.number().positive().optional().nullable(),
+  unit: z.string().optional().nullable(),
+  technique: z.string().optional().nullable(),
+  durationMinutes: z.coerce.number().int().positive().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  conditionText: z.string().optional().nullable(),
+});
+export const serviceStepSchema = z.object({
+  name: z.string().min(1, "Nhập tên bước"),
+  description: z.string().optional().nullable(),
+  durationMinutes: z.coerce.number().int().positive().optional().nullable(),
+  technique: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  warnings: z.string().optional().nullable(),
+  isRequired: z.boolean().default(true),
+  conditionText: z.string().optional().nullable(),
+  products: z.array(stepProductSchema).default([]),
+  technologies: z.array(stepTechnologySchema).default([]),
+  options: z.array(stepOptionSchema).default([]),
+});
+export const serviceStepsSchema = z.array(serviceStepSchema);
+
 export const serviceCreateSchema = z.object({
   code: z.string().min(1).optional(),
   name: z.string().min(1, "Bắt buộc"),
@@ -154,6 +196,7 @@ export const serviceCreateSchema = z.object({
   staffRequirements: staffRequirementSchema.optional(),
   resourceRequirements: resourceRequirementSchema.optional(),
   materials: serviceMaterialStandardSchema.optional(),
+  steps: serviceStepsSchema.optional(), // SOP chuẩn hóa (Redesign P1)
 });
 export const serviceUpdateSchema = serviceCreateSchema.partial().omit({ code: true });
 
