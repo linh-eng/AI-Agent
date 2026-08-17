@@ -1866,6 +1866,55 @@ Từ `BK-100030` (P3, 3 dịch vụ) → 1 TreatmentSession **planId NULL** (wal
 - **Giới hạn còn lại:** classification/policy engine (defer); ADJUSTMENT enum có sẵn nhưng chưa mở UI; snapshot
   media/chữ ký vẫn theo cơ chế cũ; song song nhiều dịch vụ chưa hỗ trợ (P3 sequential).
 
+## BUSINESS REDESIGN — P1–P4 CLOSURE (nghiệm thu xuyên suốt) (v0.24.0)
+
+Vòng CLOSURE end-to-end cho toàn bộ redesign (P1 Service SOP · P2 Protocol compose · P3 Booking
+multi-service · P4 Actual Session). **Chỉ THÊM test** (`test/redesign-closure.test.ts`, 10 test) — KHÔNG
+đổi business logic, KHÔNG mở feature/Pricing/Sidebar/ProtocolLoop. **323 test / 41 file PASS** (313 + 10).
+tsc sạch · build OK · 31 migration up-to-date.
+
+### Sơ đồ entity/relation cuối (P1–P4)
+```
+Service ─1:N→ ServiceStep ─1:N→ ServiceStepProduct / ServiceStepTechnology / ServiceStepOption   (P1 SOP)
+Service.version (bump khi sửa SOP)
+BrandProtocol (compositionMode: LEGACY_STEPS | SERVICES)
+   ├ LEGACY_STEPS → steps Json  (giữ nguyên)
+   └ SERVICES     → 1:N ProtocolService → Service (reference, KHÔNG clone SOP)   (P2)
+Booking ─1:N→ BookingItem → Service   (P3; Booking.serviceId = item[0], resources ở Booking-level)
+Booking ─1:1→ TreatmentSession (bookingId @unique; planId NULLABLE walk-in)
+TreatmentSession ─1:N→ SessionExecutionItem → Service (+bookingItem soft, executionSnapshot BẤT BIẾN)  (P4)
+TreatmentSession ─1:N→ MaterialUsage (CONSUMPTION append-only + REVERSAL ledger, idempotencyKey unique)
+```
+
+### Acceptance matrix (A–V) — evidence: test/redesign-closure.test.ts + các test P1–P4
+A Service SOP · B Protocol compose · C Legacy protocol · D Booking multi-service · E Legacy booking dual-read ·
+F Session multi-service (1:1) · G Walk-in (planId null) · H Plan-based regression · I Option selection ·
+J Standard vs actual (5g/4g) · **K Snapshot immutable** (sửa Service name+SOP+option+product → executionSnapshot
+byte-for-byte KHÔNG đổi, DB evidence) · L Inventory actual usage · M idempotency · N Reversal ledger (giữ gốc +
+chặn 2 lần) · O Completion retry no double-effect · P Completed-session edit (lý do+audit+403) · Q RBAC ·
+R Finance privacy (costAllocated=null non-finance) · S Audit trail (7 sự kiện + không log secret) ·
+T DB invariants (0 orphan LEFT JOIN, unique Booking↔Session, reversal link, legacy tồn tại) · U UI workflow ·
+V Full regression 323/41.
+
+### Migration safety (P1–P4)
+| Migration | Additive | Relax constraint | Destructive |
+|---|---|---|---|
+| R_service_steps | 17 | 0 | 0 |
+| S_protocol_services | 7 | 0 | 0 |
+| T_booking_items | 5 | 0 | 0 |
+| U_session_execution | 18 | 1 (`planId DROP NOT NULL`) | 0 |
+
+`planId DROP NOT NULL` = **relax constraint** (không mất dữ liệu), KHÔNG phải destructive. 0 DROP TABLE/COLUMN/
+TRUNCATE/DELETE/reset trên cả 4 migration.
+
+### Limitations (giữ nguyên — KHÔNG fix trong closure)
+ProtocolLoop classification/policy DEFER · Service historical version table chưa có (serviceVersionSnapshot chỉ
+marker; snapshot bất biến ở Session executionSnapshot) · multi-service **sequential only** · ADJUSTMENT enum
+chưa mở UI · **regression suite dùng chung DB test — KHÔNG chạy song song** (2 run đồng thời gây race giả, chạy
+đơn lẻ 323/41 sạch).
+
+### Kết luận: ✅ **P1–P4 CLOSURE PASS**
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript
