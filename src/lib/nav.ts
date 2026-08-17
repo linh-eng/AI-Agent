@@ -26,40 +26,64 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+// -----------------------------------------------------------------------------
+// IA-PH1 — sắp xếp lại theo HÀNH TRÌNH KHÁCH HÀNG (regroup + rename thuần).
+// KHÔNG đổi route/permission của bất kỳ item nào; chỉ đổi nhóm/thứ tự/nhãn.
+//   * "Phác đồ" → "Kế hoạch điều trị" (tách khỏi Protocol master).
+//   * "Chăm sóc khách hàng" → "CSKH & Follow-up".
+//   * "Hình ảnh & Đánh giá" → "Thư viện ảnh & Đánh giá".
+//   * "Dịch vụ" MOVE sang Thư viện chuyên môn (sibling với Protocol).
+//   * "Bảng giá" + "Giá sàn" MOVE sang "Giá & Chính sách"; Marketing thành group riêng.
+// -----------------------------------------------------------------------------
 export const NAV_GROUPS: NavGroup[] = [
   {
-    title: "Spa & CRM",
+    title: "Tổng quan",
     items: [
       { href: "/crm", label: "Tổng quan", icon: LayoutDashboard, perm: "booking.read" },
+    ],
+  },
+  {
+    title: "Khách hàng & Hành trình",
+    items: [
       { href: "/customers", label: "Khách hàng", icon: Users, perm: "customer.read" },
       { href: "/bookings", label: "Lịch hẹn", icon: CalendarDays, perm: "booking.read" },
-      { href: "/services", label: "Dịch vụ", icon: Sparkles, perm: "service.read" },
-      { href: "/treatment-plans", label: "Phác đồ", icon: HeartPulse, perm: "treatment.read" },
-      { href: "/before-after", label: "Hình ảnh & Đánh giá", icon: Images, perm: "customer.read" },
+      { href: "/treatment-plans", label: "Kế hoạch điều trị", icon: HeartPulse, perm: "treatment.read" },
+      { href: "/before-after", label: "Thư viện ảnh & Đánh giá", icon: Images, perm: "customer.read" },
       { href: "/proposals", label: "Báo giá", icon: FileSpreadsheet, perm: "proposal.read" },
       // Tài chính / lập hóa đơn — gate theo quyền NGHIỆP VỤ (write), không theo read chung.
       { href: "/invoices", label: "Hóa đơn", icon: Receipt, perm: "invoice.write" },
       { href: "/payments", label: "Thanh toán", icon: Wallet, perm: "payment.write" },
-      { href: "/pricing", label: "Bảng giá", icon: Tag, perm: "price.write" },
-      { href: "/price-floor", label: "Giá sàn", icon: Gauge, perm: ["pricefloor.read", "finance.read"] },
-      { href: "/marketing", label: "Marketing", icon: Megaphone, perm: "marketing.read" },
-      { href: "/followups", label: "Chăm sóc khách hàng", icon: MessageCircleHeart, perm: ["followup.apply", "followup.write", "task.write"] },
+      { href: "/followups", label: "CSKH & Follow-up", icon: MessageCircleHeart, perm: ["followup.apply", "followup.write", "task.write"] },
       { href: "/tasks", label: "Công việc", icon: ListTodo, perm: "task.write" },
     ],
   },
   {
-    title: "Thư viện Spa",
+    title: "Thư viện chuyên môn",
     items: [
-      { href: "/brands", label: "Thương hiệu", icon: Building2, perm: "library.read" },
-      { href: "/technologies", label: "Công nghệ", icon: Cpu, perm: "library.read" },
+      { href: "/services", label: "Dịch vụ", icon: Sparkles, perm: "service.read" },
       { href: "/protocols", label: "Protocol", icon: ScrollText, perm: "library.read" },
+      { href: "/technologies", label: "Công nghệ", icon: Cpu, perm: "library.read" },
+      { href: "/brands", label: "Thương hiệu", icon: Building2, perm: "library.read" },
       { href: "/catalog", label: "Sản phẩm", icon: ShoppingBag, perm: "library.read" },
       { href: "/form-templates", label: "Biểu mẫu", icon: FileText, perm: "library.read" },
       { href: "/care-instructions", label: "Hướng dẫn chăm sóc", icon: BookOpen, perm: "library.read" },
     ],
   },
   {
-    title: "Vật tư",
+    title: "Giá & Chính sách",
+    items: [
+      { href: "/pricing", label: "Bảng giá", icon: Tag, perm: "price.write" },
+      { href: "/price-floor", label: "Giá sàn", icon: Gauge, perm: ["pricefloor.read", "finance.read"] },
+    ],
+  },
+  {
+    title: "Marketing",
+    items: [
+      { href: "/marketing", label: "Marketing", icon: Megaphone, perm: "marketing.read" },
+    ],
+  },
+  {
+    title: "Kho & Vật tư",
     items: [
       { href: "/materials", label: "Kho vật tư sử dụng", icon: Boxes, perm: "customer.read" },
       { href: "/customer-materials", label: "Vật tư khách hàng", icon: Package, perm: "customer.read" },
@@ -68,11 +92,11 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    title: "Hệ thống",
+    title: "Vận hành & Hệ thống",
     items: [
-      { href: "/users", label: "Quản trị người dùng", icon: ShieldCheck, perm: "user.manage" },
       { href: "/employees", label: "Nhân sự", icon: Users, perm: "staff.read" },
       { href: "/import-customers", label: "Nhập khách hàng", icon: Upload, perm: "customer.write" },
+      { href: "/users", label: "Quản trị người dùng", icon: ShieldCheck, perm: "user.manage" },
       { href: "/settings", label: "Cài đặt", icon: Settings, perm: "setting.write" },
     ],
   },

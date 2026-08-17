@@ -2253,6 +2253,40 @@ Required DMK (1.113M) + Laser Pico (0.9M) + package-specific 0.1M = **giá vốn
   (optional-in-base) — base = required only; auto-write Recommended → PriceRule; VAT. Package-below-floor ở
   Booking chưa mở (mới ở Proposal). Service chưa có bảng lịch sử SOP → serviceVersionMarker chỉ đối chiếu.
 
+## IA-PH1: SIDEBAR REGROUP + RENAME (v0.29.1) — nav-only, 0 backend
+
+Sắp xếp lại sidebar theo **HÀNH TRÌNH KHÁCH HÀNG** (owner-approved). Thuần **regroup/reorder/rename trong
+`src/lib/nav.ts`** — **KHÔNG đổi route, permission, ROLE_PERMISSIONS, backend, migration, entity**. **0 migration**.
+**394 test / 47 file PASS** (382 + `test/nav-ia.test.ts` 12). tsc sạch · lint 0 lỗi · build OK.
+
+### Nhóm target (8) — `NAV_GROUPS`
+1. **Tổng quan** (/crm) · 2. **Khách hàng & Hành trình** (Khách hàng · Lịch hẹn · Kế hoạch điều trị · Thư viện
+ảnh & Đánh giá · Báo giá · Hóa đơn · Thanh toán · CSKH & Follow-up · Công việc) · 3. **Thư viện chuyên môn**
+(Dịch vụ · Protocol · Công nghệ · Thương hiệu · Sản phẩm · Biểu mẫu · Hướng dẫn chăm sóc) · 4. **Giá & Chính
+sách** (Bảng giá · Giá sàn) · 5. **Marketing** · 6. **Kho & Vật tư** (4 mục) · 7. **Vận hành & Hệ thống**
+(Nhân sự · Nhập khách hàng · Quản trị người dùng · Cài đặt) · 8. **Kho THNG** (giữ nguyên, env-gated).
+
+### Thay đổi (LOW-RISK)
+- **MOVE:** `Dịch vụ` (/services) → Thư viện chuyên môn (sibling Protocol) · `Bảng giá`+`Giá sàn` → Giá &
+  Chính sách · `Marketing` → group riêng.
+- **RENAME:** "Phác đồ" → **"Kế hoạch điều trị"** (/treatment-plans) · "Chăm sóc khách hàng" → **"CSKH &
+  Follow-up"** (/followups) · "Hình ảnh & Đánh giá" → **"Thư viện ảnh & Đánh giá"** (/before-after). Protocol
+  KHÔNG đổi tên.
+- **GIỮ:** Công việc (/tasks) global; Thư viện ảnh & Đánh giá global; REMOVE 0 mục.
+- **Bất biến (test byte-for-byte):** route (28 href spa) + permission từng item + warehouse env gating +
+  active-route highlight detail (`/services/[id]/costing|recommended-price` → Dịch vụ; `/protocols/[id]/pricing`
+  → Protocol). Sidebar vẫn permission-based (Mục 15).
+
+### Chứng minh — `test/nav-ia.test.ts` (12) + `nav-rbac.test.ts` (10, cập nhật nhãn mới)
+A thứ tự 8 nhóm · B+C Dịch vụ↔Protocol sibling · D+G+I nhãn rename · E Bảng giá/Giá sàn nhóm mới · F Marketing
+group riêng · H Công việc global · **J permission byte-for-byte bất biến** · **K route (href) bất biến** · L
+warehouse env gating · M unauthorized ẩn · N multi-role union · O active-route detail. Full regression 394/47.
+
+### IA-PH2 (chưa làm — để phase sau)
+Nested children "Hóa đơn & Thanh toán" (cần mở rộng nav.ts hỗ trợ `children`); thêm entry global "Giá vốn &
+biên" / "Giá bán đề xuất" vào Giá & Chính sách; rà evidence "Thư viện ảnh & Đánh giá" vs tab 360 (IA-PH3).
+**KHÔNG CONFLICT** — mọi thay đổi IA-PH1 là nav presentation.
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript

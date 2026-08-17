@@ -24,7 +24,7 @@ describe("Mục 15 · Sidebar permission-based (N)", () => {
     for (const hidden of ["Hóa đơn", "Thanh toán", "Bảng giá", "Giá sàn", "Marketing", "Quản trị người dùng", "Cài đặt"]) {
       expect(m.has(hidden)).toBe(false);
     }
-    for (const shown of ["Khách hàng", "Lịch hẹn", "Phác đồ", "Chăm sóc khách hàng", "Công việc"]) {
+    for (const shown of ["Khách hàng", "Lịch hẹn", "Kế hoạch điều trị", "CSKH & Follow-up", "Công việc"]) {
       expect(m.has(shown)).toBe(true);
     }
   });
@@ -34,7 +34,7 @@ describe("Mục 15 · Sidebar permission-based (N)", () => {
     for (const hidden of ["Hóa đơn", "Thanh toán", "Bảng giá", "Giá sàn", "Marketing", "Quản trị người dùng"]) {
       expect(m.has(hidden)).toBe(false);
     }
-    expect(m.has("Phác đồ")).toBe(true);
+    expect(m.has("Kế hoạch điều trị")).toBe(true);
     expect(m.has("Khách hàng")).toBe(true);
   });
 
