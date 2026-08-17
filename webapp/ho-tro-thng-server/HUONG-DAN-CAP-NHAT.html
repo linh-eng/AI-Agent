@@ -76,6 +76,17 @@
   <li><span class="step">4</span> Xem nhật ký để chắc chắn không lỗi: <pre>pm2 logs ho-tro-thng</pre></li>
 </ol>
 
+<div class="warn"><b>⚠️ Lần ĐẦU dùng PM2 phải START, không phải restart</b>
+  Nếu <code>pm2 stop</code> / <code>pm2 restart</code> báo <span class="mono">[PM2][ERROR] Process or Namespace ho-tro-thng not found</span>
+  thì nghĩa là PM2 <b>chưa quản lý app</b> (chưa từng start bằng PM2, hoặc PM2 vừa khởi động lại mà chưa lưu tiến trình).
+  Lần đầu phải chạy (đứng ngay trong thư mục <span class="mono">ho-tro-thng-server</span>):
+  <pre>pm2 list                              <span class="c"># xem đang có gì (thường trống)</span>
+pm2 start server.js --name ho-tro-thng
+pm2 save                              <span class="c"># lưu để lần sau tự bật lại</span>
+pm2 list                              <span class="c"># phải thấy ho-tro-thng · online</span></pre>
+  Trước khi <code>pm2 start</code> nhớ <b>đóng cửa sổ đen</b> đang chạy app (nếu có) để tránh trùng cổng.
+  Từ <b>các lần cập nhật sau</b> mới dùng <code>pm2 restart ho-tro-thng</code>.</div>
+
 <h3>TÌNH HUỐNG B — App chạy bằng cửa sổ đen / start-windows.bat</h3>
 <ol>
   <li><span class="step">1</span> Đóng cửa sổ đen đang chạy app (hoặc nhấn <code>Ctrl + C</code> trong cửa sổ đó) để tắt máy chủ.</li>
@@ -112,6 +123,7 @@
   <tr><td>Có cần chạy lệnh cài gói (npm install)?</td><td>Không. App không phụ thuộc gói ngoài — chỉ cần Node.js đã cài sẵn.</td></tr>
   <tr><td>Bỏ qua vài bản (vd vX.5 → vX.9) được không?</td><td>Được. Cứ chép đè 2 file của bản mới nhất là đủ; các thay đổi tích hợp sẵn.</td></tr>
   <tr><td>Người dùng vẫn thấy bản cũ?</td><td>Bấm <b>Ctrl + F5</b>. Nếu vẫn cũ: kiểm tra còn tiến trình cũ chạy song song không (mục 6).</td></tr>
+  <tr><td>PM2 báo <span class="mono">Process or Namespace ho-tro-thng not found</span>?</td><td>PM2 chưa quản lý app. Lần đầu chạy <code>pm2 start server.js --name ho-tro-thng</code> rồi <code>pm2 save</code> (xem hộp cảnh báo mục 3). Từ lần sau mới dùng <code>pm2 restart</code>. Hoặc dùng cách cửa sổ đen (Tình huống B).</td></tr>
 </table>
 
 <h2>8. Bảng kiểm nhanh (checklist)</h2>
