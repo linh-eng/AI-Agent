@@ -216,6 +216,54 @@ async function main() {
     },
   });
 
+  // === Redesign P2 · Protocol compose NHIỀU Service (coexistence) — "Điều trị sắc tố kết hợp" ===
+  const techPico = await prisma.technology.upsert({
+    where: { code: "CN-PICO" }, update: {},
+    create: { code: "CN-PICO", name: "Laser Pico", group: "Laser", deviceModel: "PicoSure-like", area: "Mặt", durationMinutes: 30, indications: "Nám, sắc tố", contraindications: "Thai kỳ, da rám nắng cấp" },
+  });
+  const svcLaserPico = await prisma.service.upsert({
+    where: { code: "DV-PICO-01" }, update: {},
+    create: {
+      code: "DV-PICO-01", name: "Laser Pico điều trị sắc tố", categoryId: catLaser.id, status: "ACTIVE", durationMinutes: 30, standardPrice: 2_000_000, expectedCost: 400_000, version: 1,
+      technologyIds: [techPico.id], defaultTechnologyId: techPico.id,
+      steps: { create: [
+        { sortOrder: 0, name: "Tê ủ", durationMinutes: 15, technique: "Ủ tê 15 phút", isRequired: true },
+        { sortOrder: 1, name: "Bắn Laser Pico", durationMinutes: 12, technique: "Bắn theo vùng sắc tố", isRequired: true, technologies: { create: [{ technologyId: techPico.id, notes: "Spot theo mức độ nám" }] } },
+        { sortOrder: 2, name: "Làm dịu", durationMinutes: 3, technique: "Đắp dịu + chống nắng", isRequired: true },
+      ] },
+    },
+  });
+  const svcRecovery = await prisma.service.upsert({
+    where: { code: "DV-RECOVERY-01" }, update: {},
+    create: {
+      code: "DV-RECOVERY-01", name: "Recovery phục hồi da", categoryId: catFacial.id, status: "ACTIVE", durationMinutes: 20, standardPrice: 600_000, expectedCost: 150_000, version: 1,
+      steps: { create: [
+        { sortOrder: 0, name: "Đắp mặt nạ phục hồi", durationMinutes: 15, isRequired: true },
+        { sortOrder: 1, name: "Thoa serum + chống nắng", durationMinutes: 5, isRequired: true },
+      ] },
+    },
+  });
+  const svcDmkForCompose = await prisma.service.findUnique({ where: { code: "DV-DMK-ENZ" } });
+  const protoCompose = await prisma.brandProtocol.findUnique({ where: { code: "PROTO-PIGMENT-COMBO" } });
+  if (!protoCompose && svcDmkForCompose) {
+    await prisma.brandProtocol.create({
+      data: {
+        code: "PROTO-PIGMENT-COMBO", name: "Điều trị sắc tố kết hợp (compose)", kind: "INTERNAL", status: "ACTIVE", version: 1,
+        compositionMode: "SERVICES",
+        purpose: "Phác đồ chuẩn compose từ NHIỀU dịch vụ — mỗi dịch vụ giữ SOP riêng (Redesign P2).",
+        suitableFor: "Nám, tăng sắc tố sau viêm", contraindications: "Thai kỳ, da đang tổn thương",
+        recommendedFreq: "2–4 tuần/lần", recommendedCount: 5, createdBy: "Phạm Chuyên Viên",
+        services: {
+          create: [
+            { sortOrder: 0, serviceId: svcDmkForCompose.id, isRequired: true, serviceVersionSnapshot: svcDmkForCompose.version, conditionText: "Chọn enzyme theo tình trạng da", recommendedVariants: [{ stepName: "Đắp Enzyme Masque", optionName: "Enzyme #2 (da dày/nhiều dầu)" }] },
+            { sortOrder: 1, serviceId: svcLaserPico.id, isRequired: true, serviceVersionSnapshot: svcLaserPico.version, notes: "Bắn sau khi da đã được enzyme làm sạch" },
+            { sortOrder: 2, serviceId: svcRecovery.id, isRequired: false, serviceVersionSnapshot: svcRecovery.version, conditionText: "Thêm khi da nhạy cảm/đỏ nhiều" },
+          ],
+        },
+      },
+    });
+  }
+
   // --- CẤU HÌNH DỊCH VỤ đầy đủ (mục 3): công nghệ/protocol/nhân sự/tài nguyên/vật tư định mức ---
   // Dịch vụ 1 — RF nâng cơ mặt (Công nghệ cao): RF, KTV chính bắt buộc, Máy RF, vật tư định mức.
   await prisma.service.update({

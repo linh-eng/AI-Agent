@@ -1672,6 +1672,76 @@ qty>0 & unit bắt buộc → 422 · §19 finance mask (`sopMaterialCost` null n
 - `ServiceMaterialStandard` (khối E) **giữ nguyên** song song SOP; có thể hợp nhất "vật tư định mức" vào bước
   SOP ở phase sau nếu muốn một nguồn duy nhất.
 
+## BUSINESS REDESIGN — Phase 2 · Protocol compose NHIỀU Service (ProtocolService) (v0.22.0)
+
+Cho phép một **Protocol chuẩn compose NHIỀU Service** (mỗi Service giữ SOP riêng từ P1), trong khi Protocol
+kiểu cũ theo `steps Json` VẪN chạy bình thường. **Quyết định giữ nguyên: COEXISTENCE** — không rewrite,
+không convert hàng loạt, không DROP dữ liệu cũ. Thuần **additive, 0 DROP**. Migration **`S_protocol_services`**
+(0 phá hủy, 7 additive; tổng **29 migration**). **296 test pass** (baseline 288 + `test/protocol-compose.test.ts`
+8). tsc sạch · build OK.
+
+### Audit trước khi code (kết luận)
+- `BrandProtocol` = thư viện Protocol; **legacy steps** lưu ở `steps Json?` (`{items:[…]}`); version = integer +
+  `changeLog Json`; công nghệ/sản phẩm qua join `BrandProtocolTechnology`/`BrandProtocolProduct`; được tham chiếu
+  bởi `TreatmentSession.brandProtocolId` (+`plannedProtocolId` soft). **TreatmentPlan KHÔNG** tham chiếu protocol
+  trực tiếp (chỉ qua session). Dữ liệu KHÔNG được làm mất: `steps`, `technologies`, `products`, version/changeLog,
+  các field cấp-protocol (purpose/suitableFor/contraindications/pre-post-care/freq/count), quan hệ `sessions`.
+
+### Quyết định kiến trúc
+1. **Mode = enum tường minh** `ProtocolCompositionMode {LEGACY_STEPS, SERVICES}` (mặc định **LEGACY_STEPS** →
+   mọi protocol cũ giữ nguyên hành vi). Ít ambiguity hơn suy-diễn theo "có/không có services". **MIXED KHÔNG
+   thêm** (tránh nhập nhằng) — chưa cần.
+2. **Version pinning (báo LIMITATION trung thực):** Service hiện chỉ có `version` integer, **CHƯA có bảng lịch
+   sử SOP**. `ProtocolService.serviceVersionSnapshot` **ghi lại số version** lúc gắn/publish (để đối chiếu),
+   nhưng **KHÔNG dựng lại được SOP cũ**. Mặc định protocol tham chiếu Service **LIVE** (SOP hiện hành). Snapshot
+   SOP **bất biến** thực sự sẽ diễn ra ở **P4** (Plan/Session) qua `sopSnapshot()` (đã có từ P1). Không fake pinning.
+
+### Migration & schema (`S_protocol_services`)
+- Enum `ProtocolCompositionMode`; `BrandProtocol` +`compositionMode` (default LEGACY_STEPS) + quan hệ `services`.
+- Model **`ProtocolService`** (`protocol_services`): `protocolId`, `serviceId`, `sortOrder`, `phase?`, `isRequired`,
+  `conditionText?`, `notes?`, `durationOverride?`, `serviceVersionSnapshot?`, `recommendedVariants Json?`. FK
+  protocol **Cascade**, FK service **Restrict** (Service không hard-delete). **KHÔNG** có cột steps/product/tech
+  → không double-source. Back-relation `Service.protocolServices`.
+
+### Backend
+- `src/lib/protocol-compose.ts`: `protocolServiceInclude`/`protocolServicesInclude` (đọc kèm **preview SOP** của
+  Service read-only), `buildProtocolServicesCreate(services, versionById)` (ghi serviceVersionSnapshot),
+  `composeTotalDuration` (Σ durationOverride ?? Service.duration ?? Σ bước SOP).
+- Validation: `protocolServiceSchema`/`protocolServicesSchema` + `compositionMode`/`services` thêm vào
+  create/update protocol.
+- API `POST /api/brand-protocols` + `PATCH /api/brand-protocols/[id]`: nhận `compositionMode` + `services`
+  (thay TOÀN BỘ; xác thực Service tồn tại → **422** nếu thiếu; ghi version snapshot). GET trả `services` (+SOP
+  preview) + `composeDuration`. Audit **`PROTOCOL_SERVICES_CHANGED`** (before/after gọn). Legacy `bumpVersion`/
+  `status`/`steps` giữ nguyên.
+
+### UI — `/protocols/[id]`
+Selector **"Cách tổ chức nội dung"** (Theo bước cũ | Compose nhiều Dịch vụ). Khi SERVICES: card **"Compose từ
+Dịch vụ (n) · ~tổng thời lượng′"** — thêm dịch vụ (dropdown active-only), **↑/↓ đổi thứ tự**, xóa, **Bắt buộc**,
+ghi đè thời lượng, điều kiện, ghi chú; **expand xem SOP read-only** của Service (số bước/thời lượng/phương án/
+cảnh báo). Hiển thị `vX (gắn vY)` khi version live khác snapshot. Card "Các bước thực hiện" (legacy) **ẩn** ở
+mode SERVICES (dữ liệu vẫn giữ). Link ExternalLink → sửa SOP ở màn Dịch vụ (KHÔNG sửa SOP trực tiếp từ protocol).
+
+### Demo (seed-demo.ts) — `PROTO-PIGMENT-COMBO` "Điều trị sắc tố kết hợp"
+mode SERVICES, 3 dịch vụ: **DMK Enzyme Treatment** (bắt buộc, ĐK "chọn enzyme theo tình trạng da",
+recommendedVariants Enzyme#2) → **Laser Pico** (`DV-PICO-01`, bắt buộc) → **Recovery** (`DV-RECOVERY-01`, tùy
+chọn). Thêm công nghệ Laser Pico + 2 service mới. Guard idempotent `if (!protoCompose && svcDmk)`.
+
+### Chứng minh (test/protocol-compose.test.ts, 8 test HTTP thật)
+A legacy protocol vẫn chạy (mode LEGACY_STEPS, steps giữ, 0 ProtocolService) · B 1 Protocol→3 Service đúng
+sortOrder + version snapshot + preview SOP 5 bước + composeDuration=128 · C reorder persistence · D+E optional +
+override (durationOverride/recommendedVariants) KHÔNG clone SOP · **F Service source-of-truth** (sửa SOP Service
+→ protocol phản chiếu live 4 bước; serviceVersionSnapshot giữ lúc gắn) · G versioning (đổi composition +
+bumpVersion → v2 + audit PROTOCOL_SERVICES_CHANGED) · H RBAC (thiếu protocol.write→403, ẩn danh→401) · I
+validation serviceId sai→422.
+
+### Coexistence & KHÔNG mở rộng phase (đúng ranh giới)
+- **KHÔNG đụng:** TreatmentPlan/Booking/Session business rule, RBAC/finance (Mục 15), Pricing/Costing, sidebar.
+  RBAC dùng lại `protocol.write`/`protocol.approve` sẵn có. Không CONFLICT với baseline Mục 2–16 + P1.
+- **Chưa làm (phase sau):** P3 Booking multi-service (BookingItem); P4 Actual Session chọn phương án + snapshot
+  SOP + trừ tồn theo phương án. **TreatmentPlan tích hợp:** hiện Planned Session chọn 1 Protocol/1 Service như cũ
+  — khi chọn protocol SERVICES (nhiều dịch vụ) hệ thống CHƯA tự tách thành nhiều buổi (mới phân tích, chưa đổi
+  rule — thuộc phase Plan). `sopSnapshot`/`composeTotalDuration` đã sẵn cho các phase đó.
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript

@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 import { brandProtocolCreateSchema } from "@/lib/library-validation";
 import { sequentialCode, auditLog } from "@/lib/clinic";
+import { buildProtocolServicesCreate } from "@/lib/protocol-compose";
 
 export const GET = handle(async (req) => {
   await requirePermission(PERMISSIONS.LIBRARY_READ);
@@ -33,8 +34,15 @@ export const GET = handle(async (req) => {
 export const POST = handle(async (req) => {
   const session = await requirePermission(PERMISSIONS.PROTOCOL_WRITE);
   const parsed = brandProtocolCreateSchema.parse(await req.json());
-  const { technologyIds, productIds, ...data } = parsed;
+  const { technologyIds, productIds, services, ...data } = parsed;
   const code = parsed.code ?? sequentialCode("PROTO", await prisma.brandProtocol.count());
+  // Redesign P2 — nếu tạo kèm compose Service, ghi version snapshot của từng Service.
+  let servicesCreate: any = undefined;
+  if (services?.length) {
+    const svcs = await prisma.service.findMany({ where: { id: { in: services.map((s) => s.serviceId) } }, select: { id: true, version: true } });
+    const versionById = new Map(svcs.map((s) => [s.id, s.version]));
+    servicesCreate = { create: buildProtocolServicesCreate(services, versionById) };
+  }
   const protocol = await prisma.brandProtocol.create({
     data: {
       ...data,
@@ -46,6 +54,7 @@ export const POST = handle(async (req) => {
       products: productIds.length
         ? { create: productIds.map((spaProductId) => ({ spaProductId })) }
         : undefined,
+      services: servicesCreate,
     },
   });
   await auditLog({

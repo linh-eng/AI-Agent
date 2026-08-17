@@ -14,6 +14,19 @@ const dateOpt = z
 
 export const libraryStatusEnum = z.enum(["DRAFT", "REVIEW", "APPROVED", "ACTIVE", "ARCHIVED"]);
 export const protocolKindEnum = z.enum(["BRAND", "INTERNAL"]);
+export const protocolCompositionModeEnum = z.enum(["LEGACY_STEPS", "SERVICES"]);
+
+// ----- Protocol Service (Redesign P2 — compose nhiều Service, KHÔNG clone SOP) -----
+export const protocolServiceSchema = z.object({
+  serviceId: z.string().min(1, "Chọn dịch vụ"),
+  phase: z.string().optional().nullable(),
+  isRequired: z.boolean().optional().default(true),
+  conditionText: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  durationOverride: z.coerce.number().int().positive().optional().nullable(),
+  recommendedVariants: jsonOpt,
+});
+export const protocolServicesSchema = z.array(protocolServiceSchema).max(50);
 export const productTypeEnum = z.enum(["PROFESSIONAL", "HOME_CARE", "BOTH"]);
 export const recommendationPriorityEnum = z.enum(["ESSENTIAL", "RECOMMENDED", "OPTIONAL"]);
 
@@ -71,6 +84,8 @@ export const brandProtocolCreateSchema = z.object({
   createdBy: z.string().optional().nullable(),
   technologyIds: z.array(z.string()).default([]),
   productIds: z.array(z.string()).default([]),
+  compositionMode: protocolCompositionModeEnum.optional(),
+  services: protocolServicesSchema.optional(),
 });
 export const brandProtocolUpdateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -96,6 +111,9 @@ export const brandProtocolUpdateSchema = z.object({
   bumpVersion: z.boolean().optional(),
   changeReason: z.string().optional().nullable(),
   changedBy: z.string().optional().nullable(),
+  // Redesign P2 — chế độ compose + danh sách Service (thay toàn bộ khi gửi)
+  compositionMode: protocolCompositionModeEnum.optional(),
+  services: protocolServicesSchema.optional(),
 });
 
 // ----- Spa Product -----

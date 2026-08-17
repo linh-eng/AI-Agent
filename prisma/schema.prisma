@@ -1143,6 +1143,7 @@ model Service {
   floorVersions     ServicePriceFloorVersion[]
   materialStandards ServiceMaterialStandard[]
   steps             ServiceStep[]
+  protocolServices  ProtocolService[] // Redesign P2 — Service được compose vào các Protocol
 
   @@map("services")
 }
@@ -1621,6 +1622,14 @@ enum ProtocolKind {
   INTERNAL // Protocol nội bộ do doanh nghiệp tự xây (có thể compose từ nhiều nguồn)
 }
 
+/// Cách một Protocol tổ chức nội dung (Redesign P2 — coexistence, additive).
+/// LEGACY_STEPS = protocol theo bước cũ (BrandProtocol.steps Json) — MẶC ĐỊNH, giữ tương thích.
+/// SERVICES     = protocol compose từ NHIỀU Service (ProtocolService), mỗi Service giữ SOP riêng.
+enum ProtocolCompositionMode {
+  LEGACY_STEPS
+  SERVICES
+}
+
 /// Loại sản phẩm theo logic chi phí/doanh thu (mục 15 phần bổ sung)
 enum ProductType {
   PROFESSIONAL // Dùng trong quá trình thực hiện dịch vụ (ảnh hưởng chi phí session)
@@ -1700,6 +1709,9 @@ model BrandProtocol {
   brandId           String?
   version           Int           @default(1)
   status            LibraryStatus @default(DRAFT)
+  // Redesign P2 — cách tổ chức nội dung protocol. Mặc định LEGACY_STEPS để mọi protocol
+  // cũ giữ nguyên hành vi (steps Json). SERVICES = compose nhiều Service (ProtocolService).
+  compositionMode   ProtocolCompositionMode @default(LEGACY_STEPS)
   purpose           String? // Mục tiêu
   suitableFor       String? // Đối tượng/tình trạng phù hợp
   contraindications String? // Chống chỉ định
@@ -1723,10 +1735,42 @@ model BrandProtocol {
   technologies BrandProtocolTechnology[]
   products     BrandProtocolProduct[]
   sessions     TreatmentSession[]
+  services     ProtocolService[] // Redesign P2 — compose nhiều Service (coexist với steps Json cũ)
 
   @@index([brandId])
   @@index([status])
   @@map("brand_protocols")
+}
+
+/// Redesign P2 — Protocol compose NHIỀU Service. Mỗi dòng THAM CHIẾU 1 Service (không clone SOP).
+/// Service vẫn là source-of-truth cho các bước/sản phẩm/công nghệ (SOP ở ServiceStep của P1).
+/// ProtocolService chỉ mang thông tin cấp-compose + override nhẹ (thứ tự, bắt buộc, điều kiện,
+/// ghi đè thời lượng, gợi ý phương án). KHÔNG duplicate ServiceStep.
+model ProtocolService {
+  id                     String   @id @default(cuid())
+  protocolId             String
+  serviceId              String
+  sortOrder              Int      @default(0)
+  phase                  String? // Nhóm/giai đoạn trong protocol (tùy chọn)
+  isRequired             Boolean  @default(true)
+  conditionText          String? // Điều kiện áp dụng (vd "chọn theo tình trạng da")
+  notes                  String? // Ghi chú cấp compose
+  durationOverride       Int? // Ghi đè thời lượng (phút) — nhẹ, KHÔNG clone SOP
+  // Ghi lại version Service tại thời điểm gắn/publish (truy vết). Vì Service hiện chỉ có
+  // integer version (chưa có bảng lịch sử SOP), giá trị này để ĐỐI CHIẾU — không tự dựng lại
+  // SOP cũ. Snapshot SOP bất biến thực sự diễn ra ở P4 (Plan/Session) qua sopSnapshot().
+  serviceVersionSnapshot Int?
+  // Gợi ý phương án cho từng bước (KHÔNG clone SOP) — vd [{stepName, optionName}]. Nullable.
+  recommendedVariants    Json?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  protocol BrandProtocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+  service  Service       @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@index([protocolId, sortOrder])
+  @@index([serviceId])
+  @@map("protocol_services")
 }
 
 /// Join: protocol ↔ công nghệ sử dụng
