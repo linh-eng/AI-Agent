@@ -127,6 +127,7 @@ async function main() {
         code: "DV-DMK-ENZ", name: "DMK Enzyme Treatment", categoryId: catFacial.id, status: "ACTIVE",
         durationMinutes: 83, standardPrice: 2_500_000, expectedCost: 700_000, version: 1,
         technologyIds: [techLED.id], defaultTechnologyId: techLED.id,
+        staffRequirements: [{ role: "Kỹ thuật viên", quantity: 1, required: true }],
         steps: {
           create: [
             {
@@ -939,6 +940,22 @@ async function main() {
   await consumeFromCustomerMaterial(custMat.id, { sessionId: sLinh1.id, performedBy: "Phạm Chuyên Viên", quantity: 3 });
   await consumeFromCustomerMaterial(custMat.id, { sessionId: sLinh2.id, performedBy: "Phạm Chuyên Viên", quantity: 2 });
   // -> đã dùng 5, còn 5. (Khách khác KHÔNG dùng được — chặn ở service, có test.)
+
+  // --- Pricing/Costing PH1 — giá vốn dịch vụ DMK (v1 PUBLISHED) ---
+  const svcDmkCost = await prisma.service.findUnique({ where: { code: "DV-DMK-ENZ" }, select: { id: true } });
+  if (svcDmkCost && (await prisma.serviceCostingVersion.count({ where: { serviceId: svcDmkCost.id } })) === 0) {
+    const { createCostingVersion, publishCostingVersion } = await import("../src/lib/service-costing");
+    // Vật tư SOP: Cleanser 5×100k + Mist 3×60k = 680k; Nhân sự KTV 200k (defaultFee);
+    // Thiết bị 100k; Cơ sở 50k; Overhead PER_MINUTE 1000₫×83′ = 83k → Tổng 1.113.000₫.
+    const { version } = await createCostingVersion({
+      serviceId: svcDmkCost.id,
+      equipmentCost: 100_000, facilityCost: 50_000, otherCost: 0,
+      overheadMethod: "PER_MINUTE", overheadValue: 1_000,
+      note: "Giá vốn DMK Enzyme (demo PH1)", createdBy: "Trần Quản Lý",
+    });
+    await publishCostingVersion(version.id, "Trần Quản Lý");
+    console.log("   Giá vốn DMK: v1 PUBLISHED (vật tư 680k + nhân sự 200k + thiết bị 100k + cơ sở 50k + overhead 83k = 1.113.000₫).");
+  }
 
   console.log("   Vật tư demo: JetPeel 100ml (còn 82ml), Vật tư khách hàng 10đv (còn 5).");
   console.log("✅ Seed DEMO hoàn tất: 7 khách (KH-100001..007), brand Klapp, CN RF/HIFU,");

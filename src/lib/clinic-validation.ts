@@ -807,3 +807,36 @@ export const taskActionSchema = z.object({
 export const sessionReorderSchema = z.object({
   order: z.array(z.object({ id: z.string().min(1), orderIndex: z.coerce.number().int() })).min(1),
 });
+
+// =============================================================================
+// PRICING / COSTING — PH1: Service Costing (giá vốn dịch vụ có version).
+//  * override vật tư phải KÈM lý do (refine → 422 nếu thiếu).
+//  * PH1 chỉ tính COST — không có Floor/Recommended trong schema này.
+// =============================================================================
+const overheadMethodEnum = z.enum(["MANUAL", "FIXED_PER_SERVICE", "PER_MINUTE"]);
+
+const costingBase = z.object({
+  materialOverride: z.coerce.number().min(0).optional().nullable(),
+  materialOverrideReason: z.string().trim().min(1).optional().nullable(),
+  equipmentCost: z.coerce.number().min(0).optional(),
+  facilityCost: z.coerce.number().min(0).optional(),
+  otherCost: z.coerce.number().min(0).optional(),
+  overheadMethod: overheadMethodEnum.optional(),
+  overheadValue: z.coerce.number().min(0).optional(),
+  durationMinutes: z.coerce.number().int().min(0).optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+
+// override có giá trị (≠ null) thì lý do bắt buộc.
+const requireOverrideReason = (d: { materialOverride?: number | null; materialOverrideReason?: string | null }) =>
+  d.materialOverride == null || !!(d.materialOverrideReason && d.materialOverrideReason.trim());
+
+export const costingCreateSchema = costingBase
+  .extend({ serviceId: z.string().min(1) })
+  .refine(requireOverrideReason, { message: "Ghi đè giá vốn vật tư cần lý do", path: ["materialOverrideReason"] });
+
+export const costingUpdateSchema = costingBase
+  .partial()
+  .refine(requireOverrideReason, { message: "Ghi đè giá vốn vật tư cần lý do", path: ["materialOverrideReason"] });
+
+export const costingPublishSchema = z.object({ note: z.string().optional().nullable() });

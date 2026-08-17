@@ -1050,24 +1050,24 @@ model Customer {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  activities        CrmActivity[]
-  bookings          Booking[]
-  assessments       Assessment[]
-  plans             TreatmentPlan[]
-  sessions          TreatmentSession[]
-  payments          Payment[]
-  tasks             Task[]
-  recommendations   ProductRecommendation[]
-  formInstances     FormInstance[]
-  proposals         TreatmentProposal[]
-  careInstances     CareInstructionInstance[]
-  mediaAssets       MediaAsset[]
-  customerMaterials CustomerMaterial[]
-  portalAccount     CustomerPortalAccount?
-  invoices          Invoice[]
-  deposits          Deposit[]
+  activities           CrmActivity[]
+  bookings             Booking[]
+  assessments          Assessment[]
+  plans                TreatmentPlan[]
+  sessions             TreatmentSession[]
+  payments             Payment[]
+  tasks                Task[]
+  recommendations      ProductRecommendation[]
+  formInstances        FormInstance[]
+  proposals            TreatmentProposal[]
+  careInstances        CareInstructionInstance[]
+  mediaAssets          MediaAsset[]
+  customerMaterials    CustomerMaterial[]
+  portalAccount        CustomerPortalAccount?
+  invoices             Invoice[]
+  deposits             Deposit[]
   careProcessInstances CareProcessInstance[]
-  marketingCampaign MarketingCampaign?        @relation(fields: [campaignId], references: [id])
+  marketingCampaign    MarketingCampaign?        @relation(fields: [campaignId], references: [id])
 
   @@index([phone])
   @@index([campaignId])
@@ -1143,11 +1143,12 @@ model Service {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @default(now()) @updatedAt
 
-  category          ServiceCategory?          @relation(fields: [categoryId], references: [id])
+  category          ServiceCategory?           @relation(fields: [categoryId], references: [id])
   bookings          Booking[]
   sessions          TreatmentSession[]
   priceFloor        ServicePriceFloor?
   floorVersions     ServicePriceFloorVersion[]
+  costingVersions   ServiceCostingVersion[] // Pricing PH1 — giá vốn dịch vụ có version (tách khỏi Floor)
   materialStandards ServiceMaterialStandard[]
   steps             ServiceStep[]
   protocolServices  ProtocolService[] // Redesign P2 — Service được compose vào các Protocol
@@ -1213,15 +1214,15 @@ model ServiceStep {
 
 /// Vật tư/sản phẩm định mức của một bước — link Catalog (SpaProduct). Quantity > 0.
 model ServiceStepProduct {
-  id            String   @id @default(cuid())
+  id            String  @id @default(cuid())
   serviceStepId String
   spaProductId  String? // liên kết Catalog (nếu chọn từ danh mục)
   name          String // nhãn/hiển thị (fallback khi không gắn catalog)
-  quantity      Decimal  @default(1) @db.Decimal(14, 3)
+  quantity      Decimal @default(1) @db.Decimal(14, 3)
   unit          String
-  isRequired    Boolean  @default(true)
+  isRequired    Boolean @default(true)
   notes         String?
-  sortOrder     Int      @default(0)
+  sortOrder     Int     @default(0)
 
   step    ServiceStep @relation(fields: [serviceStepId], references: [id], onDelete: Cascade)
   product SpaProduct? @relation(fields: [spaProductId], references: [id])
@@ -1644,17 +1645,17 @@ model Task {
   processVersion        Int? // version quy trình tại thời điểm áp (đông cứng)
   stepSnapshot          Json? // snapshot bước lúc áp: {dayOffset,channel,title,script,checklist}
   // --- Vòng đời hoàn thành / mở lại / hủy có audit (không hard-delete lịch sử) ---
-  completedAt    DateTime?
-  completedBy    String?
-  completionNote String? // kết quả/ghi chú khi hoàn thành
-  checklistState Json? // các mục checklist đã tick khi xử lý
-  actualChannel  DeliveryChannel? // kênh liên hệ thực tế (có thể khác kênh dự kiến)
-  reopenedAt     DateTime?
-  reopenedBy     String?
-  reopenReason   String?
-  cancelledAt    DateTime?
-  cancelledBy    String?
-  cancelReason   String?
+  completedAt           DateTime?
+  completedBy           String?
+  completionNote        String? // kết quả/ghi chú khi hoàn thành
+  checklistState        Json? // các mục checklist đã tick khi xử lý
+  actualChannel         DeliveryChannel? // kênh liên hệ thực tế (có thể khác kênh dự kiến)
+  reopenedAt            DateTime?
+  reopenedBy            String?
+  reopenReason          String?
+  cancelledAt           DateTime?
+  cancelledBy           String?
+  cancelReason          String?
 
   customer     Customer?            @relation(fields: [customerId], references: [id])
   booking      Booking?             @relation(fields: [bookingId], references: [id])
@@ -1773,13 +1774,13 @@ model Technology {
 // Khác với TreatmentPlan (phác đồ riêng của khách).
 // ----------------------------------------------------------------------------
 model BrandProtocol {
-  id                String        @id @default(cuid())
-  code              String        @unique
+  id                String                  @id @default(cuid())
+  code              String                  @unique
   name              String
-  kind              ProtocolKind  @default(BRAND)
+  kind              ProtocolKind            @default(BRAND)
   brandId           String?
-  version           Int           @default(1)
-  status            LibraryStatus @default(DRAFT)
+  version           Int                     @default(1)
+  status            LibraryStatus           @default(DRAFT)
   // Redesign P2 — cách tổ chức nội dung protocol. Mặc định LEGACY_STEPS để mọi protocol
   // cũ giữ nguyên hành vi (steps Json). SERVICES = compose nhiều Service (ProtocolService).
   compositionMode   ProtocolCompositionMode @default(LEGACY_STEPS)
@@ -1793,14 +1794,14 @@ model BrandProtocol {
   postCare          String? // Hướng dẫn sau
   recommendedFreq   String? // Tần suất khuyến nghị
   recommendedCount  Int? // Số lần khuyến nghị
-  attachments       String[]      @default([]) // hình ảnh/video/tài liệu (URL)
+  attachments       String[]                @default([]) // hình ảnh/video/tài liệu (URL)
   note              String? // Ghi chú chuyên môn
   sourceRef         String? // Nguồn tham khảo (khi INTERNAL compose từ nhiều hãng)
   changeLog         Json? // Lịch sử version
   createdBy         String?
-  isActive          Boolean       @default(true)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  isActive          Boolean                 @default(true)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
 
   brand        Brand?                    @relation(fields: [brandId], references: [id])
   technologies BrandProtocolTechnology[]
@@ -2018,25 +2019,25 @@ enum ProposalItemType {
 }
 
 model TreatmentProposal {
-  id               String         @id @default(cuid())
-  code             String         @unique
-  customerId       String
-  planId           String?
-  title            String
-  status           ProposalStatus @default(DRAFT)
-  version          Int            @default(1)
-  note             String? // ghi chú nội bộ (ẩn khỏi khách)
-  createdBy        String?
+  id                String         @id @default(cuid())
+  code              String         @unique
+  customerId        String
+  planId            String?
+  title             String
+  status            ProposalStatus @default(DRAFT)
+  version           Int            @default(1)
+  note              String? // ghi chú nội bộ (ẩn khỏi khách)
+  createdBy         String?
   // --- Chốt phương án (snapshot bất biến) ---
   priceAdjustReason String? // lý do điều chỉnh giá khi chốt (khác giá phương án gốc / bán dưới sàn)
-  acceptedOptionId String?
-  acceptedAt       DateTime?
-  acceptedBy       String?
-  agreedPrice      Decimal?       @db.Decimal(18, 2)
-  appliedDiscount  Decimal?       @db.Decimal(18, 2)
-  acceptedSnapshot Json? // bản đông cứng option đã chọn (item + giá) tại thời điểm chốt
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  acceptedOptionId  String?
+  acceptedAt        DateTime?
+  acceptedBy        String?
+  agreedPrice       Decimal?       @db.Decimal(18, 2)
+  appliedDiscount   Decimal?       @db.Decimal(18, 2)
+  acceptedSnapshot  Json? // bản đông cứng option đã chọn (item + giá) tại thời điểm chốt
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   customer Customer                  @relation(fields: [customerId], references: [id])
   plan     TreatmentPlan?            @relation(fields: [planId], references: [id])
@@ -2521,18 +2522,18 @@ model CustomerMaterial {
 
 // Lịch sử tiêu hao vật tư (dùng cho cả 2 nguồn)
 model MaterialUsage {
-  id                 String         @id @default(cuid())
+  id                 String            @id @default(cuid())
   source             MaterialSource
   containerId        String? // khi SHARED_STOCK
   customerMaterialId String? // khi CUSTOMER_OWNED
   sessionId          String?
   customerId         String?
   performedBy        String?
-  quantity           Decimal        @db.Decimal(14, 3)
-  remainingBefore    Decimal?       @db.Decimal(14, 3) // tồn trước khi dùng (snapshot)
-  remainingAfter     Decimal?       @db.Decimal(14, 3) // tồn sau khi dùng (snapshot)
-  unitCost           Decimal?       @db.Decimal(18, 2) // snapshot giá vốn/đơn vị
-  costAllocated      Decimal?       @db.Decimal(18, 2) // chi phí phân bổ = quantity * unitCost
+  quantity           Decimal           @db.Decimal(14, 3)
+  remainingBefore    Decimal?          @db.Decimal(14, 3) // tồn trước khi dùng (snapshot)
+  remainingAfter     Decimal?          @db.Decimal(14, 3) // tồn sau khi dùng (snapshot)
+  unitCost           Decimal?          @db.Decimal(18, 2) // snapshot giá vốn/đơn vị
+  costAllocated      Decimal?          @db.Decimal(18, 2) // chi phí phân bổ = quantity * unitCost
   serviceId          String? // snapshot (báo cáo theo dịch vụ)
   technologyId       String? // snapshot (báo cáo theo công nghệ)
   brandProtocolId    String? // snapshot (báo cáo theo protocol)
@@ -2544,8 +2545,8 @@ model MaterialUsage {
   reversedAt         DateTime? // set trên bản GỐC khi đã bị hoàn tác (chặn hoàn tác 2 lần)
   reversedBy         String?
   reversalReason     String?
-  occurredAt         DateTime       @default(now())
-  createdAt          DateTime       @default(now())
+  occurredAt         DateTime          @default(now())
+  createdAt          DateTime          @default(now())
 
   container        MaterialContainer? @relation(fields: [containerId], references: [id])
   customerMaterial CustomerMaterial?  @relation(fields: [customerMaterialId], references: [id])
@@ -2639,9 +2640,9 @@ model Deposit {
   voidedBy    String?
   createdAt   DateTime      @default(now())
 
-  customer Customer  @relation(fields: [customerId], references: [id])
-  booking  Booking?  @relation(fields: [bookingId], references: [id])
-  invoice  Invoice?  @relation(fields: [invoiceId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+  booking  Booking? @relation(fields: [bookingId], references: [id])
+  invoice  Invoice? @relation(fields: [invoiceId], references: [id])
 
   @@index([customerId])
   @@index([invoiceId])
@@ -2918,39 +2919,39 @@ enum CostCalcType {
 }
 
 model ServicePriceFloorVersion {
-  id                 String             @id @default(cuid())
-  serviceId          String
-  version            Int
-  status             FloorVersionStatus @default(DRAFT)
-  method             FloorMethod        @default(MARGIN)
-  minMarginPercent   Decimal            @default(0) @db.Decimal(6, 2)
-  manualFloorPrice   Decimal?           @db.Decimal(18, 2) // khi method=MANUAL
-  roundingUnit       Int                @default(1000) // làm tròn lên (đ)
-  durationMinutes    Int? // snapshot thời lượng dịch vụ (cho per-minute/duration)
+  id                    String             @id @default(cuid())
+  serviceId             String
+  version               Int
+  status                FloorVersionStatus @default(DRAFT)
+  method                FloorMethod        @default(MARGIN)
+  minMarginPercent      Decimal            @default(0) @db.Decimal(6, 2)
+  manualFloorPrice      Decimal?           @db.Decimal(18, 2) // khi method=MANUAL
+  roundingUnit          Int                @default(1000) // làm tròn lên (đ)
+  durationMinutes       Int? // snapshot thời lượng dịch vụ (cho per-minute/duration)
   // --- Snapshot tổng (đông cứng khi publish) ---
-  standardPriceSnapshot Decimal @default(0) @db.Decimal(18, 2)
-  materialCost       Decimal            @default(0) @db.Decimal(18, 2)
-  staffCost          Decimal            @default(0) @db.Decimal(18, 2)
-  machineCost        Decimal            @default(0) @db.Decimal(18, 2)
-  roomCost           Decimal            @default(0) @db.Decimal(18, 2)
-  operationCost      Decimal            @default(0) @db.Decimal(18, 2)
-  otherCost          Decimal            @default(0) @db.Decimal(18, 2)
-  totalCost          Decimal            @default(0) @db.Decimal(18, 2)
-  floorPrice         Decimal            @default(0) @db.Decimal(18, 2)
-  maxDiscount        Decimal            @default(0) @db.Decimal(18, 2)
-  maxDiscountPercent Decimal            @default(0) @db.Decimal(6, 2)
+  standardPriceSnapshot Decimal            @default(0) @db.Decimal(18, 2)
+  materialCost          Decimal            @default(0) @db.Decimal(18, 2)
+  staffCost             Decimal            @default(0) @db.Decimal(18, 2)
+  machineCost           Decimal            @default(0) @db.Decimal(18, 2)
+  roomCost              Decimal            @default(0) @db.Decimal(18, 2)
+  operationCost         Decimal            @default(0) @db.Decimal(18, 2)
+  otherCost             Decimal            @default(0) @db.Decimal(18, 2)
+  totalCost             Decimal            @default(0) @db.Decimal(18, 2)
+  floorPrice            Decimal            @default(0) @db.Decimal(18, 2)
+  maxDiscount           Decimal            @default(0) @db.Decimal(18, 2)
+  maxDiscountPercent    Decimal            @default(0) @db.Decimal(6, 2)
   // --- Hiệu lực + vết ---
-  effectiveFrom      DateTime?
-  effectiveTo        DateTime?
-  changeReason       String?
-  note               String?
-  createdBy          String?
-  approvedBy         String?
-  approvedAt         DateTime?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  effectiveFrom         DateTime?
+  effectiveTo           DateTime?
+  changeReason          String?
+  note                  String?
+  createdBy             String?
+  approvedBy            String?
+  approvedAt            DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
-  service Service               @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  service Service              @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   lines   PriceFloorCostLine[]
 
   @@unique([serviceId, version])
@@ -3005,6 +3006,82 @@ model BelowFloorApproval {
   @@index([serviceId])
   @@index([proposalId])
   @@map("below_floor_approvals")
+}
+
+// =============================================================================
+// PRICING / COSTING — PH1: SERVICE COSTING FOUNDATION (v0.25.0)
+// Nền tảng GIÁ VỐN dịch vụ độc lập, CÓ VERSION, TÁCH khỏi Giá sàn (Floor).
+//  * PH1 CHỈ tính CHI PHÍ (cost) — KHÔNG tính Floor/Recommended Price.
+//  * Nguồn tái sử dụng (không clone business logic):
+//      - Vật tư: ServiceStepProduct.quantity × SpaProduct.cost (expectedMaterialCost, P1).
+//      - Nhân sự: Service.staffRequirements × EmployeeRoleFee (hiệu lực ngày, mục 8).
+//      - Thiết bị/Cơ sở/Khác: nhập tay (chưa có engine khấu hao — đúng phạm vi PH1).
+//      - Overhead: MANUAL | FIXED_PER_SERVICE | PER_MINUTE (tối giản, không GL engine).
+//  * Bất biến lịch sử: version PUBLISHED đông cứng snapshot cost + sourceSnapshot;
+//    đổi SpaProduct.cost / EmployeeRoleFee / SOP quantity về sau KHÔNG đổi version cũ.
+//  * Additive-only: KHÔNG đụng Floor v1/v2, PriceRule, Booking, Proposal, Invoice.
+// =============================================================================
+enum CostingStatus {
+  DRAFT // Bản nháp — được tính lại từ nguồn LIVE
+  PUBLISHED // Đã phát hành — snapshot bất biến
+  SUPERSEDED // Bị thay bởi version mới (giữ nguyên, không xóa)
+}
+
+// Cách phân bổ overhead (tối giản — KHÔNG phải accounting engine).
+enum CostAllocationType {
+  MANUAL // Nhập tay 1 con số
+  FIXED_PER_SERVICE // Cố định mỗi buổi dịch vụ
+  PER_MINUTE // Theo thời lượng (× số phút)
+}
+
+model ServiceCostingVersion {
+  id        String        @id @default(cuid())
+  serviceId String
+  version   Int
+  status    CostingStatus @default(DRAFT)
+
+  // Snapshot bối cảnh nguồn (để đối chiếu; version SOP live có thể khác về sau).
+  serviceVersionSnapshot Int? // Service.version tại thời điểm tính
+  durationMinutes        Int? // snapshot thời lượng (cho overhead PER_MINUTE)
+
+  // --- MATERIAL (vật tư) — computed từ SOP; cho phép override có lý do ---
+  computedMaterialCost   Decimal  @default(0) @db.Decimal(18, 2) // Σ SOP product × cost (live lúc tính)
+  materialOverride       Decimal? @db.Decimal(18, 2) // ghi đè (nullable = không override)
+  materialOverrideReason String? // bắt buộc khi có override
+  finalMaterialCost      Decimal  @default(0) @db.Decimal(18, 2) // = override ?? computed
+
+  // --- LABOR (nhân sự) — computed từ staffRequirements × EmployeeRoleFee ---
+  laborCost Decimal @default(0) @db.Decimal(18, 2)
+
+  // --- Manual components ---
+  equipmentCost Decimal @default(0) @db.Decimal(18, 2) // thiết bị (nhập tay PH1)
+  facilityCost  Decimal @default(0) @db.Decimal(18, 2) // phòng/giường/cơ sở (nhập tay PH1)
+  otherCost     Decimal @default(0) @db.Decimal(18, 2)
+
+  // --- OVERHEAD (vận hành) — theo phương pháp phân bổ tối giản ---
+  overheadMethod CostAllocationType @default(MANUAL)
+  overheadValue  Decimal            @default(0) @db.Decimal(18, 2) // giá trị theo method (số tiền hoặc đơn giá/phút)
+  overheadCost   Decimal            @default(0) @db.Decimal(18, 2) // computed từ method+value(+minutes)
+
+  // --- Tổng hợp (snapshot) ---
+  directCost         Decimal @default(0) @db.Decimal(18, 2) // material+labor+equipment+facility
+  totalEstimatedCost Decimal @default(0) @db.Decimal(18, 2) // direct + overhead + other
+
+  // --- Evidence + vết ---
+  sourceSnapshot Json? // {serviceVersion, materialInputs[], laborInputs[], equipmentInput, facilityInput, overheadInput, otherInput, capturedAt}
+  note           String?
+  createdBy      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  publishedBy    String?
+  publishedAt    DateTime?
+  supersedesId   String? // version trước bị thay (soft ref)
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceId, version])
+  @@index([serviceId, status])
+  @@map("service_costing_versions")
 }
 
 // =============================================================================

@@ -619,7 +619,10 @@ function ServiceDetailModal({ id, canFinance, canWrite, onClose, onEdit }: { id:
           <Row k="Giá chuẩn" v={formatCurrency(Number(d.standardPrice))} />
           {canFinance && <Row k="Giá vốn dự kiến" v={d.expectedCost != null ? formatCurrency(Number(d.expectedCost)) : "—"} />}
           {canFinance && d.floorSummary?.hasFloor && <Row k="Tổng chi phí (giá sàn)" v={`${formatCurrency(d.floorSummary.totalCost)} → sàn ${formatCurrency(d.floorSummary.floorPrice)} (biên ${d.floorSummary.minMarginPercent}%)`} />}
-          <div className="pt-1"><Link href="/price-floor" className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Xem / Thiết lập giá sàn</Link></div>
+          <div className="pt-1 flex flex-wrap gap-x-4 gap-y-1">
+            <Link href="/price-floor" className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Xem / Thiết lập giá sàn</Link>
+            {canFinance && <Link href={`/services/${id}/costing`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Giá vốn dịch vụ (costing)</Link>}
+          </div>
         </Sect>
       </div>
     </Modal>

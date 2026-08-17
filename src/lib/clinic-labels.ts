@@ -246,6 +246,16 @@ export const COST_CATEGORY_LABEL: Record<string, string> = {
   MATERIAL: "Vật tư", STAFF: "Nhân sự", MACHINE: "Máy / thiết bị",
   ROOM: "Phòng / giường", OPERATION: "Vận hành", OTHER: "Chi phí khác",
 };
+// --- Pricing/Costing PH1 — trạng thái + phương pháp overhead ---
+export const COSTING_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Bản nháp", PUBLISHED: "Đã phát hành", SUPERSEDED: "Đã thay thế",
+};
+export const COSTING_STATUS_TONE: Record<string, Tone> = {
+  DRAFT: "muted", PUBLISHED: "success", SUPERSEDED: "muted",
+};
+export const OVERHEAD_METHOD_LABEL: Record<string, string> = {
+  MANUAL: "Nhập tay", FIXED_PER_SERVICE: "Cố định mỗi buổi", PER_MINUTE: "Theo phút",
+};
 export const COST_CALC_TYPE_LABEL: Record<string, string> = {
   FIXED: "Cố định", PER_MINUTE: "Theo phút", PER_SESSION: "Trọn buổi",
   PER_USE: "Theo lần dùng", PERCENT_DIRECT: "% trên chi phí trực tiếp", PER_DURATION: "Theo thời lượng",

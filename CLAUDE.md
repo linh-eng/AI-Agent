@@ -1915,6 +1915,76 @@ chưa mở UI · **regression suite dùng chung DB test — KHÔNG chạy song s
 
 ### Kết luận: ✅ **P1–P4 CLOSURE PASS**
 
+## PRICING / COSTING — PH1: SERVICE COSTING FOUNDATION (v0.25.0)
+
+Nền tảng **GIÁ VỐN dịch vụ độc lập, CÓ VERSION, TÁCH khỏi Giá sàn (Floor)**. PH1 CHỈ tính COST — **KHÔNG**
+Floor/Recommended/PriceBook/BookingItem/Protocol-package/VAT. Thuần **additive, 0 DROP**. Migration
+**`V_service_costing`** (2 enum + 1 bảng; 0 destructive; tổng **32 migration**). **336 test / 42 file PASS**
+(baseline 323 + `test/service-costing.test.ts` 13). tsc sạch · lint 0 lỗi (chỉ warning cũ) · build OK.
+
+### Migration & schema (`V_service_costing`)
+- Enum `CostingStatus {DRAFT, PUBLISHED, SUPERSEDED}` · `CostAllocationType {MANUAL, FIXED_PER_SERVICE, PER_MINUTE}`.
+- Model **`ServiceCostingVersion`** (`service_costing_versions`): `serviceId`+`version` (@@unique), `status`,
+  `serviceVersionSnapshot`, `durationMinutes`; MATERIAL: `computedMaterialCost`/`materialOverride`/
+  `materialOverrideReason`/`finalMaterialCost`; `laborCost`; manual `equipmentCost`/`facilityCost`/`otherCost`;
+  overhead `overheadMethod`/`overheadValue`/`overheadCost`; tổng `directCost`/`totalEstimatedCost`;
+  `sourceSnapshot Json` (evidence), `note`, `createdBy/At`, `publishedBy/At`, `supersedesId`. FK service **Cascade**.
+- Service +relation `costingVersions` (KHÔNG đụng field cũ). **KHÔNG** đụng Floor v1/v2, PriceRule, Booking,
+  Proposal, Invoice, ServiceMaterialStandard.
+
+### Lib `src/lib/service-costing.ts` (reuse — KHÔNG clone business logic)
+- **Vật tư**: `computeCostSources` dùng lại `expectedMaterialCost` (P1) = Σ `ServiceStepProduct.qty ×
+  SpaProduct.cost` (SP có gắn Catalog). SP thiếu cost → **warning** (không cộng, không bịa). SOP không có SP → 0.
+- **Nhân sự**: `resolveRoleFeeAverage(role, at)` = trung bình `EmployeeRoleFee` hiện hành của nhân sự ACTIVE
+  (fallback `defaultFee`); staffRequirements × fee. Vai trò không có phí → **warning** (tính 0, cần khai báo).
+- **Công thức (§10)**: `DirectCost = FinalMaterial + Labor + Equipment + Facility`;
+  `TotalEstimatedCost = DirectCost + Overhead + Other` (`computeTotals`, unit-tested). Overhead
+  `computeOverhead`: PER_MINUTE = value×minutes; MANUAL/FIXED = value.
+- **Override vật tư**: `finalMaterialCost = materialOverride ?? computedMaterialCost`; override cần **lý do**
+  (Zod refine → 422); KHÔNG sửa ngược ServiceStepProduct/SpaProduct.cost.
+- **Version/publish**: `createCostingVersion` (DRAFT, tính từ LIVE) · `updateCostingVersion`/
+  `recalculateCostingVersion` (chỉ DRAFT) · `publishCostingVersion` (DRAFT→PUBLISHED: đông cứng cột +
+  `sourceSnapshot`; PUBLISHED cũ → SUPERSEDED, `supersedesId`). **Published bất biến** — sửa/recalc → 409.
+- **Finance mask**: `maskCosting` che TẤT CẢ số cost + `sourceSnapshot` (chứa unitCost/fee) nếu không `finance.read`.
+
+### API (`/api/service-costings`)
+`GET ?serviceId=` (list, `pricefloor.read`, mask theo finance.read) · `POST` (tạo DRAFT, `pricefloor.write`,
+trả `warnings`) · `GET/PATCH /[id]` (chi tiết + sửa DRAFT) · `POST /[id]/recalculate` · `POST /[id]/publish`.
+Audit: **`SERVICE_COSTING_CREATED` / `_RECALCULATED` / `_OVERRIDE_CHANGED` / `_PUBLISHED`** (before/after, không
+log secret). **RBAC reuse** `pricefloor.read`/`pricefloor.write` + `finance.read` — **KHÔNG thêm permission mới**.
+
+### UI — trang nội bộ `/services/[id]/costing` (KHÔNG sửa sidebar/nav.ts)
+Entry point: link **"Giá vốn dịch vụ (costing)"** trong modal chi tiết Dịch vụ (chỉ hiện với `finance.read`).
+Cột trái danh sách version + trạng thái; cột phải **breakdown A–H** (A vật tư SOP · B nhân sự · C thiết bị ·
+D cơ sở · trực tiếp · E overhead · F khác · **G tổng giá vốn** · H version/status/SOP-version/thời điểm) +
+form tạo DRAFT (thiết bị/cơ sở/khác + overhead method/value + ghi đè vật tư có lý do) + Tính lại/Phát hành.
+Thiếu `finance.read` → trang báo không đủ quyền (server đã mask, không dựa UI ẩn).
+
+### Chứng minh (test/service-costing.test.ts, 13 test HTTP thật → tiêu chí A–T)
+A create · **B** material từ SOP (5×100k+3×50k=650k) · **C** labor từ staffReq×roleFee (300k) · D manual
+equip/facility/other · **E** overhead PER_MINUTE(1000×60=60k) & MANUAL=value · **F** total (direct 1.100k,
+total 1.160k) · **G** override+lý do (final=override) · **H** override thiếu lý do→422 · **I** publish freeze +
+sourceSnapshot đủ evidence · **J/K/L** đổi SpaProduct.cost / SOP quantity / EmployeeRoleFee sau publish →
+v1 **BẤT BIẾN** (cột + snapshot) · **M** new draft/recalculate lấy nguồn MỚI · **N** published edit/recalc→409 ·
+**O/P** finance thấy số / non-finance null (kể cả sourceSnapshot + list) · **Q** RBAC 401/403 · **R** audit 4
+sự kiện không lộ secret · **S** legacy: KHÔNG ghi ngược expectedCost/floor/materialStandard · warnings SP thiếu
+cost + vai trò chưa phí. **T** full regression 336/42 không regression.
+
+### Demo (seed-demo.ts) — DMK Enzyme (DV-DMK-ENZ) costing v1 PUBLISHED
+Vật tư SOP 680k (Cleanser 5×100k + Mist 3×60k) + Nhân sự KTV 200k + Thiết bị 100k + Cơ sở 50k + Overhead
+PER_MINUTE 1.000₫×83′=83k = **Tổng giá vốn 1.113.000₫**. (DMK service thêm `staffRequirements` KTV — additive.)
+
+### Coexistence & OUT OF SCOPE (đúng ranh giới PH1)
+- **KHÔNG đụng**: Floor v1/`computeFloor` & v2/`ServicePriceFloorVersion` (giữ nguyên công thức + hành vi
+  Booking/checkFloor), PriceRule/PriceBook, BookingItem.priceSnapshot, Proposal `acceptedSnapshot`, Invoice
+  freeze, RBAC matrix/finance privacy (Mục 15), sidebar/nav, ProtocolLoop. **KHÔNG double-write** nguồn cũ.
+- **Legacy** `Service.expectedCost` / `ServicePriceFloor` v1 / `ServicePriceFloorVersion` v2 / `PriceFloorCostLine`
+  / `ServiceMaterialStandard` **giữ nguyên** — chỉ đánh dấu "nguồn trùng, deprecate ở phase sau" (audit §18 báo cáo).
+- **Chưa làm (phase sau)**: chuẩn hóa/deprecate Floor v1↔v2, Floor tham chiếu Costing, RecommendedPrice
+  (targetMargin), Package/Protocol pricing, VAT, engine khấu hao thiết bị/overhead đầy đủ, `CostAllocationProfile`
+  (PH1 nhúng overhead method vào version — tối giản). `Service` chưa có **bảng lịch sử SOP** nên
+  `serviceVersionSnapshot` chỉ là marker; bất biến thực nằm ở cột cost + `sourceSnapshot` của version PUBLISHED.
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript
