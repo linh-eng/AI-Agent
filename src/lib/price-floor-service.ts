@@ -22,6 +22,22 @@ export class FloorError extends Error {
 export async function recomputeVersion(versionId: string, tx: Prisma.TransactionClient = prisma) {
   const v = await tx.servicePriceFloorVersion.findUnique({ where: { id: versionId }, include: { lines: { orderBy: { orderIndex: "asc" } }, service: { select: { standardPrice: true, durationMinutes: true } } } });
   if (!v) throw new FloorError("Không tìm thấy version giá sàn", 404);
+
+  // PH2 — version tạo TỪ Costing: totalCost là SNAPSHOT từ ServiceCostingVersion,
+  // KHÔNG tính lại từ cost lines (không có lines editable). Chỉ tính lại floorPrice
+  // theo tổng đã snapshot + biên (MARGIN). Snapshot cost giữ bất biến.
+  if (v.serviceCostingVersionId) {
+    const total = num(v.totalCost);
+    const floorPrice = computeFloorPrice({ totalCost: total, method: v.method, minMarginPercent: num(v.minMarginPercent), manualFloorPrice: v.manualFloorPrice == null ? null : num(v.manualFloorPrice), roundingUnit: v.roundingUnit });
+    const standard = num(v.service.standardPrice);
+    const md = maxDiscount(standard, floorPrice);
+    return tx.servicePriceFloorVersion.update({
+      where: { id: versionId },
+      data: { standardPriceSnapshot: standard, floorPrice, maxDiscount: md.amount, maxDiscountPercent: md.percent },
+      include: { lines: { orderBy: { orderIndex: "asc" } } },
+    });
+  }
+
   const minutes = v.durationMinutes ?? v.service.durationMinutes ?? 0;
   const cost = computeVersionCost(
     v.lines.map((l) => ({ category: l.category, quantity: num(l.quantity), unitCost: num(l.unitCost), calcType: l.calcType, calcValue: l.calcValue == null ? null : num(l.calcValue), minutes: l.minutes })),
@@ -82,6 +98,50 @@ export async function createFloorVersion(input: {
   return created;
 }
 
+/**
+ * PH2 — Tạo Floor version MỚI từ một ServiceCostingVersion đã PHÁT HÀNH (PUBLISHED).
+ *  - Snapshot `totalEstimatedCost` → `totalCost`; map 6 thành phần costing → 6 cột snapshot floor
+ *    (MATERIAL=finalMaterial, STAFF=labor, MACHINE=equipment, ROOM=facility, OPERATION=overhead, OTHER=other).
+ *  - Công thức chuẩn MARGIN: floor = totalCost / (1 − margin%). KHÔNG cost lines editable.
+ *  - Không đọc cost LIVE khi validate về sau (snapshot bất biến sau publish/activate).
+ */
+export async function createFloorVersionFromCosting(input: {
+  serviceId: string; serviceCostingVersionId: string; minMarginPercent: number;
+  roundingUnit?: number; changeReason?: string | null; note?: string | null; createdBy?: string | null;
+}) {
+  const service = await prisma.service.findUnique({ where: { id: input.serviceId }, select: { id: true, standardPrice: true } });
+  if (!service) throw new FloorError("Không tìm thấy dịch vụ", 404);
+  const costing = await prisma.serviceCostingVersion.findUnique({ where: { id: input.serviceCostingVersionId } });
+  if (!costing) throw new FloorError("Không tìm thấy version giá vốn", 404);
+  if (costing.serviceId !== input.serviceId) throw new FloorError("Version giá vốn không thuộc dịch vụ này", 422);
+  if (costing.status !== "PUBLISHED") throw new FloorError("Chỉ tạo giá sàn từ version giá vốn ĐÃ PHÁT HÀNH (PUBLISHED)", 422);
+
+  const totalCost = num(costing.totalEstimatedCost);
+  const roundingUnit = input.roundingUnit ?? 1000;
+  const floorPrice = computeFloorPrice({ totalCost, method: "MARGIN", minMarginPercent: input.minMarginPercent, roundingUnit });
+  const standard = num(service.standardPrice);
+  const md = maxDiscount(standard, floorPrice);
+
+  const last = await prisma.servicePriceFloorVersion.findFirst({ where: { serviceId: input.serviceId }, orderBy: { version: "desc" }, select: { version: true } });
+  const nextVersion = (last?.version ?? 0) + 1;
+
+  return prisma.servicePriceFloorVersion.create({
+    data: {
+      serviceId: input.serviceId, version: nextVersion, status: "DRAFT",
+      method: "MARGIN", minMarginPercent: input.minMarginPercent, roundingUnit,
+      durationMinutes: costing.durationMinutes ?? null,
+      serviceCostingVersionId: costing.id, costSource: "COSTING_VERSION",
+      // Snapshot cost (map costing → cột floor) — hiển thị breakdown + bất biến.
+      standardPriceSnapshot: standard,
+      materialCost: num(costing.finalMaterialCost), staffCost: num(costing.laborCost),
+      machineCost: num(costing.equipmentCost), roomCost: num(costing.facilityCost),
+      operationCost: num(costing.overheadCost), otherCost: num(costing.otherCost),
+      totalCost, floorPrice, maxDiscount: md.amount, maxDiscountPercent: md.percent,
+      changeReason: input.changeReason ?? null, note: input.note ?? null, createdBy: input.createdBy ?? null,
+    },
+  });
+}
+
 /** Sửa version — chỉ khi DRAFT/PENDING_APPROVAL. Thay toàn bộ lines nếu gửi. */
 export async function updateFloorVersion(versionId: string, patch: Record<string, any>) {
   const v = await prisma.servicePriceFloorVersion.findUnique({ where: { id: versionId } });
@@ -99,9 +159,12 @@ export async function updateFloorVersion(versionId: string, patch: Record<string
     if (patch.effectiveTo !== undefined) data.effectiveTo = patch.effectiveTo;
     if (patch.changeReason !== undefined) data.changeReason = patch.changeReason;
     if (patch.note !== undefined) data.note = patch.note;
+    // PH2 — costing-backed: KHÔNG cho thay cost lines (nguồn cost là Costing, bất biến).
+    if (v.serviceCostingVersionId && Array.isArray(patch.lines))
+      throw new FloorError("Version tạo từ Giá vốn — không sửa cost lines; đổi ở màn Giá vốn.", 409);
     await tx.servicePriceFloorVersion.update({ where: { id: versionId }, data });
 
-    if (Array.isArray(patch.lines)) {
+    if (!v.serviceCostingVersionId && Array.isArray(patch.lines)) {
       await tx.priceFloorCostLine.deleteMany({ where: { versionId } });
       await tx.priceFloorCostLine.createMany({
         data: patch.lines.map((l: any, i: number) => ({

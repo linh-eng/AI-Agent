@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Save, Send, CheckCircle2, Play, Ban } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Send, CheckCircle2, Play, Ban, ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ export default function PriceFloorDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editLines, setEditLines] = useState<any[] | null>(null); // bản nháp đang sửa
+  const [costForm, setCostForm] = useState<{ costingId: string; margin: string }>({ costingId: "", margin: "30" });
   const [editMeta, setEditMeta] = useState<any>({});
 
   const load = useCallback(async () => {
@@ -54,6 +55,15 @@ export default function PriceFloorDetailPage() {
     try { const v = await apiFetch<any>(`/api/price-floors/${serviceId}`, { method: "POST", body: JSON.stringify({ minMarginPercent: sel?.minMarginPercent ?? 30, method: "MARGIN" }) }); await load(); setSelId(v.id); }
     catch (e) { setError(e instanceof Error ? e.message : "Lỗi"); }
   }
+  // PH2 — tạo Floor version từ Giá vốn (Costing) đã phát hành.
+  async function createFromCosting() {
+    setError(null);
+    if (!costForm.costingId) { setError("Chọn version giá vốn đã phát hành"); return; }
+    try {
+      const v = await apiFetch<any>(`/api/price-floors/${serviceId}`, { method: "POST", body: JSON.stringify({ serviceCostingVersionId: costForm.costingId, minMarginPercent: Number(costForm.margin || 0) }) });
+      await load(); setSelId(v.id);
+    } catch (e) { setError(e instanceof Error ? e.message : "Lỗi"); }
+  }
   function startEdit() {
     setEditMeta({ method: sel.method, minMarginPercent: sel.minMarginPercent ?? 0, manualFloorPrice: sel.manualFloorPrice ?? "", roundingUnit: sel.roundingUnit ?? 1000, changeReason: sel.changeReason ?? "" });
     setEditLines((sel.lines ?? []).map((l: any) => ({ ...l })));
@@ -61,7 +71,11 @@ export default function PriceFloorDetailPage() {
   async function saveEdit() {
     setError(null);
     try {
-      await apiFetch(`/api/price-floor-versions/${sel.id}`, { method: "PATCH", body: JSON.stringify({ ...editMeta, minMarginPercent: Number(editMeta.minMarginPercent || 0), manualFloorPrice: editMeta.manualFloorPrice === "" ? null : Number(editMeta.manualFloorPrice), roundingUnit: Number(editMeta.roundingUnit || 1000), lines: editLines }) });
+      // Version từ Giá vốn: chỉ đổi biên/làm tròn — KHÔNG gửi cost lines (server chặn).
+      const isCostingSel = !!sel?.serviceCostingVersionId;
+      const body: any = { ...editMeta, minMarginPercent: Number(editMeta.minMarginPercent || 0), manualFloorPrice: editMeta.manualFloorPrice === "" ? null : Number(editMeta.manualFloorPrice), roundingUnit: Number(editMeta.roundingUnit || 1000) };
+      if (!isCostingSel) body.lines = editLines;
+      await apiFetch(`/api/price-floor-versions/${sel.id}`, { method: "PATCH", body: JSON.stringify(body) });
       setEditLines(null); await load();
     } catch (e) { setError(e instanceof Error ? e.message : "Lỗi"); }
   }
@@ -71,12 +85,25 @@ export default function PriceFloorDetailPage() {
     catch (e) { setError(e instanceof Error ? e.message : "Lỗi"); }
   }
 
+  // PH2 — version tạo từ Giá vốn (Costing): cost breakdown là SNAPSHOT từ costing,
+  // không sửa cost lines ở màn giá sàn. totalCost lấy từ snapshot, chỉ đổi biên.
+  const isCosting = !!sel?.serviceCostingVersionId;
+
   // preview khi đang sửa
   const previewLines = editing ? editLines! : (sel?.lines ?? []);
-  const cost = fin ? computeVersionCost(previewLines.map((l: any) => ({ category: l.category, quantity: Number(l.quantity), unitCost: Number(l.unitCost), calcType: l.calcType, calcValue: l.calcValue == null || l.calcValue === "" ? null : Number(l.calcValue), minutes: l.minutes })), data.durationMinutes ?? 0) : null;
-  const previewMethod = editing ? editMeta.method : sel?.method;
+  const linesCost = fin ? computeVersionCost(previewLines.map((l: any) => ({ category: l.category, quantity: Number(l.quantity), unitCost: Number(l.unitCost), calcType: l.calcType, calcValue: l.calcValue == null || l.calcValue === "" ? null : Number(l.calcValue), minutes: l.minutes })), data.durationMinutes ?? 0) : null;
+  const cost = fin
+    ? (isCosting
+        ? { byCategory: { MATERIAL: Number(sel?.breakdown?.MATERIAL ?? 0), STAFF: Number(sel?.breakdown?.STAFF ?? 0), MACHINE: Number(sel?.breakdown?.MACHINE ?? 0), ROOM: Number(sel?.breakdown?.ROOM ?? 0), OPERATION: Number(sel?.breakdown?.OPERATION ?? 0), OTHER: Number(sel?.breakdown?.OTHER ?? 0) }, totalCost: Number(sel?.totalCost ?? 0), lineAmounts: [] as number[], directCost: 0 }
+        : linesCost)
+    : null;
+  const previewMethod = isCosting ? "MARGIN" : (editing ? editMeta.method : sel?.method);
   const previewMargin = editing ? Number(editMeta.minMarginPercent || 0) : Number(sel?.minMarginPercent ?? 0);
-  const previewFloor = fin && cost ? computeFloorPrice({ totalCost: cost.totalCost, method: previewMethod, minMarginPercent: previewMargin, manualFloorPrice: editing ? (editMeta.manualFloorPrice === "" ? null : Number(editMeta.manualFloorPrice)) : sel?.manualFloorPrice, roundingUnit: editing ? Number(editMeta.roundingUnit || 1000) : sel?.roundingUnit }) : (sel ? Number(sel.floorPrice) : 0);
+  const previewFloor = fin && cost
+    ? (isCosting
+        ? computeFloorPrice({ totalCost: cost.totalCost, method: "MARGIN", minMarginPercent: previewMargin, roundingUnit: editing ? Number(editMeta.roundingUnit || 1000) : sel?.roundingUnit })
+        : computeFloorPrice({ totalCost: cost.totalCost, method: previewMethod, minMarginPercent: previewMargin, manualFloorPrice: editing ? (editMeta.manualFloorPrice === "" ? null : Number(editMeta.manualFloorPrice)) : sel?.manualFloorPrice, roundingUnit: editing ? Number(editMeta.roundingUnit || 1000) : sel?.roundingUnit }))
+    : (sel ? Number(sel.floorPrice) : 0);
   const md = maxDiscount(data.standardPrice, previewFloor);
   const belowFloor = data.standardPrice + 1e-6 < previewFloor;
 
@@ -88,6 +115,23 @@ export default function PriceFloorDetailPage() {
       {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
       {!fin && <p className="mb-3 rounded border border-amber-500/40 bg-amber-500/5 p-2 text-xs text-amber-700">Bạn chỉ xem được giá sàn & cảnh báo (không có quyền tài chính để xem chi tiết chi phí/biên).</p>}
 
+      {/* PH2 — Tạo Giá sàn từ Giá vốn đã phát hành (khuyến nghị). */}
+      {canWrite && fin && !editing && (
+        <Card className="mb-4"><CardContent className="flex flex-wrap items-end gap-3 p-3">
+          <div className="text-sm font-medium">Tạo giá sàn từ Giá vốn (khuyến nghị)</div>
+          <div className="space-y-1"><Label className="text-xs">Version giá vốn (đã phát hành)</Label>
+            <Select className="h-8" value={costForm.costingId} onChange={(e) => setCostForm({ ...costForm, costingId: e.target.value })}>
+              <option value="">— Chọn —</option>
+              {(data.publishedCostings ?? []).map((c: any) => <option key={c.id} value={c.id}>Giá vốn v{c.version}{c.totalEstimatedCost != null ? ` · ${formatCurrency(c.totalEstimatedCost)}` : ""}</option>)}
+            </Select>
+          </div>
+          <div className="space-y-1"><Label className="text-xs">Biên tối thiểu (%)</Label><Input className="h-8 w-24" type="number" value={costForm.margin} onChange={(e) => setCostForm({ ...costForm, margin: e.target.value })} /></div>
+          <Button size="sm" onClick={createFromCosting} disabled={!costForm.costingId}><Plus className="h-3.5 w-3.5" /> Tạo từ Giá vốn</Button>
+          {(data.publishedCostings ?? []).length === 0 && <span className="text-xs text-amber-600">Dịch vụ chưa có Giá vốn phát hành. <Link href={`/services/${serviceId}/costing`} className="text-primary hover:underline">Thiết lập Giá vốn</Link></span>}
+          <Link href={`/services/${serviceId}/costing`} className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Xem Giá vốn</Link>
+        </CardContent></Card>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         {/* Cột trái: danh sách version */}
         <Card><CardContent className="p-0">
@@ -98,7 +142,7 @@ export default function PriceFloorDetailPage() {
               <button key={v.id} onClick={() => { setEditLines(null); setSelId(v.id); }} className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted/40 ${selId === v.id ? "bg-muted/60" : ""}`}>
                 <div>
                   <div className="font-medium">V{v.version} · <span className="text-primary">{formatCurrency(Number(v.floorPrice))}</span></div>
-                  <div className="text-xs text-muted-foreground">{v.effectiveFrom ? `Từ ${formatDate(v.effectiveFrom)}` : "chưa áp dụng"}</div>
+                  <div className="text-xs text-muted-foreground">{v.effectiveFrom ? `Từ ${formatDate(v.effectiveFrom)}` : "chưa áp dụng"}{v.costSource === "COSTING_VERSION" ? " · từ Giá vốn" : ""}</div>
                 </div>
                 <Badge tone={FLOOR_VERSION_STATUS_TONE[v.status] ?? "muted"}>{FLOOR_VERSION_STATUS_LABEL[v.status] ?? v.status}</Badge>
               </button>
@@ -138,8 +182,16 @@ export default function PriceFloorDetailPage() {
               {!editing && sel.changeReason && <div className="space-y-1 sm:col-span-4"><Label className="text-xs">Lý do thay đổi</Label><div className="text-sm text-muted-foreground">{sel.changeReason}</div></div>}
             </CardContent></Card>
 
-            {/* Cost breakdown A–F (chỉ finance.read) */}
-            {fin ? (
+            {/* PH2 — version từ Giá vốn: breakdown là snapshot read-only, dẫn sang màn Giá vốn để sửa. */}
+            {fin && isCosting && (
+              <Card><CardContent className="p-3 text-xs text-muted-foreground">
+                Chi phí cấu thành lấy SNAPSHOT từ <b>Giá vốn</b> (bất biến). Sửa chi phí ở màn Giá vốn.
+                <Link href={`/services/${serviceId}/costing`} className="ml-1 inline-flex items-center gap-1 text-primary hover:underline"><ExternalLink className="h-3 w-3" /> Xem Giá vốn</Link>
+              </CardContent></Card>
+            )}
+
+            {/* Cost breakdown A–F (chỉ finance.read; version line-based) */}
+            {fin && !isCosting ? (
               <>
                 {CAT_BLOCK.map(({ key, letter }) => {
                   const lines = previewLines.map((l: any, i: number) => ({ ...l, _i: i })).filter((l: any) => l.category === key);

@@ -1985,6 +1985,83 @@ PER_MINUTE 1.000₫×83′=83k = **Tổng giá vốn 1.113.000₫**. (DMK servic
   (PH1 nhúng overhead method vào version — tối giản). `Service` chưa có **bảng lịch sử SOP** nên
   `serviceVersionSnapshot` chỉ là marker; bất biến thực nằm ở cột cost + `sourceSnapshot` của version PUBLISHED.
 
+## PRICING / COSTING — PH2: FLOOR NORMALIZATION + COSTING REFERENCE (v0.26.0)
+
+Chuẩn hóa Giá sàn theo **MARGIN** + cho Floor v2 **tham chiếu ServiceCostingVersion** (PH1). Tách rõ:
+**Costing** = chi phí dự kiến · **FloorPrice** = giá bán thấp nhất được phép. **Owner đã phê duyệt** đổi
+Floor formula/tham chiếu costing/deprecate v1 trong phạm vi PH2. Thuần **additive, 0 DROP**. Migration
+**`W_floor_costing_link`** (1 enum + 2 cột nullable + FK SetNull; tổng **33 migration**). **348 test / 43 file
+PASS** (336 + `test/floor-costing.test.ts` 12). tsc sạch · lint 0 lỗi · build OK.
+
+### Migration & schema (`W_floor_costing_link`)
+- Enum `FloorCostSource {COSTING_VERSION, LEGACY_LINES}`.
+- `ServicePriceFloorVersion` +`serviceCostingVersionId String?` (FK → ServiceCostingVersion, **onDelete SetNull**)
+  +`costSource FloorCostSource @default(LEGACY_LINES)`. Existing v2 rows backfill `LEGACY_LINES` (additive).
+- Back-relation `ServiceCostingVersion.floorVersions`. **KHÔNG** đụng ServicePriceFloor v1, PriceFloorCostLine,
+  PriceRule, Booking, Proposal, Invoice, permission matrix.
+
+### Công thức chuẩn (OWNER DECISION) — MARGIN
+`FloorPrice = TotalEstimatedCost / (1 − MinimumMarginRate)`, `0 ≤ rate < 1`. `computeFloorPrice` (mặc định
+MARGIN) + **epsilon 1e-9 trước ceil** để bội số đúng không lệch (1.4M/0.7 = 2.000.000 chính xác, không thành
+2.000.001). Legacy v1 giữ **MARKUP** cũ (`computeFloor` = total×(1+margin)) — **KHÔNG rewrite lịch sử**.
+
+### Floor v2 tham chiếu Costing — `src/lib/price-floor-service.ts`
+- **`createFloorVersionFromCosting`**: chỉ nhận Costing **PUBLISHED** (DRAFT → 422; không thuộc dịch vụ → 422;
+  không tồn tại → 404). Snapshot `totalEstimatedCost` → `totalCost`; map 6 thành phần costing → 6 cột snapshot
+  floor (MATERIAL=finalMaterial, STAFF=labor, MACHINE=equipment, ROOM=facility, OPERATION=overhead, OTHER=other);
+  MARGIN; **KHÔNG cost lines editable** (không nhập lại 6 thành phần). Version DRAFT → dùng workflow
+  submit/approve/activate hiện tại.
+- **`recomputeVersion` guard**: version costing-backed KHÔNG tính lại từ lines (không có) — chỉ tính lại floor
+  từ totalCost snapshot + biên. `updateFloorVersion` chặn sửa lines cho costing-backed (409). Legacy line-based
+  v2 giữ nguyên hành vi.
+- **Immutability**: đổi SpaProduct.cost / SOP / EmployeeRoleFee / publish Costing v2 sau → Floor cũ **bất biến**
+  (totalCost + floorPrice snapshot). Muốn giá sàn mới → tạo Floor version mới tham chiếu Costing mới.
+
+### `checkServicePriceFloor` — priority + provenance
+Ưu tiên **version v2 ACTIVE** (costing-backed hay line-based đều là 1 version active duy nhất/dịch vụ) → fallback
+**v1**. Trả `source`: **`V2_COSTING`** (active có serviceCostingVersionId) · **`LEGACY_V2`** (active line-based) ·
+**`LEGACY_V1`** (fallback v1) · `null` (chưa khai). `serviceCostingVersionId` kèm theo. Không leak cost cho
+non-finance (chỉ floorPrice guardrail như baseline).
+
+### Below-floor / maxDiscount (giữ nguyên)
+Proposal `proposalOptionFloorTotal` → `checkServicePriceFloor` (nay ưu tiên v2/costing) → below-floor cần
+`pricefloor.override` + `BelowFloorApproval` (mục 6/26, **không đổi**). `maxDiscount` vẫn derived từ
+`Service.standardPrice` − floorPrice (**KHÔNG đụng PriceRule/PriceBook**).
+
+### API / UI
+- API: `POST /api/price-floors/[serviceId]` — có `serviceCostingVersionId` → tạo từ Costing (PH2, khuyến nghị);
+  bỏ trống → legacy line-based (tương thích). GET trả thêm `costSource`/`serviceCostingVersionId` (provenance,
+  không nhạy cảm) + `publishedCostings[]` (totalEstimatedCost mask theo finance.read). Audit **`PRICE_FLOOR_CREATED`**
+  + **`PRICE_FLOOR_COSTING_LINKED`** (create costing-based); **`PRICE_FLOOR_PUBLISHED`** + **`PRICE_FLOOR_SUPERSEDED`**
+  (khi activate).
+- UI `/price-floor/[serviceId]`: panel **"Tạo giá sàn từ Giá vốn (khuyến nghị)"** (chọn Costing PUBLISHED +
+  biên → tạo); version costing-backed hiển thị breakdown **read-only snapshot** + link **"Xem Giá vốn"**
+  (`/services/[id]/costing`), KHÔNG cho sửa cost lines. Reuse RBAC `pricefloor.read/write/approve/override` +
+  `finance.read` (**KHÔNG thêm permission**).
+
+### Chứng minh (test/floor-costing.test.ts, 12 test HTTP+lib → A–U)
+A+B+C+H tạo từ Costing + MARGIN chuẩn (1.2M/0.7=1.714.286) + snapshot cost + 0 cost lines · B pure (1.4M/0.7=
+2.0M exact) · D draft costing→422 · E missing→404 · **F+G** immutable (Costing đổi/thêm v2 → Floor cũ giữ,
+Floor mới dùng Costing mới) · **K** checkServicePriceFloor source=V2_COSTING · **J** legacy line-based v2 =
+LEGACY_LINES/LEGACY_V2 vẫn chạy · **I+L** chỉ v1 → LEGACY_V1 + v1 row bất biến (MARKUP không rewrite) · **M+N**
+proposalOptionFloorTotal dùng floor mới (below-floor đúng) · edge margin âm/≥100/costing khác dịch vụ→422 ·
+**P+Q** finance mask (non-finance totalCost/breakdown/publishedCostings=null) + RBAC 401/403 · **R** audit
+CREATED/COSTING_LINKED/PUBLISHED. **S/N/O/U** (Booking/Proposal/Invoice/P1–P4) không regression qua full suite.
+
+### Demo (seed-demo.ts) — DMK: Costing v1 → Floor từ Costing
+Giá vốn DMK v1 1.113.000₫ → **Giá sàn DMK từ Costing** biên 30% = **1.590.000₫** (ACTIVE, `costSource=COSTING_VERSION`).
+
+### Coexistence & OUT OF SCOPE (đúng ranh giới PH2)
+- **KHÔNG đụng** (đã regression xanh): `Booking.price`/`BookingItem.priceSnapshot`/`resolvePrice`,
+  `Service.standardPrice`/PriceRule/PriceBook/segment resolver, Proposal `acceptedSnapshot`, Invoice freeze,
+  ROLE_PERMISSIONS/Mục 15. **KHÔNG historical rewrite**: v1/v2 cũ + maxDiscount + BelowFloorApproval + snapshot
+  giữ nguyên; MARGIN mới chỉ áp version v2 tạo sau PH2.
+- **Legacy v1**: KHÔNG DROP/DELETE; vẫn GET/validate qua fallback; UI không khuyến khích tạo mới v1 (đường tạo
+  mới dùng Costing). **Legacy v2 line-based**: giữ nguyên, vẫn tạo/sửa được (tương thích test v2).
+- **Chưa làm (phase sau)**: RecommendedPrice/targetMargin, Package/Protocol pricing, BookingItem snapshot fix
+  (segment vs list — PH4), VAT, engine khấu hao/overhead. Floor override tường minh (calculated vs manual floor)
+  chưa mở rộng — costing-backed dùng MARGIN thuần; MANUAL floor chỉ ở legacy path.
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript

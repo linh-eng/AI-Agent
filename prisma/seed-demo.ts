@@ -953,8 +953,16 @@ async function main() {
       overheadMethod: "PER_MINUTE", overheadValue: 1_000,
       note: "Giá vốn DMK Enzyme (demo PH1)", createdBy: "Trần Quản Lý",
     });
-    await publishCostingVersion(version.id, "Trần Quản Lý");
+    const pub = await publishCostingVersion(version.id, "Trần Quản Lý");
     console.log("   Giá vốn DMK: v1 PUBLISHED (vật tư 680k + nhân sự 200k + thiết bị 100k + cơ sở 50k + overhead 83k = 1.113.000₫).");
+
+    // PH2 — Giá sàn DMK tạo TỪ Giá vốn v1 (MARGIN 30%) → 1.113.000 / 0.70 ≈ 1.590.000₫ (làm tròn 1000).
+    const { createFloorVersionFromCosting, transitionFloorVersion } = await import("../src/lib/price-floor-service");
+    const floor = await createFloorVersionFromCosting({ serviceId: svcDmkCost.id, serviceCostingVersionId: pub.version.id, minMarginPercent: 30, changeReason: "Giá sàn từ Giá vốn v1 (demo PH2)", createdBy: "Trần Quản Lý" });
+    await transitionFloorVersion(floor.id, "submit", { canApprove: true });
+    await transitionFloorVersion(floor.id, "approve", { actor: "Ban giám đốc", canApprove: true });
+    await transitionFloorVersion(floor.id, "activate", { actor: "Ban giám đốc", canApprove: true });
+    console.log(`   Giá sàn DMK: từ Giá vốn v1, biên 30% → ${Number(floor.floorPrice).toLocaleString("vi-VN")}₫ (ACTIVE, nguồn COSTING_VERSION).`);
   }
 
   console.log("   Vật tư demo: JetPeel 100ml (còn 82ml), Vật tư khách hàng 10đv (còn 5).");

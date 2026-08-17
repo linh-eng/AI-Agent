@@ -746,6 +746,16 @@ export const floorVersionCreateSchema = z.object({
   lines: z.array(floorCostLineSchema).optional(), // bỏ trống → auto từ dịch vụ
 });
 
+// PH2 — Tạo Floor version từ ServiceCostingVersion đã PHÁT HÀNH.
+//   minMarginPercent: 0 ≤ rate < 100 (max 99.99 → ≥100% trả 422; âm trả 422).
+export const floorVersionFromCostingSchema = z.object({
+  serviceCostingVersionId: z.string().min(1),
+  minMarginPercent: z.coerce.number().min(0).max(99.99),
+  roundingUnit: z.coerce.number().int().min(1).default(1000),
+  changeReason: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+
 // Sửa version DRAFT/PENDING (thay toàn bộ lines).
 export const floorVersionUpdateSchema = z.object({
   method: floorMethodEnum.optional(),

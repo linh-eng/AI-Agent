@@ -2951,12 +2951,25 @@ model ServicePriceFloorVersion {
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
-  service Service              @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  lines   PriceFloorCostLine[]
+  // --- Pricing PH2: liên kết nguồn giá vốn (Costing) — additive, nullable ---
+  serviceCostingVersionId String? // FK tới ServiceCostingVersion PUBLISHED (nguồn cost cho v2 mới)
+  costSource              FloorCostSource @default(LEGACY_LINES) // COSTING_VERSION = tạo từ Costing; LEGACY_LINES = cost lines cũ
+
+  service        Service                @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  costingVersion ServiceCostingVersion? @relation(fields: [serviceCostingVersionId], references: [id], onDelete: SetNull)
+  lines          PriceFloorCostLine[]
 
   @@unique([serviceId, version])
   @@index([serviceId, status])
+  @@index([serviceCostingVersionId])
   @@map("service_price_floor_versions")
+}
+
+// Nguồn cost breakdown của một FloorVersion (PH2). Historical (v2 cũ) = LEGACY_LINES;
+// version mới tạo từ Costing = COSTING_VERSION (snapshot totalEstimatedCost, không cost lines editable).
+enum FloorCostSource {
+  COSTING_VERSION
+  LEGACY_LINES
 }
 
 model PriceFloorCostLine {
@@ -3077,7 +3090,8 @@ model ServiceCostingVersion {
   publishedAt    DateTime?
   supersedesId   String? // version trước bị thay (soft ref)
 
-  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  service       Service                    @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  floorVersions ServicePriceFloorVersion[] // PH2 — các FloorVersion tham chiếu costing này
 
   @@unique([serviceId, version])
   @@index([serviceId, status])

@@ -28,6 +28,9 @@ export function computeFloor(c: FloorComponents): { totalCost: number; floorPric
   return { totalCost, floorPrice };
 }
 
+// Provenance nguồn giá sàn dùng để validate (PH2 — nội bộ, không leak cost).
+export type FloorSource = "V2_COSTING" | "LEGACY_V2" | "LEGACY_V1" | null;
+
 export interface FloorCheck {
   hasFloor: boolean;
   totalCost: number;
@@ -40,6 +43,8 @@ export interface FloorCheck {
   maxDiscount?: number;
   maxDiscountPercent?: number;
   version?: number | null;
+  source?: FloorSource; // PH2: V2_COSTING > LEGACY_V2 > LEGACY_V1
+  serviceCostingVersionId?: string | null; // nếu floor v2 tham chiếu Costing
 }
 
 // =============================================================================
@@ -133,7 +138,9 @@ export function computeFloorPrice(input: {
   if (input.method === "MANUAL") raw = num(input.manualFloorPrice);
   else if (input.method === "MARKUP") raw = total * (1 + m);
   else raw = m >= 1 ? total : total / (1 - m); // MARGIN mặc định; biên 100% vô nghĩa → dùng total
-  return Math.ceil(raw / round) * round;
+  // Làm tròn LÊN theo đơn vị; trừ epsilon để tránh sai số dấu phẩy động (vd 1.4M/0.7
+  // = 2000000.0000002 → không được thành 2000001). Bội số đúng vẫn giữ nguyên.
+  return Math.ceil(raw / round - 1e-9) * round;
 }
 
 /** Chiết khấu tối đa từ giá chuẩn xuống giá sàn. */
@@ -175,16 +182,19 @@ export async function checkServicePriceFloor(serviceId: string, price: number, a
   if (active) {
     const floorPrice = num(active.floorPrice);
     const below = price + 1e-6 < floorPrice;
+    // Provenance PH2: version v2 tham chiếu Costing → V2_COSTING; ngược lại LEGACY_V2.
+    const source: FloorSource = (active as any).serviceCostingVersionId ? "V2_COSTING" : "LEGACY_V2";
     return {
       hasFloor: true, totalCost: num(active.totalCost), floorPrice, price, below,
       shortfall: below ? floorPrice - price : 0, floorVersionId: active.id, standardPrice,
       maxDiscount: num(active.maxDiscount), maxDiscountPercent: num(active.maxDiscountPercent), version: active.version,
+      source, serviceCostingVersionId: (active as any).serviceCostingVersionId ?? null,
     };
   }
 
   // v1 fallback (model cũ).
   const floor = await prisma.servicePriceFloor.findUnique({ where: { serviceId } });
-  if (!floor) return { hasFloor: false, totalCost: 0, floorPrice: 0, price, below: false, shortfall: 0, standardPrice };
+  if (!floor) return { hasFloor: false, totalCost: 0, floorPrice: 0, price, below: false, shortfall: 0, standardPrice, source: null };
   const { totalCost, floorPrice } = computeFloor({
     laborCost: num(floor.laborCost), operationCost: num(floor.operationCost), depreciationCost: num(floor.depreciationCost),
     materialCost: num(floor.materialCost), roomCost: num(floor.roomCost), otherCost: num(floor.otherCost),
@@ -192,7 +202,7 @@ export async function checkServicePriceFloor(serviceId: string, price: number, a
   });
   const below = price + 1e-6 < floorPrice;
   const md = maxDiscount(standardPrice, floorPrice);
-  return { hasFloor: true, totalCost, floorPrice, price, below, shortfall: below ? floorPrice - price : 0, floorVersionId: null, standardPrice, maxDiscount: md.amount, maxDiscountPercent: md.percent, version: null };
+  return { hasFloor: true, totalCost, floorPrice, price, below, shortfall: below ? floorPrice - price : 0, floorVersionId: null, standardPrice, maxDiscount: md.amount, maxDiscountPercent: md.percent, version: null, source: "LEGACY_V1", serviceCostingVersionId: null };
 }
 
 /**
