@@ -1143,17 +1143,18 @@ model Service {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @default(now()) @updatedAt
 
-  category          ServiceCategory?           @relation(fields: [categoryId], references: [id])
-  bookings          Booking[]
-  sessions          TreatmentSession[]
-  priceFloor        ServicePriceFloor?
-  floorVersions     ServicePriceFloorVersion[]
-  costingVersions   ServiceCostingVersion[] // Pricing PH1 — giá vốn dịch vụ có version (tách khỏi Floor)
-  materialStandards ServiceMaterialStandard[]
-  steps             ServiceStep[]
-  protocolServices  ProtocolService[] // Redesign P2 — Service được compose vào các Protocol
-  bookingItems      BookingItem[] // Redesign P3 — Service là 1 hạng mục trong Booking nhiều dịch vụ
-  executionItems    SessionExecutionItem[] // Redesign P4 — Service được thực hiện thực tế trong buổi
+  category                 ServiceCategory?                 @relation(fields: [categoryId], references: [id])
+  bookings                 Booking[]
+  sessions                 TreatmentSession[]
+  priceFloor               ServicePriceFloor?
+  floorVersions            ServicePriceFloorVersion[]
+  costingVersions          ServiceCostingVersion[] // Pricing PH1 — giá vốn dịch vụ có version (tách khỏi Floor)
+  recommendedPriceVersions ServiceRecommendedPriceVersion[] // Pricing PH3 — giá đề xuất theo biên mục tiêu
+  materialStandards        ServiceMaterialStandard[]
+  steps                    ServiceStep[]
+  protocolServices         ProtocolService[] // Redesign P2 — Service được compose vào các Protocol
+  bookingItems             BookingItem[] // Redesign P3 — Service là 1 hạng mục trong Booking nhiều dịch vụ
+  executionItems           SessionExecutionItem[] // Redesign P4 — Service được thực hiện thực tế trong buổi
 
   @@map("services")
 }
@@ -3090,12 +3091,57 @@ model ServiceCostingVersion {
   publishedAt    DateTime?
   supersedesId   String? // version trước bị thay (soft ref)
 
-  service       Service                    @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  floorVersions ServicePriceFloorVersion[] // PH2 — các FloorVersion tham chiếu costing này
+  service             Service                          @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  floorVersions       ServicePriceFloorVersion[] // PH2 — các FloorVersion tham chiếu costing này
+  recommendedVersions ServiceRecommendedPriceVersion[] // PH3 — các Recommended Price tham chiếu costing này
 
   @@unique([serviceId, version])
   @@index([serviceId, status])
   @@map("service_costing_versions")
+}
+
+// =============================================================================
+// PRICING / COSTING — PH3: RECOMMENDED PRICE / TARGET MARGIN (v0.27.0)
+// Lớp GIÁ ĐỀ XUẤT độc lập: "với giá vốn + biên MỤC TIÊU, nên bán ở mức nào?".
+//  * KHÁC Floor (giá bán tối thiểu / minimum margin) và KHÁC PriceRule (giá bán thực tế).
+//  * Tham chiếu ServiceCostingVersion PUBLISHED; công thức MARGIN: cost / (1 − target%).
+//  * Ràng buộc: target ≥ minimum margin của Floor ACTIVE + recommended ≥ giá sàn (nếu có Floor).
+//  * Versioned; PUBLISHED bất biến (snapshot cost + target + giá + tham chiếu Floor).
+//  * Decision-support: KHÔNG ghi ngược Service.standardPrice / PriceRule / Floor / Costing.
+//  * Dùng lại enum CostingStatus (DRAFT/PUBLISHED/SUPERSEDED) — cùng vòng đời.
+// =============================================================================
+model ServiceRecommendedPriceVersion {
+  id                      String        @id @default(cuid())
+  serviceId               String
+  serviceCostingVersionId String // nguồn giá vốn (PUBLISHED)
+  version                 Int
+  status                  CostingStatus @default(DRAFT)
+
+  targetMarginPercent        Decimal @db.Decimal(6, 2) // biên MỤC TIÊU trên doanh thu (0 ≤ % < 100)
+  costSnapshot               Decimal @default(0) @db.Decimal(18, 2) // = costing.totalEstimatedCost lúc tính (nhạy cảm)
+  roundingUnit               Int     @default(1000)
+  calculatedRecommendedPrice Decimal @default(0) @db.Decimal(18, 2) // giá đề xuất (snapshot)
+
+  // Tham chiếu Floor ACTIVE lúc lập (evidence ràng buộc; nullable nếu chưa có Floor)
+  floorVersionId     String?
+  floorPriceSnapshot Decimal? @db.Decimal(18, 2)
+
+  note          String?
+  effectiveFrom DateTime?
+  createdBy     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  publishedBy   String?
+  publishedAt   DateTime?
+  supersedesId  String?
+
+  service        Service               @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  costingVersion ServiceCostingVersion @relation(fields: [serviceCostingVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([serviceId, version])
+  @@index([serviceId, status])
+  @@index([serviceCostingVersionId])
+  @@map("service_recommended_price_versions")
 }
 
 // =============================================================================

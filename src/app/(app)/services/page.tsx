@@ -622,6 +622,7 @@ function ServiceDetailModal({ id, canFinance, canWrite, onClose, onEdit }: { id:
           <div className="pt-1 flex flex-wrap gap-x-4 gap-y-1">
             <Link href="/price-floor" className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Xem / Thiết lập giá sàn</Link>
             {canFinance && <Link href={`/services/${id}/costing`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Giá vốn dịch vụ (costing)</Link>}
+            {canFinance && <Link href={`/services/${id}/recommended-price`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Giá đề xuất (recommended)</Link>}
           </div>
         </Sect>
       </div>

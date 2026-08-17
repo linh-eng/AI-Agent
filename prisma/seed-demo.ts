@@ -963,6 +963,12 @@ async function main() {
     await transitionFloorVersion(floor.id, "approve", { actor: "Ban giám đốc", canApprove: true });
     await transitionFloorVersion(floor.id, "activate", { actor: "Ban giám đốc", canApprove: true });
     console.log(`   Giá sàn DMK: từ Giá vốn v1, biên 30% → ${Number(floor.floorPrice).toLocaleString("vi-VN")}₫ (ACTIVE, nguồn COSTING_VERSION).`);
+
+    // PH3 — Giá đề xuất DMK: biên MỤC TIÊU 40% → 1.113.000 / 0.60 = 1.855.000₫ (≥ giá sàn).
+    const { createRecommendedVersion, publishRecommendedVersion } = await import("../src/lib/recommended-price");
+    const rec = await createRecommendedVersion({ serviceId: svcDmkCost.id, serviceCostingVersionId: pub.version.id, targetMarginPercent: 40, note: "Giá đề xuất DMK biên 40% (demo PH3)", createdBy: "Trần Quản Lý" });
+    const recPub = await publishRecommendedVersion(rec.id, "Trần Quản Lý");
+    console.log(`   Giá đề xuất DMK: biên mục tiêu 40% → ${Number(recPub.calculatedRecommendedPrice).toLocaleString("vi-VN")}₫ (PUBLISHED; giá chuẩn 2.500.000₫).`);
   }
 
   console.log("   Vật tư demo: JetPeel 100ml (còn 82ml), Vật tư khách hàng 10đv (còn 5).");

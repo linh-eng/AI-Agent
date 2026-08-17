@@ -106,7 +106,10 @@ export default function ServiceCostingPage() {
       <PageHeader
         title={`Giá vốn dịch vụ${service ? " · " + service.name : ""}`}
         description="Nền tảng giá vốn có version — tách khỏi Giá sàn. Vật tư từ SOP, nhân sự từ phí vai trò; thiết bị/cơ sở/overhead nhập tay."
-        action={<Link href="/services" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ArrowLeft className="h-4 w-4" /> Về Dịch vụ</Link>}
+        action={<div className="flex items-center gap-3">
+          <Link href={`/services/${id}/recommended-price`} className="inline-flex items-center gap-1 text-sm text-primary hover:underline">Giá đề xuất →</Link>
+          <Link href="/services" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ArrowLeft className="h-4 w-4" /> Về Dịch vụ</Link>
+        </div>}
       />
 
       {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}

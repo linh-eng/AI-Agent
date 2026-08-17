@@ -2062,6 +2062,67 @@ Giá vốn DMK v1 1.113.000₫ → **Giá sàn DMK từ Costing** biên 30% = **
   (segment vs list — PH4), VAT, engine khấu hao/overhead. Floor override tường minh (calculated vs manual floor)
   chưa mở rộng — costing-backed dùng MARGIN thuần; MANUAL floor chỉ ở legacy path.
 
+## PRICING / COSTING — PH3: RECOMMENDED PRICE / TARGET MARGIN (v0.27.0)
+
+Lớp **GIÁ ĐỀ XUẤT** độc lập (decision-support): "với giá vốn + biên MỤC TIÊU, nên bán ở mức nào?". KHÁC
+Floor (giá bán tối thiểu / minimum margin) và KHÁC PriceRule (giá bán thực tế theo segment). Thuần
+**additive, 0 DROP**. Migration **`X_recommended_price`** (1 bảng; 0 destructive; tổng **34 migration**).
+**360 test / 44 file PASS** (348 + `test/recommended-price.test.ts` 12). tsc sạch · lint 0 lỗi · build OK.
+
+### Migration & schema (`X_recommended_price`)
+- Model **`ServiceRecommendedPriceVersion`** (`service_recommended_price_versions`): `serviceId`+`version`
+  (@@unique), `serviceCostingVersionId` (FK → ServiceCostingVersion, **onDelete Restrict**), `status`
+  (**dùng lại enum `CostingStatus`** DRAFT/PUBLISHED/SUPERSEDED), `targetMarginPercent`, `costSnapshot`,
+  `roundingUnit`, `calculatedRecommendedPrice`, `floorVersionId?`+`floorPriceSnapshot?` (evidence ràng buộc),
+  `note`, `createdBy/At`, `publishedBy/At`, `supersedesId`. **KHÔNG** đụng Costing/Floor/PriceRule/Service.
+
+### Công thức + ràng buộc — `src/lib/recommended-price.ts`
+- **MARGIN mục tiêu**: `RecommendedPrice = TotalEstimatedCost / (1 − targetMargin%)` (dùng lại
+  `computeFloorPrice` MARGIN + epsilon). `targetMargin`: 0 ≤ % < 100 (Zod max 99.99 → âm/≥100 = 422).
+- **Nguồn**: chỉ `ServiceCostingVersion` **PUBLISHED** (DRAFT→422, sai dịch vụ→422, không có→404). KHÔNG dùng
+  expectedCost / floor lines / expectedMaterialCost live / PriceRule.
+- **Ràng buộc Floor (QUYẾT ĐỊNH: VALIDATION, không clamp — giữ đúng semantics biên mục tiêu):** khi có Floor
+  ACTIVE → **§5** `targetMargin ≥ minMargin(floor)` (else 422) VÀ **§6** `recommended ≥ floorPrice` (else 422);
+  snapshot `floorVersionId`+`floorPriceSnapshot`. Không có Floor → không ràng buộc.
+- **Versioning**: DRAFT (sửa/tính lại) → PUBLISHED (đông cứng snapshot + re-validate Floor) → cũ SUPERSEDED.
+  PUBLISHED bất biến (PATCH/recalculate → 409). `priceComparisonBand` (derived §13: BELOW_FLOOR /
+  BETWEEN_FLOOR_AND_RECOMMENDED / AT_OR_ABOVE_RECOMMENDED — chỉ hiển thị, không policy/enum DB).
+
+### Finance privacy (§15) + RBAC
+- `maskCosting`-style: che **`targetMarginPercent` + `costSnapshot`** nếu không `finance.read`;
+  `calculatedRecommendedPrice` giữ visibility như Floor (guardrail). Non-finance KHÔNG suy được cost (margin
+  ẩn). Áp ở SERVER (list + detail).
+- Reuse `pricefloor.read` (GET) + `pricefloor.write` (POST/PATCH/publish/recalculate) + `finance.read` —
+  **KHÔNG thêm permission, KHÔNG sửa ROLE_PERMISSIONS**.
+
+### API / UI
+- API: `/api/recommended-prices` (GET?serviceId / POST) · `/[id]` (GET/PATCH) · `/[id]/recalculate` ·
+  `/[id]/publish`. Audit **`RECOMMENDED_PRICE_CREATED`/`_RECALCULATED`/`_PUBLISHED`/`_SUPERSEDED`**.
+- UI nội bộ `/services/[id]/recommended-price` (KHÔNG sửa sidebar/nav): so sánh **Costing / Floor ACTIVE /
+  Recommended / Standard** + banner vị trí giá chuẩn (KHÔNG tự sửa standardPrice) + tạo/tính lại/phát hành +
+  ràng buộc Floor hiển thị. Entry link trong modal Dịch vụ + màn Giá vốn. Thiếu `finance.read` → báo không đủ quyền.
+
+### Chứng minh (test/recommended-price.test.ts, 12 test → A–V)
+A+C+H tạo + MARGIN (1.2M/0.6=2.0M) + rounding · B costing PUBLISHED bắt buộc (DRAFT/sai dịch vụ→422) · D+E
+margin âm/≥100→422 · **F+G** ràng buộc Floor (target<minMargin→422; target≥floor OK & recommended≥floor;
+target=floorMargin → recommended=floorPrice) · I publish freeze · **J+K** immutable (đổi Product.cost /
+publish Costing v2 → Recommended v1 KHÔNG đổi) · **L** new Recommended dùng Costing mới · M published edit→409 ·
+**N+O+P** không double-write (Service.standardPrice / PriceRule count 0 / Floor row KHÔNG đổi) · **Q** finance
+mask (targetMargin/costSnapshot null; giá đề xuất hiện) · **R** RBAC 401/403 · **S** audit 3 sự kiện. **T/U/V**
+(Proposal/Booking/Invoice + PH1/PH2 + P1–P4) không regression qua full suite 360/44.
+
+### Demo (seed-demo.ts) — DMK: Costing → Floor → Recommended → Standard
+Giá vốn 1.113.000₫ → Giá sàn 1.590.000₫ (biên 30%) → **Giá đề xuất 1.855.000₫** (biên mục tiêu 40%,
+PUBLISHED) · Giá chuẩn 2.500.000₫. Minh họa 4 mức giá tách bạch.
+
+### Coexistence & OUT OF SCOPE (đúng ranh giới PH3)
+- **KHÔNG double-write** (đã regression + test N/O/P): `Service.standardPrice`, PriceRule, Floor, Costing,
+  Proposal `acceptedSnapshot`, Booking, Invoice. Recommended Price là domain riêng, chỉ đọc.
+- **KHÔNG đụng** Mục 15 permission/finance privacy, sidebar/nav, ProtocolLoop.
+- **Chưa làm (phase sau)**: auto-write Recommended → PriceRule; Package/Protocol pricing; BookingItem snapshot
+  fix (segment vs list — PH4); Proposal/Invoice redesign; VAT; pricing-psychology rounding. Comparison band là
+  derived display, không thành policy/permission.
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript

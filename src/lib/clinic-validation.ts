@@ -850,3 +850,21 @@ export const costingUpdateSchema = costingBase
   .refine(requireOverrideReason, { message: "Ghi đè giá vốn vật tư cần lý do", path: ["materialOverrideReason"] });
 
 export const costingPublishSchema = z.object({ note: z.string().optional().nullable() });
+
+// =============================================================================
+// PRICING / COSTING — PH3: Recommended Price (giá đề xuất theo biên mục tiêu).
+//   targetMarginPercent: 0 ≤ % < 100 (âm/≥100 → 422). Nguồn = ServiceCostingVersion PUBLISHED.
+// =============================================================================
+export const recommendedCreateSchema = z.object({
+  serviceId: z.string().min(1),
+  serviceCostingVersionId: z.string().min(1),
+  targetMarginPercent: z.coerce.number().min(0).max(99.99),
+  roundingUnit: z.coerce.number().int().min(1).default(1000),
+  note: z.string().optional().nullable(),
+});
+
+export const recommendedUpdateSchema = z.object({
+  targetMarginPercent: z.coerce.number().min(0).max(99.99).optional(),
+  roundingUnit: z.coerce.number().int().min(1).optional(),
+  note: z.string().optional().nullable(),
+});
