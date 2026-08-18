@@ -1538,23 +1538,23 @@ model TreatmentSession {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
-  plan           TreatmentPlan?            @relation(fields: [planId], references: [id], onDelete: Cascade)
-  stage          TreatmentStage?           @relation(fields: [stageId], references: [id])
-  customer       Customer                  @relation(fields: [customerId], references: [id])
-  booking        Booking?                  @relation(fields: [bookingId], references: [id])
-  service        Service?                  @relation(fields: [serviceId], references: [id])
-  technology     Technology?               @relation(fields: [technologyId], references: [id])
-  brandProtocol  BrandProtocol?            @relation(fields: [brandProtocolId], references: [id])
-  tasks          Task[]
-  formInstances  FormInstance[]
-  careInstances  CareInstructionInstance[]
-  materials      SessionMaterial[]
-  materialUsages MaterialUsage[]
-  mediaAssets    MediaAsset[]
-  staff          SessionStaff[]
+  plan               TreatmentPlan?             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  stage              TreatmentStage?            @relation(fields: [stageId], references: [id])
+  customer           Customer                   @relation(fields: [customerId], references: [id])
+  booking            Booking?                   @relation(fields: [bookingId], references: [id])
+  service            Service?                   @relation(fields: [serviceId], references: [id])
+  technology         Technology?                @relation(fields: [technologyId], references: [id])
+  brandProtocol      BrandProtocol?             @relation(fields: [brandProtocolId], references: [id])
+  tasks              Task[]
+  formInstances      FormInstance[]
+  careInstances      CareInstructionInstance[]
+  materials          SessionMaterial[]
+  materialUsages     MaterialUsage[]
+  mediaAssets        MediaAsset[]
+  staff              SessionStaff[]
   staffContributions SessionStaffContribution[] // HR-PH3
-  review         SessionReview?
-  executionItems SessionExecutionItem[] // Redesign P4 — mỗi dịch vụ thực tế đã làm
+  review             SessionReview?
+  executionItems     SessionExecutionItem[] // Redesign P4 — mỗi dịch vụ thực tế đã làm
 
   @@index([planId, sessionNumber])
   @@index([customerId])
@@ -1583,9 +1583,9 @@ model SessionExecutionItem {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
-  session     TreatmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  service     Service          @relation(fields: [serviceId], references: [id], onDelete: Restrict)
-  bookingItem BookingItem?     @relation(fields: [bookingItemId], references: [id], onDelete: SetNull)
+  session            TreatmentSession           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  service            Service                    @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  bookingItem        BookingItem?               @relation(fields: [bookingItemId], references: [id], onDelete: SetNull)
   staffContributions SessionStaffContribution[] // HR-PH3
 
   @@index([sessionId, sortOrder])
@@ -2741,6 +2741,7 @@ model Branch {
   workShifts         WorkShift[] // HR-PH2
   attendanceRecords  AttendanceRecord[] // HR-PH2
   staffContributions SessionStaffContribution[] // HR-PH3
+  kpiPeriods         KpiPeriod[] // HR-PH4
 
   @@map("branches")
 }
@@ -2778,8 +2779,10 @@ model Employee {
   workShifts         WorkShift[] // HR-PH2
   attendanceRecords  AttendanceRecord[] // HR-PH2
   contributions      SessionStaffContribution[] // HR-PH3
-  branchRef          Branch?                 @relation(fields: [branchId], references: [id]) // KHÔNG đổi tên field `branch`
-  user               User?                   @relation(fields: [userId], references: [id])
+  kpiSnapshots       EmployeeKpiSnapshot[] // HR-PH4
+  reviews            SessionReview[] // HR-PH4 (FK bổ sung, snapshot technicianName giữ nguyên)
+  branchRef          Branch?                    @relation(fields: [branchId], references: [id]) // KHÔNG đổi tên field `branch`
+  user               User?                      @relation(fields: [userId], references: [id])
 
   @@index([isActive])
   @@index([status])
@@ -2861,7 +2864,7 @@ model EmployeeSchedule {
   effectiveTo   DateTime?
   createdAt     DateTime  @default(now())
 
-  employee  Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee   Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   workShifts WorkShift[] // HR-PH2 — ca dated sinh từ mẫu này (idempotent)
 
   @@index([employeeId])
@@ -2946,14 +2949,14 @@ enum AdjustmentStatus {
 /// Ca làm việc theo NGÀY cụ thể (khác EmployeeSchedule mẫu tuần). Sinh idempotent từ
 /// mẫu hoặc quản lý tạo tay. Timestamps là instant (true-UTC); workDate = ngày local ca.
 model WorkShift {
-  id               String          @id @default(cuid())
+  id               String           @id @default(cuid())
   employeeId       String
   branchId         String? // chi nhánh (snapshot FK; cho RBAC/report theo chi nhánh sau)
   scheduleId       String? // mẫu nguồn nếu sinh tự động (null = tạo tay)
-  workDate         DateTime        @db.Date // ngày làm (local theo tz chi nhánh)
+  workDate         DateTime         @db.Date // ngày làm (local theo tz chi nhánh)
   scheduledStartAt DateTime // instant bắt đầu dự kiến
   scheduledEndAt   DateTime // instant kết thúc dự kiến (có thể qua ngày — cross-midnight)
-  breakMinutes     Int             @default(0) // nghỉ giữa ca (phút)
+  breakMinutes     Int              @default(0) // nghỉ giữa ca (phút)
   shiftLabel       String? // nhãn ca (sáng/chiều/tối…)
   roleSnapshot     String? // vai trò dự kiến (snapshot, tùy chọn)
   source           AttendanceSource @default(MANUAL)
@@ -2963,10 +2966,10 @@ model WorkShift {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @default(now()) @updatedAt
 
-  employee    Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  branch      Branch?            @relation(fields: [branchId], references: [id])
-  schedule    EmployeeSchedule?  @relation(fields: [scheduleId], references: [id])
-  attendance  AttendanceRecord[]
+  employee   Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  branch     Branch?            @relation(fields: [branchId], references: [id])
+  schedule   EmployeeSchedule?  @relation(fields: [scheduleId], references: [id])
+  attendance AttendanceRecord[]
 
   @@index([employeeId, workDate])
   @@index([branchId, workDate])
@@ -2977,28 +2980,28 @@ model WorkShift {
 /// Bản ghi chấm công THỰC TẾ. Có thể tồn tại khi KHÔNG có WorkShift (workday tự do).
 /// KHÔNG hard-delete: sai → VOID (giữ vết). Sửa lịch sử → qua AttendanceAdjustment.
 model AttendanceRecord {
-  id                  String           @id @default(cuid())
-  employeeId          String
-  workShiftId         String? // ca liên quan (nullable — chấm công không theo ca)
-  branchId            String?
-  workDate            DateTime         @db.Date
-  checkInAt           DateTime? // instant check-in (server-side)
-  checkOutAt          DateTime? // instant check-out
-  breakMinutesActual  Int              @default(0)
-  workedMinutes       Int? // tính khi check-out (checkOut-checkIn-break)
-  scheduledMinutes    Int? // từ ca (nếu có)
-  overtimeMinutes     Int? // CANDIDATE tính toán (KHÔNG phải OT được duyệt/trả lương)
-  lateMinutes         Int? // trễ so với ca
-  earlyLeaveMinutes   Int? // về sớm so với ca
-  source              AttendanceSource @default(APP)
-  status              AttendanceStatus @default(OPEN)
-  note                String?
-  voidReason          String?
-  voidedBy            String?
-  voidedAt            DateTime?
-  createdBy           String?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @default(now()) @updatedAt
+  id                 String           @id @default(cuid())
+  employeeId         String
+  workShiftId        String? // ca liên quan (nullable — chấm công không theo ca)
+  branchId           String?
+  workDate           DateTime         @db.Date
+  checkInAt          DateTime? // instant check-in (server-side)
+  checkOutAt         DateTime? // instant check-out
+  breakMinutesActual Int              @default(0)
+  workedMinutes      Int? // tính khi check-out (checkOut-checkIn-break)
+  scheduledMinutes   Int? // từ ca (nếu có)
+  overtimeMinutes    Int? // CANDIDATE tính toán (KHÔNG phải OT được duyệt/trả lương)
+  lateMinutes        Int? // trễ so với ca
+  earlyLeaveMinutes  Int? // về sớm so với ca
+  source             AttendanceSource @default(APP)
+  status             AttendanceStatus @default(OPEN)
+  note               String?
+  voidReason         String?
+  voidedBy           String?
+  voidedAt           DateTime?
+  createdBy          String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @default(now()) @updatedAt
 
   employee    Employee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   workShift   WorkShift?             @relation(fields: [workShiftId], references: [id])
@@ -3085,36 +3088,36 @@ enum ContributionEntryKind {
 
 /// Đóng góp nhân sự thực tế cho buổi / dịch vụ item / bước (snapshot bất biến).
 model SessionStaffContribution {
-  id                    String                @id @default(cuid())
-  treatmentSessionId    String
+  id                     String                @id @default(cuid())
+  treatmentSessionId     String
   sessionExecutionItemId String? // cấp dịch vụ item (nullable → cấp buổi)
-  serviceStepKey        String? // khóa bước/phase (snapshot từ SOP — SOP đổi vẫn hiểu được)
-  serviceIdSnapshot     String? // dịch vụ tại thời điểm đóng góp (đối chiếu khi Service đổi tên)
-  serviceNameSnapshot   String?
-  employeeId            String
-  employeeNameSnapshot  String // tên NV tại thời điểm (không recompute từ hồ sơ hiện tại)
-  employeeRoleSnapshot  String? // chức danh/vai trò-trong-buổi lúc đó
-  contributionTypeId    String? // FK danh mục (soft — snapshot code là nguồn hiểu)
-  contributionTypeCode  String // snapshot code (bất biến)
-  startedAt             DateTime?
-  endedAt               DateTime?
-  actualMinutes         Int? // suy từ start/end hoặc nhập tay (MANUAL) — không âm
-  weight                Decimal?              @db.Decimal(6, 3) // trọng số vận hành (KHÔNG phải chia tiền)
-  quantity              Decimal?              @db.Decimal(14, 3)
-  branchId              String?
-  source                AttendanceSource      @default(MANUAL)
-  entryKind             ContributionEntryKind @default(CONTRIBUTION)
-  status                ContributionStatus    @default(DRAFT)
-  crossCheckFlags       Json? // cờ đối chiếu chấm công (INFO/WARNING) — cảnh báo, không chặn
-  note                  String?
-  idempotencyKey        String?               @unique // chống tạo trùng (double-tap/retry)
-  reversalOfId          String? // bút toán REVERSAL trỏ bản gốc
-  reversedAt            DateTime? // set trên bản GỐC khi đã hoàn tác (chặn hoàn tác 2 lần)
-  reversedBy            String?
-  reversalReason        String?
-  createdBy             String?
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @default(now()) @updatedAt
+  serviceStepKey         String? // khóa bước/phase (snapshot từ SOP — SOP đổi vẫn hiểu được)
+  serviceIdSnapshot      String? // dịch vụ tại thời điểm đóng góp (đối chiếu khi Service đổi tên)
+  serviceNameSnapshot    String?
+  employeeId             String
+  employeeNameSnapshot   String // tên NV tại thời điểm (không recompute từ hồ sơ hiện tại)
+  employeeRoleSnapshot   String? // chức danh/vai trò-trong-buổi lúc đó
+  contributionTypeId     String? // FK danh mục (soft — snapshot code là nguồn hiểu)
+  contributionTypeCode   String // snapshot code (bất biến)
+  startedAt              DateTime?
+  endedAt                DateTime?
+  actualMinutes          Int? // suy từ start/end hoặc nhập tay (MANUAL) — không âm
+  weight                 Decimal?              @db.Decimal(6, 3) // trọng số vận hành (KHÔNG phải chia tiền)
+  quantity               Decimal?              @db.Decimal(14, 3)
+  branchId               String?
+  source                 AttendanceSource      @default(MANUAL)
+  entryKind              ContributionEntryKind @default(CONTRIBUTION)
+  status                 ContributionStatus    @default(DRAFT)
+  crossCheckFlags        Json? // cờ đối chiếu chấm công (INFO/WARNING) — cảnh báo, không chặn
+  note                   String?
+  idempotencyKey         String?               @unique // chống tạo trùng (double-tap/retry)
+  reversalOfId           String? // bút toán REVERSAL trỏ bản gốc
+  reversedAt             DateTime? // set trên bản GỐC khi đã hoàn tác (chặn hoàn tác 2 lần)
+  reversedBy             String?
+  reversalReason         String?
+  createdBy              String?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @default(now()) @updatedAt
 
   session          TreatmentSession           @relation(fields: [treatmentSessionId], references: [id], onDelete: Cascade)
   executionItem    SessionExecutionItem?      @relation(fields: [sessionExecutionItemId], references: [id], onDelete: SetNull)
@@ -3635,7 +3638,8 @@ model SessionReview {
   customerId        String
   satisfactionScore Int? // điểm hài lòng chung (1–5)
   technicianScore   Int? // điểm đánh giá kỹ thuật viên (1–5)
-  technicianName    String? // KTV được đánh giá (snapshot tên)
+  technicianName    String? // KTV được đánh giá (snapshot tên) — GIỮ NGUYÊN (legacy identity)
+  employeeId        String? // HR-PH4: FK bổ sung (nullable) — chỉ set khi khớp CHÍNH XÁC 1 nhân sự active; KHÔNG backfill/đoán
   comment           String? // nhận xét của khách
   wouldReturn       Boolean? // khách sẽ quay lại?
   technicianReport  String? // báo cáo của KTV sau buổi (nội bộ)
@@ -3643,9 +3647,11 @@ model SessionReview {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  session TreatmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session  TreatmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  employee Employee?        @relation(fields: [employeeId], references: [id], onDelete: SetNull) // HR-PH4
 
   @@index([customerId])
+  @@index([employeeId])
   @@map("session_reviews")
 }
 
@@ -3675,4 +3681,170 @@ model BookingResource {
 
   @@index([type])
   @@map("booking_resources")
+}
+
+// =============================================================================
+// HR-PH4 — KPI ENGINE + PERIOD SNAPSHOT (v0.33.0)
+// KPI = ĐO LƯỜNG HIỆU SUẤT (performance measurement). KHÔNG tự động ảnh hưởng
+// lương/thưởng. Không tính tiền lương/hoa hồng ở phase này. Chỉ dùng FACT đáng
+// tin: SessionStaffContribution (VERIFIED) + AttendanceRecord (VERIFIED) +
+// EmployeeLeave + TreatmentSession + SessionReview (LEGACY_NAME_MATCH khi chỉ có
+// tên). Snapshot theo kỳ BẤT BIẾN khi LOCKED. Additive — 0 DROP.
+// =============================================================================
+
+enum KpiCategory {
+  PRODUCTIVITY
+  QUALITY
+  ATTENDANCE
+  CUSTOMER
+  SALES
+  OPERATIONAL
+}
+
+enum KpiCalculationType {
+  COUNT_DISTINCT
+  SUM
+  AVERAGE
+  RATIO
+  COUNT
+}
+
+/// Nguồn FACT tin cậy cho KPI — quyết định chất lượng dữ liệu (sourceQuality).
+enum KpiSourceType {
+  CONTRIBUTION // SessionStaffContribution (VERIFIED)
+  ATTENDANCE // AttendanceRecord (VERIFIED)
+  SESSION // TreatmentSession (VERIFIED)
+  REVIEW // SessionReview (LEGACY_NAME_MATCH nếu chỉ khớp tên)
+  LEAVE // EmployeeLeave
+  MANUAL
+}
+
+enum KpiDirection {
+  HIGHER_BETTER
+  LOWER_BETTER
+  NEUTRAL
+}
+
+enum KpiPeriodStatus {
+  DRAFT
+  CALCULATED
+  REVIEWED
+  LOCKED
+}
+
+/// Chất lượng nguồn dữ liệu KPI — KHÔNG trình bày mọi chỉ số như nhau về độ tin cậy.
+enum KpiSourceQuality {
+  VERIFIED // dựa trên FK/ledger đáng tin (contribution/attendance)
+  PARTIAL // một phần đáng tin
+  LEGACY_NAME_MATCH // chỉ khớp theo tên (review name-based) — cần thận trọng
+  INSUFFICIENT // không đủ dữ liệu tin cậy để quy cho nhân sự
+}
+
+enum KpiSnapshotStatus {
+  CURRENT
+  SUPERSEDED
+}
+
+/// Định nghĩa KPI — MASTER DATA cấu hình (bật/tắt, đổi tên, sắp xếp, gắn target).
+/// Công thức tính theo `code` nằm trong code (deterministic); calculationType là
+/// metadata mô tả. KPI chưa hỗ trợ công thức → bỏ qua khi tính (ghi rõ, không bịa).
+model KpiDefinition {
+  id              String             @id @default(cuid())
+  code            String             @unique // vd sessions_contributed
+  name            String
+  category        KpiCategory
+  description     String?
+  unit            String? // buổi / phút / điểm / %
+  calculationType KpiCalculationType @default(SUM)
+  sourceType      KpiSourceType      @default(CONTRIBUTION)
+  direction       KpiDirection       @default(HIGHER_BETTER)
+  isActive        Boolean            @default(true)
+  sortOrder       Int                @default(0)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @default(now()) @updatedAt
+
+  snapshots EmployeeKpiSnapshot[]
+  targets   KpiTarget[]
+
+  @@map("kpi_definitions")
+}
+
+/// Kỳ KPI — MONTHLY hoặc CUSTOM range. KHÔNG dùng lại PayrollPeriod (chưa có).
+/// Vòng đời DRAFT → CALCULATED → REVIEWED → LOCKED (LOCKED = bất biến).
+model KpiPeriod {
+  id           String          @id @default(cuid())
+  code         String          @unique // KP-YYYYMM / KP-xxxxxx
+  name         String
+  periodType   String          @default("MONTHLY") // MONTHLY | CUSTOM
+  startDate    DateTime        @db.Date
+  endDate      DateTime        @db.Date
+  branchId     String? // lọc theo chi nhánh (nullable = toàn tổ chức)
+  status       KpiPeriodStatus @default(DRAFT)
+  calculatedAt DateTime?
+  calculatedBy String?
+  lockedAt     DateTime?
+  lockedBy     String?
+  note         String?
+  createdBy    String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @default(now()) @updatedAt
+
+  branch    Branch?               @relation(fields: [branchId], references: [id])
+  snapshots EmployeeKpiSnapshot[]
+
+  @@index([status])
+  @@map("kpi_periods")
+}
+
+/// Snapshot KPI 1 nhân sự × 1 định nghĩa × 1 kỳ. BẤT BIẾN khi kỳ LOCKED.
+/// Tính lại (kỳ chưa khóa) → supersede bản CURRENT cũ (append-only, version++).
+/// `calculationSnapshot` chứa bằng chứng để TÁI LẬP giá trị (drill-down).
+model EmployeeKpiSnapshot {
+  id                  String            @id @default(cuid())
+  kpiPeriodId         String
+  employeeId          String
+  kpiDefinitionId     String
+  value               Decimal           @db.Decimal(18, 3)
+  numerator           Decimal?          @db.Decimal(18, 3)
+  denominator         Decimal?          @db.Decimal(18, 3)
+  sourceCount         Int               @default(0)
+  calculationSnapshot Json? // bằng chứng: công thức + id nguồn + input
+  sourceQuality       KpiSourceQuality  @default(VERIFIED)
+  branchSnapshot      String? // chi nhánh tại thời điểm tính (nếu kỳ lọc theo chi nhánh)
+  version             Int               @default(1)
+  status              KpiSnapshotStatus @default(CURRENT)
+  calculatedAt        DateTime          @default(now())
+  lockedAt            DateTime?
+  createdBy           String?
+
+  period     KpiPeriod     @relation(fields: [kpiPeriodId], references: [id], onDelete: Cascade)
+  employee   Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  definition KpiDefinition @relation(fields: [kpiDefinitionId], references: [id], onDelete: Cascade)
+
+  @@unique([kpiPeriodId, employeeId, kpiDefinitionId, version])
+  @@index([kpiPeriodId, employeeId])
+  @@index([employeeId, kpiDefinitionId])
+  @@index([status])
+  @@map("employee_kpi_snapshots")
+}
+
+/// Mục tiêu KPI (tùy chọn) — TÁCH khỏi giá trị. KHÔNG tự tạo thưởng lương.
+model KpiTarget {
+  id              String    @id @default(cuid())
+  kpiDefinitionId String
+  scope           String    @default("COMPANY") // COMPANY | BRANCH | ROLE | EMPLOYEE
+  scopeRef        String? // branchId / role / employeeId theo scope
+  targetValue     Decimal   @db.Decimal(18, 3)
+  effectiveFrom   DateTime?
+  effectiveTo     DateTime?
+  isActive        Boolean   @default(true)
+  note            String?
+  createdBy       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  definition KpiDefinition @relation(fields: [kpiDefinitionId], references: [id], onDelete: Cascade)
+
+  @@index([kpiDefinitionId])
+  @@map("kpi_targets")
 }

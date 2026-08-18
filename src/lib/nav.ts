@@ -109,6 +109,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/employees", label: "Nhân sự", icon: Users, perm: "staff.read" },
       // HR-PH2 — workspace chấm công (Ca/Chấm công/Nghỉ phép). Gate theo attendance.read.
       { href: "/attendance", label: "Chấm công", icon: CalendarDays, perm: "attendance.read" },
+      // HR-PH4 — workspace hiệu suất KPI (kỳ + snapshot). Gate theo attendance.read.
+      { href: "/performance", label: "Hiệu suất (KPI)", icon: BarChart3, perm: "attendance.read" },
       { href: "/import-customers", label: "Nhập khách hàng", icon: Upload, perm: "customer.write" },
       { href: "/users", label: "Quản trị người dùng", icon: ShieldCheck, perm: "user.manage" },
       { href: "/settings", label: "Cài đặt", icon: Settings, perm: "setting.write" },

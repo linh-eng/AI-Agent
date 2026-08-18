@@ -864,6 +864,10 @@ async function main() {
   const { ensureContributionTypes } = await import("../src/lib/contribution-service");
   await ensureContributionTypes();
 
+  // HR-PH4 — danh mục định nghĩa KPI (config, idempotent).
+  const { ensureKpiDefinitions } = await import("../src/lib/kpi");
+  await ensureKpiDefinitions();
+
   console.log("✅ Seed hoàn tất.");
   console.log("   Đăng nhập kho: admin@sophia.com.vn / admin123");
   console.log("   Đăng nhập spa: quanly@sophia.com.vn / quanly123 (Quản lý)");

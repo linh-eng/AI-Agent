@@ -2666,3 +2666,92 @@ Tài khoản demo sau khi seed: `admin@thng.com.vn` / `admin123` (mỗi vai trò
 - Nhánh phát triển hiện tại: `claude/thng-warehouse-management-ovqy6h`.
 - Mỗi thay đổi nghiệp vụ mới nên: cập nhật `schema.prisma` (nếu cần) → API route + Zod → UI → seed/demo.
 - Khi thêm module mới, cập nhật file này cho khớp thực tế codebase.
+
+## HR-PH4: KPI ENGINE + PERIOD SNAPSHOT (v0.33.0)
+
+Đo lường **HIỆU SUẤT theo kỳ** từ FACT đáng tin, snapshot BẤT BIẾN khi khóa. **KPI = performance
+measurement, KHÔNG tự động ảnh hưởng lương/thưởng** (no hidden coupling; tiền lương/hoa hồng/payroll để
+HR-PH5+). Thuần **additive, 0 DROP**. Migration **`Zd_hr_kpi`** (tổng **40 migration**). **506 test / 52 file PASS** (483 + `test/hr-kpi.test.ts` 23). tsc sạch · lint 0 lỗi · build OK · fresh deploy 40 migration +
+seed + seed:demo sạch (13 định nghĩa KPI, kỳ demo KP-000001 = 52 snapshot/4 nhân sự).
+
+### Audit nguồn (§3–4) — chỉ dùng FACT đáng tin
+- **VERIFIED:** `SessionStaffContribution` (hiệu lực NET = `entryKind=CONTRIBUTION AND status=ACTIVE` — loại
+  bản REVERSED + dòng REVERSAL, không đếm đôi) · `AttendanceRecord` (status COMPLETED/ADJUSTED) ·
+  `TreatmentSession` (incident/completed qua liên kết contribution) · `EmployeeLeave` (APPROVED).
+- **Review identity (§4/§21):** `SessionReview` VẪN name-based (`technicianName`). **Thêm FK additive
+  `SessionReview.employeeId?` (nullable, SetNull) — KHÔNG backfill/đoán.** Review write mới giải FK CHỈ khi
+  khớp **CHÍNH XÁC 1 nhân sự ACTIVE** (deterministic). KPI review: khớp FK → **VERIFIED**; chỉ khớp tên &
+  tên DUY NHẤT → **LEGACY_NAME_MATCH**; tên trùng/không khớp → **INSUFFICIENT** (KHÔNG quy nhầm).
+- **SALES KPI: DEFER** (attribution `createdBy`/`receivedBy` là tên tự do — không đáng tin, HR-PH0). KHÔNG tính
+  doanh thu nhân sự trong PH4.
+
+### Migration & schema (`Zd_hr_kpi`)
+- Enums: `KpiCategory` (PRODUCTIVITY/QUALITY/ATTENDANCE/CUSTOMER/SALES/OPERATIONAL) · `KpiCalculationType` ·
+  `KpiSourceType` · `KpiDirection` · `KpiPeriodStatus` (DRAFT/CALCULATED/REVIEWED/LOCKED) · `KpiSourceQuality`
+  (VERIFIED/PARTIAL/LEGACY_NAME_MATCH/INSUFFICIENT) · `KpiSnapshotStatus` (CURRENT/SUPERSEDED).
+- **`KpiDefinition`** (MASTER config: code/name/category/unit/calculationType/sourceType/direction/isActive/
+  sortOrder) · **`KpiPeriod`** (KP-xxxxxx, MONTHLY|CUSTOM, startDate/endDate `@db.Date`, branchId?, status +
+  calculated/locked audit) · **`EmployeeKpiSnapshot`** (value/numerator/denominator/sourceCount/
+  `calculationSnapshot Json` [bằng chứng tái lập]/`sourceQuality`/branchSnapshot/version/status; `@@unique
+  [period,employee,def,version]`) · **`KpiTarget`** (scope COMPANY/BRANCH/ROLE/EMPLOYEE, TÁCH khỏi value,
+  KHÔNG tạo thưởng). `SessionReview` +`employeeId?` FK. Back-relations Employee/Branch.
+
+### Engine — `src/lib/kpi.ts` (deterministic, event-time)
+- `KPI_DEFINITION_SEED` 13 KPI hỗ trợ; `ensureKpiDefinitions` (lazy upsert, giữ chỉnh sửa admin). Công thức
+  theo `code` trong engine (deterministic); `calculationType` là metadata. Code chưa hỗ trợ → **bỏ qua**
+  (không bịa số).
+- **Công thức (§10):** sessions_contributed = distinct session (effective) · services_performed = distinct
+  executionItem · treatment_minutes = Σ actualMinutes (effective) · worked/late/early/OT = Σ AttendanceRecord ·
+  attendance_days = distinct workDate · approved_leave_days = Σ ngày nghỉ APPROVED · incident_count = distinct
+  session có incident qua contribution · avg_technician/avg_satisfaction/review_count (chất lượng theo FK/tên).
+- **Branch (§24)/Role (§25):** lọc theo **branch tại event-time** (contribution.branchId/attendance.branchId),
+  KHÔNG dùng `Employee.branchId` hiện tại; role dùng `employeeRoleSnapshot` của contribution (không rewrite).
+- **Reversal-aware (§11):** helper `effectiveContributionWhere()` → NET đúng, regression test D.
+- **Tính lại/khóa (§12–13):** `calculatePeriod` supersede bản CURRENT (status→SUPERSEDED, version++) →
+  append-only, idempotent (giá trị bằng nhau, đúng 1 CURRENT/(nv,def)). `lockPeriod` → snapshot BẤT BIẾN
+  (recalc LOCKED → 409; đổi nguồn sau khóa KHÔNG đổi snapshot). Múi giờ VN (periodBounds qua parseVnLocal).
+
+### API (reuse RBAC — KHÔNG thêm permission)
+`/api/kpi-definitions` (+`[id]`) · `/api/kpi-periods` (+`[id]`, `[id]/calculate`, `[id]/recalculate`,
+`[id]/lock`) · `/api/employee-kpi-snapshots` (+`[id]/evidence` drill-down) · `/api/kpi-targets`. Audit
+`KPI_DEFINITION_*`/`KPI_PERIOD_CREATED|CALCULATED|RECALCULATED|LOCKED|UPDATED`/`KPI_TARGET_CREATED`.
+- **RBAC (§19):** đọc org = `attendance.read` (MANAGER/BOD — managerial, KHÔNG dùng over-broad staff.read) ·
+  quản lý (tạo def/period/calculate/lock/target) = `attendance.write` (MANAGER) · **self-view = ownership FK
+  `Employee.userId`** (KHÔNG permission, KHÔNG fallback tên/email). `finance.read` đơn lẻ KHÔNG cấp quản lý
+  KPI; `payroll.read` KHÔNG bắt buộc để xem KPI thường. **KPI value KHÔNG payroll-private** (§20 — không mask).
+
+### UI
+- **Hồ sơ nhân sự tab G** ("Hoạt động & Đánh giá"): giữ tổng quan legacy + thêm **panel KPI theo kỳ**
+  (chọn kỳ → chỉ số/giá trị/đơn vị/**chất lượng nguồn**/drill-down bằng chứng).
+- **Workspace `/performance`** (Vận hành & Hệ thống, `attendance.read`): chọn/tạo/tính/khóa kỳ · **xếp hạng
+  theo 1 chỉ số so sánh được** (KHÔNG rank chéo vai trò không tương đương) · ma trận nhân sự×KPI · drill-down.
+  Nav item "Hiệu suất (KPI)". KHÔNG hiển thị lương/thưởng.
+
+### CSV (§26) — `docs/KPI_CSV.md`
+`kpi_definitions.csv` + `kpi_targets.csv` (config/master). **KHÔNG** import giá trị snapshot (sinh từ engine).
+
+### Chứng minh (test/hr-kpi.test.ts, 23 test → A–AF)
+Contribution A–H (sessions/services/minutes · **D reversal NET** · E pre-lock recalc · F multi-staff · G branch
+event-time · H role snapshot giữ) · Attendance I–O (worked/days/late/early/OT · **N nghỉ duyệt ≠ vắng thô** ·
+O cross-midnight) · Review P–T (avg/count · **S LEGACY_NAME_MATCH** · **T tên trùng KHÔNG quy nhầm**) ·
+Snapshot U–Z (calculate/CALCULATED · **V recalc idempotent+supersede** · **W LOCKED 409** · **X đổi nguồn sau
+khóa bất biến** · Y calculationSnapshot tái lập + evidence · Z sourceCount) · RBAC/Self AA–AF (self chỉ của
+mình · self KHÔNG xem người khác · manager org · **finance.read đơn lẻ→403** · payroll.read không bắt buộc ·
+multi-role union). Full regression **506/52** không regression.
+
+### Demo (seed:demo) — KP-000001 (08/2026)
+52 snapshot/4 nhân sự. Contribution KPI VERIFIED (KTV 45′, Master 15′); review KPI LEGACY_NAME_MATCH (đánh giá
+demo name-based, chưa có FK — minh họa chất lượng nguồn); approved_leave_days VERIFIED. DRAFT (khóa ở /performance).
+
+### CONFLICTS: KHÔNG CÓ
+Không tính tiền lương/hoa hồng/payroll · không dùng sales attribution tên tự do làm sự thật (defer) · không
+rewrite KPI đã khóa (supersede/append-only) · không redefine `EmployeeRoleFee` (giữ costing-only) · KHÔNG dùng
+`finance.read` làm quyền private lương/KPI · review FK additive nullable (không backfill/không destructive) ·
+không hard-delete snapshot. Additive 0 DROP. Baseline HR-PH1/2/3 + EmployeeRoleFee + SessionStaff + freeze +
+MaterialUsage reversal + Pricing/Costing + Booking + IA/RBAC (Mục 15) bất biến.
+
+### Deferred HR-PH5+
+Commission/incentive (diễn giải KPI→tiền) · PayrollPeriod/earning lines · sales attribution FK (SalesAttribution)
++ sales KPI · aggregate performance score (weighted, cần công thức tường minh) · KpiRule PUBLISHED chuyển snapshot
+→ bonus (payroll-private) · KPI reopen workflow (hiện LOCKED = cuối) · review FK backfill có xác nhận · branch-scoped
+RBAC (hiện org-wide) · self-service UI nhập/khiếu nại KPI.

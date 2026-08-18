@@ -79,7 +79,7 @@ describe("IA-PH1 · Regroup + rename (LOW-RISK nav-only)", () => {
       .flatMap((g) => flatten(g.items).map((i) => i.href))
       .filter((h): h is string => !!h)
       .sort();
-    const expected = [...Object.keys(BASELINE_PERM), "/service-costings", "/recommended-prices", "/attendance"].sort();
+    const expected = [...Object.keys(BASELINE_PERM), "/service-costings", "/recommended-prices", "/attendance", "/performance"].sort();
     expect(spaHrefs).toEqual(expected);
   });
 

@@ -169,13 +169,19 @@ export default function EmployeeDetailPage() {
       )}
 
       {tab === "kpi" && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Kpi label="Tổng buổi đã thực hiện" value={e.kpi.totalSessions} />
-          <Kpi label="Điểm KTV trung bình" value={e.kpi.avgTechScore != null ? `${e.kpi.avgTechScore}/5` : "—"} />
-          <Kpi label="Số lượt đánh giá" value={e.kpi.reviewCount} />
-          <Kpi label="Điểm hài lòng TB" value={e.kpi.avgSatisfaction != null ? `${e.kpi.avgSatisfaction}/5` : "—"} />
-          <Kpi label="Số sự cố/bất thường" value={e.kpi.incidents} tone={e.kpi.incidents > 0 ? "amber" : undefined} />
-          <div className="sm:col-span-3 text-xs text-muted-foreground">Số liệu suy từ Buổi thực hiện + Đánh giá (read-only, không nhập tay).</div>
+        <div className="space-y-6">
+          <div>
+            <div className="mb-2 text-sm font-medium">Tổng quan đánh giá hiện tại (read-only)</div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Kpi label="Tổng buổi đã thực hiện" value={e.kpi.totalSessions} />
+              <Kpi label="Điểm KTV trung bình" value={e.kpi.avgTechScore != null ? `${e.kpi.avgTechScore}/5` : "—"} />
+              <Kpi label="Số lượt đánh giá" value={e.kpi.reviewCount} />
+              <Kpi label="Điểm hài lòng TB" value={e.kpi.avgSatisfaction != null ? `${e.kpi.avgSatisfaction}/5` : "—"} />
+              <Kpi label="Số sự cố/bất thường" value={e.kpi.incidents} tone={e.kpi.incidents > 0 ? "amber" : undefined} />
+              <div className="sm:col-span-3 text-xs text-muted-foreground">Số liệu suy từ Buổi thực hiện + Đánh giá (read-only, không nhập tay).</div>
+            </div>
+          </div>
+          <EmployeeKpiPeriodPanel employeeId={id} />
         </div>
       )}
 
@@ -214,6 +220,59 @@ function ContributionTab({ employeeId }: { employeeId: string }) {
 
 function Kpi({ label, value, tone }: { label: string; value: any; tone?: string }) {
   return <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">{label}</div><div className={`mt-1 text-2xl font-semibold ${tone === "amber" ? "text-amber-600" : ""}`}>{value}</div></CardContent></Card>;
+}
+
+const KPI_QUALITY_LABEL: Record<string, string> = { VERIFIED: "Đã xác minh", PARTIAL: "Một phần", LEGACY_NAME_MATCH: "Khớp theo tên (cũ)", INSUFFICIENT: "Chưa đủ dữ liệu" };
+const KPI_QUALITY_TONE: Record<string, string> = { VERIFIED: "success", PARTIAL: "warning", LEGACY_NAME_MATCH: "warning", INSUFFICIENT: "muted" };
+
+// HR-PH4 — KPI theo KỲ (snapshot). Chọn kỳ → bảng KPI + chất lượng nguồn + drill-down.
+function EmployeeKpiPeriodPanel({ employeeId }: { employeeId: string }) {
+  const [periods, setPeriods] = useState<any[]>([]);
+  const [periodId, setPeriodId] = useState("");
+  const [rows, setRows] = useState<any[]>([]);
+  const [evid, setEvid] = useState<any | null>(null);
+  useEffect(() => { apiFetch<any[]>("/api/kpi-periods").then((ps) => { setPeriods(ps); if (ps[0]) setPeriodId(ps[0].id); }).catch(() => setPeriods([])); }, []);
+  useEffect(() => { if (!periodId) { setRows([]); return; } apiFetch<any[]>(`/api/employee-kpi-snapshots?kpiPeriodId=${periodId}&employeeId=${employeeId}`).then(setRows).catch(() => setRows([])); }, [periodId, employeeId]);
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-2">
+        <div className="text-sm font-medium">KPI theo kỳ (snapshot)</div>
+        <Select className="ml-auto w-64" value={periodId} onChange={(e) => setPeriodId(e.target.value)}>
+          <option value="">— Chọn kỳ —</option>
+          {periods.map((p) => <option key={p.id} value={p.id}>{p.code} · {p.name} ({p.status})</option>)}
+        </Select>
+      </div>
+      <Card><CardContent className="p-0">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
+          <thead><tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+            <th className="px-3 py-2">Chỉ số</th><th className="px-3 py-2 text-right">Giá trị</th><th className="px-3 py-2">Đơn vị</th>
+            <th className="px-3 py-2">Nguồn</th><th className="px-3 py-2">Chất lượng</th><th className="px-3 py-2"></th>
+          </tr></thead>
+          <tbody>{rows.length === 0 ? <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">Chưa có snapshot KPI cho kỳ này.</td></tr> :
+            rows.map((r) => (
+              <tr key={r.id} className="border-b last:border-0">
+                <td className="px-3 py-2">{r.definition?.name}</td>
+                <td className="px-3 py-2 text-right font-medium">{Number(r.value)}</td>
+                <td className="px-3 py-2 text-muted-foreground">{r.definition?.unit ?? ""}</td>
+                <td className="px-3 py-2 text-xs text-muted-foreground">{r.sourceCount}</td>
+                <td className="px-3 py-2"><Badge tone={(KPI_QUALITY_TONE[r.sourceQuality] as any) ?? "muted"}>{KPI_QUALITY_LABEL[r.sourceQuality] ?? r.sourceQuality}</Badge></td>
+                <td className="px-3 py-2 text-right"><Button variant="ghost" size="sm" onClick={() => apiFetch<any>(`/api/employee-kpi-snapshots/${r.id}/evidence`).then(setEvid).catch(() => {})}>Bằng chứng</Button></td>
+              </tr>
+            ))}</tbody>
+        </table></div>
+        <div className="px-3 py-2 text-xs text-muted-foreground">KPI = đo lường hiệu suất, KHÔNG phải lương/thưởng. Chất lượng nguồn được đánh dấu rõ (review theo tên = "khớp theo tên").</div>
+      </CardContent></Card>
+      {evid && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEvid(null)}>
+          <div className="max-h-[80vh] w-full max-w-2xl overflow-auto rounded-lg bg-background p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-between"><div className="font-medium">Bằng chứng: {evid.snapshot?.definition?.name} = {Number(evid.snapshot?.value)}</div><Button variant="ghost" size="sm" onClick={() => setEvid(null)}>Đóng</Button></div>
+            {evid.note && <div className="mb-2 rounded bg-amber-50 px-3 py-2 text-xs text-amber-700">{evid.note}</div>}
+            <pre className="overflow-auto rounded bg-muted/40 p-3 text-xs">{JSON.stringify(evid.records, null, 2)}</pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function BasicTab({ e, canWrite, onSave }: { e: any; canWrite: boolean; onSave: (b: any) => void }) {

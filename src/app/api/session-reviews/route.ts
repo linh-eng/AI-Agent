@@ -28,10 +28,20 @@ export const POST = handle(async (req) => {
   const ts = await prisma.treatmentSession.findUnique({ where: { id: parsed.sessionId }, select: { id: true, customerId: true } });
   if (!ts) return fail(404, "Không tìm thấy buổi thực hiện");
 
+  // HR-PH4: giải FK employeeId theo tên — CHỈ khi khớp CHÍNH XÁC 1 nhân sự đang
+  // hoạt động (deterministic, không đoán/không backfill). 0 hoặc >1 → để null,
+  // KPI review sẽ đánh dấu LEGACY_NAME_MATCH/INSUFFICIENT.
+  let resolvedEmployeeId: string | null = null;
+  if (parsed.technicianName) {
+    const matches = await prisma.employee.findMany({ where: { fullName: parsed.technicianName, status: "ACTIVE" }, select: { id: true }, take: 2 });
+    if (matches.length === 1) resolvedEmployeeId = matches[0].id;
+  }
+
   const data = {
     satisfactionScore: parsed.satisfactionScore ?? null,
     technicianScore: parsed.technicianScore ?? null,
     technicianName: parsed.technicianName ?? null,
+    employeeId: resolvedEmployeeId,
     comment: parsed.comment ?? null,
     wouldReturn: parsed.wouldReturn ?? null,
     technicianReport: parsed.technicianReport ?? null,

@@ -1046,6 +1046,20 @@ async function main() {
     }
   }
 
+  // HR-PH4 — kỳ KPI demo (08/2026): tính snapshot từ FACT contribution/attendance/review.
+  try {
+    const existing = await prisma.kpiPeriod.findFirst({ where: { code: "KP-000001" } });
+    if (!existing) {
+      const { ensureKpiDefinitions, calculatePeriod } = await import("../src/lib/kpi");
+      await ensureKpiDefinitions();
+      const period = await prisma.kpiPeriod.create({ data: { code: "KP-000001", name: "Kỳ 08/2026", periodType: "MONTHLY", startDate: new Date("2026-08-01T00:00:00.000Z"), endDate: new Date("2026-08-31T00:00:00.000Z"), status: "DRAFT", createdBy: "seed-demo" } });
+      const res = await calculatePeriod({ userId: null, name: "seed-demo", email: null, permissions: [], roles: [] } as any, period.id);
+      console.log(`   KPI demo: KP-000001 (08/2026) — đã tính ${res.snapshots} snapshot / ${res.employees} nhân sự (DRAFT, có thể khóa ở /performance).`);
+    }
+  } catch (e) {
+    console.log("   ⚠️  Bỏ qua KPI demo:", (e as Error).message);
+  }
+
   console.log("   Vật tư demo: JetPeel 100ml (còn 82ml), Vật tư khách hàng 10đv (còn 5).");
   console.log("✅ Seed DEMO hoàn tất: 7 khách (KH-100001..007), brand Klapp, CN RF/HIFU,");
   console.log("   protocol DEMO có version, kho vật tư spa, 2 chiến dịch, báo giá 3 phương án.");

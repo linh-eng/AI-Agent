@@ -1022,3 +1022,45 @@ export const protocolRecommendedCreateSchema = z.object({
   roundingUnit: z.coerce.number().int().min(1).default(1000),
   note: z.string().optional().nullable(),
 });
+
+// ---------------------------------------------------------------------------
+// HR-PH4 — KPI ENGINE (definitions / periods / targets)
+// ---------------------------------------------------------------------------
+export const kpiDefinitionCreateSchema = z.object({
+  code: z.string().min(1).max(80),
+  name: z.string().min(1),
+  category: z.enum(["PRODUCTIVITY", "QUALITY", "ATTENDANCE", "CUSTOMER", "SALES", "OPERATIONAL"]),
+  description: z.string().optional().nullable(),
+  unit: z.string().optional().nullable(),
+  calculationType: z.enum(["COUNT_DISTINCT", "SUM", "AVERAGE", "RATIO", "COUNT"]).optional(),
+  sourceType: z.enum(["CONTRIBUTION", "ATTENDANCE", "SESSION", "REVIEW", "LEAVE", "MANUAL"]).optional(),
+  direction: z.enum(["HIGHER_BETTER", "LOWER_BETTER", "NEUTRAL"]).optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.coerce.number().int().optional(),
+});
+export const kpiDefinitionUpdateSchema = kpiDefinitionCreateSchema.partial().omit({ code: true });
+
+export const kpiPeriodCreateSchema = z.object({
+  name: z.string().min(1),
+  periodType: z.enum(["MONTHLY", "CUSTOM"]).optional(),
+  startDate: z.string().min(8),
+  endDate: z.string().min(8),
+  branchId: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+}).refine((v) => v.endDate >= v.startDate, { message: "Ngày kết thúc phải ≥ ngày bắt đầu", path: ["endDate"] });
+
+export const kpiPeriodUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  note: z.string().optional().nullable(),
+  status: z.enum(["DRAFT", "CALCULATED", "REVIEWED", "LOCKED"]).optional(),
+});
+
+export const kpiTargetCreateSchema = z.object({
+  kpiDefinitionId: z.string().min(1),
+  scope: z.enum(["COMPANY", "BRANCH", "ROLE", "EMPLOYEE"]).optional(),
+  scopeRef: z.string().optional().nullable(),
+  targetValue: z.coerce.number(),
+  effectiveFrom: z.string().optional().nullable(),
+  effectiveTo: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
