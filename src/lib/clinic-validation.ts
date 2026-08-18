@@ -1135,3 +1135,33 @@ export const salesAttributionSchema = z.object({
   branchId: z.string().optional().nullable(),
 });
 export const compReverseSchema = z.object({ reason: z.string().min(1) });
+
+// ---------------------------------------------------------------------------
+// HR-PH6 — PAYROLL (base salary / component rules / periods)
+// ---------------------------------------------------------------------------
+export const baseSalaryCreateSchema = z.object({
+  employeeId: z.string().min(1),
+  amount: z.coerce.number().nonnegative(),
+  effectiveFrom: z.string().min(8),
+  effectiveTo: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export const payrollComponentSchema = z.object({
+  code: z.string().min(1).max(80),
+  name: z.string().min(1),
+  kind: z.enum(["EARNING", "DEDUCTION"]),
+  calcType: z.enum(["FIXED", "PERCENT_BASE", "PERCENT_GROSS"]).optional(),
+  value: z.coerce.number(),
+  scope: z.enum(["COMPANY", "ROLE", "EMPLOYEE"]).optional(),
+  scopeRef: z.string().optional().nullable(),
+  sortOrder: z.coerce.number().int().optional(),
+  isActive: z.boolean().optional(),
+});
+export const payrollPeriodCreateSchema = z.object({
+  name: z.string().min(1),
+  periodType: z.enum(["MONTHLY", "CUSTOM"]).optional(),
+  startDate: z.string().min(8),
+  endDate: z.string().min(8),
+  branchId: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+}).refine((v) => v.endDate >= v.startDate, { message: "Ngày kết thúc phải ≥ ngày bắt đầu", path: ["endDate"] });

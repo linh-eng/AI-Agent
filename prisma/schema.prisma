@@ -2783,6 +2783,8 @@ model Employee {
   reviews            SessionReview[] // HR-PH4 (FK bổ sung, snapshot technicianName giữ nguyên)
   salesAttributions  SalesAttribution[] // HR-PH5
   compensationEvents CompensationEvent[] // HR-PH5
+  baseSalaries       EmployeeBaseSalary[] // HR-PH6
+  payrollLines       EmployeePayrollLine[] // HR-PH6
   branchRef          Branch?                    @relation(fields: [branchId], references: [id]) // KHÔNG đổi tên field `branch`
   user               User?                      @relation(fields: [userId], references: [id])
 
@@ -4146,4 +4148,143 @@ model CompensationEvent {
   @@index([sourceType, sourceId])
   @@index([status])
   @@map("compensation_events")
+}
+
+// =============================================================================
+// HR-PH6 — PAYROLL (Bảng lương) (v0.35.0)
+// -----------------------------------------------------------------------------
+// GỘP CompensationEvent (HR-PH5) + lương cơ bản + phụ cấp → LƯƠNG GỘP → trừ
+// khấu trừ (cấu hình) → LƯƠNG THỰC NHẬN. Payslip BẤT BIẾN khi DUYỆT.
+// NGUYÊN TẮC CỨNG:
+//  * KHÔNG hard-code thuế PIT/BHXH — chủ doanh nghiệp tự khai qua PayrollComponentRule
+//    (FIXED / % lương cơ bản / % lương gộp). Hệ thống KHÔNG bịa tỷ lệ luật định.
+//  * Thu nhập lấy từ CompensationEvent (ELIGIBLE, KHÔNG phải REVERSAL) — reversal
+//    đã net ở tầng event; KHÔNG tính lại tiền.
+//  * Lương cơ bản (EmployeeBaseSalary) TÁCH khỏi EmployeeRoleFee (costing-only).
+//  * Append-only + version (supersede khi tính lại); DUYỆT → khóa bất biến.
+//  * Payroll là DỮ LIỆU RIÊNG TƯ — gate payroll.read/write/approve + self FK.
+// =============================================================================
+
+enum PayrollPeriodStatus {
+  DRAFT
+  CALCULATED
+  APPROVED
+  PAID
+  LOCKED
+}
+
+enum PayrollComponentKind {
+  EARNING // phụ cấp / khoản cộng
+  DEDUCTION // khấu trừ (BHXH/PIT/tạm ứng… — chủ DN tự khai)
+}
+
+enum PayrollCalcType {
+  FIXED
+  PERCENT_BASE // % trên lương cơ bản
+  PERCENT_GROSS // % trên lương gộp
+}
+
+enum PayrollLineStatus {
+  CURRENT
+  SUPERSEDED
+}
+
+/// Lương cơ bản theo nhân sự — CÓ hiệu lực ngày (đổi lương = tạo bản mới, append-only).
+model EmployeeBaseSalary {
+  id            String    @id @default(cuid())
+  employeeId    String
+  amount        Decimal   @db.Decimal(18, 2)
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+  note          String?
+  createdBy     String?
+  createdAt     DateTime  @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, effectiveFrom])
+  @@map("employee_base_salaries")
+}
+
+/// Cấu hình phụ cấp/khấu trừ — chủ DN tự khai (KHÔNG hard-code luật). scope
+/// COMPANY/ROLE/EMPLOYEE. calcType FIXED / % lương cơ bản / % lương gộp.
+model PayrollComponentRule {
+  id        String               @id @default(cuid())
+  code      String               @unique
+  name      String
+  kind      PayrollComponentKind
+  calcType  PayrollCalcType      @default(FIXED)
+  value     Decimal              @db.Decimal(18, 4) // số tiền (FIXED) hoặc % (PERCENT_*)
+  scope     String               @default("COMPANY") // COMPANY | ROLE | EMPLOYEE
+  scopeRef  String? // roleCode / employeeId theo scope
+  sortOrder Int                  @default(0)
+  isActive  Boolean              @default(true)
+  note      String?
+  createdBy String?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @default(now()) @updatedAt
+
+  @@index([kind])
+  @@map("payroll_component_rules")
+}
+
+/// Kỳ lương — DRAFT → CALCULATED → APPROVED → PAID → LOCKED. APPROVED = bất biến.
+model PayrollPeriod {
+  id           String              @id @default(cuid())
+  code         String              @unique // PR-xxxxxx
+  name         String
+  periodType   String              @default("MONTHLY")
+  startDate    DateTime            @db.Date
+  endDate      DateTime            @db.Date
+  branchId     String?
+  status       PayrollPeriodStatus @default(DRAFT)
+  calculatedAt DateTime?
+  calculatedBy String?
+  approvedAt   DateTime?
+  approvedBy   String?
+  paidAt       DateTime?
+  paidBy       String?
+  note         String?
+  createdBy    String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @default(now()) @updatedAt
+
+  lines EmployeePayrollLine[]
+
+  @@index([status])
+  @@map("payroll_periods")
+}
+
+/// Phiếu lương 1 nhân sự × 1 kỳ (BẤT BIẾN khi kỳ APPROVED). breakdown = bằng chứng.
+model EmployeePayrollLine {
+  id                 String            @id @default(cuid())
+  payrollPeriodId    String
+  employeeId         String
+  baseSalary         Decimal           @default(0) @db.Decimal(18, 2)
+  earningsCommission Decimal           @default(0) @db.Decimal(18, 2)
+  earningsIncentive  Decimal           @default(0) @db.Decimal(18, 2)
+  earningsBonus      Decimal           @default(0) @db.Decimal(18, 2)
+  earningsAdjustment Decimal           @default(0) @db.Decimal(18, 2)
+  allowanceTotal     Decimal           @default(0) @db.Decimal(18, 2)
+  grossPay           Decimal           @default(0) @db.Decimal(18, 2)
+  deductionTotal     Decimal           @default(0) @db.Decimal(18, 2)
+  netPay             Decimal           @default(0) @db.Decimal(18, 2)
+  breakdown          Json // chi tiết từng khoản (bằng chứng tái lập)
+  employeeSnapshot   String?
+  branchSnapshot     String?
+  version            Int               @default(1)
+  status             PayrollLineStatus @default(CURRENT)
+  lockedAt           DateTime?
+  createdBy          String?
+  createdAt          DateTime          @default(now())
+
+  period   PayrollPeriod @relation(fields: [payrollPeriodId], references: [id], onDelete: Cascade)
+  employee Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([payrollPeriodId, employeeId, version])
+  @@index([payrollPeriodId])
+  @@index([employeeId])
+  @@index([status])
+  @@map("employee_payroll_lines")
 }

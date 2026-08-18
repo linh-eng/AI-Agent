@@ -1096,6 +1096,31 @@ async function main() {
     console.log("   ⚠️  Bỏ qua Lương thưởng demo:", (e as Error).message);
   }
 
+  // HR-PH6 — Bảng lương demo: kỳ PR-000001 (08/2026) gộp thu nhập HR-PH5 + lương
+  // cơ bản + phụ cấp/khấu trừ (chủ DN tự khai). KHÔNG hard-code thuế/BHXH.
+  try {
+    const existing = await prisma.payrollPeriod.findFirst({ where: { code: "PR-000001" } });
+    if (!existing) {
+      const { calculatePayrollPeriod } = await import("../src/lib/payroll");
+      const seedSession = { userId: null, name: "seed-demo", email: null, permissions: [], roles: [] } as any;
+      // Lương cơ bản demo
+      await prisma.employeeBaseSalary.createMany({ data: [
+        { employeeId: nvKTV.id, amount: 10_000_000 as any, effectiveFrom: new Date("2026-01-01T00:00:00Z"), createdBy: "seed-demo" },
+        { employeeId: nvMaster.id, amount: 15_000_000 as any, effectiveFrom: new Date("2026-01-01T00:00:00Z"), createdBy: "seed-demo" },
+      ] });
+      // Phụ cấp + khấu trừ demo (giá trị minh họa — chủ DN tự khai theo quy định)
+      await prisma.payrollComponentRule.createMany({ data: [
+        { code: "PC-ANTRUA", name: "Phụ cấp ăn trưa", kind: "EARNING", calcType: "FIXED", value: 730_000 as any, scope: "COMPANY", sortOrder: 1, createdBy: "seed-demo" },
+        { code: "BHXH-NV", name: "BHXH/BHYT/BHTN (khai tay 10.5%)", kind: "DEDUCTION", calcType: "PERCENT_BASE", value: 10.5 as any, scope: "COMPANY", sortOrder: 2, createdBy: "seed-demo" },
+      ] });
+      const period = await prisma.payrollPeriod.create({ data: { code: "PR-000001", name: "Lương tháng 08/2026", periodType: "MONTHLY", startDate: new Date("2026-08-01T00:00:00Z"), endDate: new Date("2026-08-31T00:00:00Z"), status: "DRAFT", createdBy: "seed-demo" } });
+      const res = await calculatePayrollPeriod(seedSession, period.id);
+      console.log(`   Bảng lương demo: PR-000001 (08/2026) — đã tính ${res.employees} phiếu (gộp thưởng HR-PH5 + lương CB + phụ cấp − BHXH khai tay). DRAFT, duyệt ở /payroll.`);
+    }
+  } catch (e) {
+    console.log("   ⚠️  Bỏ qua Bảng lương demo:", (e as Error).message);
+  }
+
   console.log("   Vật tư demo: JetPeel 100ml (còn 82ml), Vật tư khách hàng 10đv (còn 5).");
   console.log("✅ Seed DEMO hoàn tất: 7 khách (KH-100001..007), brand Klapp, CN RF/HIFU,");
   console.log("   protocol DEMO có version, kho vật tư spa, 2 chiến dịch, báo giá 3 phương án.");

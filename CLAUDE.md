@@ -2852,3 +2852,78 @@ PayrollPeriod/PayrollEmployeeSummary/payslip · thuế PIT/BHXH · thanh toán l
 allocation doanh thu gói → per-component (mở PERCENT_ALLOCATED_REVENUE) · loyalty/voucher/prepaid engine (mới
 tách khái niệm) · attribution write points tự động ở workflow thương mại (hiện thủ công/API) · team bonus/
 allowance/deduction rule families.
+
+## HR-PH6: PAYROLL (Bảng lương) — CLOSURE chuỗi Nhân sự→Lương (v0.35.0)
+
+Mảnh cuối HR: **GỘP `CompensationEvent` (HR-PH5) + lương cơ bản + phụ cấp → lương gộp → trừ khấu trừ (cấu
+hình) → thực nhận**; phiếu lương BẤT BIẾN khi duyệt. **KHÔNG tính thuế PIT/BHXH luật định tự động** (chủ DN
+tự khai qua `PayrollComponentRule`). Thuần **additive, 0 DROP**. Migration **`Zf_hr_payroll`** (4 model + 4
+enum; tổng **42 migration**). **550 test / 54 file PASS** (537 + `test/hr-payroll.test.ts` 13). tsc sạch ·
+lint 0 lỗi · build OK · fresh deploy 42 migration + seed + seed:demo sạch.
+
+### Nguyên tắc cứng
+- **KHÔNG hard-code PIT/BHXH** — dùng `PayrollComponentRule` (FIXED / % lương cơ bản / % lương gộp); hệ thống
+  không bịa tỷ lệ luật định.
+- **Thu nhập** = `CompensationEvent` status ELIGIBLE, eventType ≠ REVERSAL (bản đã REVERSED loại, dòng REVERSAL
+  loại → net đúng, không tính lại tiền).
+- **Lương cơ bản** (`EmployeeBaseSalary`, versioned) TÁCH khỏi `EmployeeRoleFee` (costing-only).
+- Append-only + version (supersede khi tính lại); **DUYỆT → khóa bất biến**. Payroll RIÊNG TƯ (payroll.*  + self FK).
+
+### Migration & schema (`Zf_hr_payroll`)
+- Enum `PayrollPeriodStatus` (DRAFT/CALCULATED/APPROVED/PAID/LOCKED) · `PayrollComponentKind` (EARNING/DEDUCTION)
+  · `PayrollCalcType` (FIXED/PERCENT_BASE/PERCENT_GROSS) · `PayrollLineStatus` (CURRENT/SUPERSEDED).
+- **`EmployeeBaseSalary`** (lương cơ bản versioned hiệu lực ngày) · **`PayrollComponentRule`** (phụ cấp/khấu
+  trừ cấu hình, scope COMPANY/ROLE/EMPLOYEE) · **`PayrollPeriod`** (PR-xxxxxx, lifecycle) · **`EmployeePayrollLine`**
+  (phiếu lương: base/commission/incentive/bonus/allowance/gross/deduction/net + `breakdown` Json bằng chứng +
+  version/status/lockedAt; `@@unique[period,employee,version]`). Back-relation Employee.
+
+### Engine — `src/lib/payroll.ts`
+`resolveBaseSalary` (hiệu lực ngày) · `resolveComponents` (COMPANY + ROLE khớp + EMPLOYEE khớp) ·
+`earningsForPeriod` (net event) · `computePayrollLine` (gross = base + phụ cấp + commission/incentive/bonus;
+deduction FIXED/%base/%gross; net = gross − deduction) · `calculatePayrollPeriod` (supersede CURRENT, version++,
+idempotent; chặn khi APPROVED/PAID → 409) · `approvePayrollPeriod` (CALCULATED→APPROVED + khóa phiếu) ·
+`markPayrollPaid` (APPROVED→PAID). Múi giờ VN (parseVnLocal).
+
+### API / RBAC (reuse — KHÔNG thêm permission)
+`/api/payroll-periods`(+`[id]`, `/calculate`, `/approve`, `/pay`) · `/api/employee-base-salaries` ·
+`/api/payroll-component-rules` · `/api/employee-payroll-lines` (self-scope). Audit `PAYROLL_PERIOD_CREATED|
+CALCULATED|APPROVED|PAID` · `PAYROLL_BASE_SALARY_SET` · `PAYROLL_COMPONENT_CREATED`.
+- **RBAC:** đọc org = `payroll.read` (MANAGER/BOD) · tạo/tính/cấu hình = `payroll.write` (MANAGER) · duyệt/chi =
+  `payroll.approve` (MANAGER) · **self-view phiếu lương = FK `Employee.userId`**. **`finance.read` KHÔNG cấp
+  quyền payroll** (dữ liệu riêng tư tách biệt).
+
+### UI
+- Workspace **`/payroll`** (Vận hành & Hệ thống, `payroll.read`): tab **Kỳ lương** (tạo/tính/duyệt/chi + bảng
+  phiếu + modal phiếu lương chi tiết) · tab **Cấu hình lương** (lương cơ bản versioned + phụ cấp/khấu trừ tự
+  khai). Nav item "Bảng lương".
+- **Hồ sơ nhân sự tab J** "Bảng lương" — phiếu lương của nhân sự (read-only, riêng tư; self hoặc payroll.read).
+
+### CSV — `docs/PAYROLL_CSV.md`
+`employee_base_salaries` + `payroll_component_rules` (config/master). **KHÔNG** import `employee_payroll_lines`.
+
+### Chứng minh (test/hr-payroll.test.ts, 13 test → A–P)
+Base salary A–B (versioned hiệu lực) · Earnings C–E (gộp commission/incentive/bonus · **E reversal loại net**) ·
+Allowance/Deduction F–H (phụ cấp FIXED · **G khấu trừ %base+%gross tự khai** · H scope ROLE) · Lifecycle I–L
+(CALCULATED · **J supersede idempotent 1 CURRENT** · **K duyệt bất biến + tính lại 409 + khóa phiếu** · L
+PAID) · RBAC/Self M–P (self own · **O finance.read đơn lẻ→403** · P payroll.read xem / approve cần cho duyệt).
+Full regression **550/54** không regression.
+
+### Demo (seed:demo) — PR-000001 (08/2026)
+4 phiếu. **Phạm Chuyên Viên**: base 10tr + phụ cấp 730k + thưởng dịch vụ 150k + hoa hồng 150k = gộp 11.03tr −
+BHXH 10.5% (1.05tr) = **thực nhận 9.98tr**. **Trần Quản Lý**: base 15tr + 730k + thưởng 50k = 15.78tr − 1.575tr
+= **14.205tr**. Minh họa gộp thu nhập HR-PH5 + khấu trừ khai tay (không hard-code luật).
+
+### CONFLICTS: KHÔNG CÓ
+Không hard-code thuế/BHXH · không dùng EmployeeRoleFee làm lương · không tính lại tiền event (chỉ gộp net) ·
+không hard-delete phiếu (supersede + khóa khi duyệt) · không đổi Invoice/Payment/CompensationEvent · KHÔNG dùng
+`finance.read` cho privacy lương. Additive 0 DROP. Baseline HR-PH1..5 + Costing/Pricing + KPI lock + Booking +
+IA/RBAC (Mục 15) bất biến.
+
+### Deferred (ngoài phạm vi HR — cần quyết định chủ DN / tích hợp riêng)
+Payslip PDF/export · thanh toán lương thật (bank file) · hạch toán kế toán · engine thuế PIT lũy tiến/BHXH tự
+động theo luật · bảng công chi tiết → lương theo giờ/ngày công · Loyalty/Voucher/Prepaid (domain mới).
+
+## TRẠNG THÁI TỔNG — chuỗi HR hoàn tất (HR-PH1→PH6)
+Nhân sự→Chấm công→Đóng góp→KPI→Lương thưởng→**Bảng lương** đã đóng trọn vòng. Nghiệp vụ lõi (Kho THNG 7 phase +
+Spa 41 mục + HR PH1–6) hoàn tất. Còn lại: **Loyalty/Prepaid** (domain mới, cần owner spec) + **blocker hạ tầng
+production** (DB provider/S3/Vercel/backup vận hành/Sentry — cần admin) + nợ kỹ thuật nhỏ lẻ (đã liệt kê từng phase).

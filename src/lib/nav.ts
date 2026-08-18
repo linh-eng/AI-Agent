@@ -113,6 +113,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/performance", label: "Hiệu suất (KPI)", icon: BarChart3, perm: "attendance.read" },
       // HR-PH5 — workspace lương thưởng (chính sách/attribution/sự kiện thu nhập). Gate compensationPolicy.read.
       { href: "/compensation", label: "Lương thưởng", icon: Wallet, perm: ["compensationPolicy.read", "commission.read"] },
+      // HR-PH6 — workspace bảng lương (kỳ lương/phiếu lương/cấu hình). Gate payroll.read.
+      { href: "/payroll", label: "Bảng lương", icon: Receipt, perm: "payroll.read" },
       { href: "/import-customers", label: "Nhập khách hàng", icon: Upload, perm: "customer.write" },
       { href: "/users", label: "Quản trị người dùng", icon: ShieldCheck, perm: "user.manage" },
       { href: "/settings", label: "Cài đặt", icon: Settings, perm: "setting.write" },
