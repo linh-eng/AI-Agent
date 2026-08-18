@@ -3,6 +3,14 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.8.1 — 2026-08-18
+- **Bảo hành – Bảo trì (rà soát bổ sung):**
+  - Hiển thị **Thời gian bảo hành** + **tự tính Ngày hết hạn bảo hành** = ngày mua + thời gian BH
+    (khi chưa nhập ngày hết hạn trực tiếp); cảnh báo bảo hành cũng dùng mốc tính này.
+  - Lịch sử bảo trì thêm cột **"Người thực hiện"** (tách khỏi Đơn vị/hãng và Người ghi).
+  - **Badge đếm cảnh báo** ở menu "Cảnh báo" (thông báo tự động, tự làm mới mỗi 5 phút).
+- ⚠️ Có thêm cột mới (người thực hiện) → cần chạy `npm run prisma:push` khi cập nhật.
+
 ## 1.8.0 — 2026-08-18
 - **Khấu hao — bổ sung phương pháp "Theo sản lượng"** (units of production): nhập tổng sản lượng ước
   tính; **ghi nhận sản lượng theo thời gian** (số shot/lượt/giờ chạy) ở trang chi tiết tài sản → hệ thống

@@ -26,6 +26,7 @@ export const POST = handle(async (req, ctx) => {
       description: input.description,
       cost: input.cost ?? null,
       vendor: input.vendor,
+      performedBy: input.performedBy,
       performedAt: new Date(input.performedAt),
       note: input.note,
       createdById: session.userId,

@@ -594,7 +594,8 @@ model MaintenanceLog {
   type        MaintenanceType @default(MAINTENANCE)
   description String
   cost        Float?
-  vendor      String? // đơn vị/kỹ thuật thực hiện
+  vendor      String? // đơn vị/hãng thực hiện
+  performedBy String?         @map("performed_by") // người thực hiện (kỹ thuật viên)
   performedAt DateTime        @map("performed_at")
   note        String?
   createdById String          @map("created_by_id")

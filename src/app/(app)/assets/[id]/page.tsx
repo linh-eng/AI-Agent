@@ -22,6 +22,7 @@ interface Maint {
   description: string;
   cost?: number | null;
   vendor?: string | null;
+  performedBy?: string | null;
   performedAt: string;
   note?: string | null;
   createdBy: { name: string };
@@ -124,7 +125,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ type: "MAINTENANCE", description: "", cost: "", vendor: "", performedAt: "", note: "" });
+  const [form, setForm] = useState({ type: "MAINTENANCE", description: "", cost: "", vendor: "", performedBy: "", performedAt: "", note: "" });
 
   // Thanh toán & công nợ
   const [payOpen, setPayOpen] = useState(false);
@@ -250,12 +251,13 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
           description: form.description,
           cost: form.cost ? Number(form.cost) : null,
           vendor: form.vendor || null,
+          performedBy: form.performedBy || null,
           performedAt: form.performedAt,
           note: form.note || null,
         }),
       });
       setOpen(false);
-      setForm({ type: "MAINTENANCE", description: "", cost: "", vendor: "", performedAt: "", note: "" });
+      setForm({ type: "MAINTENANCE", description: "", cost: "", vendor: "", performedBy: "", performedAt: "", note: "" });
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi");
@@ -441,7 +443,14 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
 
       {/* (b) Bảo hành & bảo trì định kỳ */}
       {(() => {
-        const wDays = daysBetween(data.warrantyUntil);
+        // Hạn BH hiệu lực = ngày nhập trực tiếp, hoặc ngày mua + thời gian BH (tháng).
+        let warrantyEnd: string | null = data.warrantyUntil ?? null;
+        let computed = false;
+        if (!warrantyEnd && data.purchaseDate && data.warrantyMonths) {
+          warrantyEnd = addMonths(data.purchaseDate, data.warrantyMonths);
+          computed = true;
+        }
+        const wDays = daysBetween(warrantyEnd);
         const lastMaint = data.maintenance[0]?.performedAt ?? null; // maintenance sắp xếp desc
         const baseForNext = lastMaint ?? data.purchaseDate ?? null;
         const nextMaint =
@@ -451,10 +460,12 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
           <Card className="mb-4">
             <CardContent className="grid gap-4 p-5 text-sm sm:grid-cols-4">
               <Info label="Hãng / đơn vị bảo hành" value={data.warrantyVendor ?? "—"} />
+              <Info label="Thời gian bảo hành" value={data.warrantyMonths ? `${data.warrantyMonths} tháng` : "—"} />
               <div>
-                <div className="text-xs text-muted-foreground">Bảo hành đến</div>
+                <div className="text-xs text-muted-foreground">Ngày hết hạn bảo hành</div>
                 <div className="font-medium">
-                  {data.warrantyUntil ? formatDate(data.warrantyUntil) : "—"}
+                  {warrantyEnd ? formatDate(warrantyEnd) : "—"}
+                  {computed && <span className="ml-1 text-xs text-muted-foreground">(tính từ ngày mua)</span>}
                   {wDays != null &&
                     (wDays < 0 ? (
                       <Badge tone="danger" className="ml-2">Hết BH</Badge>
@@ -630,7 +641,8 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                 <TH>Ngày</TH>
                 <TH>Loại</TH>
                 <TH>Nội dung</TH>
-                <TH>Đơn vị</TH>
+                <TH>Đơn vị / hãng</TH>
+                <TH>Người thực hiện</TH>
                 <TH className="text-right">Chi phí</TH>
                 <TH>Người ghi</TH>
               </TR>
@@ -638,7 +650,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
             <TBody>
               {data.maintenance.length === 0 ? (
                 <TR>
-                  <TD colSpan={6} className="py-8 text-center text-muted-foreground">Chưa có bản ghi bảo trì</TD>
+                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">Chưa có bản ghi bảo trì</TD>
                 </TR>
               ) : (
                 data.maintenance.map((m) => (
@@ -654,6 +666,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                       {m.note && <div className="text-xs text-muted-foreground">{m.note}</div>}
                     </TD>
                     <TD className="text-muted-foreground">{m.vendor ?? "—"}</TD>
+                    <TD className="text-muted-foreground">{m.performedBy ?? "—"}</TD>
                     <TD className="text-right">{m.cost != null ? `${formatNumber(m.cost)} đ` : "—"}</TD>
                     <TD className="text-muted-foreground">{m.createdBy.name}</TD>
                   </TR>
@@ -684,10 +697,14 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
             <Label>Nội dung *</Label>
             <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <Label>Đơn vị / kỹ thuật</Label>
+              <Label>Đơn vị / hãng</Label>
               <Input value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Người thực hiện</Label>
+              <Input value={form.performedBy} onChange={(e) => setForm({ ...form, performedBy: e.target.value })} placeholder="Tên kỹ thuật viên" />
             </div>
             <div className="space-y-1.5">
               <Label>Chi phí (đ)</Label>

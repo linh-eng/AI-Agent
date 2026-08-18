@@ -97,6 +97,7 @@ export function AppShell({
     name: "Sophia Wellness",
     logo: null,
   });
+  const [alertCount, setAlertCount] = useState(0);
 
   useEffect(() => {
     apiFetch<any>("/api/settings")
@@ -108,6 +109,14 @@ export function AppShell({
         } catch {}
       })
       .catch(() => {});
+    // Đếm cảnh báo cho badge ở menu (thông báo tự động). Làm mới mỗi 5 phút.
+    const loadCount = () =>
+      apiFetch<{ total: number }>("/api/alerts/count")
+        .then((d) => setAlertCount(d.total ?? 0))
+        .catch(() => {});
+    loadCount();
+    const t = setInterval(loadCount, 5 * 60 * 1000);
+    return () => clearInterval(t);
   }, []);
 
   async function logout() {
@@ -174,7 +183,15 @@ export function AppShell({
                       )}
                     >
                       <Icon className="h-4 w-4" />
-                      {item.label}
+                      <span className="flex-1">{item.label}</span>
+                      {item.href === "/alerts" && alertCount > 0 && (
+                        <span className={cn(
+                          "ml-auto min-w-5 rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold",
+                          active ? "bg-primary-foreground text-primary" : "bg-red-500 text-white"
+                        )}>
+                          {alertCount > 99 ? "99+" : alertCount}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}

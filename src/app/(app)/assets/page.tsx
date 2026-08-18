@@ -243,7 +243,14 @@ export default function AssetsPage() {
                 </TR>
               ) : (
                 rows.map((a) => {
-                  const days = a.warrantyUntil ? daysUntil(a.warrantyUntil) : null;
+                  // Hạn BH hiệu lực = ngày nhập trực tiếp, hoặc ngày mua + thời gian BH.
+                  let warrantyEnd = a.warrantyUntil ?? null;
+                  if (!warrantyEnd && a.purchaseDate && a.warrantyMonths) {
+                    const d = new Date(a.purchaseDate);
+                    d.setMonth(d.getMonth() + a.warrantyMonths);
+                    warrantyEnd = d.toISOString();
+                  }
+                  const days = warrantyEnd ? daysUntil(warrantyEnd) : null;
                   return (
                     <TR key={a.id}>
                       <TD>
@@ -261,9 +268,9 @@ export default function AssetsPage() {
                         <Badge tone={ASSET_STATUS_TONE[a.status] ?? "muted"}>{ASSET_STATUS_LABEL[a.status] ?? a.status}</Badge>
                       </TD>
                       <TD>
-                        {a.warrantyUntil ? (
+                        {warrantyEnd ? (
                           <span className={days! < 0 ? "text-red-600" : days! <= 60 ? "text-amber-600" : ""}>
-                            {formatDate(a.warrantyUntil)}
+                            {formatDate(warrantyEnd)}
                             {days! < 0 ? " (hết BH)" : days! <= 60 ? ` (còn ${days}n)` : ""}
                           </span>
                         ) : (

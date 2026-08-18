@@ -164,33 +164,48 @@ export interface WarrantyAlert {
   isExpired: boolean;
 }
 
+/** Hạn bảo hành hiệu lực = ngày nhập trực tiếp, hoặc ngày mua + thời gian BH (tháng). */
+export function effectiveWarrantyEnd(a: {
+  warrantyUntil: Date | null;
+  purchaseDate: Date | null;
+  warrantyMonths: number | null;
+}): Date | null {
+  if (a.warrantyUntil) return a.warrantyUntil;
+  if (a.purchaseDate && a.warrantyMonths) {
+    const d = new Date(a.purchaseDate);
+    d.setMonth(d.getMonth() + a.warrantyMonths);
+    return d;
+  }
+  return null;
+}
+
 /** Thiết bị/tài sản sắp hoặc đã hết hạn bảo hành (ngưỡng ngày). */
 export async function getWarrantyAlerts(days = 60): Promise<WarrantyAlert[]> {
   const assets = await prisma.asset.findMany({
     where: {
-      warrantyUntil: { not: null },
       status: { not: "RETIRED" },
+      OR: [{ warrantyUntil: { not: null } }, { AND: [{ warrantyMonths: { not: null } }, { purchaseDate: { not: null } }] }],
     },
     include: { product: true },
-    orderBy: { warrantyUntil: "asc" },
   });
   const out: WarrantyAlert[] = [];
   for (const a of assets) {
-    if (!a.warrantyUntil) continue;
-    const left = daysUntil(a.warrantyUntil);
+    const end = effectiveWarrantyEnd(a);
+    if (!end) continue;
+    const left = daysUntil(end);
     if (left > days) continue;
     out.push({
       assetId: a.id,
       code: a.code,
       productName: a.product.name,
       serialNumber: a.serialNumber,
-      warrantyUntil: a.warrantyUntil.toISOString(),
+      warrantyUntil: end.toISOString(),
       daysLeft: left,
       status: a.status,
       isExpired: left < 0,
     });
   }
-  return out;
+  return out.sort((x, y) => x.daysLeft - y.daysLeft);
 }
 
 export interface MaintenanceDueAlert {

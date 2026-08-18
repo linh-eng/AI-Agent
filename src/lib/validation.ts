@@ -206,6 +206,7 @@ export const maintenanceCreateSchema = z.object({
   description: z.string().trim().min(1, "Nhập nội dung"),
   cost: z.number().nonnegative().nullable().optional(),
   vendor: optionalString,
+  performedBy: optionalString,
   performedAt: z.string().min(1, "Chọn ngày thực hiện"),
   note: optionalString,
 });
