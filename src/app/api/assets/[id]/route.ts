@@ -30,7 +30,7 @@ export const GET = handle(async (_req, ctx) => {
 });
 
 export const PATCH = handle(async (req, ctx) => {
-  await requirePermission(PERMISSIONS.ASSET_WRITE);
+  await requirePermission(PERMISSIONS.ASSET_MANAGE);
   const input = assetUpdateSchema.parse(await req.json());
   const row = await prisma.asset.update({
     where: { id: ctx.params.id },

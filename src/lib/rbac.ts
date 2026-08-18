@@ -27,6 +27,7 @@ export const PERMISSIONS = {
   SUPPLIER_WRITE: "supplier.write",
   PRODUCT_READ: "product.read",
   PRODUCT_WRITE: "product.write",
+  PRODUCT_MANAGE: "product.manage", // sửa thông tin sản phẩm (giới hạn: ADMIN/MANAGER)
   WAREHOUSE_READ: "warehouse.read",
   WAREHOUSE_WRITE: "warehouse.write",
 
@@ -44,6 +45,7 @@ export const PERMISSIONS = {
 
   ASSET_READ: "asset.read",
   ASSET_WRITE: "asset.write",
+  ASSET_MANAGE: "asset.manage", // sửa thông tin tài sản/thiết bị (giới hạn: ADMIN/MANAGER)
 
   REPORT_READ: "report.read",
 
@@ -61,7 +63,8 @@ export const PERMISSION_LABELS: Record<PermissionCode, string> = {
   "supplier.read": "Xem nhà cung cấp",
   "supplier.write": "Sửa nhà cung cấp",
   "product.read": "Xem sản phẩm",
-  "product.write": "Sửa sản phẩm",
+  "product.write": "Thêm sản phẩm",
+  "product.manage": "Chỉnh sửa sản phẩm",
   "warehouse.read": "Xem kho",
   "warehouse.write": "Sửa kho",
   "inventory.read": "Xem tồn kho",
@@ -75,7 +78,8 @@ export const PERMISSION_LABELS: Record<PermissionCode, string> = {
   "service.write": "Quản lý liệu trình dịch vụ",
   "service.use": "Ghi nhận thực hiện dịch vụ",
   "asset.read": "Xem tài sản/thiết bị",
-  "asset.write": "Quản lý tài sản/thiết bị",
+  "asset.write": "Thêm tài sản/thiết bị",
+  "asset.manage": "Chỉnh sửa tài sản/thiết bị",
   "report.read": "Xem báo cáo",
   "setting.manage": "Cài đặt công ty",
   "user.manage": "Quản trị người dùng",
@@ -100,6 +104,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.CATEGORY_WRITE,
     PERMISSIONS.SUPPLIER_WRITE,
     PERMISSIONS.PRODUCT_WRITE,
+    PERMISSIONS.PRODUCT_MANAGE,
     PERMISSIONS.WAREHOUSE_WRITE,
     PERMISSIONS.INBOUND_WRITE,
     PERMISSIONS.INBOUND_MANAGE,
@@ -110,6 +115,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.SERVICE_WRITE,
     PERMISSIONS.SERVICE_USE,
     PERMISSIONS.ASSET_WRITE,
+    PERMISSIONS.ASSET_MANAGE,
     PERMISSIONS.SETTING_MANAGE,
   ],
 

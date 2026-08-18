@@ -17,7 +17,7 @@ export const GET = handle(async (_req, ctx) => {
 });
 
 export const PATCH = handle(async (req, ctx) => {
-  await requirePermission(PERMISSIONS.PRODUCT_WRITE);
+  await requirePermission(PERMISSIONS.PRODUCT_MANAGE);
   const data = productCreateSchema.partial().parse(await req.json());
   await ensureUnique("product", "sku", data.sku, "Mã SKU", ctx.params.id);
   await ensureUnique("product", "barcode", data.barcode, "Mã vạch", ctx.params.id);

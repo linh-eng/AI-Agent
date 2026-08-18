@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -105,11 +105,13 @@ const EMPTY = {
 
 export default function ProductsPage() {
   const canWrite = useCan(PERMISSIONS.PRODUCT_WRITE);
+  const canManage = useCan(PERMISSIONS.PRODUCT_MANAGE);
   const [rows, setRows] = useState<Row[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Row | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [form, setForm] = useState(EMPTY);
@@ -128,31 +130,65 @@ export default function ProductsPage() {
     apiFetch<Brand[]>("/api/brands").then(setBrands).catch(() => {});
   }, []);
 
-  async function create(e: React.FormEvent) {
+  function openCreate() {
+    setEditing(null);
+    setForm(EMPTY);
+    setError(null);
+    setOpen(true);
+  }
+  function openEdit(r: Row) {
+    setEditing(r);
+    setForm({
+      sku: r.sku,
+      barcode: r.barcode ?? "",
+      name: r.name,
+      brand: r.brand ?? "",
+      categoryId: r.category?.id ?? "",
+      trackingMode: r.trackingMode,
+      requiresExpiry: !!r.requiresExpiry,
+      isTester: !!r.isTester,
+      uom: r.uom,
+      minStock: r.minStock != null ? String(r.minStock) : "",
+      expiryAlertDays: r.expiryAlertDays != null ? String(r.expiryAlertDays) : "",
+      purchaseDate: r.purchaseDate ? r.purchaseDate.slice(0, 10) : "",
+      openedDate: r.openedDate ? r.openedDate.slice(0, 10) : "",
+      expiryDate: r.expiryDate ? r.expiryDate.slice(0, 10) : "",
+    });
+    setError(null);
+    setOpen(true);
+  }
+
+  async function save(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const payload = {
+      sku: form.sku,
+      barcode: form.barcode || null,
+      name: form.name,
+      brand: form.brand || null,
+      categoryId: form.categoryId || null,
+      trackingMode: form.trackingMode,
+      requiresExpiry: form.trackingMode === "LOT" ? form.requiresExpiry : false,
+      isTester: form.isTester,
+      uom: form.uom,
+      minStock: form.minStock ? Number(form.minStock) : null,
+      expiryAlertDays: form.expiryAlertDays ? Number(form.expiryAlertDays) : null,
+      purchaseDate: form.purchaseDate || null,
+      openedDate: form.openedDate || null,
+      expiryDate: form.expiryDate || null,
+    };
     try {
-      await apiFetch("/api/products", {
-        method: "POST",
-        body: JSON.stringify({
-          sku: form.sku,
-          barcode: form.barcode || null,
-          name: form.name,
-          brand: form.brand || null,
-          categoryId: form.categoryId || null,
-          trackingMode: form.trackingMode,
-          requiresExpiry: form.trackingMode === "LOT" ? form.requiresExpiry : false,
-          isTester: form.isTester,
-          uom: form.uom,
-          minStock: form.minStock ? Number(form.minStock) : null,
-          expiryAlertDays: form.expiryAlertDays ? Number(form.expiryAlertDays) : null,
-          purchaseDate: form.purchaseDate || null,
-          openedDate: form.openedDate || null,
-          expiryDate: form.expiryDate || null,
-        }),
-      });
+      if (editing) {
+        await apiFetch(`/api/products/${editing.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await apiFetch("/api/products", { method: "POST", body: JSON.stringify(payload) });
+      }
       setOpen(false);
       setForm(EMPTY);
+      setEditing(null);
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi");
@@ -172,7 +208,7 @@ export default function ProductsPage() {
         description="Hàng hóa trong kho — chế độ quản lý theo lô (có HSD) hoặc theo số lượng."
         action={
           canWrite && (
-            <Button onClick={() => setOpen(true)}>
+            <Button onClick={openCreate}>
               <Plus className="h-4 w-4" /> Thêm sản phẩm
             </Button>
           )
@@ -198,18 +234,19 @@ export default function ProductsPage() {
                 <TH>ĐVT</TH>
                 <TH className="text-right">Định mức</TH>
                 <TH>HSD</TH>
+                {canManage && <TH className="text-right">Sửa</TH>}
               </TR>
             </THead>
             <TBody>
               {loading ? (
                 <TR>
-                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={canManage ? 8 : 7} className="py-8 text-center text-muted-foreground">
                     Đang tải…
                   </TD>
                 </TR>
               ) : filtered.length === 0 ? (
                 <TR>
-                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={canManage ? 8 : 7} className="py-8 text-center text-muted-foreground">
                     Chưa có sản phẩm
                   </TD>
                 </TR>
@@ -266,6 +303,13 @@ export default function ProductsPage() {
                         return <div className="flex flex-wrap gap-1">{badges}</div>;
                       })()}
                     </TD>
+                    {canManage && (
+                      <TD className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(p)} title="Chỉnh sửa">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </TD>
+                    )}
                   </TR>
                 ))
               )}
@@ -274,8 +318,8 @@ export default function ProductsPage() {
         </CardContent>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Thêm sản phẩm">
-        <form onSubmit={create} onKeyDown={focusNextOnEnter} className="space-y-4">
+      <Modal open={open} onClose={() => setOpen(false)} title={editing ? `Chỉnh sửa ${editing.sku}` : "Thêm sản phẩm"}>
+        <form onSubmit={save} onKeyDown={focusNextOnEnter} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>SKU *</Label>

@@ -28,6 +28,9 @@ interface Asset {
   status: string;
   location?: string | null;
   warehouse?: { name: string } | null;
+  warehouseId?: string | null;
+  supplierId?: string | null;
+  note?: string | null;
   purchaseDate?: string | null;
   warrantyUntil?: string | null;
 }
@@ -41,6 +44,7 @@ function daysUntil(iso: string): number {
 
 export default function AssetsPage() {
   const canWrite = useCan(PERMISSIONS.ASSET_WRITE);
+  const canManage = useCan(PERMISSIONS.ASSET_MANAGE);
   const [rows, setRows] = useState<Asset[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -89,13 +93,13 @@ export default function AssetsPage() {
       productId: "",
       code: a.code,
       serialNumber: a.serialNumber ?? "",
-      warehouseId: "",
-      supplierId: "",
+      warehouseId: a.warehouseId ?? "",
+      supplierId: a.supplierId ?? "",
       status: a.status,
       location: a.location ?? "",
       purchaseDate: a.purchaseDate ? a.purchaseDate.slice(0, 10) : "",
       warrantyUntil: a.warrantyUntil ? a.warrantyUntil.slice(0, 10) : "",
-      note: "",
+      note: a.note ?? "",
     });
     setError(null);
     setOpen(true);
@@ -115,6 +119,9 @@ export default function AssetsPage() {
             location: form.location || null,
             purchaseDate: form.purchaseDate || null,
             warrantyUntil: form.warrantyUntil || null,
+            warehouseId: form.warehouseId || null,
+            supplierId: form.supplierId || null,
+            note: form.note || null,
           }),
         });
       } else {
@@ -165,17 +172,17 @@ export default function AssetsPage() {
                 <TH>Vị trí</TH>
                 <TH className="text-center">Trạng thái</TH>
                 <TH>Bảo hành đến</TH>
-                {canWrite && <TH className="text-right">Sửa</TH>}
+                {canManage && <TH className="text-right">Sửa</TH>}
               </TR>
             </THead>
             <TBody>
               {loading ? (
                 <TR>
-                  <TD colSpan={canWrite ? 7 : 6} className="py-8 text-center text-muted-foreground">Đang tải…</TD>
+                  <TD colSpan={canManage ? 7 : 6} className="py-8 text-center text-muted-foreground">Đang tải…</TD>
                 </TR>
               ) : rows.length === 0 ? (
                 <TR>
-                  <TD colSpan={canWrite ? 7 : 6} className="py-8 text-center text-muted-foreground">Chưa có tài sản</TD>
+                  <TD colSpan={canManage ? 7 : 6} className="py-8 text-center text-muted-foreground">Chưa có tài sản</TD>
                 </TR>
               ) : (
                 rows.map((a) => {
@@ -206,9 +213,9 @@ export default function AssetsPage() {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </TD>
-                      {canWrite && (
+                      {canManage && (
                         <TD className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(a)}>
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(a)} title="Chỉnh sửa">
                             <Pencil className="h-4 w-4" />
                           </Button>
                         </TD>
@@ -271,29 +278,25 @@ export default function AssetsPage() {
               <Label>Vị trí đặt</Label>
               <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
             </div>
-            {!editing && (
-              <div className="space-y-1.5">
-                <Label>Kho</Label>
-                <Select value={form.warehouseId} onChange={(e) => setForm({ ...form, warehouseId: e.target.value })}>
-                  <option value="">— Không gắn kho —</option>
-                  {warehouses.map((w) => (
-                    <option key={w.id} value={w.id}>{w.name}</option>
-                  ))}
-                </Select>
-              </div>
-            )}
-          </div>
-          {!editing && (
             <div className="space-y-1.5">
-              <Label>Nhà cung cấp</Label>
-              <Combobox
-                value={form.supplierId}
-                onChange={(v) => setForm({ ...form, supplierId: v })}
-                placeholder="— Chọn NCC —"
-                items={suppliers.map((s) => ({ value: s.id, label: s.name }))}
-              />
+              <Label>Kho</Label>
+              <Select value={form.warehouseId} onChange={(e) => setForm({ ...form, warehouseId: e.target.value })}>
+                <option value="">— Không gắn kho —</option>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </Select>
             </div>
-          )}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Nhà cung cấp</Label>
+            <Combobox
+              value={form.supplierId}
+              onChange={(v) => setForm({ ...form, supplierId: v })}
+              placeholder="— Chọn NCC —"
+              items={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+            />
+          </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Hủy</Button>

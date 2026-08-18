@@ -3,6 +3,13 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.4.0 — 2026-08-18
+- **Chỉnh sửa sản phẩm:** thêm nút ✏️ ở mỗi sản phẩm để cập nhật/bổ sung thông tin sau khi tạo.
+- **Tài sản/thiết bị:** khi sửa nay cho phép cập nhật thêm Kho + Nhà cung cấp (trước chỉ lúc tạo).
+- **Phân quyền riêng cho sửa** (giới hạn ADMIN/MANAGER): thêm quyền `product.manage`,
+  `asset.manage`. Tài khoản không có quyền sẽ không thấy nút sửa và không sửa được (chặn ở server).
+- ⚠️ Sau khi cập nhật cần chạy `npm run db:sync-rbac` rồi ĐĂNG NHẬP LẠI để nạp quyền mới.
+
 ## 1.3.1 — 2026-08-14
 - Thêm bộ script **tự khởi động khi bật máy (Windows)** trong `scripts/windows/`:
   `install-autostart.bat` (mở cổng 9000 + tạo tác vụ tự chạy khi đăng nhập),
