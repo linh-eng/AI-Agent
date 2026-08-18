@@ -35,7 +35,7 @@ export default function LoyaltyPage() {
   );
 }
 
-export function LoyaltyMemberPanel({ customerId, canWrite }: { customerId: string; canWrite: boolean }) {
+function LoyaltyMemberPanel({ customerId, canWrite }: { customerId: string; canWrite: boolean }) {
   const [s, setS] = useState<any | null>(null);
   const [msg, setMsg] = useState("");
   const [f, setF] = useState({ points: "", amount: "", paymentId: "" });
