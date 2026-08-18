@@ -3,6 +3,14 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.5.0 — 2026-08-18
+- **Phân hệ Kho Dịch Vụ** (menu Dịch vụ & Thiết bị): sổ theo dõi hàng đã mở nắp/dùng dở cho
+  dịch vụ. Khi Ghi nhận dịch vụ tiêu hao hàng có HSD (requiresExpiry), hệ thống tự tạo/cập nhật
+  "hộp đã mở": trừ dần định mức, hết thì tự mở hộp mới. Hiển thị: mã/tên hàng, ngày mở nắp,
+  người mở/cập nhật, còn lại, HSD sau mở (= ngày mở + PAO nhóm), định mức theo từng dịch vụ,
+  trạng thái (Đang sử dụng / Đã hết / Sắp/Hết HSD). Cho điều chỉnh còn lại, đánh dấu hết, xóa (SERVICE_WRITE).
+- ⚠️ Có thêm bảng mới → cần chạy `npm run prisma:push` khi cập nhật.
+
 ## 1.4.0 — 2026-08-18
 - **Chỉnh sửa sản phẩm:** thêm nút ✏️ ở mỗi sản phẩm để cập nhật/bổ sung thông tin sau khi tạo.
 - **Tài sản/thiết bị:** khi sửa nay cho phép cập nhật thêm Kho + Nhà cung cấp (trước chỉ lúc tạo).

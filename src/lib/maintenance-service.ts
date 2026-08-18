@@ -17,6 +17,7 @@ const CLEAR_ORDER = [
   "shotLog",
   "handpiece",
   "asset",
+  "serviceStockItem",
   "serviceUsage",
   "serviceItem",
   "service",

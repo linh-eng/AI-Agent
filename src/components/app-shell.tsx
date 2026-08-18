@@ -18,6 +18,7 @@ import {
   Warehouse,
   HeartPulse,
   ClipboardList,
+  FlaskConical,
   Cpu,
   Zap,
   BarChart3,
@@ -57,6 +58,7 @@ const NAV = [
     items: [
       { href: "/services", label: "Liệu trình dịch vụ", icon: HeartPulse },
       { href: "/service-usage", label: "Ghi nhận dịch vụ", icon: ClipboardList },
+      { href: "/service-stock", label: "Kho Dịch Vụ", icon: FlaskConical },
       { href: "/assets", label: "Tài sản / Thiết bị", icon: Cpu },
       { href: "/handpieces", label: "Tay cầm / Shot", icon: Zap },
     ],

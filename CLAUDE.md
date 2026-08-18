@@ -32,6 +32,10 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
   (giữ nguyên mã lô + HSD) ở kho đích; mỗi lần tách lô ghi 2 `StockMovement` (OUTBOUND + INBOUND, `refType=TRANSFER`).
 - **Dịch vụ/liệu trình (Phase 2):** khai báo định mức tiêu hao (`Service` + `ServiceItem`); ghi nhận thực hiện
   N lượt (`ServiceUsage`) → tự lập phiếu xuất `INTERNAL_USE` (FEFO) trừ kho theo định mức × số lượt.
+- **Kho Dịch Vụ (hàng đã mở nắp):** `ServiceStockItem` — sổ theo dõi hàng mở nắp/dùng dở cho dịch vụ.
+  Ghi nhận dịch vụ tiêu hao hàng `requiresExpiry` → tự trừ "hộp đang mở" (cũ trước), hết thì mở hộp mới
+  (1 đơn vị), HSD sau mở = ngày mở + PAO nhóm (`Category.openMaxMonths`). Trạng thái Đang dùng/Đã hết/
+  Sắp-Hết HSD; cho điều chỉnh còn lại/đánh dấu hết/xóa. Là sổ theo dõi overlay, không đổi sổ tồn kho chính.
 - **Tài sản/thiết bị (Phase 2):** `Asset` theo serial, trạng thái (IN_STOCK/IN_USE/MAINTENANCE/RETIRED),
   ngày mua & hạn bảo hành — quản lý riêng, không nằm trong tồn theo lô.
 - **Tay cầm / vật tư theo máy (đếm shot):** `Handpiece` gắn với 1 máy (`Asset` tùy chọn hoặc tên máy),

@@ -34,6 +34,8 @@ model User {
   maintenance   MaintenanceLog[] @relation("MaintenanceCreatedBy")
   shotLogs      ShotLog[]        @relation("ShotCreatedBy")
   auditLogs     AuditLog[]
+  svcStockOpened  ServiceStockItem[] @relation("SvcStockOpenedBy")
+  svcStockUpdated ServiceStockItem[] @relation("SvcStockUpdatedBy")
 
   @@map("users")
 }
@@ -97,6 +99,7 @@ model Warehouse {
   serviceUsages ServiceUsage[]
   stockCounts   StockCount[]
   assets        Asset[]
+  serviceStock  ServiceStockItem[]
 
   @@map("warehouses")
 }
@@ -190,6 +193,7 @@ model Product {
   transferItems   StockTransferItem[]
   stockCountItems StockCountItem[]
   assets          Asset[]
+  serviceStock    ServiceStockItem[]
 
   @@map("products")
 }
@@ -601,4 +605,36 @@ model AuditLog {
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("audit_logs")
+}
+
+// -----------------------------------------------------------------------------
+// Kho Dịch Vụ — theo dõi hàng đã MỞ NẮP đang dùng dở cho dịch vụ. Mỗi bản ghi =
+// 1 hộp/chai đã mở của 1 sản phẩm: còn lại bao nhiêu, HSD sau mở, ai mở/cập nhật.
+// Tự sinh/cập nhật khi Ghi nhận dịch vụ (chỉ với hàng requiresExpiry = mở nắp).
+// -----------------------------------------------------------------------------
+enum ServiceStockStatus {
+  IN_USE // đang sử dụng
+  EMPTY  // đã hết
+}
+
+model ServiceStockItem {
+  id           String             @id @default(cuid())
+  productId    String             @map("product_id")
+  product      Product            @relation(fields: [productId], references: [id])
+  warehouseId  String?            @map("warehouse_id")
+  warehouse    Warehouse?         @relation(fields: [warehouseId], references: [id])
+  openedDate   DateTime           @map("opened_date")          // ngày mở nắp
+  expiryDate   DateTime?          @map("expiry_date")          // HSD sau mở = ngày mở + PAO nhóm
+  initialQty   Float              @default(1) @map("initial_qty") // dung tích/số lượng khi mở (mặc định 1 đơn vị)
+  remainingQty Float              @map("remaining_qty")        // còn lại sau khi trừ định mức
+  status       ServiceStockStatus @default(IN_USE)
+  openedById   String             @map("opened_by_id")
+  openedBy     User               @relation("SvcStockOpenedBy", fields: [openedById], references: [id])
+  updatedById  String?            @map("updated_by_id")
+  updatedBy    User?              @relation("SvcStockUpdatedBy", fields: [updatedById], references: [id])
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  @@index([productId, status])
+  @@map("service_stock_items")
 }

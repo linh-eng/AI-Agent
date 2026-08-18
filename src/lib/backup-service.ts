@@ -33,6 +33,7 @@ const MODEL_ORDER = [
   "service",
   "serviceItem",
   "serviceUsage",
+  "serviceStockItem",
   "asset",
   "handpiece",
   "shotLog",

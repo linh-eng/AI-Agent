@@ -6,6 +6,7 @@ import { prisma } from "./prisma";
 import { HttpError } from "./session";
 import { nextServiceUsageCode } from "./codes";
 import { createIssue, reverseAndCancelIssueTx } from "./outbound-service";
+import { applyServiceStock } from "./service-stock-service";
 
 export interface ServiceUsageInput {
   serviceId: string;
@@ -80,6 +81,13 @@ export async function recordServiceUsage(input: ServiceUsageInput, userId: strin
       detail: `${code} → ${issue.code}`,
     },
   });
+
+  // Cập nhật Kho Dịch Vụ (sổ theo dõi hàng đã mở nắp) — không chặn nếu lỗi.
+  await applyServiceStock(
+    issueItems.map((i) => ({ productId: i.productId, qty: i.quantity })),
+    input.warehouseId,
+    userId
+  ).catch((e) => console.error("[service-stock] applyServiceStock lỗi:", e));
 
   return { id: usage.id, code: usage.code, issueId: issue.id, issueCode: issue.code };
 }
