@@ -2337,6 +2337,88 @@ PH1–PH5, Invoice/Payment/Proposal semantics, ROLE_PERMISSIONS/permission matri
 warehouse, schema/migration. Package pricing (Protocol) **KHÔNG** có menu toàn cục (đúng ranh giới — để phase
 sau). Deep-link mọi route cũ giữ nguyên.
 
+## HR-PH1: EMPLOYEE FOUNDATION + BRANCH + HR PRIVACY/RBAC (v0.30.0)
+
+Nền HR cho các phase Chấm công/Lương thưởng sau. **Thuần additive, 0 DROP.** Migration **`Za_hr_foundation`**
+(sau `Z_protocol_pricing`; tên `Za_` sắp đúng thứ tự byte sau `Z_` — dành `Zb_`, `Zc_`… cho HR-PH2+; tổng
+**37 migration**). **428 test / 49 file PASS** (412 + `test/hr-foundation.test.ts` 16). tsc sạch · lint 0 lỗi ·
+build OK · fresh deploy 37 migration + seed + seed:demo sạch.
+
+### Migration & schema (`Za_hr_foundation`)
+- Enum `EmploymentType` (MONTHLY/DAILY/HOURLY/CONTRACT/OTHER) — **classification, KHÔNG phải cách tính lương**.
+- Model **`Branch`** (`branches`): code @unique · name · timezone? · address? · isActive · note. Master chi nhánh
+  ổn định (cho Chấm công/Lương sau này).
+- `Employee` +`branchId String?` (FK Branch, onDelete SetNull) +`employmentType EmploymentType?` +`endDate DateTime?`
+  +`userId String? @unique` (liên kết TÙY CHỌN 1-1 tới `User`). Quan hệ `branchRef`/`user`; **`Employee.branch`
+  (String) legacy GIỮ NGUYÊN** (không đổi tên/không xóa). `User` +back-relation `employee Employee?`.
+- **Backfill (trong migration, deterministic):** mỗi giá trị `Employee.branch` trimmed KHÁC NHAU (case-sensitive)
+  → 1 Branch (`CN-000x` theo thứ tự) → gán `branchId` khớp CHÍNH XÁC tên. **KHÔNG merge tên khác hoa/thường**
+  (tránh gộp nhầm 2 cơ sở); giá trị rỗng bỏ qua; không đoán. INSERT/UPDATE — 0 lệnh phá hủy.
+
+### Nguyên tắc BẤT BIẾN (blocker)
+- **Employee ≠ User** — `userId` chỉ là liên kết tùy chọn cho self-view; **KHÔNG merge, KHÔNG suy quyền RBAC**
+  từ liên kết, KHÔNG tự tạo tài khoản.
+- **`EmployeeRoleFee` GIỮ NGUYÊN ngữ nghĩa** = rate giá vốn nhân công (FIXED/buổi, versioned) cho Service
+  Costing/Giá sàn. **KHÔNG** redefine thành lương/hoa hồng. PayrollRate/CommissionRule là entity của phase sau.
+- **finance.read ≠ payroll** — namespace HR/lương TÁCH BIỆT (test chứng minh finance.read KHÔNG suy ra payroll.read).
+
+### RBAC (owner phê duyệt — additive, namespace mới)
+Hằng số RESERVED (feature ở HR-PH2+): `attendance.read/write` · `payroll.read/write/approve` ·
+`compensationPolicy.read/write` · `commission.read`. **Mapping:** MANAGER (đủ, gồm approve) · BOD (READ-ONLY:
+payroll/attendance/compensationPolicy/commission read) · ADMIN (qua ALL_PERMISSIONS). **Vai trò khác KHÔNG
+nhận.** Quyền cũ (Mục 15) **bất biến** (`git diff` rbac chỉ THÊM). Self-view **không dùng permission** — là
+ownership theo FK `userId`.
+
+### Self-view foundation — `src/lib/hr-self.ts`
+`resolveSelfEmployee`/`resolveSelfEmployeeId`/`isSelfEmployee` — ánh xạ user→employee **CHỈ theo FK userId**,
+**KHÔNG fallback tên/email** (chống mạo nhận). Dùng cho HR-PH2+ (tự xem chấm công/KPI/lương của chính mình);
+CHƯA có endpoint self trong PH1.
+
+### API / UI
+- `/api/employees` (GET filter `branchId`, kèm `branchName/employmentType/endDate/hasAccount`; POST/PATCH nhận
+  `branchId`+`employmentType`+`endDate`, chặn branchId không tồn tại 422) · **`/api/employees/[id]/link-user`**
+  (POST link/unlink 1-1: user tồn tại, 1 user↔1 employee, audit `EMPLOYEE_USER_LINKED/UNLINKED`) ·
+  **`/api/branches`** (GET `staff.read`; POST `staff.write` — **tái dùng**, không thêm `branch.manage`) +
+  `/[id]` (PATCH; soft qua isActive, KHÔNG hard-delete).
+- Audit: `EMPLOYEE_UPDATED` giàu hơn (branchId/employmentType/endDate before→after), `BRANCH_CREATED/UPDATED`,
+  `EMPLOYEE_USER_LINKED/UNLINKED`.
+- UI `/employees/[id]` tab **Thông tin**: thêm Select Chi nhánh (từ Branch active) + Hình thức làm việc + Ngày
+  kết thúc + dòng trạng thái **tài khoản liên kết** (read-only). Giữ 7 tab, KHÔNG lộ tab lương. `EmploymentType`
+  nhãn ở `clinic-labels.ts`. **UX chọn/gắn tài khoản (user picker) DEFER** — PH1 chỉ nền API + hiển thị trạng thái.
+
+### Privacy classes (tài liệu)
+GENERAL STAFF (tên/chức danh/năng lực) · MANAGERIAL (chấm công/KPI — PH2+) · HR/PAYROLL PRIVATE (lương/hoa
+hồng/payroll — PH5+, quyền `payroll.*`) · FINANCIAL COST PRIVATE (`EmployeeRoleFee`/giá vốn — `staff.fee.read`/
+`finance.read`) · EMPLOYEE SELF (chỉ của mình, theo FK). **Không trộn mask.**
+
+### CSV contract (định nghĩa, chưa build import)
+`branches.csv` (code*, name*, timezone, address) · `employees.csv` (code, fullName*, branchCode→branchId,
+employmentType, startDate, endDate) · `employee_roles.csv` · `employee_role_fees.csv` (versioned — import=tạo
+bản mới). KHÔNG CSV cho attendance thực tế/payroll/contribution (migration-only).
+
+### Chứng minh (test/hr-foundation.test.ts, 16 test A–T)
+RBAC unit A (quyền cũ bất biến) · B (finance.read≠payroll.read) · C (staff.fee.read≠payroll.read) · mapping HR
+(MANAGER đủ/BOD read-only/vai trò thấp KHÔNG nhận) · G+H · Self-view D (resolve theo FK) · E (A≠B) · F (chưa
+link→null, không fallback tên/email) · Branch I (code unique 409) · J+K (branchId hợp lệ + legacy String giữ) ·
+L+M (backfill deterministic, KHÔNG merge khác hoa/thường, rỗng bỏ qua) · N (inactive filter) · O (list không
+regress + field HR mới) · link-user 1-1 (gắn/gỡ + chặn 1 user 2 employee 422) · Privacy P (không field
+salary/payroll) · S (mask EmployeeRoleFee giữ) · T (ẩn danh 401) · Q (finance.read KHÔNG mở HR khi thiếu
+staff.read → 403).
+
+### Demo (seed:demo)
+Branch `CN-0001` "CS1"; 5 nhân sự gán `branchId` + `employmentType=MONTHLY`; **NV-000004 (Đỗ Thu Ngân) liên kết
+tài khoản `thungan@sophia.com.vn`** minh họa self-view.
+
+### Deferred HR-PH2+ (KHÔNG làm ở PH1)
+AttendanceRecord/WorkShift dated/LeaveRequest-approval/overtime · SessionStaffContribution · Commission/Incentive
+· PayrollPeriod/PayrollEarningLine · KPI payroll rules · user-picker UX · CSV import thật · `Employee.branch`
+String vẫn giữ (chưa chứng minh gỡ an toàn).
+
+### CONFLICTS
+**Không có.** Không redefine EmployeeRoleFee · không merge Employee/User · không đổi TreatmentSession
+cardinality/Invoice-Payment semantics · không tái dùng finance.read cho lương · migration additive (0 DROP).
+Thêm permission HR là **owner-approved additive**; quyền cũ Mục 15 bất biến.
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript

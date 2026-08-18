@@ -183,6 +183,7 @@ model User {
 
   roles     UserRole[]
   auditLogs AuditLog[]
+  employee  Employee? // HR-PH1 — liên kết TÙY CHỌN 1-1 tới hồ sơ nhân sự (self-view). Không tự tạo/không suy quyền
 
   @@map("users")
 }
@@ -2711,6 +2712,34 @@ enum EmployeeStatus {
   RESIGNED // Nghỉ việc
 }
 
+/// HR-PH1 — Phân loại hình thức làm việc (CLASSIFICATION, KHÔNG phải cách tính lương;
+/// số tiền/chính sách lương thuộc HR-PH5+). Hybrid: tháng/ngày/giờ + hợp đồng/khác.
+enum EmploymentType {
+  MONTHLY // Lương tháng
+  DAILY // Theo ngày công
+  HOURLY // Theo giờ
+  CONTRACT // Hợp đồng/khoán
+  OTHER // Khác
+}
+
+/// HR-PH1 — Danh mục chi nhánh/cơ sở (master ổn định cho Chấm công/Lương sau này).
+/// Additive: Employee.branch (String) cũ GIỮ NGUYÊN; branchId FK là chuẩn hóa dần.
+model Branch {
+  id        String   @id @default(cuid())
+  code      String   @unique // Mã chi nhánh (CN-xxxxxx / tự đặt)
+  name      String
+  timezone  String? // IANA tz nếu cần (mặc định vận hành Asia/Ho_Chi_Minh)
+  address   String?
+  isActive  Boolean  @default(true)
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  employees Employee[]
+
+  @@map("branches")
+}
+
 model Employee {
   id         String         @id @default(cuid())
   code       String         @unique // NV-xxxxxx
@@ -2719,7 +2748,7 @@ model Employee {
   email      String?
   dob        DateTime? // ngày sinh (mục 8.2)
   title      String? // chức danh chính
-  branch     String? // chi nhánh/cơ sở
+  branch     String? // chi nhánh/cơ sở (LEGACY String — GIỮ; chuẩn hóa dần qua branchId)
   startDate  DateTime? // ngày bắt đầu làm việc
   status     EmployeeStatus @default(ACTIVE)
   roles      String[]       @default([]) // đa vai trò (giữ tương thích; nguồn phí = EmployeeRoleFee)
@@ -2729,15 +2758,24 @@ model Employee {
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
+  // --- HR-PH1 (additive) ---
+  branchId       String? // FK chuẩn hóa chi nhánh (nullable; backfill từ `branch` String)
+  employmentType EmploymentType? // hình thức làm việc (classification, KHÔNG phải lương)
+  endDate        DateTime? // ngày kết thúc làm việc (nghỉ việc) — bổ sung cạnh startDate
+  userId         String?         @unique // liên kết TÙY CHỌN 1-1 tới tài khoản đăng nhập (self-view). KHÔNG merge Employee≠User
+
   sessionAssignments SessionStaff[]
   roleFees           EmployeeRoleFee[]
   competences        EmployeeCompetence[]
   certifications     EmployeeCertification[]
   schedules          EmployeeSchedule[]
   leaves             EmployeeLeave[]
+  branchRef          Branch?                 @relation(fields: [branchId], references: [id]) // KHÔNG đổi tên field `branch`
+  user               User?                   @relation(fields: [userId], references: [id])
 
   @@index([isActive])
   @@index([status])
+  @@index([branchId])
   @@map("employees")
 }
 

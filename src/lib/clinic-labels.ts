@@ -271,6 +271,10 @@ export const EMPLOYEE_STATUS_LABEL: Record<string, string> = {
 export const EMPLOYEE_STATUS_TONE: Record<string, Tone> = {
   ACTIVE: "success", ON_LEAVE: "warning", RESIGNED: "muted",
 };
+// HR-PH1 — hình thức làm việc (classification)
+export const EMPLOYMENT_TYPE_LABEL: Record<string, string> = {
+  MONTHLY: "Lương tháng", DAILY: "Theo ngày", HOURLY: "Theo giờ", CONTRACT: "Hợp đồng/khoán", OTHER: "Khác",
+};
 export const LEAVE_TYPE_LABEL: Record<string, string> = {
   ANNUAL: "Nghỉ phép", SICK: "Nghỉ bệnh", EMERGENCY: "Nghỉ đột xuất", UNAVAILABLE: "Không khả dụng", OTHER: "Khác",
 };

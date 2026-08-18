@@ -475,6 +475,21 @@ async function main() {
   // Nhân sự đã NGHỈ VIỆC (mục 16): không được phân công booking/session mới; lịch sử giữ.
   await prisma.employee.create({ data: { code: "NV-000005", fullName: "Ngô Nghỉ Việc", phone: "0911000005", title: "KTV (cũ)", branch: "CS1", status: "RESIGNED", roles: ["Kỹ thuật viên"], defaultFee: 200_000 } });
 
+  // --- HR-PH1 (demo): Branch master + branchId + employmentType + liên kết tài khoản ---
+  // Chi nhánh chuẩn hóa từ chuỗi legacy "CS1"; giữ nguyên Employee.branch (String).
+  const branchCS1 = await prisma.branch.upsert({
+    where: { code: "CN-0001" },
+    update: {},
+    create: { code: "CN-0001", name: "CS1", timezone: "Asia/Ho_Chi_Minh", address: "Trụ sở chính", isActive: true },
+  });
+  await prisma.employee.updateMany({ where: { branch: "CS1" }, data: { branchId: branchCS1.id, employmentType: "MONTHLY" } });
+  // Liên kết TÙY CHỌN 1-1 tài khoản đăng nhập ↔ hồ sơ nhân sự (self-view). Không tạo mới, không suy quyền.
+  const cashierUser = await prisma.user.findUnique({ where: { email: "thungan@sophia.com.vn" } }).catch(() => null);
+  if (cashierUser) {
+    const already = await prisma.employee.findUnique({ where: { userId: cashierUser.id } }).catch(() => null);
+    if (!already) await prisma.employee.update({ where: { code: "NV-000004" }, data: { userId: cashierUser.id } });
+  }
+
   // Phí theo vai trò (mục 4): mỗi vai trò một mức; có HIỆU LỰC theo ngày (mục 5).
   await prisma.employeeRoleFee.createMany({ data: [
     { employeeId: nvKTV.id, role: "KTV chính", fee: 250_000, effectiveFrom: new Date("2024-03-01"), createdBy: "Trần Quản Lý" },

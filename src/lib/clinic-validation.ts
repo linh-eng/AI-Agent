@@ -563,15 +563,35 @@ export const employeeCreateSchema = z.object({
   email: z.string().email().optional().nullable().or(z.literal("")),
   dob: dateOpt,
   title: z.string().optional().nullable(),
-  branch: z.string().optional().nullable(),
+  branch: z.string().optional().nullable(), // LEGACY String — giữ
   startDate: dateOpt,
   status: employeeStatusEnum.optional(),
   roles: z.array(z.string()).default([]), // đa vai trò
   defaultFee: z.coerce.number().min(0).optional().nullable(),
   note: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
+  // --- HR-PH1 (additive) ---
+  branchId: z.string().optional().nullable(), // chọn Branch chuẩn hóa
+  employmentType: z.enum(["MONTHLY", "DAILY", "HOURLY", "CONTRACT", "OTHER"]).optional().nullable(),
+  endDate: dateOpt,
 });
 export const employeeUpdateSchema = employeeCreateSchema.partial().omit({ code: true });
+
+// HR-PH1 — liên kết/gỡ tài khoản đăng nhập ↔ hồ sơ nhân sự (chỉ theo FK userId).
+export const employeeLinkUserSchema = z.object({
+  userId: z.string().min(1).nullable(), // null = gỡ liên kết
+});
+
+// HR-PH1 — Danh mục chi nhánh (master).
+export const branchCreateSchema = z.object({
+  code: z.string().min(1).max(30).optional(), // tự sinh CN-xxxx nếu trống
+  name: z.string().min(1, "Bắt buộc tên chi nhánh"),
+  timezone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+export const branchUpdateSchema = branchCreateSchema.partial();
 
 // ----- Nhân sự master data (mục 8) -----
 export const roleFeeCreateSchema = z.object({

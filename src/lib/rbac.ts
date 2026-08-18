@@ -132,6 +132,19 @@ export const PERMISSIONS = {
   MARKETING_READ: "marketing.read",
   MARKETING_WRITE: "marketing.write", // chiến dịch/lead/ROI
   MEDIA_WRITE: "media.write", // upload/xóa media (ảnh khách, before/after, tệp)
+
+  // --- HR-PH1: namespace RESERVED cho Chấm công / Lương thưởng (owner phê duyệt, additive) ---
+  // Lưu ý: các model/route Chấm công & Lương thuộc HR-PH2+; PH1 mới đặt hằng số nền +
+  // ánh xạ vai trò. TÁCH BIỆT với finance.read (tài chính công ty ≠ riêng tư lương cá nhân)
+  // và với staff.fee.read (chỉ phí giá vốn nhân công). KHÔNG dùng lại cho self-view.
+  ATTENDANCE_READ: "attendance.read", // xem chấm công (cấp tổ chức)
+  ATTENDANCE_WRITE: "attendance.write", // ghi/sửa chấm công (có audit)
+  PAYROLL_READ: "payroll.read", // xem bảng lương cấp TỔ CHỨC (KHÁC self-view của chính mình)
+  PAYROLL_WRITE: "payroll.write", // tạo/tính bảng lương
+  PAYROLL_APPROVE: "payroll.approve", // duyệt kỳ lương
+  COMPENSATION_POLICY_READ: "compensationPolicy.read", // xem chính sách lương thưởng
+  COMPENSATION_POLICY_WRITE: "compensationPolicy.write", // tạo/sửa chính sách lương thưởng
+  COMMISSION_READ: "commission.read", // xem hoa hồng cấp tổ chức
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -185,6 +198,11 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PRICEFLOOR_OVERRIDE,
     PERMISSIONS.BOOKING_OVERRIDE,
     PERMISSIONS.MARKETING_READ,
+    // HR-PH1 — BGĐ giám sát READ-ONLY lương thưởng/chấm công (feature ở HR-PH2+)
+    PERMISSIONS.ATTENDANCE_READ,
+    PERMISSIONS.PAYROLL_READ,
+    PERMISSIONS.COMPENSATION_POLICY_READ,
+    PERMISSIONS.COMMISSION_READ,
   ],
 
   // Mua hàng: tạo PO/đề nghị nhập
@@ -269,6 +287,15 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.MARKETING_READ,
     PERMISSIONS.MARKETING_WRITE,
     PERMISSIONS.MEDIA_WRITE,
+    // HR-PH1 — quyền HR/Lương thưởng cấp tổ chức (owner phê duyệt; feature ở HR-PH2+)
+    PERMISSIONS.ATTENDANCE_READ,
+    PERMISSIONS.ATTENDANCE_WRITE,
+    PERMISSIONS.PAYROLL_READ,
+    PERMISSIONS.PAYROLL_WRITE,
+    PERMISSIONS.PAYROLL_APPROVE,
+    PERMISSIONS.COMPENSATION_POLICY_READ,
+    PERMISSIONS.COMPENSATION_POLICY_WRITE,
+    PERMISSIONS.COMMISSION_READ,
   ],
 
   // Lễ tân: tạo khách, đặt lịch, nhận thanh toán, chốt phương án, gửi hướng dẫn

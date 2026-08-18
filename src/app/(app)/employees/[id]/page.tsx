@@ -12,7 +12,7 @@ import { apiFetch } from "@/lib/client";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
-import { EMPLOYEE_ROLE_OPTIONS, EMPLOYEE_STATUS_LABEL, EMPLOYEE_STATUS_TONE, LEAVE_TYPE_LABEL, COMPETENCE_KIND_LABEL, DOW_LABEL } from "@/lib/clinic-labels";
+import { EMPLOYEE_ROLE_OPTIONS, EMPLOYEE_STATUS_LABEL, EMPLOYEE_STATUS_TONE, EMPLOYMENT_TYPE_LABEL, LEAVE_TYPE_LABEL, COMPETENCE_KIND_LABEL, DOW_LABEL } from "@/lib/clinic-labels";
 
 const TABS = [
   { k: "basic", label: "A. Thông tin cơ bản" }, { k: "roles", label: "B. Vai trò & Phí" },
@@ -186,7 +186,9 @@ function Kpi({ label, value, tone }: { label: string; value: any; tone?: string 
 }
 
 function BasicTab({ e, canWrite, onSave }: { e: any; canWrite: boolean; onSave: (b: any) => void }) {
-  const [f, setF] = useState({ fullName: e.fullName, phone: e.phone ?? "", email: e.email ?? "", title: e.title ?? "", branch: e.branch ?? "", dob: e.dob ? e.dob.slice(0, 10) : "", startDate: e.startDate ? e.startDate.slice(0, 10) : "", note: e.note ?? "" });
+  const [f, setF] = useState({ fullName: e.fullName, phone: e.phone ?? "", email: e.email ?? "", title: e.title ?? "", branch: e.branch ?? "", branchId: e.branchId ?? "", employmentType: e.employmentType ?? "", dob: e.dob ? e.dob.slice(0, 10) : "", startDate: e.startDate ? e.startDate.slice(0, 10) : "", endDate: e.endDate ? e.endDate.slice(0, 10) : "", note: e.note ?? "" });
+  const [branches, setBranches] = useState<any[]>([]);
+  useEffect(() => { apiFetch<any[]>("/api/branches?active=1").then(setBranches).catch(() => setBranches([])); }, []);
   return (
     <Card><CardContent className="space-y-3 p-4">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -195,11 +197,28 @@ function BasicTab({ e, canWrite, onSave }: { e: any; canWrite: boolean; onSave: 
         <div className="space-y-1"><Label>Điện thoại</Label><Input value={f.phone} disabled={!canWrite} onChange={(ev) => setF({ ...f, phone: ev.target.value })} /></div>
         <div className="space-y-1"><Label>Email</Label><Input value={f.email} disabled={!canWrite} onChange={(ev) => setF({ ...f, email: ev.target.value })} /></div>
         <div className="space-y-1"><Label>Ngày sinh</Label><Input type="date" value={f.dob} disabled={!canWrite} onChange={(ev) => setF({ ...f, dob: ev.target.value })} /></div>
+        <div className="space-y-1"><Label>Hình thức làm việc</Label>
+          <Select value={f.employmentType} disabled={!canWrite} onChange={(ev) => setF({ ...f, employmentType: ev.target.value })}>
+            <option value="">— Chưa phân loại —</option>
+            {Object.entries(EMPLOYMENT_TYPE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </Select>
+        </div>
         <div className="space-y-1"><Label>Ngày bắt đầu làm việc</Label><Input type="date" value={f.startDate} disabled={!canWrite} onChange={(ev) => setF({ ...f, startDate: ev.target.value })} /></div>
-        <div className="space-y-1"><Label>Chi nhánh</Label><Input value={f.branch} disabled={!canWrite} onChange={(ev) => setF({ ...f, branch: ev.target.value })} /></div>
+        <div className="space-y-1"><Label>Ngày kết thúc (nghỉ việc)</Label><Input type="date" value={f.endDate} disabled={!canWrite} onChange={(ev) => setF({ ...f, endDate: ev.target.value })} /></div>
+        <div className="space-y-1"><Label>Chi nhánh</Label>
+          <Select value={f.branchId} disabled={!canWrite} onChange={(ev) => setF({ ...f, branchId: ev.target.value })}>
+            <option value="">— Chưa gán —</option>
+            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </Select>
+        </div>
+        <div className="space-y-1"><Label>Chi nhánh (văn bản cũ)</Label><Input value={f.branch} disabled={!canWrite} placeholder="Giữ tương thích dữ liệu cũ" onChange={(ev) => setF({ ...f, branch: ev.target.value })} /></div>
         <div className="space-y-1"><Label>Ghi chú</Label><Input value={f.note} disabled={!canWrite} onChange={(ev) => setF({ ...f, note: ev.target.value })} /></div>
       </div>
-      {canWrite && <div className="flex justify-end"><Button onClick={() => onSave({ ...f, dob: f.dob || null, startDate: f.startDate || null, phone: f.phone || null, email: f.email || null, title: f.title || null, branch: f.branch || null, note: f.note || null })}>Lưu</Button></div>}
+      <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        Tài khoản đăng nhập liên kết: {e.user ? <span className="font-medium text-foreground">{e.user.email}{e.user.isActive === false ? " (đã khóa)" : ""}</span> : "Chưa liên kết"}
+        <span className="ml-1">· Nhân sự ≠ tài khoản (liên kết tùy chọn cho self-view; quản lý qua API HR-PH1).</span>
+      </div>
+      {canWrite && <div className="flex justify-end"><Button onClick={() => onSave({ ...f, dob: f.dob || null, startDate: f.startDate || null, endDate: f.endDate || null, phone: f.phone || null, email: f.email || null, title: f.title || null, branch: f.branch || null, branchId: f.branchId || null, employmentType: f.employmentType || null, note: f.note || null })}>Lưu</Button></div>}
     </CardContent></Card>
   );
 }
