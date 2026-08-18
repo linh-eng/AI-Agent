@@ -42,6 +42,8 @@ interface Asset {
   warrantyVendor?: string | null;
   warrantyMonths?: number | null;
   maintenanceCycleMonths?: number | null;
+  contractValue?: number | null;
+  managementType?: "DEBT" | "INVOICE" | "CONTRACT" | null;
 }
 
 function daysUntil(iso: string): number {
@@ -72,6 +74,9 @@ const EMPTY_FORM = {
   warrantyVendor: "",
   warrantyMonths: "",
   maintenanceCycleMonths: "",
+  // (c) thanh toán & công nợ
+  contractValue: "",
+  managementType: "",
 };
 
 export default function AssetsPage() {
@@ -129,6 +134,8 @@ export default function AssetsPage() {
       warrantyVendor: a.warrantyVendor ?? "",
       warrantyMonths: a.warrantyMonths != null ? String(a.warrantyMonths) : "",
       maintenanceCycleMonths: a.maintenanceCycleMonths != null ? String(a.maintenanceCycleMonths) : "",
+      contractValue: a.contractValue != null ? String(a.contractValue) : "",
+      managementType: a.managementType ?? "",
     });
     setError(null);
     setOpen(true);
@@ -149,6 +156,8 @@ export default function AssetsPage() {
       warrantyVendor: form.warrantyVendor || null,
       warrantyMonths: form.warrantyMonths ? Number(form.warrantyMonths) : null,
       maintenanceCycleMonths: form.maintenanceCycleMonths ? Number(form.maintenanceCycleMonths) : null,
+      contractValue: num(form.contractValue),
+      managementType: form.managementType || null,
     };
     try {
       if (editing) {
@@ -412,6 +421,30 @@ export default function AssetsPage() {
                 <Input type="number" min="1" value={form.maintenanceCycleMonths} onChange={(e) => setForm({ ...form, maintenanceCycleMonths: e.target.value })} />
               </div>
             </div>
+          </div>
+
+          {/* (c) Thanh toán & công nợ */}
+          <div className="rounded-lg border bg-muted/30 p-3">
+            <div className="mb-2 text-sm font-medium">Thanh toán &amp; công nợ</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Tổng giá trị hợp đồng (đ)</Label>
+                <Input type="number" min="0" value={form.contractValue} onChange={(e) => setForm({ ...form, contractValue: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Hình thức quản lý</Label>
+                <Select value={form.managementType} onChange={(e) => setForm({ ...form, managementType: e.target.value })}>
+                  <option value="">— Chọn —</option>
+                  <option value="DEBT">Theo công nợ</option>
+                  <option value="INVOICE">Theo hóa đơn</option>
+                  <option value="CONTRACT">Theo hợp đồng</option>
+                </Select>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Chi tiết các đợt thanh toán, ngân hàng, hình thức chi trả và file đính kèm quản lý ở trang chi
+              tiết tài sản.
+            </p>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">

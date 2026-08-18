@@ -35,6 +35,8 @@ const MODEL_ORDER = [
   "serviceUsage",
   "serviceStockItem",
   "asset",
+  "assetPayment",
+  "assetAttachment",
   "handpiece",
   "shotLog",
   "stockCount",

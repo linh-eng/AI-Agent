@@ -3,6 +3,15 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.7.0 — 2026-08-18
+- **(c) Thanh toán & Công nợ tài sản:** thêm Tổng giá trị hợp đồng + Hình thức quản lý (công nợ/hóa
+  đơn/hợp đồng) cho tài sản; theo dõi **đã thanh toán / còn công nợ**; quản lý **các đợt thanh toán**
+  (số tiền, ngày, phương thức tiền mặt/chuyển khoản, ngân hàng, hình thức chi trả: qua công ty / cá nhân
+  tạm ứng / khác, ghi chú). **Đính kèm file** (Hợp đồng, Hóa đơn VAT, Ủy nhiệm chi) lưu trong hệ thống,
+  ≤5MB/file, xem/tải trực tiếp. Quản lý ở trang chi tiết tài sản; thêm/xóa đợt thanh toán & file chỉ
+  ADMIN/MANAGER (asset.manage).
+- ⚠️ Có thêm bảng/cột mới → cần chạy `npm run prisma:push` khi cập nhật.
+
 ## 1.6.0 — 2026-08-18
 - **(a) Khấu hao tài sản:** thêm nguyên giá, giá trị thu hồi, ngày bắt đầu, thời gian (tháng),
   phương pháp (đường thẳng / số dư giảm dần). Trang chi tiết tài sản hiển thị giá trị đã khấu hao

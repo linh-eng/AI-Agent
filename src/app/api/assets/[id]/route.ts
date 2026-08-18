@@ -24,6 +24,21 @@ export const GET = handle(async (_req, ctx) => {
         include: { createdBy: { select: { name: true } } },
         orderBy: { performedAt: "desc" },
       },
+      payments: {
+        include: {
+          createdBy: { select: { name: true } },
+          attachments: {
+            select: { id: true, kind: true, filename: true, mimeType: true, size: true, note: true, createdAt: true },
+          },
+        },
+        orderBy: { paidDate: "asc" },
+      },
+      // File cấp tài sản (hợp đồng, hóa đơn) — không kèm nội dung file (data) cho nhẹ.
+      attachments: {
+        where: { paymentId: null },
+        select: { id: true, kind: true, filename: true, mimeType: true, size: true, note: true, createdAt: true, uploadedBy: { select: { name: true } } },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
   return ok(row);
@@ -51,6 +66,8 @@ export const PATCH = handle(async (req, ctx) => {
       ...(input.warrantyVendor !== undefined ? { warrantyVendor: input.warrantyVendor } : {}),
       ...(input.warrantyMonths !== undefined ? { warrantyMonths: input.warrantyMonths } : {}),
       ...(input.maintenanceCycleMonths !== undefined ? { maintenanceCycleMonths: input.maintenanceCycleMonths } : {}),
+      ...(input.contractValue !== undefined ? { contractValue: input.contractValue } : {}),
+      ...(input.managementType !== undefined ? { managementType: input.managementType } : {}),
     },
   });
   return ok(row);

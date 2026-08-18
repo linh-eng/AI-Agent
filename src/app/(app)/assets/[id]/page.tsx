@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Wrench, TrendingDown } from "lucide-react";
+import { ArrowLeft, Plus, Wrench, TrendingDown, CreditCard, Paperclip, Trash2, Upload } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -26,6 +26,27 @@ interface Maint {
   note?: string | null;
   createdBy: { name: string };
 }
+interface Attach {
+  id: string;
+  kind: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  note?: string | null;
+  createdAt: string;
+  uploadedBy?: { name: string } | null;
+}
+interface Payment {
+  id: string;
+  amount: number;
+  paidDate: string;
+  method: string;
+  bankInfo?: string | null;
+  payerType: string;
+  note?: string | null;
+  createdBy: { name: string };
+  attachments: Attach[];
+}
 interface Asset {
   id: string;
   code: string;
@@ -38,6 +59,10 @@ interface Asset {
   purchaseDate?: string | null;
   warrantyUntil?: string | null;
   note?: string | null;
+  contractValue?: number | null;
+  managementType?: string | null;
+  payments: Payment[];
+  attachments: Attach[];
   cost?: number | null;
   salvageValue?: number | null;
   depreciationStart?: string | null;
@@ -66,14 +91,39 @@ const DEP_METHOD_LABEL: Record<string, string> = {
   STRAIGHT_LINE: "Đường thẳng",
   DECLINING: "Số dư giảm dần",
 };
+const MANAGE_LABEL: Record<string, string> = { DEBT: "Theo công nợ", INVOICE: "Theo hóa đơn", CONTRACT: "Theo hợp đồng" };
+const METHOD_LABEL: Record<string, string> = { CASH: "Tiền mặt", TRANSFER: "Chuyển khoản", OTHER: "Khác" };
+const PAYER_LABEL: Record<string, string> = { COMPANY: "Qua công ty", PERSONAL_ADVANCE: "Cá nhân tạm ứng", OTHER: "Khác" };
+const KIND_LABEL: Record<string, string> = { CONTRACT: "Hợp đồng", INVOICE: "Hóa đơn VAT", PAYMENT_ORDER: "Ủy nhiệm chi", OTHER: "Khác" };
+
+// Đọc file -> data URI base64 (dùng lưu đính kèm trong DB).
+function fileToDataUri(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(new Error("Không đọc được file"));
+    r.readAsDataURL(file);
+  });
+}
+const MAX_FILE = 5 * 1024 * 1024;
 
 export default function AssetDetailPage({ params }: { params: { id: string } }) {
   const canWrite = useCan(PERMISSIONS.ASSET_WRITE);
+  const canManage = useCan(PERMISSIONS.ASSET_MANAGE);
   const [data, setData] = useState<Asset | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ type: "MAINTENANCE", description: "", cost: "", vendor: "", performedAt: "", note: "" });
+
+  // Thanh toán & công nợ
+  const [payOpen, setPayOpen] = useState(false);
+  const [payForm, setPayForm] = useState({ amount: "", paidDate: "", method: "TRANSFER", bankInfo: "", payerType: "COMPANY", note: "" });
+  const [payFile, setPayFile] = useState<File | null>(null);
+  const [payBusy, setPayBusy] = useState(false);
+  const [payErr, setPayErr] = useState<string | null>(null);
+  const [upKind, setUpKind] = useState("CONTRACT");
+  const [upBusy, setUpBusy] = useState(false);
 
   async function load() {
     setData(await apiFetch<Asset>(`/api/assets/${params.id}`));
@@ -82,6 +132,71 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     load().finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
+
+  async function uploadFile(file: File, kind: string, paymentId?: string) {
+    if (file.size > MAX_FILE) throw new Error("File vượt quá 5MB.");
+    const dataUri = await fileToDataUri(file);
+    await apiFetch(`/api/assets/${params.id}/attachments`, {
+      method: "POST",
+      body: JSON.stringify({ kind, filename: file.name, mimeType: file.type || "application/octet-stream", data: dataUri, size: file.size, paymentId: paymentId ?? null }),
+    });
+  }
+
+  async function addPayment(e: React.FormEvent) {
+    e.preventDefault();
+    setPayErr(null);
+    if (!payForm.amount || Number(payForm.amount) <= 0) return setPayErr("Nhập số tiền > 0.");
+    if (!payForm.paidDate) return setPayErr("Chọn ngày thanh toán.");
+    if (payFile && payFile.size > MAX_FILE) return setPayErr("File ủy nhiệm chi vượt quá 5MB.");
+    setPayBusy(true);
+    try {
+      const res = await apiFetch<{ id: string }>(`/api/assets/${params.id}/payments`, {
+        method: "POST",
+        body: JSON.stringify({
+          amount: Number(payForm.amount),
+          paidDate: payForm.paidDate,
+          method: payForm.method,
+          bankInfo: payForm.bankInfo || null,
+          payerType: payForm.payerType,
+          note: payForm.note || null,
+        }),
+      });
+      if (payFile) await uploadFile(payFile, "PAYMENT_ORDER", res.id);
+      setPayOpen(false);
+      setPayForm({ amount: "", paidDate: "", method: "TRANSFER", bankInfo: "", payerType: "COMPANY", note: "" });
+      setPayFile(null);
+      load();
+    } catch (err) {
+      setPayErr(err instanceof Error ? err.message : "Lỗi");
+    } finally {
+      setPayBusy(false);
+    }
+  }
+  async function delPayment(pid: string) {
+    if (!confirm("Xóa đợt thanh toán này?")) return;
+    await apiFetch(`/api/assets/${params.id}/payments/${pid}`, { method: "DELETE" });
+    load();
+  }
+  async function onUploadAsset(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError(null);
+    setUpBusy(true);
+    try {
+      await uploadFile(file, upKind);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lỗi tải file");
+    } finally {
+      setUpBusy(false);
+    }
+  }
+  async function delAttachment(aid: string) {
+    if (!confirm("Xóa file đính kèm này?")) return;
+    await apiFetch(`/api/assets/${params.id}/attachments/${aid}`, { method: "DELETE" });
+    load();
+  }
 
   async function addLog(e: React.FormEvent) {
     e.preventDefault();
@@ -262,6 +377,138 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
         );
       })()}
 
+      {/* (c) Thanh toán & công nợ */}
+      {(() => {
+        const paid = data.payments.reduce((s, p) => s + p.amount, 0);
+        const owed = (data.contractValue ?? 0) - paid;
+        return (
+          <>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                <h3 className="font-semibold">Thanh toán &amp; công nợ</h3>
+                {data.managementType && <Badge tone="muted">{MANAGE_LABEL[data.managementType]}</Badge>}
+              </div>
+              {canManage && (
+                <Button size="sm" onClick={() => { setPayErr(null); setPayOpen(true); }}>
+                  <Plus className="h-4 w-4" /> Thêm đợt thanh toán
+                </Button>
+              )}
+            </div>
+            <Card className="mb-4">
+              <CardContent className="p-5">
+                <div className="mb-4 grid gap-4 text-sm sm:grid-cols-4">
+                  <Info label="Tổng giá trị hợp đồng" value={data.contractValue != null ? `${formatNumber(data.contractValue)} đ` : "—"} />
+                  <Info label="Đã thanh toán" value={`${formatNumber(paid)} đ`} />
+                  <div>
+                    <div className="text-xs text-muted-foreground">Còn công nợ</div>
+                    <div className={`font-semibold ${owed > 0 ? "text-destructive" : "text-emerald-600"}`}>
+                      {data.contractValue != null ? `${formatNumber(Math.max(0, owed))} đ` : "—"}
+                    </div>
+                  </div>
+                  <Info label="Số đợt đã trả" value={String(data.payments.length)} />
+                </div>
+
+                {/* Đợt thanh toán */}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <THead>
+                      <TR>
+                        <TH>Ngày</TH>
+                        <TH className="text-right">Số tiền</TH>
+                        <TH>Phương thức</TH>
+                        <TH>Ngân hàng</TH>
+                        <TH>Hình thức chi trả</TH>
+                        <TH>Chứng từ</TH>
+                        <TH>Người ghi</TH>
+                        {canManage && <TH></TH>}
+                      </TR>
+                    </THead>
+                    <TBody>
+                      {data.payments.length === 0 ? (
+                        <TR>
+                          <TD colSpan={canManage ? 8 : 7} className="py-6 text-center text-muted-foreground">Chưa có đợt thanh toán</TD>
+                        </TR>
+                      ) : (
+                        data.payments.map((p) => (
+                          <TR key={p.id}>
+                            <TD>{formatDate(p.paidDate)}</TD>
+                            <TD className="text-right font-medium">{formatNumber(p.amount)} đ</TD>
+                            <TD>{METHOD_LABEL[p.method] ?? p.method}</TD>
+                            <TD className="text-muted-foreground">{p.bankInfo ?? "—"}</TD>
+                            <TD>{PAYER_LABEL[p.payerType] ?? p.payerType}</TD>
+                            <TD>
+                              {p.attachments.length === 0 ? (
+                                <span className="text-muted-foreground">—</span>
+                              ) : (
+                                <div className="flex flex-wrap gap-1">
+                                  {p.attachments.map((a) => (
+                                    <a key={a.id} href={`/api/assets/${params.id}/attachments/${a.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                                      <Paperclip className="h-3 w-3" />{KIND_LABEL[a.kind] ?? a.filename}
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                            </TD>
+                            <TD className="text-muted-foreground">{p.createdBy.name}</TD>
+                            {canManage && (
+                              <TD className="text-right">
+                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => delPayment(p.id)} title="Xóa">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TD>
+                            )}
+                          </TR>
+                        ))
+                      )}
+                    </TBody>
+                  </Table>
+                </div>
+
+                {/* File cấp hợp đồng / hóa đơn */}
+                <div className="mt-5 border-t pt-4">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium">Hồ sơ đính kèm (hợp đồng, hóa đơn…)</span>
+                    {canManage && (
+                      <>
+                        <Select value={upKind} onChange={(e) => setUpKind(e.target.value)} className="h-8 w-40">
+                          <option value="CONTRACT">Hợp đồng</option>
+                          <option value="INVOICE">Hóa đơn VAT</option>
+                          <option value="PAYMENT_ORDER">Ủy nhiệm chi</option>
+                          <option value="OTHER">Khác</option>
+                        </Select>
+                        <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-input bg-card px-3 py-1.5 text-sm hover:bg-accent">
+                          <Upload className="h-4 w-4" /> {upBusy ? "Đang tải…" : "Tải file (≤5MB)"}
+                          <input type="file" className="hidden" onChange={onUploadAsset} disabled={upBusy} />
+                        </label>
+                      </>
+                    )}
+                  </div>
+                  {data.attachments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Chưa có hồ sơ đính kèm.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {data.attachments.map((a) => (
+                        <div key={a.id} className="inline-flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-1.5 text-sm">
+                          <Badge tone="muted">{KIND_LABEL[a.kind] ?? "Khác"}</Badge>
+                          <a href={`/api/assets/${params.id}/attachments/${a.id}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">{a.filename}</a>
+                          <span className="text-xs text-muted-foreground">({Math.round(a.size / 1024)} KB)</span>
+                          {canManage && (
+                            <button onClick={() => delAttachment(a.id)} className="text-destructive" title="Xóa">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        );
+      })()}
+
       <div className="mb-2 flex items-center gap-2">
         <Wrench className="h-4 w-4 text-muted-foreground" />
         <h3 className="font-semibold">Lịch sử bảo trì / sửa chữa</h3>
@@ -347,6 +594,57 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Hủy</Button>
             <Button type="submit">Lưu</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Thêm đợt thanh toán */}
+      <Modal open={payOpen} onClose={() => setPayOpen(false)} title="Thêm đợt thanh toán">
+        <form onSubmit={addPayment} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Số tiền (đ) *</Label>
+              <Input type="number" min="0" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} required />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Ngày thanh toán *</Label>
+              <Input type="date" value={payForm.paidDate} onChange={(e) => setPayForm({ ...payForm, paidDate: e.target.value })} required />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Phương thức</Label>
+              <Select value={payForm.method} onChange={(e) => setPayForm({ ...payForm, method: e.target.value })}>
+                <option value="TRANSFER">Chuyển khoản</option>
+                <option value="CASH">Tiền mặt</option>
+                <option value="OTHER">Khác</option>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Hình thức chi trả</Label>
+              <Select value={payForm.payerType} onChange={(e) => setPayForm({ ...payForm, payerType: e.target.value })}>
+                <option value="COMPANY">Thanh toán qua công ty</option>
+                <option value="PERSONAL_ADVANCE">Cá nhân tạm ứng</option>
+                <option value="OTHER">Khác</option>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Ngân hàng / số tài khoản</Label>
+            <Input value={payForm.bankInfo} onChange={(e) => setPayForm({ ...payForm, bankInfo: e.target.value })} placeholder="VD: Vietcombank - 0123456789" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Ghi chú</Label>
+            <Input value={payForm.note} onChange={(e) => setPayForm({ ...payForm, note: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Ủy nhiệm chi / chứng từ (≤5MB)</Label>
+            <input type="file" onChange={(e) => setPayFile(e.target.files?.[0] ?? null)} className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-card file:px-3 file:py-1.5 file:text-sm hover:file:bg-accent" />
+          </div>
+          {payErr && <p className="text-sm text-destructive">{payErr}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setPayOpen(false)} disabled={payBusy}>Hủy</Button>
+            <Button type="submit" disabled={payBusy}>{payBusy ? "Đang lưu…" : "Lưu"}</Button>
           </div>
         </form>
       </Modal>

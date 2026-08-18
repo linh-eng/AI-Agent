@@ -229,7 +229,30 @@ const assetExtraFields = {
   warrantyVendor: optionalString,
   warrantyMonths: z.number().int().positive().max(600).nullable().optional(),
   maintenanceCycleMonths: z.number().int().positive().max(600).nullable().optional(),
+  contractValue: z.number().nonnegative().nullable().optional(),
+  managementType: z.enum(["DEBT", "INVOICE", "CONTRACT"]).nullable().optional(),
 };
+
+// Đợt thanh toán tài sản.
+export const assetPaymentSchema = z.object({
+  amount: z.number().positive("Số tiền > 0"),
+  paidDate: z.string().min(1, "Chọn ngày thanh toán"),
+  method: z.enum(["CASH", "TRANSFER", "OTHER"]).default("TRANSFER"),
+  bankInfo: optionalString,
+  payerType: z.enum(["COMPANY", "PERSONAL_ADVANCE", "OTHER"]).default("COMPANY"),
+  note: optionalString,
+});
+
+// File đính kèm tài sản (data URI base64). Giới hạn ~5MB.
+export const assetAttachmentSchema = z.object({
+  kind: z.enum(["CONTRACT", "INVOICE", "PAYMENT_ORDER", "OTHER"]).default("OTHER"),
+  filename: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().min(1).max(120),
+  data: z.string().min(1).max(7_500_000), // base64 ~5MB
+  size: z.number().int().nonnegative().max(5_242_880, "File tối đa 5MB"),
+  paymentId: optionalString,
+  note: optionalString,
+});
 
 export const assetCreateSchema = z.object({
   productId: z.string().min(1, "Chọn thiết bị"),

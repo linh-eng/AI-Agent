@@ -53,6 +53,8 @@ export const POST = handle(async (req) => {
       warrantyVendor: input.warrantyVendor,
       warrantyMonths: input.warrantyMonths ?? null,
       maintenanceCycleMonths: input.maintenanceCycleMonths ?? null,
+      contractValue: input.contractValue ?? null,
+      managementType: input.managementType ?? null,
     },
     include: { product: { select: { sku: true, name: true } } },
   });

@@ -36,6 +36,8 @@ model User {
   auditLogs     AuditLog[]
   svcStockOpened  ServiceStockItem[] @relation("SvcStockOpenedBy")
   svcStockUpdated ServiceStockItem[] @relation("SvcStockUpdatedBy")
+  assetPayments    AssetPayment[]    @relation("AssetPaymentBy")
+  assetAttachments AssetAttachment[] @relation("AssetAttachmentBy")
 
   @@map("users")
 }
@@ -474,11 +476,17 @@ model Asset {
   warrantyMonths         Int?    @map("warranty_months")          // thời gian bảo hành (tháng)
   maintenanceCycleMonths Int?    @map("maintenance_cycle_months") // chu kỳ bảo trì định kỳ (tháng)
 
+  // (c) Thanh toán & công nợ
+  contractValue  Float?           @map("contract_value")  // tổng giá trị hợp đồng/tài sản
+  managementType AssetManageType? @map("management_type") // hình thức quản lý (công nợ/hóa đơn/hợp đồng)
+
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
   maintenance MaintenanceLog[]
   handpieces  Handpiece[]
+  payments    AssetPayment[]
+  attachments AssetAttachment[]
 
   @@index([status])
   @@index([warrantyUntil])
@@ -655,4 +663,74 @@ model ServiceStockItem {
 
   @@index([productId, status])
   @@map("service_stock_items")
+}
+
+// -----------------------------------------------------------------------------
+// (c) Thanh toán & Công nợ tài sản
+// -----------------------------------------------------------------------------
+enum AssetManageType {
+  DEBT     // theo công nợ
+  INVOICE  // theo hóa đơn
+  CONTRACT // theo hợp đồng
+}
+
+enum PaymentMethod {
+  CASH     // tiền mặt
+  TRANSFER // chuyển khoản
+  OTHER    // khác
+}
+
+enum PayerType {
+  COMPANY          // thanh toán qua công ty
+  PERSONAL_ADVANCE // cá nhân tạm ứng
+  OTHER            // khác
+}
+
+enum AttachmentKind {
+  CONTRACT      // hợp đồng
+  INVOICE       // hóa đơn VAT
+  PAYMENT_ORDER // ủy nhiệm chi
+  OTHER
+}
+
+// Đợt thanh toán cho 1 tài sản (tiến độ thanh toán).
+model AssetPayment {
+  id          String        @id @default(cuid())
+  assetId     String        @map("asset_id")
+  asset       Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  amount      Float
+  paidDate    DateTime      @map("paid_date")
+  method      PaymentMethod @default(TRANSFER)
+  bankInfo    String?       @map("bank_info") // ngân hàng / số TK thanh toán
+  payerType   PayerType     @default(COMPANY) @map("payer_type")
+  note        String?
+  createdById String        @map("created_by_id")
+  createdBy   User          @relation("AssetPaymentBy", fields: [createdById], references: [id])
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  attachments AssetAttachment[]
+
+  @@index([assetId])
+  @@map("asset_payments")
+}
+
+// File đính kèm (hợp đồng, hóa đơn VAT, ủy nhiệm chi...) lưu base64 trong DB.
+model AssetAttachment {
+  id           String         @id @default(cuid())
+  assetId      String         @map("asset_id")
+  asset        Asset          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  paymentId    String?        @map("payment_id")
+  payment      AssetPayment?  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  kind         AttachmentKind @default(OTHER)
+  filename     String
+  mimeType     String         @map("mime_type")
+  size         Int
+  data         String         // data URI base64
+  note         String?
+  uploadedById String         @map("uploaded_by_id")
+  uploadedBy   User           @relation("AssetAttachmentBy", fields: [uploadedById], references: [id])
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  @@index([assetId])
+  @@map("asset_attachments")
 }
