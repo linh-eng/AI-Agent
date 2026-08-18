@@ -860,6 +860,10 @@ async function main() {
     },
   });
 
+  // HR-PH3 — danh mục loại đóng góp nhân sự (config, idempotent).
+  const { ensureContributionTypes } = await import("../src/lib/contribution-service");
+  await ensureContributionTypes();
+
   console.log("✅ Seed hoàn tất.");
   console.log("   Đăng nhập kho: admin@sophia.com.vn / admin123");
   console.log("   Đăng nhập spa: quanly@sophia.com.vn / quanly123 (Quản lý)");

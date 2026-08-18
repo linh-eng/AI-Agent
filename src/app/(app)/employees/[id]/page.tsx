@@ -19,6 +19,7 @@ const TABS = [
   { k: "comp", label: "C. Năng lực" }, { k: "cert", label: "D. Chứng nhận" },
   { k: "sched", label: "E. Lịch làm việc" }, { k: "leave", label: "F. Nghỉ phép" },
   { k: "kpi", label: "G. Hoạt động & Đánh giá" },
+  { k: "contrib", label: "H. Đóng góp chuyên môn" },
 ];
 
 export default function EmployeeDetailPage() {
@@ -177,7 +178,37 @@ export default function EmployeeDetailPage() {
           <div className="sm:col-span-3 text-xs text-muted-foreground">Số liệu suy từ Buổi thực hiện + Đánh giá (read-only, không nhập tay).</div>
         </div>
       )}
+
+      {tab === "contrib" && <ContributionTab employeeId={id} />}
     </div>
+  );
+}
+
+// HR-PH3 — Lịch sử đóng góp chuyên môn (read-only, snapshot bất biến).
+function ContributionTab({ employeeId }: { employeeId: string }) {
+  const [rows, setRows] = useState<any[]>([]);
+  useEffect(() => { apiFetch<any[]>(`/api/session-staff-contributions?employeeId=${employeeId}`).then(setRows).catch(() => setRows([])); }, [employeeId]);
+  return (
+    <Card><CardContent className="p-0">
+      <div className="overflow-x-auto"><table className="w-full text-sm">
+        <thead><tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+          <th className="px-3 py-2">Ngày</th><th className="px-3 py-2">Buổi</th><th className="px-3 py-2">Dịch vụ/Bước</th>
+          <th className="px-3 py-2">Loại</th><th className="px-3 py-2 text-right">Phút</th><th className="px-3 py-2">Trạng thái</th>
+        </tr></thead>
+        <tbody>{rows.length === 0 ? <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">Chưa có đóng góp.</td></tr> :
+          rows.map((r) => (
+            <tr key={r.id} className={`border-b last:border-0 ${r.status === "REVERSED" || r.entryKind === "REVERSAL" ? "text-muted-foreground line-through" : ""}`}>
+              <td className="px-3 py-2">{formatDate(r.createdAt)}</td>
+              <td className="px-3 py-2">{r.session?.code ?? "—"}</td>
+              <td className="px-3 py-2">{r.serviceNameSnapshot ?? "Cấp buổi"}{r.serviceStepKey ? ` / ${r.serviceStepKey}` : ""}</td>
+              <td className="px-3 py-2">{r.contributionTypeCode}</td>
+              <td className="px-3 py-2 text-right">{r.actualMinutes == null ? "—" : `${r.actualMinutes}′`}</td>
+              <td className="px-3 py-2">{r.status}</td>
+            </tr>
+          ))}</tbody>
+      </table></div>
+      <div className="px-3 py-2 text-xs text-muted-foreground">Snapshot bất biến — đổi tên NV/dịch vụ về sau không đổi lịch sử. Không hiển thị tiền lương/hoa hồng (HR-PH5+).</div>
+    </CardContent></Card>
   );
 }
 

@@ -708,6 +708,35 @@ export const leaveRequestCreateSchema = z.object({
 });
 export const leaveDecisionSchema = z.object({ reason: z.string().optional().nullable() });
 
+// ===== HR-PH3 — Sổ đóng góp nhân sự theo buổi =====
+export const contributionCreateSchema = z.object({
+  treatmentSessionId: z.string().min(1),
+  sessionExecutionItemId: z.string().optional().nullable(),
+  serviceStepKey: z.string().optional().nullable(),
+  employeeId: z.string().min(1),
+  contributionTypeCode: z.string().min(1, "Chọn loại đóng góp"),
+  startedAt: z.string().optional().nullable(),
+  endedAt: z.string().optional().nullable(),
+  actualMinutes: z.coerce.number().int().min(0).optional().nullable(),
+  weight: z.coerce.number().min(0).optional().nullable(),
+  quantity: z.coerce.number().min(0).optional().nullable(),
+  branchId: z.string().optional().nullable(),
+  source: z.enum(["APP", "MANUAL", "DEVICE"]).optional(),
+  note: z.string().optional().nullable(),
+  idempotencyKey: z.string().optional().nullable(),
+});
+export const contributionUpdateSchema = z.object({
+  contributionTypeCode: z.string().optional(),
+  startedAt: z.string().optional().nullable(),
+  endedAt: z.string().optional().nullable(),
+  actualMinutes: z.coerce.number().int().min(0).optional().nullable(),
+  weight: z.coerce.number().min(0).optional().nullable(),
+  quantity: z.coerce.number().min(0).optional().nullable(),
+  branchId: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export const contributionReverseSchema = z.object({ reason: z.string().min(1, "Bắt buộc lý do") });
+
 export const sessionStaffCreateSchema = z.object({
   sessionId: z.string().min(1),
   employeeId: z.string().optional().nullable(),

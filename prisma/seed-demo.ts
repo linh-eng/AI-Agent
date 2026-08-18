@@ -490,6 +490,19 @@ async function main() {
     if (!already) await prisma.employee.update({ where: { code: "NV-000004" }, data: { userId: cashierUser.id } });
   }
 
+  // HR-PH3 — demo đóng góp nhân sự thực tế cho buổi SS-100001 (2 nhân sự, có phút + trọng số).
+  {
+    const { ensureContributionTypes } = await import("../src/lib/contribution-service");
+    await ensureContributionTypes();
+    const tPrimary = await prisma.staffContributionType.findUnique({ where: { code: "PRIMARY_OPERATOR" } });
+    const tMaster = await prisma.staffContributionType.findUnique({ where: { code: "MASTER_SUPERVISION" } });
+    const exists = await prisma.sessionStaffContribution.count({ where: { treatmentSessionId: sLinh1.id } });
+    if (exists === 0) {
+      await prisma.sessionStaffContribution.create({ data: { treatmentSessionId: sLinh1.id, employeeId: nvKTV.id, employeeNameSnapshot: nvKTV.fullName, employeeRoleSnapshot: nvKTV.title, contributionTypeId: tPrimary?.id ?? null, contributionTypeCode: "PRIMARY_OPERATOR", actualMinutes: 45, weight: 0.7, status: "ACTIVE", source: "MANUAL", createdBy: "seed" } });
+      await prisma.sessionStaffContribution.create({ data: { treatmentSessionId: sLinh1.id, employeeId: nvMaster.id, employeeNameSnapshot: nvMaster.fullName, employeeRoleSnapshot: nvMaster.title, contributionTypeId: tMaster?.id ?? null, contributionTypeCode: "MASTER_SUPERVISION", actualMinutes: 15, weight: 0.3, status: "ACTIVE", source: "MANUAL", createdBy: "seed" } });
+    }
+  }
+
   // Phí theo vai trò (mục 4): mỗi vai trò một mức; có HIỆU LỰC theo ngày (mục 5).
   await prisma.employeeRoleFee.createMany({ data: [
     { employeeId: nvKTV.id, role: "KTV chính", fee: 250_000, effectiveFrom: new Date("2024-03-01"), createdBy: "Trần Quản Lý" },

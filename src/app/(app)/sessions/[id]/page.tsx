@@ -15,6 +15,7 @@ import { SessionMediaShare } from "@/components/session-media-share";
 import { SpaMaterialConsume } from "@/components/spa-material-consume";
 import { SessionExecutions } from "@/components/session-executions";
 import { SessionStaff } from "@/components/session-staff";
+import { SessionContributions } from "@/components/session-contributions";
 import { SessionReview } from "@/components/session-review";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
@@ -351,6 +352,10 @@ export default function SessionExecutionPage() {
         {/* D — Nhân sự thực hiện */}
         <Block letter="D" title="Nhân sự thực hiện" hint="Phân công đa vai trò (chính/hỗ trợ/master/kiểm tra/tư vấn) kèm phí. Phí là snapshot của buổi; chỉ người có quyền tài chính thấy phí.">
           <SessionStaff sessionId={id} canWrite={canWrite && (!completed || edit)} />
+          <div className="mt-4">
+            <div className="mb-2 text-sm font-semibold">Đóng góp thực tế (bằng chứng công việc)</div>
+            <SessionContributions sessionId={id} canWrite={canWrite && (!completed || edit)} executionItems={(s as any).executionItems} />
+          </div>
         </Block>
 
         {/* E — Vật tư sử dụng */}

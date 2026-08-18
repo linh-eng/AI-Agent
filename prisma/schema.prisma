@@ -1552,6 +1552,7 @@ model TreatmentSession {
   materialUsages MaterialUsage[]
   mediaAssets    MediaAsset[]
   staff          SessionStaff[]
+  staffContributions SessionStaffContribution[] // HR-PH3
   review         SessionReview?
   executionItems SessionExecutionItem[] // Redesign P4 — mỗi dịch vụ thực tế đã làm
 
@@ -1585,6 +1586,7 @@ model SessionExecutionItem {
   session     TreatmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   service     Service          @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   bookingItem BookingItem?     @relation(fields: [bookingItemId], references: [id], onDelete: SetNull)
+  staffContributions SessionStaffContribution[] // HR-PH3
 
   @@index([sessionId, sortOrder])
   @@index([serviceId])
@@ -2735,9 +2737,10 @@ model Branch {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  employees         Employee[]
-  workShifts        WorkShift[] // HR-PH2
-  attendanceRecords AttendanceRecord[] // HR-PH2
+  employees          Employee[]
+  workShifts         WorkShift[] // HR-PH2
+  attendanceRecords  AttendanceRecord[] // HR-PH2
+  staffContributions SessionStaffContribution[] // HR-PH3
 
   @@map("branches")
 }
@@ -2774,6 +2777,7 @@ model Employee {
   leaves             EmployeeLeave[]
   workShifts         WorkShift[] // HR-PH2
   attendanceRecords  AttendanceRecord[] // HR-PH2
+  contributions      SessionStaffContribution[] // HR-PH3
   branchRef          Branch?                 @relation(fields: [branchId], references: [id]) // KHÔNG đổi tên field `branch`
   user               User?                   @relation(fields: [userId], references: [id])
 
@@ -3043,6 +3047,88 @@ model SessionStaff {
   @@index([sessionId])
   @@index([employeeId])
   @@map("session_staff")
+}
+
+// =============================================================================
+// HR-PH3 — SỔ ĐÓNG GÓP NHÂN SỰ THEO BUỔI (actual work evidence, immutable).
+//  * SessionStaff (gán/tóm tắt) GIỮ NGUYÊN; đây là bằng chứng CÔNG VIỆC THỰC TẾ.
+//  * KHÔNG tiền lương/hoa hồng (HR-PH5+). weight = trọng số vận hành, KHÔNG phải chia tiền.
+//  * Bất biến sau freeze buổi; sửa qua REVERSAL (mẫu MaterialUsage). KHÔNG hard-delete.
+// =============================================================================
+/// Danh mục loại đóng góp (config additive — KHÔNG hard-code enum vai trò nghiệp vụ).
+model StaffContributionType {
+  id            String   @id @default(cuid())
+  code          String   @unique // ASSESSMENT / PRIMARY_OPERATOR / …
+  name          String
+  category      String? // nhóm (đánh giá/thực hiện/giám sát/hỗ trợ…)
+  defaultWeight Decimal? @db.Decimal(6, 3)
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  description   String?
+  createdAt     DateTime @default(now())
+
+  contributions SessionStaffContribution[]
+
+  @@map("staff_contribution_types")
+}
+
+enum ContributionStatus {
+  DRAFT // trước freeze — sửa an toàn
+  ACTIVE // đã đông cứng/finalize — chỉ sửa qua REVERSAL
+  REVERSED // bản gốc đã bị hoàn tác (giữ nguyên, không xóa)
+}
+
+enum ContributionEntryKind {
+  CONTRIBUTION // đóng góp thực tế
+  REVERSAL // bút toán bù (net về 0) — trỏ bản gốc
+}
+
+/// Đóng góp nhân sự thực tế cho buổi / dịch vụ item / bước (snapshot bất biến).
+model SessionStaffContribution {
+  id                    String                @id @default(cuid())
+  treatmentSessionId    String
+  sessionExecutionItemId String? // cấp dịch vụ item (nullable → cấp buổi)
+  serviceStepKey        String? // khóa bước/phase (snapshot từ SOP — SOP đổi vẫn hiểu được)
+  serviceIdSnapshot     String? // dịch vụ tại thời điểm đóng góp (đối chiếu khi Service đổi tên)
+  serviceNameSnapshot   String?
+  employeeId            String
+  employeeNameSnapshot  String // tên NV tại thời điểm (không recompute từ hồ sơ hiện tại)
+  employeeRoleSnapshot  String? // chức danh/vai trò-trong-buổi lúc đó
+  contributionTypeId    String? // FK danh mục (soft — snapshot code là nguồn hiểu)
+  contributionTypeCode  String // snapshot code (bất biến)
+  startedAt             DateTime?
+  endedAt               DateTime?
+  actualMinutes         Int? // suy từ start/end hoặc nhập tay (MANUAL) — không âm
+  weight                Decimal?              @db.Decimal(6, 3) // trọng số vận hành (KHÔNG phải chia tiền)
+  quantity              Decimal?              @db.Decimal(14, 3)
+  branchId              String?
+  source                AttendanceSource      @default(MANUAL)
+  entryKind             ContributionEntryKind @default(CONTRIBUTION)
+  status                ContributionStatus    @default(DRAFT)
+  crossCheckFlags       Json? // cờ đối chiếu chấm công (INFO/WARNING) — cảnh báo, không chặn
+  note                  String?
+  idempotencyKey        String?               @unique // chống tạo trùng (double-tap/retry)
+  reversalOfId          String? // bút toán REVERSAL trỏ bản gốc
+  reversedAt            DateTime? // set trên bản GỐC khi đã hoàn tác (chặn hoàn tác 2 lần)
+  reversedBy            String?
+  reversalReason        String?
+  createdBy             String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @default(now()) @updatedAt
+
+  session          TreatmentSession           @relation(fields: [treatmentSessionId], references: [id], onDelete: Cascade)
+  executionItem    SessionExecutionItem?      @relation(fields: [sessionExecutionItemId], references: [id], onDelete: SetNull)
+  employee         Employee                   @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  branch           Branch?                    @relation(fields: [branchId], references: [id])
+  contributionType StaffContributionType?     @relation(fields: [contributionTypeId], references: [id])
+  reversalOf       SessionStaffContribution?  @relation("ContribReversal", fields: [reversalOfId], references: [id])
+  reversals        SessionStaffContribution[] @relation("ContribReversal")
+
+  @@index([treatmentSessionId])
+  @@index([sessionExecutionItemId])
+  @@index([employeeId])
+  @@index([status])
+  @@map("session_staff_contributions")
 }
 
 // =============================================================================

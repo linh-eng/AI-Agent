@@ -8,6 +8,7 @@ import { sessionUpdateSchema } from "@/lib/clinic-validation";
 import { canSeeFinance, maskFinance, auditLog } from "@/lib/clinic";
 import { deriveStageStatus, PRE_EXECUTION_PLAN_STATUSES } from "@/lib/treatment-plan";
 import { buildSessionSnapshot } from "@/lib/session-execution";
+import { freezeSessionContributions } from "@/lib/contribution-service";
 
 // Các trường "thực tế" được kiểm khi sửa buổi đã hoàn thành (để ghi diff audit).
 const AUDIT_FIELDS = [
@@ -102,6 +103,8 @@ export const PATCH = handle(async (req, { params }) => {
 
   // Audit hoàn thành buổi (P4) — không log secret.
   if (parsed.status === "COMPLETED" && !wasCompleted) {
+    // HR-PH3 — đông cứng đóng góp nhân sự khi buổi freeze (DRAFT → ACTIVE, bất biến).
+    if (data.executionFrozenAt) await freezeSessionContributions(params.id);
     await auditLog({ userId: session.userId, action: "SESSION_COMPLETED", entityType: "TreatmentSession", entityId: params.id, changes: { frozenAt: (data.executionFrozenAt as any) ?? cur.performedAt } });
   }
 

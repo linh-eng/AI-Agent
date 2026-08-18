@@ -2498,6 +2498,95 @@ KHÔNG mở·payroll reserved bất biến).
 **Không có.** Không destructive `EmployeeSchedule` · không xóa leave cũ · không dùng EmployeeRoleFee cho payroll
 · không đổi finance.read · không merge Employee/User · không hard-delete chấm công. Additive 0 DROP.
 
+## HR-PH3: SESSION STAFF CONTRIBUTION LEDGER (v0.32.0)
+
+Sổ đóng góp nhân sự THỰC TẾ theo buổi (bằng chứng công việc, bất biến). **Thuần additive, 0 DROP.** Migration
+**`Zc_hr_session_contribution`** (tổng **39 migration**). **483 test / 51 file PASS** (459 +
+`test/hr-session-contribution.test.ts` 24). tsc sạch · lint 0 lỗi · build OK · fresh deploy 39 migration + seed + seed:demo sạch.
+
+### Nguyên tắc
+`SessionStaff` (gán/tóm tắt) GIỮ NGUYÊN; `SessionStaffContribution` là **bằng chứng công việc thực tế** (source
+of truth cho performed work). **KHÔNG tiền lương/hoa hồng** (HR-PH5+); `weight` = trọng số vận hành, KHÔNG chia
+tiền. `EmployeeRoleFee` bất biến. Contribution đông cứng theo buổi; sửa qua **REVERSAL** (mẫu MaterialUsage);
+**KHÔNG hard-delete**. Đóng góp **KHÔNG** suy từ Booking (Booking=ý định · Session=thực tế).
+
+### Migration & schema (`Zc_hr_session_contribution`)
+- `StaffContributionType` (`staff_contribution_types`): **config/reference table** (code @unique/name/category/
+  defaultWeight/sortOrder/isActive) — KHÔNG hard-code enum vai trò. Seed 8 code (ASSESSMENT/CONSULTATION/
+  PRIMARY_OPERATOR/ASSISTANT/MASTER_SUPERVISION/TECHNOLOGY_OPERATOR/RECOVERY/OTHER), additive.
+- `SessionStaffContribution` (`session_staff_contributions`): treatmentSessionId · **sessionExecutionItemId?**
+  (cấp dịch vụ item; null=cấp buổi) · **serviceStepKey?** (bước/phase snapshot) · serviceIdSnapshot/
+  serviceNameSnapshot (đông cứng Service) · employeeId (Restrict) · **employeeNameSnapshot/employeeRoleSnapshot**
+  (bất biến) · contributionTypeId?+**contributionTypeCode** (snapshot) · startedAt/endedAt/**actualMinutes** ·
+  **weight**/quantity · branchId? · source(AttendanceSource) · **entryKind** (CONTRIBUTION/REVERSAL) · **status**
+  (DRAFT/ACTIVE/REVERSED) · crossCheckFlags Json · **idempotencyKey @unique** · reversalOfId/reversedAt/By/Reason.
+- Back-relation: TreatmentSession/SessionExecutionItem/Employee/Branch. Enums `ContributionStatus`,
+  `ContributionEntryKind`.
+
+### 3 cấp đóng góp
+Cấp BUỔI (sessionExecutionItemId null — vd CONSULTANT cả buổi) · cấp DỊCH VỤ ITEM (KTV thực hiện DMK) · cấp
+BƯỚC/PHASE (serviceStepKey, vd Master làm phase LASER). sessionExecutionItemId nullable; bước dùng key snapshot
+(SOP đổi vẫn hiểu). Nhiều nhân sự/1 item + weight (chưa ép tổng=1).
+
+### Snapshot bất biến (mục 6–7)
+Mỗi đóng góp chụp: tên NV + role-in-session + tên/id Service tại thời điểm. **Đổi tên NV/Service về sau KHÔNG
+đổi lịch sử** (test F/G). Dùng lại freeze buổi (`executionFrozenAt`) — khi buổi COMPLETED, DRAFT→ACTIVE
+(`freezeSessionContributions` gọi trong session PATCH). Không dựng hệ thống lịch sử Service cạnh tranh.
+
+### Thời gian (mục 8)
+start+end → `actualMinutes` = hiệu instant (cross-midnight OK, không âm — test W). Chỉ có minutes → cho nhập
+tay (MANUAL). Không âm (422).
+
+### Đối chiếu chấm công (HR-PH2) — CẢNH BÁO, không chặn
+`crossCheckContribution` → cờ: `NO_ATTENDANCE`/`ON_APPROVED_LEAVE`/`BRANCH_MISMATCH`/`OVERLAP_CONTRIBUTION`/
+`TWO_BRANCHES_SAME_TIME` (WARNING) · `NO_SHIFT` (INFO). **Không auto-sửa chấm công, không chặn lâm sàng.** Lưu
+`crossCheckFlags` lúc tạo. Lỗi cứng chỉ: end<start.
+
+### Freeze / reversal (mục 12–13)
+DRAFT (trước freeze) sửa được (PATCH); ACTIVE/REVERSED → chặn PATCH (409), sửa qua **reverse** (compensating:
+giữ gốc → REVERSED + tạo bút toán REVERSAL net về 0 [minutes/weight âm], trỏ `reversalOfId`). Chặn hoàn tác 2
+lần (409). Correction = reversal + line mới. `idempotencyKey` chống double-tap.
+
+### RBAC (tái dùng — KHÔNG thêm permission)
+Tạo/hoàn tác = `treatment.write`; buổi đã freeze cần thêm `treatment.editCompleted` (như sửa buổi hoàn thành).
+GET org = `treatment.read`; **self-view** (nhân viên liên kết) chỉ đóng góp CỦA MÌNH (ownership FK userId).
+`finance.read` KHÔNG cấp quyền ghi; `payroll.*` KHÔNG cần cho nhập lâm sàng. Loại đóng góp đọc = mọi phiên.
+
+### API / UI
+`/api/session-staff-contributions` (GET filter session/item/employee/status/type; POST) · `/[id]` (GET/PATCH
+draft) · `/[id]/reverse` (POST) · `/api/staff-contribution-types` (GET, lazy-seed). UI: màn buổi
+`/sessions/[id]` khối D thêm **"Đóng góp thực tế"** (`components/session-contributions.tsx`: thêm/hoàn tác, cờ
+cảnh báo, phút/trọng số) · Hồ sơ nhân sự tab **H. Đóng góp chuyên môn** (read-only, snapshot). KHÔNG đổi sidebar/nav.
+
+### Audit (append-only)
+`SESSION_STAFF_CONTRIBUTION_CREATED` · `_UPDATED_DRAFT` · `_REVERSED` (kèm actor/employee/session/reason/flags).
+
+### KPI-readiness (mục 23) — chưa tính tiền
+Có đủ nền suy (HR-PH4): số Service/buổi/phút/loại/branch/role theo nhân sự qua GET filter — KHÔNG tính lương.
+
+### Legacy SessionStaff
+KHÔNG bịa đóng góp từ SessionStaff cũ. Buổi cũ có SessionStaff nhưng KHÔNG có contribution → lịch sử đóng góp
+rỗng (không backfill phút/weight giả). Ledger là nguồn sự thật cho công việc; SessionStaff giữ vai trò gán/tóm tắt.
+
+### Chứng minh (test/hr-session-contribution.test.ts, 24 test → A–AM)
+Basic A–I · Integrity J–Q (item sai buổi 422 · end<start 422 · NV lạ 422 · idempotent · nhiều dòng · RESIGNED
+vẫn ghi) · Cross-check R–X (attendance/leave/shift/branch/overlap/two-branches/cross-midnight) · Freeze/reversal
+Y–AE (DRAFT sửa · frozen 409 · reversal giữ gốc + chặn 2 lần + correction + audit + no hard-delete) · RBAC/self
+AF–AM (403 thiếu quyền · editCompleted khi freeze · self chỉ của mình · self không sửa người khác · finance.read
+không ghi · payroll không cần).
+
+### Demo (seed:demo)
+Buổi `SS-100001`: 2 đóng góp — Phạm Chuyên Viên (PRIMARY_OPERATOR, 45′, weight 0.7) + Trần Quản Lý
+(MASTER_SUPERVISION, 15′, weight 0.3).
+
+### Deferred HR-PH4+
+KPI snapshot theo kỳ · Commission/Incentive (diễn giải weight→tiền) · Payroll · overlap thành lỗi cứng (hiện
+cảnh báo) · "outside shift" chính xác (hiện NO_SHIFT=INFO khi không có ca) · self-service UI ghi đóng góp.
+
+### CONFLICTS
+**Không có.** Không thay thế SessionStaff · không đổi cardinality TreatmentSession · không suy từ Booking · không
+dùng EmployeeRoleFee làm payroll · không rewrite buổi cũ · không hard-delete · không đổi finance.read. Additive 0 DROP.
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript
