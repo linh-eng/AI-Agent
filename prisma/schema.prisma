@@ -2735,7 +2735,9 @@ model Branch {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  employees Employee[]
+  employees         Employee[]
+  workShifts        WorkShift[] // HR-PH2
+  attendanceRecords AttendanceRecord[] // HR-PH2
 
   @@map("branches")
 }
@@ -2770,6 +2772,8 @@ model Employee {
   certifications     EmployeeCertification[]
   schedules          EmployeeSchedule[]
   leaves             EmployeeLeave[]
+  workShifts         WorkShift[] // HR-PH2
+  attendanceRecords  AttendanceRecord[] // HR-PH2
   branchRef          Branch?                 @relation(fields: [branchId], references: [id]) // KHÔNG đổi tên field `branch`
   user               User?                   @relation(fields: [userId], references: [id])
 
@@ -2853,7 +2857,8 @@ model EmployeeSchedule {
   effectiveTo   DateTime?
   createdAt     DateTime  @default(now())
 
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee  Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  workShifts WorkShift[] // HR-PH2 — ca dated sinh từ mẫu này (idempotent)
 
   @@index([employeeId])
   @@map("employee_schedules")
@@ -2867,7 +2872,16 @@ enum LeaveType {
   OTHER
 }
 
+/// HR-PH2 — vòng đời đơn nghỉ (mở rộng additive; record cũ backfill APPROVED).
+enum LeaveStatus {
+  PENDING // chờ duyệt
+  APPROVED // đã duyệt
+  REJECTED // từ chối
+  CANCELLED // đã hủy
+}
+
 /// Nghỉ phép / không khả dụng (mục 8.9) — chặn gợi ý/booking trong khoảng.
+/// HR-PH2: bổ sung vòng đời duyệt + phân loại paid/unpaid (additive; KHÔNG xóa dữ liệu cũ).
 model EmployeeLeave {
   id         String    @id @default(cuid())
   employeeId String
@@ -2878,10 +2892,139 @@ model EmployeeLeave {
   createdBy  String?
   createdAt  DateTime  @default(now())
 
+  // --- HR-PH2 (additive) ---
+  status          LeaveStatus @default(APPROVED) // record cũ = APPROVED (đã chặn availability = đã duyệt)
+  isPaid          Boolean     @default(true) // phân loại có lương/không (payroll tiêu thụ ở HR-PH6)
+  requestedBy     String? // người tạo đơn (tên/email)
+  requestedAt     DateTime? // thời điểm tạo đơn
+  approvedBy      String? // người duyệt
+  approvedAt      DateTime?
+  rejectionReason String? // lý do từ chối
+  note            String?
+  updatedAt       DateTime    @default(now()) @updatedAt
+
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId, fromAt])
+  @@index([status])
   @@map("employee_leaves")
+}
+
+// =============================================================================
+// HR-PH2 — Ca làm việc dated + Chấm công + Điều chỉnh chấm công
+// (EmployeeSchedule = mẫu tuần GIỮ NGUYÊN; WorkShift = ca theo NGÀY cụ thể).
+// =============================================================================
+enum WorkShiftStatus {
+  SCHEDULED // đã lên lịch
+  COMPLETED // đã hoàn thành
+  CANCELLED // đã hủy (giữ lịch sử, không hard-delete)
+}
+
+enum AttendanceStatus {
+  OPEN // đã check-in, chưa check-out
+  COMPLETED // đã check-out, đã tính công
+  ADJUSTED // đã điều chỉnh (giữ lịch sử qua adjustment)
+  VOIDED // hủy (giữ vết + lý do)
+}
+
+enum AttendanceSource {
+  APP // nhân viên tự check-in/out trên app
+  MANUAL // quản lý tạo/sửa thủ công
+  DEVICE // thiết bị chấm công (DEFER — chưa tích hợp)
+}
+
+enum AdjustmentStatus {
+  REQUESTED // nhân viên đề nghị (chưa duyệt)
+  APPLIED // đã áp dụng (quản lý)
+  REJECTED // bị từ chối
+}
+
+/// Ca làm việc theo NGÀY cụ thể (khác EmployeeSchedule mẫu tuần). Sinh idempotent từ
+/// mẫu hoặc quản lý tạo tay. Timestamps là instant (true-UTC); workDate = ngày local ca.
+model WorkShift {
+  id               String          @id @default(cuid())
+  employeeId       String
+  branchId         String? // chi nhánh (snapshot FK; cho RBAC/report theo chi nhánh sau)
+  scheduleId       String? // mẫu nguồn nếu sinh tự động (null = tạo tay)
+  workDate         DateTime        @db.Date // ngày làm (local theo tz chi nhánh)
+  scheduledStartAt DateTime // instant bắt đầu dự kiến
+  scheduledEndAt   DateTime // instant kết thúc dự kiến (có thể qua ngày — cross-midnight)
+  breakMinutes     Int             @default(0) // nghỉ giữa ca (phút)
+  shiftLabel       String? // nhãn ca (sáng/chiều/tối…)
+  roleSnapshot     String? // vai trò dự kiến (snapshot, tùy chọn)
+  source           AttendanceSource @default(MANUAL)
+  status           WorkShiftStatus  @default(SCHEDULED)
+  note             String?
+  createdBy        String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @default(now()) @updatedAt
+
+  employee    Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  branch      Branch?            @relation(fields: [branchId], references: [id])
+  schedule    EmployeeSchedule?  @relation(fields: [scheduleId], references: [id])
+  attendance  AttendanceRecord[]
+
+  @@index([employeeId, workDate])
+  @@index([branchId, workDate])
+  @@index([status])
+  @@map("work_shifts")
+}
+
+/// Bản ghi chấm công THỰC TẾ. Có thể tồn tại khi KHÔNG có WorkShift (workday tự do).
+/// KHÔNG hard-delete: sai → VOID (giữ vết). Sửa lịch sử → qua AttendanceAdjustment.
+model AttendanceRecord {
+  id                  String           @id @default(cuid())
+  employeeId          String
+  workShiftId         String? // ca liên quan (nullable — chấm công không theo ca)
+  branchId            String?
+  workDate            DateTime         @db.Date
+  checkInAt           DateTime? // instant check-in (server-side)
+  checkOutAt          DateTime? // instant check-out
+  breakMinutesActual  Int              @default(0)
+  workedMinutes       Int? // tính khi check-out (checkOut-checkIn-break)
+  scheduledMinutes    Int? // từ ca (nếu có)
+  overtimeMinutes     Int? // CANDIDATE tính toán (KHÔNG phải OT được duyệt/trả lương)
+  lateMinutes         Int? // trễ so với ca
+  earlyLeaveMinutes   Int? // về sớm so với ca
+  source              AttendanceSource @default(APP)
+  status              AttendanceStatus @default(OPEN)
+  note                String?
+  voidReason          String?
+  voidedBy            String?
+  voidedAt            DateTime?
+  createdBy           String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @default(now()) @updatedAt
+
+  employee    Employee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  workShift   WorkShift?             @relation(fields: [workShiftId], references: [id])
+  branch      Branch?                @relation(fields: [branchId], references: [id])
+  adjustments AttendanceAdjustment[]
+
+  @@index([employeeId, workDate])
+  @@index([branchId, workDate])
+  @@index([status])
+  @@map("attendance_records")
+}
+
+/// Điều chỉnh chấm công — APPEND-ONLY (giữ before/after snapshot). Không PATCH lịch sử
+/// mà không có bằng chứng điều chỉnh. Nhân viên REQUEST, quản lý APPLY (không tự duyệt).
+model AttendanceAdjustment {
+  id                 String           @id @default(cuid())
+  attendanceRecordId String
+  beforeSnapshot     Json // trạng thái trước (bất biến)
+  afterSnapshot      Json // trạng thái sau đề nghị/áp dụng
+  reason             String // bắt buộc
+  requestedBy        String? // người đề nghị (nhân viên tự đề nghị → không tự duyệt)
+  changedBy          String? // người áp dụng (quản lý)
+  approvedBy         String?
+  status             AdjustmentStatus @default(REQUESTED)
+  createdAt          DateTime         @default(now())
+
+  record AttendanceRecord @relation(fields: [attendanceRecordId], references: [id], onDelete: Cascade)
+
+  @@index([attendanceRecordId])
+  @@map("attendance_adjustments")
 }
 
 model SessionStaff {

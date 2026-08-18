@@ -275,6 +275,18 @@ export const EMPLOYEE_STATUS_TONE: Record<string, Tone> = {
 export const EMPLOYMENT_TYPE_LABEL: Record<string, string> = {
   MONTHLY: "Lương tháng", DAILY: "Theo ngày", HOURLY: "Theo giờ", CONTRACT: "Hợp đồng/khoán", OTHER: "Khác",
 };
+// HR-PH2 — ca làm việc / chấm công / nghỉ phép
+export const WORK_SHIFT_STATUS_LABEL: Record<string, string> = { SCHEDULED: "Đã lên lịch", COMPLETED: "Hoàn thành", CANCELLED: "Đã hủy" };
+export const WORK_SHIFT_STATUS_TONE: Record<string, Tone> = { SCHEDULED: "default", COMPLETED: "success", CANCELLED: "muted" };
+export const ATTENDANCE_STATUS_LABEL: Record<string, string> = { OPEN: "Đang mở", COMPLETED: "Hoàn thành", ADJUSTED: "Đã điều chỉnh", VOIDED: "Đã hủy" };
+export const ATTENDANCE_STATUS_TONE: Record<string, Tone> = { OPEN: "warning", COMPLETED: "success", ADJUSTED: "default", VOIDED: "muted" };
+export const ATTENDANCE_SOURCE_LABEL: Record<string, string> = { APP: "Ứng dụng", MANUAL: "Thủ công", DEVICE: "Thiết bị" };
+export const LEAVE_STATUS_LABEL: Record<string, string> = { PENDING: "Chờ duyệt", APPROVED: "Đã duyệt", REJECTED: "Từ chối", CANCELLED: "Đã hủy" };
+export const LEAVE_STATUS_TONE: Record<string, Tone> = { PENDING: "warning", APPROVED: "success", REJECTED: "danger", CANCELLED: "muted" };
+export const ATTENDANCE_FLAG_LABEL: Record<string, string> = {
+  ON_TIME: "Đúng giờ", LATE: "Đi trễ", EARLY_LEAVE: "Về sớm", ABSENT: "Vắng", LEAVE: "Nghỉ phép",
+  OPEN_ATTENDANCE: "Đang mở", OVERTIME_CANDIDATE: "Ứng viên OT",
+};
 export const LEAVE_TYPE_LABEL: Record<string, string> = {
   ANNUAL: "Nghỉ phép", SICK: "Nghỉ bệnh", EMERGENCY: "Nghỉ đột xuất", UNAVAILABLE: "Không khả dụng", OTHER: "Khác",
 };

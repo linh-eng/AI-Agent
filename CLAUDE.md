@@ -2419,6 +2419,85 @@ String vẫn giữ (chưa chứng minh gỡ an toàn).
 cardinality/Invoice-Payment semantics · không tái dùng finance.read cho lương · migration additive (0 DROP).
 Thêm permission HR là **owner-approved additive**; quyền cũ Mục 15 bất biến.
 
+## HR-PH2: DATED SHIFT + ATTENDANCE + LEAVE APPROVAL (v0.31.0)
+
+Ca làm việc theo NGÀY + chấm công thực tế + nghỉ phép có duyệt. **Thuần additive, 0 DROP.** Migration
+**`Zb_hr_attendance`** (sau `Za_hr_foundation`; tổng **38 migration**). **459 test / 50 file PASS** (428 +
+`test/hr-attendance.test.ts` 31). tsc sạch · lint 0 lỗi · build OK · fresh deploy 38 migration + seed + seed:demo sạch.
+
+### Migration & schema (`Zb_hr_attendance`)
+- Enums: `WorkShiftStatus` (SCHEDULED/COMPLETED/CANCELLED) · `AttendanceStatus` (OPEN/COMPLETED/ADJUSTED/VOIDED)
+  · `AttendanceSource` (APP/MANUAL/DEVICE — DEVICE defer) · `AdjustmentStatus` (REQUESTED/APPLIED/REJECTED) ·
+  `LeaveStatus` (PENDING/APPROVED/REJECTED/CANCELLED).
+- **`WorkShift`** (`work_shifts`): ca theo NGÀY (khác `EmployeeSchedule` mẫu tuần — GIỮ NGUYÊN). employeeId,
+  branchId?, scheduleId?(nguồn mẫu), workDate `@db.Date`, scheduledStartAt/EndAt (instant, cross-midnight),
+  breakMinutes, shiftLabel, source, status. **`EmployeeSchedule` +back-relation `workShifts`.**
+- **`AttendanceRecord`** (`attendance_records`): chấm công THỰC TẾ (có thể KHÔNG có ca — workShiftId nullable).
+  checkInAt/checkOutAt (instant), breakMinutesActual, workedMinutes/scheduledMinutes/overtimeMinutes/lateMinutes/
+  earlyLeaveMinutes, source, status, void*(reason/by/at). KHÔNG hard-delete.
+- **`AttendanceAdjustment`** (`attendance_adjustments`): APPEND-ONLY before/after snapshot + reason + requestedBy/
+  changedBy/approvedBy + status.
+- **`EmployeeLeave` mở rộng additive:** +status(`@default(APPROVED)` → record cũ = APPROVED, tránh false-absent)
+  +isPaid(`@default(true)`) +requestedBy/At +approvedBy/At +rejectionReason +note +updatedAt. **Dữ liệu cũ giữ.**
+- **2 partial unique index** (raw SQL, additive): (1) `attendance_records(employeeId) WHERE status='OPEN'` →
+  1 OPEN/nhân sự, check-in trùng = 409 (chống đua); (2) `work_shifts(employeeId,workDate,scheduleId) WHERE
+  scheduleId IS NOT NULL` → sinh ca IDEMPOTENT (ca tạo tay scheduleId null không bị ràng buộc).
+
+### Lib
+- **`src/lib/attendance.ts`** (thuần): `computeAttendance` (worked/scheduled/late/early/**overtime CANDIDATE**),
+  `computeScheduledMinutes`, `buildShiftInstants` (cross-midnight = +1 ngày, dùng instant KHÔNG trừ HH:mm thô),
+  `generateShiftsFromSchedule` (recurring→dated, idempotent qua createMany skipDuplicates), `deriveFlags`
+  (ON_TIME/LATE/EARLY_LEAVE/ABSENT/LEAVE/OPEN_ATTENDANCE/OVERTIME_CANDIDATE — display, KHÔNG quy tiền),
+  `hasApprovedLeaveAt`.
+- **`src/lib/attendance-service.ts`**: `checkIn` (self FK / quản lý hộ; source APP/MANUAL; scheduled+late tính
+  ngay; P2002→409), `checkOut` (khóa `FOR UPDATE`, chống double-checkout; out<in→422; tính worked/OT/early),
+  `manualRecord` (quản lý bù công), `adjustAttendance` (nhân viên ĐỀ NGHỊ→REQUESTED không đổi record; quản lý
+  ÁP DỤNG→APPLIED + ADJUSTED; reason bắt buộc), `voidAttendance` (VOID giữ vết), `createLeaveRequest`/`decideLeave`/
+  `cancelLeave` (lifecycle, không hard-delete).
+
+### Múi giờ (tái dùng layer chung)
+Instant true-UTC; dựng giờ ca từ HH:mm qua `parseVnLocal` (Asia/Ho_Chi_Minh +7 cố định). Thời lượng = hiệu
+instant → độc lập TZ (cross-midnight đúng). `Branch.timezone` lưu sẵn cho đa-tz phase sau; PH2 vận hành **MỘT
+múi giờ VN** (ghi rõ giới hạn — khớp mục 9/21).
+
+### API (server-side authz)
+`/api/work-shifts` (+`generate` idempotent, +`[id]` PATCH hủy=CANCELLED) · `/api/attendance` (org list
+attendance.read) · `check-in`/`check-out` (self hoặc quản lý) · `manual` (attendance.write) · `me` (self,
+ownership FK) · `[id]/adjustments` (GET/POST) · `[id]/void` · `/api/leave-requests` (+`[id]` GET/PATCH-cancel,
+`[id]/approve`, `[id]/reject`). Existing `/api/employees/[id]/leaves` DELETE **thêm guard**: từ chối xóa cứng đơn
+đã qua workflow (`requestedAt` set) → hủy qua leave-requests.
+
+### RBAC (tái dùng PH1 — KHÔNG thêm permission)
+`attendance.read` (org list/xem) · `attendance.write` (tạo ca/sinh ca/chấm tay/điều chỉnh/void/duyệt nghỉ).
+**Self = ownership FK userId** (KHÔNG dùng permission; không fallback tên/email). `finance.read`/`staff.read`
+đơn lẻ KHÔNG mở chấm công (test). Payroll reserved (PH1) bất biến.
+
+### UI
+Sidebar **Vận hành & Hệ thống → "Chấm công"** (`/attendance`, gate `attendance.read`). 4 tab: **Hôm nay** (thẻ
+self check-in/out nếu tài khoản liên kết nhân sự) · **Ca làm việc** (list + sinh ca từ mẫu + hủy ca) · **Chấm
+công** (list + chấm tay + void, cột Công/Trễ/OT*/Cờ) · **Nghỉ phép** (list + tạo/duyệt/từ chối). Nhãn ở
+`clinic-labels.ts`. **Self-service check-in cho nhân viên KHÔNG có `attendance.read` = DEFER** (cần cơ chế
+self-nav ngoài permission-gating — IA change; API + test đã đủ).
+
+### Chứng minh (test/hr-attendance.test.ts, 31 test → A–AL)
+Calc unit M/N/O/P/Q/R (worked/late/early/OT/cross-midnight/timezone) · Sinh ca A–F (recurring→dated·idempotent·
+không ghi đè·cross-midnight·branch·cancel giữ) · Chấm công G–X (self FK·unlinked 403·A≠B·dup 409·checkout đóng·
+double checkout 409·adjustment before/after+audit·reason 422·void không hard-delete·nhân viên đề nghị KHÔNG tự
+duyệt) · Nghỉ Y–AD (lifecycle·duyệt/từ chối audit·paid/unpaid·approved tránh false-absent·dữ liệu cũ giữ·cancel
+giữ) · RBAC AE–AL (self chỉ của mình·attendance.read workspace·attendance.write cho sửa/duyệt·finance/staff.read
+KHÔNG mở·payroll reserved bất biến).
+
+### Nguyên tắc & nợ kỹ thuật
+- **Booking ≠ chấm công · WorkShift ≠ EmployeeSchedule · overtime CANDIDATE ≠ OT trả lương** (OT duyệt/tính
+  tiền ở HR-PH6). Chuẩn bị cross-check Session (HR-PH3) qua timestamp/branch/workDate — CHƯA implement.
+- **Chưa làm (HR-PH3+):** SessionStaffContribution · Commission/Incentive · Payroll · KPI payroll · DEVICE chấm
+  công · self-service UI cho nhân viên không quyền · branch-scoped RBAC (mới lưu branchId, quyền hiện org-wide) ·
+  đa-tz theo chi nhánh · CSV import ca/nghỉ (mới định nghĩa contract).
+
+### CONFLICTS
+**Không có.** Không destructive `EmployeeSchedule` · không xóa leave cũ · không dùng EmployeeRoleFee cho payroll
+· không đổi finance.read · không merge Employee/User · không hard-delete chấm công. Additive 0 DROP.
+
 ## Tech stack
 
 - **Framework:** Next.js 14 (App Router) + TypeScript

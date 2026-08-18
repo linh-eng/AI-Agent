@@ -630,6 +630,84 @@ export const leaveCreateSchema = z.object({
   reason: z.string().optional().nullable(),
 });
 
+// ===== HR-PH2 — Ca dated + Chấm công + Nghỉ phép (đơn duyệt) =====
+const leaveTypeEnum = z.enum(["ANNUAL", "SICK", "EMERGENCY", "UNAVAILABLE", "OTHER"]);
+const attSourceEnum = z.enum(["APP", "MANUAL", "DEVICE"]);
+
+// Ca tạo tay (quản lý): thời gian nhận CHUỖI (giờ VN) → route parse bằng parseVnLocal.
+export const workShiftCreateSchema = z.object({
+  employeeId: z.string().min(1),
+  branchId: z.string().optional().nullable(),
+  scheduledStartAt: z.string().min(1),
+  scheduledEndAt: z.string().min(1),
+  breakMinutes: z.coerce.number().int().min(0).optional(),
+  shiftLabel: z.string().optional().nullable(),
+  roleSnapshot: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export const workShiftUpdateSchema = z.object({
+  scheduledStartAt: z.string().optional(),
+  scheduledEndAt: z.string().optional(),
+  breakMinutes: z.coerce.number().int().min(0).optional(),
+  shiftLabel: z.string().optional().nullable(),
+  status: z.enum(["SCHEDULED", "COMPLETED", "CANCELLED"]).optional(),
+  note: z.string().optional().nullable(),
+});
+export const workShiftGenerateSchema = z.object({
+  employeeId: z.string().min(1),
+  from: z.string().min(1), // "YYYY-MM-DD"
+  to: z.string().min(1),
+  branchId: z.string().optional().nullable(),
+});
+
+// Check-in: self (employeeId bỏ trống → lấy từ phiên) hoặc quản lý chỉ định.
+export const attendanceCheckInSchema = z.object({
+  employeeId: z.string().optional().nullable(),
+  workShiftId: z.string().optional().nullable(),
+  branchId: z.string().optional().nullable(),
+  at: z.string().optional().nullable(), // MANUAL: quản lý nhập giờ; bỏ trống = server now()
+  source: attSourceEnum.optional(),
+  note: z.string().optional().nullable(),
+});
+export const attendanceCheckOutSchema = z.object({
+  attendanceId: z.string().optional().nullable(), // bỏ trống = bản OPEN của chính mình
+  employeeId: z.string().optional().nullable(), // quản lý check-out hộ
+  at: z.string().optional().nullable(),
+  breakMinutesActual: z.coerce.number().int().min(0).optional(),
+});
+// Quản lý tạo bản chấm công thủ công (bù ngày công / sửa).
+export const attendanceManualSchema = z.object({
+  employeeId: z.string().min(1),
+  workShiftId: z.string().optional().nullable(),
+  branchId: z.string().optional().nullable(),
+  checkInAt: z.string().min(1),
+  checkOutAt: z.string().optional().nullable(),
+  breakMinutesActual: z.coerce.number().int().min(0).optional(),
+  note: z.string().optional().nullable(),
+});
+// Điều chỉnh chấm công (append-only). requested=true → đề nghị của nhân viên (không tự duyệt).
+export const attendanceAdjustmentSchema = z.object({
+  reason: z.string().min(1, "Bắt buộc lý do"),
+  requested: z.boolean().optional(), // true = nhân viên đề nghị; false/absent = quản lý áp dụng
+  checkInAt: z.string().optional().nullable(),
+  checkOutAt: z.string().optional().nullable(),
+  breakMinutesActual: z.coerce.number().int().min(0).optional(),
+  branchId: z.string().optional().nullable(),
+});
+export const attendanceVoidSchema = z.object({ reason: z.string().min(1, "Bắt buộc lý do") });
+
+// Đơn nghỉ có duyệt (dùng chung bảng EmployeeLeave; status lifecycle).
+export const leaveRequestCreateSchema = z.object({
+  employeeId: z.string().optional().nullable(), // self → từ phiên
+  type: leaveTypeEnum.default("ANNUAL"),
+  fromAt: dateReq,
+  toAt: dateReq,
+  isPaid: z.boolean().optional(),
+  reason: z.string().optional().nullable(),
+  autoApprove: z.boolean().optional(), // quản lý tạo trực tiếp đã duyệt
+});
+export const leaveDecisionSchema = z.object({ reason: z.string().optional().nullable() });
+
 export const sessionStaffCreateSchema = z.object({
   sessionId: z.string().min(1),
   employeeId: z.string().optional().nullable(),

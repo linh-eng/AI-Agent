@@ -24,6 +24,10 @@ export const DELETE = handle(async (req, { params }) => {
   if (!lid) return fail(400, "Thiếu lid");
   const row = await prisma.employeeLeave.findFirst({ where: { id: lid, employeeId: params.id } });
   if (!row) return fail(404, "Không tìm thấy đơn nghỉ");
+  // HR-PH2 — KHÔNG hard-delete đơn đã qua workflow duyệt (requestedAt set) → hủy qua
+  // /api/leave-requests/[id] (status CANCELLED). Route này chỉ xóa "khối không khả dụng"
+  // do quản lý thêm nhanh ở tab lịch (record cũ, không thuộc luồng duyệt).
+  if (row.requestedAt) return fail(409, "Đơn nghỉ thuộc luồng duyệt — hãy hủy đơn (không xóa cứng)");
   await prisma.employeeLeave.delete({ where: { id: lid } });
   await auditLog({ userId: session.userId, action: "STAFF_LEAVE_REMOVED", entityType: "Employee", entityId: params.id, changes: { lid } });
   return ok({ ok: true });
