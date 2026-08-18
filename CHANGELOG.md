@@ -3,6 +3,17 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.6.0 — 2026-08-18
+- **(a) Khấu hao tài sản:** thêm nguyên giá, giá trị thu hồi, ngày bắt đầu, thời gian (tháng),
+  phương pháp (đường thẳng / số dư giảm dần). Trang chi tiết tài sản hiển thị giá trị đã khấu hao
+  lũy kế, giá trị còn lại, % tiến độ và **bảng theo dõi khấu hao theo năm**; danh sách tài sản thêm cột
+  "GT còn lại".
+- **(b) Bảo hành – Bảo trì:** thêm hãng/đơn vị bảo hành, thời gian BH, **chu kỳ bảo trì định kỳ**;
+  chi tiết tài sản hiển thị bảo trì gần nhất + **kế tiếp**; **Trung tâm cảnh báo** thêm mục
+  "Bảo trì định kỳ đến hạn" (tự cảnh báo khi sắp/quá hạn).
+- ⚠️ Có thêm cột mới cho tài sản → cần chạy `npm run prisma:push` khi cập nhật.
+- (Phân hệ (c) Thanh toán & Công nợ tài sản sẽ ở bản kế tiếp.)
+
 ## 1.5.0 — 2026-08-18
 - **Phân hệ Kho Dịch Vụ** (menu Dịch vụ & Thiết bị): sổ theo dõi hàng đã mở nắp/dùng dở cho
   dịch vụ. Khi Ghi nhận dịch vụ tiêu hao hàng có HSD (requiresExpiry), hệ thống tự tạo/cập nhật

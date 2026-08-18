@@ -193,6 +193,49 @@ export async function getWarrantyAlerts(days = 60): Promise<WarrantyAlert[]> {
   return out;
 }
 
+export interface MaintenanceDueAlert {
+  assetId: string;
+  code: string;
+  productName: string;
+  cycleMonths: number;
+  lastMaintenance: string | null;
+  nextDue: string;
+  daysLeft: number;
+  isOverdue: boolean;
+}
+
+/** Thiết bị đến/quá hạn bảo trì định kỳ (next = mốc gần nhất + chu kỳ). */
+export async function getMaintenanceDueAlerts(withinDays = 14): Promise<MaintenanceDueAlert[]> {
+  const assets = await prisma.asset.findMany({
+    where: { maintenanceCycleMonths: { not: null }, status: { not: "RETIRED" } },
+    include: {
+      product: { select: { name: true } },
+      maintenance: { orderBy: { performedAt: "desc" }, take: 1, select: { performedAt: true } },
+    },
+  });
+  const out: MaintenanceDueAlert[] = [];
+  for (const a of assets) {
+    const cycle = a.maintenanceCycleMonths!;
+    const base = a.maintenance[0]?.performedAt ?? a.purchaseDate;
+    if (!base) continue;
+    const next = new Date(base);
+    next.setMonth(next.getMonth() + cycle);
+    const left = daysUntil(next);
+    if (left > withinDays) continue;
+    out.push({
+      assetId: a.id,
+      code: a.code,
+      productName: a.product.name,
+      cycleMonths: cycle,
+      lastMaintenance: a.maintenance[0]?.performedAt?.toISOString() ?? null,
+      nextDue: next.toISOString(),
+      daysLeft: left,
+      isOverdue: left < 0,
+    });
+  }
+  return out.sort((x, y) => x.daysLeft - y.daysLeft);
+}
+
 export interface ShotAlert {
   handpieceId: string;
   code: string;

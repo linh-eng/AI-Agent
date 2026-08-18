@@ -441,6 +441,11 @@ enum AssetStatus {
   RETIRED // thanh lý
 }
 
+enum DepreciationMethod {
+  STRAIGHT_LINE // đường thẳng
+  DECLINING     // số dư giảm dần (ước tính)
+}
+
 model Asset {
   id            String      @id @default(cuid())
   code          String      @unique // mã tài sản
@@ -456,6 +461,19 @@ model Asset {
   supplierId    String?     @map("supplier_id")
   supplier      Supplier?   @relation(fields: [supplierId], references: [id])
   note          String?
+
+  // (a) Khấu hao
+  cost               Float?              @map("cost")               // nguyên giá
+  salvageValue       Float?              @map("salvage_value")      // giá trị thu hồi ước tính (mặc định 0)
+  depreciationStart  DateTime?           @map("depreciation_start") // ngày bắt đầu tính khấu hao
+  depreciationMonths Int?                @map("depreciation_months") // thời gian khấu hao (tháng)
+  depreciationMethod DepreciationMethod? @map("depreciation_method")
+
+  // (b) Bảo hành – bảo trì
+  warrantyVendor         String? @map("warranty_vendor")          // đơn vị/hãng bảo hành
+  warrantyMonths         Int?    @map("warranty_months")          // thời gian bảo hành (tháng)
+  maintenanceCycleMonths Int?    @map("maintenance_cycle_months") // chu kỳ bảo trì định kỳ (tháng)
+
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
 

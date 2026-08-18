@@ -12,7 +12,8 @@ import { Combobox } from "@/components/ui/combobox";
 import { focusNextOnEnter } from "@/lib/form";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatNumber } from "@/lib/utils";
+import { computeDepreciation } from "@/lib/depreciation";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import { ASSET_STATUS_LABEL, ASSET_STATUS_TONE } from "@/lib/labels";
@@ -33,6 +34,14 @@ interface Asset {
   note?: string | null;
   purchaseDate?: string | null;
   warrantyUntil?: string | null;
+  cost?: number | null;
+  salvageValue?: number | null;
+  depreciationStart?: string | null;
+  depreciationMonths?: number | null;
+  depreciationMethod?: "STRAIGHT_LINE" | "DECLINING" | null;
+  warrantyVendor?: string | null;
+  warrantyMonths?: number | null;
+  maintenanceCycleMonths?: number | null;
 }
 
 function daysUntil(iso: string): number {
@@ -41,6 +50,29 @@ function daysUntil(iso: string): number {
   const n = new Date();
   return Math.round((a - Date.UTC(n.getFullYear(), n.getMonth(), n.getDate())) / 86400000);
 }
+
+const EMPTY_FORM = {
+  productId: "",
+  code: "",
+  serialNumber: "",
+  warehouseId: "",
+  supplierId: "",
+  status: "IN_STOCK",
+  location: "",
+  purchaseDate: "",
+  warrantyUntil: "",
+  note: "",
+  // (a) khấu hao
+  cost: "",
+  salvageValue: "",
+  depreciationStart: "",
+  depreciationMonths: "",
+  depreciationMethod: "STRAIGHT_LINE",
+  // (b) bảo hành/bảo trì
+  warrantyVendor: "",
+  warrantyMonths: "",
+  maintenanceCycleMonths: "",
+};
 
 export default function AssetsPage() {
   const canWrite = useCan(PERMISSIONS.ASSET_WRITE);
@@ -53,18 +85,7 @@ export default function AssetsPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Asset | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    productId: "",
-    code: "",
-    serialNumber: "",
-    warehouseId: "",
-    supplierId: "",
-    status: "IN_STOCK",
-    location: "",
-    purchaseDate: "",
-    warrantyUntil: "",
-    note: "",
-  });
+  const [form, setForm] = useState({ ...EMPTY_FORM });
 
   async function load() {
     setLoading(true);
@@ -83,7 +104,7 @@ export default function AssetsPage() {
 
   function openCreate() {
     setEditing(null);
-    setForm({ productId: "", code: "", serialNumber: "", warehouseId: "", supplierId: "", status: "IN_STOCK", location: "", purchaseDate: "", warrantyUntil: "", note: "" });
+    setForm({ ...EMPTY_FORM });
     setError(null);
     setOpen(true);
   }
@@ -100,6 +121,14 @@ export default function AssetsPage() {
       purchaseDate: a.purchaseDate ? a.purchaseDate.slice(0, 10) : "",
       warrantyUntil: a.warrantyUntil ? a.warrantyUntil.slice(0, 10) : "",
       note: a.note ?? "",
+      cost: a.cost != null ? String(a.cost) : "",
+      salvageValue: a.salvageValue != null ? String(a.salvageValue) : "",
+      depreciationStart: a.depreciationStart ? a.depreciationStart.slice(0, 10) : "",
+      depreciationMonths: a.depreciationMonths != null ? String(a.depreciationMonths) : "",
+      depreciationMethod: a.depreciationMethod ?? "STRAIGHT_LINE",
+      warrantyVendor: a.warrantyVendor ?? "",
+      warrantyMonths: a.warrantyMonths != null ? String(a.warrantyMonths) : "",
+      maintenanceCycleMonths: a.maintenanceCycleMonths != null ? String(a.maintenanceCycleMonths) : "",
     });
     setError(null);
     setOpen(true);
@@ -109,6 +138,18 @@ export default function AssetsPage() {
     e.preventDefault();
     setError(null);
     if (!editing && !form.productId) return setError("Vui lòng chọn thiết bị (sản phẩm).");
+    const num = (v: string) => (v ? Number(v) : null);
+    // Trường khấu hao + bảo hành/bảo trì (dùng chung create & edit).
+    const extra = {
+      cost: num(form.cost),
+      salvageValue: num(form.salvageValue),
+      depreciationStart: form.depreciationStart || null,
+      depreciationMonths: form.depreciationMonths ? Number(form.depreciationMonths) : null,
+      depreciationMethod: form.depreciationMethod || null,
+      warrantyVendor: form.warrantyVendor || null,
+      warrantyMonths: form.warrantyMonths ? Number(form.warrantyMonths) : null,
+      maintenanceCycleMonths: form.maintenanceCycleMonths ? Number(form.maintenanceCycleMonths) : null,
+    };
     try {
       if (editing) {
         await apiFetch(`/api/assets/${editing.id}`, {
@@ -122,6 +163,7 @@ export default function AssetsPage() {
             warehouseId: form.warehouseId || null,
             supplierId: form.supplierId || null,
             note: form.note || null,
+            ...extra,
           }),
         });
       } else {
@@ -138,6 +180,7 @@ export default function AssetsPage() {
             purchaseDate: form.purchaseDate || null,
             warrantyUntil: form.warrantyUntil || null,
             note: form.note || null,
+            ...extra,
           }),
         });
       }
@@ -172,17 +215,18 @@ export default function AssetsPage() {
                 <TH>Vị trí</TH>
                 <TH className="text-center">Trạng thái</TH>
                 <TH>Bảo hành đến</TH>
+                <TH className="text-right">GT còn lại</TH>
                 {canManage && <TH className="text-right">Sửa</TH>}
               </TR>
             </THead>
             <TBody>
               {loading ? (
                 <TR>
-                  <TD colSpan={canManage ? 7 : 6} className="py-8 text-center text-muted-foreground">Đang tải…</TD>
+                  <TD colSpan={canManage ? 8 : 7} className="py-8 text-center text-muted-foreground">Đang tải…</TD>
                 </TR>
               ) : rows.length === 0 ? (
                 <TR>
-                  <TD colSpan={canManage ? 7 : 6} className="py-8 text-center text-muted-foreground">Chưa có tài sản</TD>
+                  <TD colSpan={canManage ? 8 : 7} className="py-8 text-center text-muted-foreground">Chưa có tài sản</TD>
                 </TR>
               ) : (
                 rows.map((a) => {
@@ -212,6 +256,25 @@ export default function AssetsPage() {
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
+                      </TD>
+                      <TD className="text-right">
+                        {(() => {
+                          if (!a.cost || !a.depreciationMonths || !a.depreciationStart)
+                            return <span className="text-muted-foreground">—</span>;
+                          const dep = computeDepreciation({
+                            cost: a.cost,
+                            salvage: a.salvageValue ?? 0,
+                            months: a.depreciationMonths,
+                            start: new Date(a.depreciationStart),
+                            method: a.depreciationMethod ?? "STRAIGHT_LINE",
+                          });
+                          if (!dep) return <span className="text-muted-foreground">—</span>;
+                          return (
+                            <span title={`Nguyên giá ${formatNumber(a.cost)} đ · đã KH ${formatNumber(dep.accumulated)} đ`}>
+                              {formatNumber(dep.remaining)} đ
+                            </span>
+                          );
+                        })()}
                       </TD>
                       {canManage && (
                         <TD className="text-right">
@@ -296,6 +359,59 @@ export default function AssetsPage() {
               placeholder="— Chọn NCC —"
               items={suppliers.map((s) => ({ value: s.id, label: s.name }))}
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Ghi chú</Label>
+            <Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+          </div>
+
+          {/* (a) Khấu hao */}
+          <div className="rounded-lg border bg-muted/30 p-3">
+            <div className="mb-2 text-sm font-medium">Khấu hao tài sản</div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="space-y-1.5">
+                <Label>Nguyên giá (đ)</Label>
+                <Input type="number" min="0" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Giá trị thu hồi (đ)</Label>
+                <Input type="number" min="0" value={form.salvageValue} onChange={(e) => setForm({ ...form, salvageValue: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Phương pháp</Label>
+                <Select value={form.depreciationMethod} onChange={(e) => setForm({ ...form, depreciationMethod: e.target.value })}>
+                  <option value="STRAIGHT_LINE">Đường thẳng</option>
+                  <option value="DECLINING">Số dư giảm dần</option>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Bắt đầu khấu hao</Label>
+                <Input type="date" value={form.depreciationStart} onChange={(e) => setForm({ ...form, depreciationStart: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Thời gian (tháng)</Label>
+                <Input type="number" min="1" value={form.depreciationMonths} onChange={(e) => setForm({ ...form, depreciationMonths: e.target.value })} />
+              </div>
+            </div>
+          </div>
+
+          {/* (b) Bảo hành / bảo trì định kỳ */}
+          <div className="rounded-lg border bg-muted/30 p-3">
+            <div className="mb-2 text-sm font-medium">Bảo hành &amp; bảo trì định kỳ</div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="space-y-1.5">
+                <Label>Hãng / đơn vị bảo hành</Label>
+                <Input value={form.warrantyVendor} onChange={(e) => setForm({ ...form, warrantyVendor: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Thời gian BH (tháng)</Label>
+                <Input type="number" min="1" value={form.warrantyMonths} onChange={(e) => setForm({ ...form, warrantyMonths: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Chu kỳ bảo trì (tháng)</Label>
+                <Input type="number" min="1" value={form.maintenanceCycleMonths} onChange={(e) => setForm({ ...form, maintenanceCycleMonths: e.target.value })} />
+              </div>
+            </div>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">

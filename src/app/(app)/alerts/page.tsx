@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CalendarClock, TrendingDown, ShieldCheck, Zap, Archive } from "lucide-react";
+import { CalendarClock, TrendingDown, ShieldCheck, Zap, Archive, Wrench } from "lucide-react";
+import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -57,6 +58,16 @@ interface UnopenedAlert {
   monthsStored: number;
   warnMonths: number;
 }
+interface MaintenanceDue {
+  assetId: string;
+  code: string;
+  productName: string;
+  cycleMonths: number;
+  lastMaintenance: string | null;
+  nextDue: string;
+  daysLeft: number;
+  isOverdue: boolean;
+}
 
 export default function AlertsPage() {
   const [expiry, setExpiry] = useState<ExpiryAlert[]>([]);
@@ -64,6 +75,7 @@ export default function AlertsPage() {
   const [warranty, setWarranty] = useState<WarrantyAlert[]>([]);
   const [shots, setShots] = useState<ShotAlert[]>([]);
   const [unopened, setUnopened] = useState<UnopenedAlert[]>([]);
+  const [maintenance, setMaintenance] = useState<MaintenanceDue[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -73,6 +85,7 @@ export default function AlertsPage() {
       warranty: WarrantyAlert[];
       shots: ShotAlert[];
       unopened: UnopenedAlert[];
+      maintenance: MaintenanceDue[];
     }>("/api/alerts")
       .then((d) => {
         setExpiry(d.expiry);
@@ -80,6 +93,7 @@ export default function AlertsPage() {
         setWarranty(d.warranty ?? []);
         setShots(d.shots ?? []);
         setUnopened(d.unopened ?? []);
+        setMaintenance(d.maintenance ?? []);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -88,7 +102,7 @@ export default function AlertsPage() {
     <div>
       <PageHeader
         title="Cảnh báo"
-        description="Lô sắp/đã hết hạn, sản phẩm dưới định mức tồn, hàng tồn lâu chưa mở nắp, thiết bị sắp hết bảo hành và tay cầm sắp hết shot."
+        description="Lô sắp/đã hết hạn, sản phẩm dưới định mức tồn, hàng tồn lâu chưa mở nắp, thiết bị sắp hết bảo hành / đến hạn bảo trì và tay cầm sắp hết shot."
       />
 
       {/* HSD */}
@@ -297,6 +311,59 @@ export default function AlertsPage() {
                         <Badge tone="danger">Hết BH {Math.abs(w.daysLeft)} ngày</Badge>
                       ) : (
                         <Badge tone="warning">Còn {w.daysLeft} ngày</Badge>
+                      )}
+                    </TD>
+                  </TR>
+                ))
+              )}
+            </TBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Bảo trì định kỳ đến hạn */}
+      <Card className="mt-6">
+        <CardContent className="p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Wrench className="h-5 w-5 text-amber-600" />
+            <h3 className="font-semibold">Bảo trì định kỳ đến hạn</h3>
+            <Badge tone={maintenance.length ? "warning" : "success"}>{maintenance.length} thiết bị</Badge>
+          </div>
+          <Table>
+            <THead>
+              <TR>
+                <TH>Mã TS</TH>
+                <TH>Thiết bị</TH>
+                <TH>Chu kỳ</TH>
+                <TH>Bảo trì gần nhất</TH>
+                <TH>Kế tiếp</TH>
+                <TH className="text-right">Còn lại</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {loading ? (
+                <TR>
+                  <TD colSpan={6} className="py-6 text-center text-muted-foreground">Đang tải…</TD>
+                </TR>
+              ) : maintenance.length === 0 ? (
+                <TR>
+                  <TD colSpan={6} className="py-6 text-center text-muted-foreground">Không có thiết bị đến hạn bảo trì 🎉</TD>
+                </TR>
+              ) : (
+                maintenance.map((m) => (
+                  <TR key={m.assetId}>
+                    <TD className="font-mono text-xs">
+                      <Link href={`/assets/${m.assetId}`} className="text-primary hover:underline">{m.code}</Link>
+                    </TD>
+                    <TD className="font-medium">{m.productName}</TD>
+                    <TD className="text-muted-foreground">{m.cycleMonths} tháng</TD>
+                    <TD>{m.lastMaintenance ? formatDate(m.lastMaintenance) : "—"}</TD>
+                    <TD>{formatDate(m.nextDue)}</TD>
+                    <TD className="text-right">
+                      {m.isOverdue ? (
+                        <Badge tone="danger">Quá hạn {Math.abs(m.daysLeft)} ngày</Badge>
+                      ) : (
+                        <Badge tone="warning">Còn {m.daysLeft} ngày</Badge>
                       )}
                     </TD>
                   </TR>

@@ -219,6 +219,18 @@ export const serviceUsageSchema = z.object({
 });
 
 // ----- Tài sản / thiết bị -----
+// Trường khấu hao + bảo hành/bảo trì (dùng chung create & update).
+const assetExtraFields = {
+  cost: z.number().nonnegative().nullable().optional(),
+  salvageValue: z.number().nonnegative().nullable().optional(),
+  depreciationStart: optionalString,
+  depreciationMonths: z.number().int().positive().max(1200).nullable().optional(),
+  depreciationMethod: z.enum(["STRAIGHT_LINE", "DECLINING"]).nullable().optional(),
+  warrantyVendor: optionalString,
+  warrantyMonths: z.number().int().positive().max(600).nullable().optional(),
+  maintenanceCycleMonths: z.number().int().positive().max(600).nullable().optional(),
+};
+
 export const assetCreateSchema = z.object({
   productId: z.string().min(1, "Chọn thiết bị"),
   code: optionalString, // để trống -> sinh tự động
@@ -230,6 +242,7 @@ export const assetCreateSchema = z.object({
   warrantyUntil: optionalString,
   supplierId: optionalString,
   note: optionalString,
+  ...assetExtraFields,
 });
 
 export const assetUpdateSchema = z.object({
@@ -241,6 +254,7 @@ export const assetUpdateSchema = z.object({
   warrantyUntil: optionalString,
   supplierId: optionalString,
   note: optionalString,
+  ...assetExtraFields,
 });
 
 // ----- Tay cầm / vật tư theo máy (đếm shot) -----

@@ -43,6 +43,14 @@ export const PATCH = handle(async (req, ctx) => {
       ...(input.warrantyUntil !== undefined ? { warrantyUntil: parseDate(input.warrantyUntil) } : {}),
       ...(input.supplierId !== undefined ? { supplierId: input.supplierId } : {}),
       ...(input.note !== undefined ? { note: input.note } : {}),
+      ...(input.cost !== undefined ? { cost: input.cost } : {}),
+      ...(input.salvageValue !== undefined ? { salvageValue: input.salvageValue } : {}),
+      ...(input.depreciationStart !== undefined ? { depreciationStart: parseDate(input.depreciationStart) } : {}),
+      ...(input.depreciationMonths !== undefined ? { depreciationMonths: input.depreciationMonths } : {}),
+      ...(input.depreciationMethod !== undefined ? { depreciationMethod: input.depreciationMethod } : {}),
+      ...(input.warrantyVendor !== undefined ? { warrantyVendor: input.warrantyVendor } : {}),
+      ...(input.warrantyMonths !== undefined ? { warrantyMonths: input.warrantyMonths } : {}),
+      ...(input.maintenanceCycleMonths !== undefined ? { maintenanceCycleMonths: input.maintenanceCycleMonths } : {}),
     },
   });
   return ok(row);
