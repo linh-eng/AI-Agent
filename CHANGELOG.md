@@ -3,6 +3,13 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.8.0 — 2026-08-18
+- **Khấu hao — bổ sung phương pháp "Theo sản lượng"** (units of production): nhập tổng sản lượng ước
+  tính; **ghi nhận sản lượng theo thời gian** (số shot/lượt/giờ chạy) ở trang chi tiết tài sản → hệ thống
+  tính khấu hao/đơn vị, lũy kế, giá trị còn lại và **bảng theo dõi theo thời gian** từ các lần ghi nhận.
+- Thời gian khấu hao nay hiển thị kèm quy đổi **năm + tháng**.
+- ⚠️ Có thêm cột/bảng mới → cần chạy `npm run prisma:push` khi cập nhật.
+
 ## 1.7.0 — 2026-08-18
 - **(c) Thanh toán & Công nợ tài sản:** thêm Tổng giá trị hợp đồng + Hình thức quản lý (công nợ/hóa
   đơn/hợp đồng) cho tài sản; theo dõi **đã thanh toán / còn công nợ**; quản lý **các đợt thanh toán**

@@ -26,6 +26,13 @@ interface Maint {
   note?: string | null;
   createdBy: { name: string };
 }
+interface DepUsageRow {
+  id: string;
+  usageDate: string;
+  units: number;
+  note?: string | null;
+  createdBy: { name: string };
+}
 interface Attach {
   id: string;
   kind: string;
@@ -67,7 +74,9 @@ interface Asset {
   salvageValue?: number | null;
   depreciationStart?: string | null;
   depreciationMonths?: number | null;
-  depreciationMethod?: "STRAIGHT_LINE" | "DECLINING" | null;
+  depreciationMethod?: "STRAIGHT_LINE" | "DECLINING" | "UNITS" | null;
+  depreciationTotalUnits?: number | null;
+  depreciationUsages: DepUsageRow[];
   warrantyVendor?: string | null;
   warrantyMonths?: number | null;
   maintenanceCycleMonths?: number | null;
@@ -90,6 +99,7 @@ function addMonths(iso: string, n: number): string {
 const DEP_METHOD_LABEL: Record<string, string> = {
   STRAIGHT_LINE: "Đường thẳng",
   DECLINING: "Số dư giảm dần",
+  UNITS: "Theo sản lượng",
 };
 const MANAGE_LABEL: Record<string, string> = { DEBT: "Theo công nợ", INVOICE: "Theo hóa đơn", CONTRACT: "Theo hợp đồng" };
 const METHOD_LABEL: Record<string, string> = { CASH: "Tiền mặt", TRANSFER: "Chuyển khoản", OTHER: "Khác" };
@@ -124,6 +134,37 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
   const [payErr, setPayErr] = useState<string | null>(null);
   const [upKind, setUpKind] = useState("CONTRACT");
   const [upBusy, setUpBusy] = useState(false);
+  // Khấu hao theo sản lượng
+  const [useOpen, setUseOpen] = useState(false);
+  const [useForm, setUseForm] = useState({ usageDate: "", units: "", note: "" });
+  const [useBusy, setUseBusy] = useState(false);
+  const [useErr, setUseErr] = useState<string | null>(null);
+
+  async function addUsage(e: React.FormEvent) {
+    e.preventDefault();
+    setUseErr(null);
+    if (!useForm.usageDate) return setUseErr("Chọn ngày.");
+    if (!useForm.units || Number(useForm.units) <= 0) return setUseErr("Nhập sản lượng > 0.");
+    setUseBusy(true);
+    try {
+      await apiFetch(`/api/assets/${params.id}/depreciation-usages`, {
+        method: "POST",
+        body: JSON.stringify({ usageDate: useForm.usageDate, units: Number(useForm.units), note: useForm.note || null }),
+      });
+      setUseOpen(false);
+      setUseForm({ usageDate: "", units: "", note: "" });
+      load();
+    } catch (err) {
+      setUseErr(err instanceof Error ? err.message : "Lỗi");
+    } finally {
+      setUseBusy(false);
+    }
+  }
+  async function delUsage(uid: string) {
+    if (!confirm("Xóa bản ghi sản lượng này?")) return;
+    await apiFetch(`/api/assets/${params.id}/depreciation-usages/${uid}`, { method: "DELETE" });
+    load();
+  }
 
   async function load() {
     setData(await apiFetch<Asset>(`/api/assets/${params.id}`));
@@ -261,41 +302,65 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
 
       {/* (a) Khấu hao */}
       {(() => {
-        if (!data.cost || !data.depreciationMonths || !data.depreciationStart) {
+        const method = data.depreciationMethod ?? "STRAIGHT_LINE";
+        const isUnits = method === "UNITS";
+        const configured =
+          !!data.cost && (isUnits ? !!data.depreciationTotalUnits : !!data.depreciationMonths && !!data.depreciationStart);
+        if (!configured) {
           return canWrite ? (
             <Card className="mb-4">
               <CardContent className="p-5 text-sm text-muted-foreground">
-                Chưa cấu hình khấu hao. Bấm <b>Sửa</b> ở trang danh sách tài sản để nhập nguyên giá, ngày bắt
-                đầu và thời gian khấu hao.
+                Chưa cấu hình khấu hao. Bấm <b>Sửa</b> ở trang danh sách tài sản để nhập nguyên giá, phương pháp
+                và {isUnits ? "tổng sản lượng ước tính" : "ngày bắt đầu + thời gian khấu hao"}.
               </CardContent>
             </Card>
           ) : null;
         }
         const dep = computeDepreciation({
-          cost: data.cost,
+          cost: data.cost!,
           salvage: data.salvageValue ?? 0,
-          months: data.depreciationMonths,
-          start: new Date(data.depreciationStart),
-          method: data.depreciationMethod ?? "STRAIGHT_LINE",
+          months: data.depreciationMonths ?? 0,
+          start: data.depreciationStart ? new Date(data.depreciationStart) : new Date(),
+          method,
+          totalUnits: data.depreciationTotalUnits ?? null,
+          usages: data.depreciationUsages.map((u) => ({ date: new Date(u.usageDate), units: u.units })),
         });
         if (!dep) return null;
+        const months = data.depreciationMonths ?? 0;
         return (
           <>
-            <div className="mb-2 flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-muted-foreground" />
-              <h3 className="font-semibold">Khấu hao tài sản</h3>
-              <Badge tone="muted">{DEP_METHOD_LABEL[data.depreciationMethod ?? "STRAIGHT_LINE"]}</Badge>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                <h3 className="font-semibold">Khấu hao tài sản</h3>
+                <Badge tone="muted">{DEP_METHOD_LABEL[method]}</Badge>
+              </div>
+              {isUnits && canManage && (
+                <Button size="sm" onClick={() => { setUseErr(null); setUseOpen(true); }}>
+                  <Plus className="h-4 w-4" /> Ghi nhận sản lượng
+                </Button>
+              )}
             </div>
             <Card className="mb-4">
               <CardContent className="p-5">
                 <div className="grid gap-4 text-sm sm:grid-cols-4">
-                  <Info label="Nguyên giá" value={`${formatNumber(data.cost)} đ`} />
-                  <Info label="Bắt đầu khấu hao" value={formatDate(data.depreciationStart)} />
-                  <Info label="Thời gian" value={`${data.depreciationMonths} tháng`} />
-                  <Info label="Khấu hao / tháng" value={`${formatNumber(dep.monthly)} đ`} />
+                  <Info label="Nguyên giá" value={`${formatNumber(data.cost!)} đ`} />
+                  {isUnits ? (
+                    <>
+                      <Info label="Tổng sản lượng ước tính" value={formatNumber(dep.totalUnits ?? 0)} />
+                      <Info label="Sản lượng đã dùng" value={formatNumber(dep.usedUnits ?? 0)} />
+                      <Info label="Khấu hao / đơn vị" value={`${formatNumber(dep.perUnit ?? 0)} đ`} />
+                    </>
+                  ) : (
+                    <>
+                      <Info label="Bắt đầu khấu hao" value={formatDate(data.depreciationStart!)} />
+                      <Info label="Thời gian" value={`${months} tháng (≈ ${Math.floor(months / 12)} năm ${months % 12} tháng)`} />
+                      <Info label="Khấu hao / tháng" value={`${formatNumber(dep.monthly)} đ`} />
+                    </>
+                  )}
                   <Info label="Đã khấu hao (lũy kế)" value={`${formatNumber(dep.accumulated)} đ`} />
                   <Info label="Giá trị còn lại" value={`${formatNumber(dep.remaining)} đ`} />
-                  <Info label="Khấu hao xong" value={formatDate(dep.endDate.toISOString())} />
+                  {!isUnits && dep.endDate && <Info label="Khấu hao xong" value={formatDate(dep.endDate.toISOString())} />}
                   <div>
                     <div className="text-xs text-muted-foreground">Tiến độ ({dep.percent}%)</div>
                     <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
@@ -303,28 +368,71 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 overflow-x-auto">
-                  <Table>
-                    <THead>
-                      <TR>
-                        <TH>Năm</TH>
-                        <TH className="text-right">Khấu hao trong năm</TH>
-                        <TH className="text-right">Lũy kế cuối năm</TH>
-                        <TH className="text-right">Còn lại cuối năm</TH>
-                      </TR>
-                    </THead>
-                    <TBody>
-                      {dep.yearly.map((y) => (
-                        <TR key={y.year}>
-                          <TD className="font-medium">{y.year}</TD>
-                          <TD className="text-right">{formatNumber(y.depreciation)} đ</TD>
-                          <TD className="text-right">{formatNumber(y.accumulated)} đ</TD>
-                          <TD className="text-right">{formatNumber(y.remaining)} đ</TD>
+
+                {isUnits ? (
+                  <div className="mt-4 overflow-x-auto">
+                    <div className="mb-1 text-sm font-medium">Ghi nhận sản lượng & khấu hao theo thời gian</div>
+                    <Table>
+                      <THead>
+                        <TR>
+                          <TH>Ngày</TH>
+                          <TH className="text-right">Sản lượng</TH>
+                          <TH className="text-right">Khấu hao</TH>
+                          <TH>Ghi chú</TH>
+                          <TH>Người ghi</TH>
+                          {canManage && <TH></TH>}
                         </TR>
-                      ))}
-                    </TBody>
-                  </Table>
-                </div>
+                      </THead>
+                      <TBody>
+                        {data.depreciationUsages.length === 0 ? (
+                          <TR>
+                            <TD colSpan={canManage ? 6 : 5} className="py-6 text-center text-muted-foreground">Chưa ghi nhận sản lượng</TD>
+                          </TR>
+                        ) : (
+                          data.depreciationUsages.map((u) => (
+                            <TR key={u.id}>
+                              <TD>{formatDate(u.usageDate)}</TD>
+                              <TD className="text-right">{formatNumber(u.units)}</TD>
+                              <TD className="text-right">{formatNumber(Math.round(u.units * (dep.perUnit ?? 0)))} đ</TD>
+                              <TD className="text-muted-foreground">{u.note ?? "—"}</TD>
+                              <TD className="text-muted-foreground">{u.createdBy.name}</TD>
+                              {canManage && (
+                                <TD className="text-right">
+                                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => delUsage(u.id)} title="Xóa">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TD>
+                              )}
+                            </TR>
+                          ))
+                        )}
+                      </TBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="mt-4 overflow-x-auto">
+                    <Table>
+                      <THead>
+                        <TR>
+                          <TH>Năm</TH>
+                          <TH className="text-right">Khấu hao trong năm</TH>
+                          <TH className="text-right">Lũy kế cuối năm</TH>
+                          <TH className="text-right">Còn lại cuối năm</TH>
+                        </TR>
+                      </THead>
+                      <TBody>
+                        {dep.yearly.map((y) => (
+                          <TR key={y.year}>
+                            <TD className="font-medium">{y.year}</TD>
+                            <TD className="text-right">{formatNumber(y.depreciation)} đ</TD>
+                            <TD className="text-right">{formatNumber(y.accumulated)} đ</TD>
+                            <TD className="text-right">{formatNumber(y.remaining)} đ</TD>
+                          </TR>
+                        ))}
+                      </TBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </>
@@ -645,6 +753,31 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setPayOpen(false)} disabled={payBusy}>Hủy</Button>
             <Button type="submit" disabled={payBusy}>{payBusy ? "Đang lưu…" : "Lưu"}</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Ghi nhận sản lượng (khấu hao theo sản lượng) */}
+      <Modal open={useOpen} onClose={() => setUseOpen(false)} title="Ghi nhận sản lượng">
+        <form onSubmit={addUsage} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Ngày *</Label>
+              <Input type="date" value={useForm.usageDate} onChange={(e) => setUseForm({ ...useForm, usageDate: e.target.value })} required />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Sản lượng *</Label>
+              <Input type="number" min="0" step="any" placeholder="VD: số shot/lượt" value={useForm.units} onChange={(e) => setUseForm({ ...useForm, units: e.target.value })} required />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Ghi chú</Label>
+            <Input value={useForm.note} onChange={(e) => setUseForm({ ...useForm, note: e.target.value })} />
+          </div>
+          {useErr && <p className="text-sm text-destructive">{useErr}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setUseOpen(false)} disabled={useBusy}>Hủy</Button>
+            <Button type="submit" disabled={useBusy}>{useBusy ? "Đang lưu…" : "Lưu"}</Button>
           </div>
         </form>
       </Modal>

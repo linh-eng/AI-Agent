@@ -225,13 +225,21 @@ const assetExtraFields = {
   salvageValue: z.number().nonnegative().nullable().optional(),
   depreciationStart: optionalString,
   depreciationMonths: z.number().int().positive().max(1200).nullable().optional(),
-  depreciationMethod: z.enum(["STRAIGHT_LINE", "DECLINING"]).nullable().optional(),
+  depreciationMethod: z.enum(["STRAIGHT_LINE", "DECLINING", "UNITS"]).nullable().optional(),
+  depreciationTotalUnits: z.number().positive().nullable().optional(),
   warrantyVendor: optionalString,
   warrantyMonths: z.number().int().positive().max(600).nullable().optional(),
   maintenanceCycleMonths: z.number().int().positive().max(600).nullable().optional(),
   contractValue: z.number().nonnegative().nullable().optional(),
   managementType: z.enum(["DEBT", "INVOICE", "CONTRACT"]).nullable().optional(),
 };
+
+// Ghi nhận sản lượng (khấu hao theo sản lượng).
+export const depreciationUsageSchema = z.object({
+  usageDate: z.string().min(1, "Chọn ngày"),
+  units: z.number().positive("Sản lượng > 0"),
+  note: optionalString,
+});
 
 // Đợt thanh toán tài sản.
 export const assetPaymentSchema = z.object({

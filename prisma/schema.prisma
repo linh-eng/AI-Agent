@@ -38,6 +38,7 @@ model User {
   svcStockUpdated ServiceStockItem[] @relation("SvcStockUpdatedBy")
   assetPayments    AssetPayment[]    @relation("AssetPaymentBy")
   assetAttachments AssetAttachment[] @relation("AssetAttachmentBy")
+  depUsages        DepreciationUsage[] @relation("DepUsageBy")
 
   @@map("users")
 }
@@ -446,6 +447,7 @@ enum AssetStatus {
 enum DepreciationMethod {
   STRAIGHT_LINE // đường thẳng
   DECLINING     // số dư giảm dần (ước tính)
+  UNITS         // theo sản lượng
 }
 
 model Asset {
@@ -470,6 +472,7 @@ model Asset {
   depreciationStart  DateTime?           @map("depreciation_start") // ngày bắt đầu tính khấu hao
   depreciationMonths Int?                @map("depreciation_months") // thời gian khấu hao (tháng)
   depreciationMethod DepreciationMethod? @map("depreciation_method")
+  depreciationTotalUnits Float?          @map("depreciation_total_units") // tổng sản lượng ước tính (PP theo sản lượng)
 
   // (b) Bảo hành – bảo trì
   warrantyVendor         String? @map("warranty_vendor")          // đơn vị/hãng bảo hành
@@ -487,6 +490,7 @@ model Asset {
   handpieces  Handpiece[]
   payments    AssetPayment[]
   attachments AssetAttachment[]
+  depreciationUsages DepreciationUsage[]
 
   @@index([status])
   @@index([warrantyUntil])
@@ -733,4 +737,20 @@ model AssetAttachment {
 
   @@index([assetId])
   @@map("asset_attachments")
+}
+
+// Ghi nhận sản lượng theo thời gian (dùng cho khấu hao theo sản lượng).
+model DepreciationUsage {
+  id          String   @id @default(cuid())
+  assetId     String   @map("asset_id")
+  asset       Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  usageDate   DateTime @map("usage_date")
+  units       Float    // sản lượng trong kỳ (vd số shot/lượt/giờ chạy)
+  note        String?
+  createdById String   @map("created_by_id")
+  createdBy   User     @relation("DepUsageBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([assetId])
+  @@map("depreciation_usages")
 }

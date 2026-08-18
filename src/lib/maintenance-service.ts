@@ -18,6 +18,7 @@ const CLEAR_ORDER = [
   "handpiece",
   "assetAttachment",
   "assetPayment",
+  "depreciationUsage",
   "asset",
   "serviceStockItem",
   "serviceUsage",

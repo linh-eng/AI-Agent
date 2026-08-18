@@ -50,6 +50,7 @@ export const POST = handle(async (req) => {
       depreciationStart: parseDate(input.depreciationStart),
       depreciationMonths: input.depreciationMonths ?? null,
       depreciationMethod: input.depreciationMethod ?? null,
+      depreciationTotalUnits: input.depreciationTotalUnits ?? null,
       warrantyVendor: input.warrantyVendor,
       warrantyMonths: input.warrantyMonths ?? null,
       maintenanceCycleMonths: input.maintenanceCycleMonths ?? null,

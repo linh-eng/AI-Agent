@@ -38,7 +38,8 @@ interface Asset {
   salvageValue?: number | null;
   depreciationStart?: string | null;
   depreciationMonths?: number | null;
-  depreciationMethod?: "STRAIGHT_LINE" | "DECLINING" | null;
+  depreciationMethod?: "STRAIGHT_LINE" | "DECLINING" | "UNITS" | null;
+  depreciationTotalUnits?: number | null;
   warrantyVendor?: string | null;
   warrantyMonths?: number | null;
   maintenanceCycleMonths?: number | null;
@@ -70,6 +71,7 @@ const EMPTY_FORM = {
   depreciationStart: "",
   depreciationMonths: "",
   depreciationMethod: "STRAIGHT_LINE",
+  depreciationTotalUnits: "",
   // (b) bảo hành/bảo trì
   warrantyVendor: "",
   warrantyMonths: "",
@@ -131,6 +133,7 @@ export default function AssetsPage() {
       depreciationStart: a.depreciationStart ? a.depreciationStart.slice(0, 10) : "",
       depreciationMonths: a.depreciationMonths != null ? String(a.depreciationMonths) : "",
       depreciationMethod: a.depreciationMethod ?? "STRAIGHT_LINE",
+      depreciationTotalUnits: a.depreciationTotalUnits != null ? String(a.depreciationTotalUnits) : "",
       warrantyVendor: a.warrantyVendor ?? "",
       warrantyMonths: a.warrantyMonths != null ? String(a.warrantyMonths) : "",
       maintenanceCycleMonths: a.maintenanceCycleMonths != null ? String(a.maintenanceCycleMonths) : "",
@@ -153,6 +156,7 @@ export default function AssetsPage() {
       depreciationStart: form.depreciationStart || null,
       depreciationMonths: form.depreciationMonths ? Number(form.depreciationMonths) : null,
       depreciationMethod: form.depreciationMethod || null,
+      depreciationTotalUnits: num(form.depreciationTotalUnits),
       warrantyVendor: form.warrantyVendor || null,
       warrantyMonths: form.warrantyMonths ? Number(form.warrantyMonths) : null,
       maintenanceCycleMonths: form.maintenanceCycleMonths ? Number(form.maintenanceCycleMonths) : null,
@@ -391,17 +395,44 @@ export default function AssetsPage() {
                 <Select value={form.depreciationMethod} onChange={(e) => setForm({ ...form, depreciationMethod: e.target.value })}>
                   <option value="STRAIGHT_LINE">Đường thẳng</option>
                   <option value="DECLINING">Số dư giảm dần</option>
+                  <option value="UNITS">Theo sản lượng</option>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>Bắt đầu khấu hao</Label>
-                <Input type="date" value={form.depreciationStart} onChange={(e) => setForm({ ...form, depreciationStart: e.target.value })} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Thời gian (tháng)</Label>
-                <Input type="number" min="1" value={form.depreciationMonths} onChange={(e) => setForm({ ...form, depreciationMonths: e.target.value })} />
-              </div>
+              {form.depreciationMethod !== "UNITS" ? (
+                <>
+                  <div className="space-y-1.5">
+                    <Label>Bắt đầu khấu hao</Label>
+                    <Input type="date" value={form.depreciationStart} onChange={(e) => setForm({ ...form, depreciationStart: e.target.value })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Thời gian (tháng)</Label>
+                    <Input type="number" min="1" value={form.depreciationMonths} onChange={(e) => setForm({ ...form, depreciationMonths: e.target.value })} />
+                    {form.depreciationMonths && Number(form.depreciationMonths) > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        ≈ {Math.floor(Number(form.depreciationMonths) / 12)} năm {Number(form.depreciationMonths) % 12} tháng
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    <Label>Bắt đầu khấu hao</Label>
+                    <Input type="date" value={form.depreciationStart} onChange={(e) => setForm({ ...form, depreciationStart: e.target.value })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Tổng sản lượng ước tính *</Label>
+                    <Input type="number" min="1" step="any" placeholder="VD: 500000 shot" value={form.depreciationTotalUnits} onChange={(e) => setForm({ ...form, depreciationTotalUnits: e.target.value })} />
+                  </div>
+                </>
+              )}
             </div>
+            {form.depreciationMethod === "UNITS" && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Khấu hao theo sản lượng: hệ thống tính theo sản lượng thực tế ghi nhận (số shot/lượt/giờ chạy)
+                so với tổng sản lượng ước tính. Ghi nhận sản lượng ở trang chi tiết tài sản.
+              </p>
+            )}
           </div>
 
           {/* (b) Bảo hành / bảo trì định kỳ */}

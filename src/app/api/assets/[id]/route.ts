@@ -24,6 +24,10 @@ export const GET = handle(async (_req, ctx) => {
         include: { createdBy: { select: { name: true } } },
         orderBy: { performedAt: "desc" },
       },
+      depreciationUsages: {
+        include: { createdBy: { select: { name: true } } },
+        orderBy: { usageDate: "asc" },
+      },
       payments: {
         include: {
           createdBy: { select: { name: true } },
@@ -63,6 +67,7 @@ export const PATCH = handle(async (req, ctx) => {
       ...(input.depreciationStart !== undefined ? { depreciationStart: parseDate(input.depreciationStart) } : {}),
       ...(input.depreciationMonths !== undefined ? { depreciationMonths: input.depreciationMonths } : {}),
       ...(input.depreciationMethod !== undefined ? { depreciationMethod: input.depreciationMethod } : {}),
+      ...(input.depreciationTotalUnits !== undefined ? { depreciationTotalUnits: input.depreciationTotalUnits } : {}),
       ...(input.warrantyVendor !== undefined ? { warrantyVendor: input.warrantyVendor } : {}),
       ...(input.warrantyMonths !== undefined ? { warrantyMonths: input.warrantyMonths } : {}),
       ...(input.maintenanceCycleMonths !== undefined ? { maintenanceCycleMonths: input.maintenanceCycleMonths } : {}),

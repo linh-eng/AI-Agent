@@ -37,6 +37,7 @@ const MODEL_ORDER = [
   "asset",
   "assetPayment",
   "assetAttachment",
+  "depreciationUsage",
   "handpiece",
   "shotLog",
   "stockCount",
