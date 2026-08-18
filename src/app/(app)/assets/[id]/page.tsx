@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Wrench, TrendingDown, CreditCard, Paperclip, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Plus, Wrench, TrendingDown, CreditCard, Paperclip, Trash2, Upload, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -218,6 +218,14 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     if (!confirm("Xóa đợt thanh toán này?")) return;
     await apiFetch(`/api/assets/${params.id}/payments/${pid}`, { method: "DELETE" });
     load();
+  }
+  async function uploadToPayment(paymentId: string, file: File) {
+    try {
+      await uploadFile(file, "PAYMENT_ORDER", paymentId);
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Lỗi tải file");
+    }
   }
   async function onUploadAsset(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -500,6 +508,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
       {(() => {
         const paid = data.payments.reduce((s, p) => s + p.amount, 0);
         const owed = (data.contractValue ?? 0) - paid;
+        const payPct = data.contractValue && data.contractValue > 0 ? Math.min(100, Math.round((paid / data.contractValue) * 100)) : 0;
         return (
           <>
             <div className="mb-2 flex items-center justify-between">
@@ -528,6 +537,19 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                   <Info label="Số đợt đã trả" value={String(data.payments.length)} />
                 </div>
 
+                {/* Tiến độ thanh toán */}
+                {data.contractValue != null && data.contractValue > 0 && (
+                  <div className="mb-4">
+                    <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                      <span>Tiến độ thanh toán</span>
+                      <span>{payPct}%</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div className={`h-full ${payPct >= 100 ? "bg-emerald-500" : "bg-primary"}`} style={{ width: `${payPct}%` }} />
+                    </div>
+                  </div>
+                )}
+
                 {/* Đợt thanh toán */}
                 <div className="overflow-x-auto">
                   <Table>
@@ -552,22 +574,35 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                         data.payments.map((p) => (
                           <TR key={p.id}>
                             <TD>{formatDate(p.paidDate)}</TD>
-                            <TD className="text-right font-medium">{formatNumber(p.amount)} đ</TD>
+                            <TD className="text-right font-medium">
+                              {formatNumber(p.amount)} đ
+                              {p.note && <div className="text-xs font-normal text-muted-foreground">{p.note}</div>}
+                            </TD>
                             <TD>{METHOD_LABEL[p.method] ?? p.method}</TD>
                             <TD className="text-muted-foreground">{p.bankInfo ?? "—"}</TD>
                             <TD>{PAYER_LABEL[p.payerType] ?? p.payerType}</TD>
                             <TD>
-                              {p.attachments.length === 0 ? (
-                                <span className="text-muted-foreground">—</span>
-                              ) : (
-                                <div className="flex flex-wrap gap-1">
-                                  {p.attachments.map((a) => (
-                                    <a key={a.id} href={`/api/assets/${params.id}/attachments/${a.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                              <div className="flex flex-col gap-1">
+                                {p.attachments.map((a) => (
+                                  <span key={a.id} className="inline-flex items-center gap-1">
+                                    <a href={`/api/assets/${params.id}/attachments/${a.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
                                       <Paperclip className="h-3 w-3" />{KIND_LABEL[a.kind] ?? a.filename}
                                     </a>
-                                  ))}
-                                </div>
-                              )}
+                                    {canManage && (
+                                      <button onClick={() => delAttachment(a.id)} className="text-destructive" title="Xóa file">
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    )}
+                                  </span>
+                                ))}
+                                {p.attachments.length === 0 && <span className="text-muted-foreground">—</span>}
+                                {canManage && (
+                                  <label className="mt-0.5 inline-flex w-fit cursor-pointer items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                                    <Plus className="h-3 w-3" /> Thêm file
+                                    <input type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadToPayment(p.id, f); }} />
+                                  </label>
+                                )}
+                              </div>
                             </TD>
                             <TD className="text-muted-foreground">{p.createdBy.name}</TD>
                             {canManage && (

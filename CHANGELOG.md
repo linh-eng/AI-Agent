@@ -3,6 +3,14 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.8.2 — 2026-08-18
+- **Thanh toán & Công nợ (rà soát bổ sung):**
+  - Thêm **thanh tiến độ thanh toán** (% đã trả trên tổng hợp đồng).
+  - **File đính kèm theo từng đợt**: mỗi đợt thanh toán có thể **thêm nhiều file** (ủy nhiệm chi…)
+    và **xóa từng file** riêng, không chỉ 1 file lúc tạo.
+  - Hiển thị **ghi chú** của mỗi đợt thanh toán.
+- Chỉ sửa giao diện — không cần `prisma:push`.
+
 ## 1.8.1 — 2026-08-18
 - **Bảo hành – Bảo trì (rà soát bổ sung):**
   - Hiển thị **Thời gian bảo hành** + **tự tính Ngày hết hạn bảo hành** = ngày mua + thời gian BH
