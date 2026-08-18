@@ -38,6 +38,11 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
   Sắp-Hết HSD; cho điều chỉnh còn lại/đánh dấu hết/xóa. Là sổ theo dõi overlay, không đổi sổ tồn kho chính.
 - **Tài sản/thiết bị (Phase 2):** `Asset` theo serial, trạng thái (IN_STOCK/IN_USE/MAINTENANCE/RETIRED),
   ngày mua & hạn bảo hành — quản lý riêng, không nằm trong tồn theo lô.
+- **Báo cáo tài sản (nhóm "Quản lý tài sản"):** 3 trang tổng hợp theo nhiều tài sản + theo thời gian
+  (nhập liệu vẫn ở trang chi tiết tài sản, đây là lớp báo cáo đọc dữ liệu qua `src/lib/asset-reports.ts`):
+  **Khấu hao** `/asset-depreciation` (bảng từng tài sản + bảng khấu hao theo năm gộp toàn danh mục, chọn
+  mốc "tính đến ngày", CSV), **Lịch bảo trì** `/asset-maintenance` (bảo trì gần nhất/kế tiếp/trạng thái đến
+  hạn theo `maintenanceCycleMonths`, CSV), **Công nợ** `/asset-debts` (hợp đồng/đã trả/còn nợ/tiến độ, CSV).
 - **Tay cầm / vật tư theo máy (đếm shot):** `Handpiece` gắn với 1 máy (`Asset` tùy chọn hoặc tên máy),
   có định mức shot tối đa (`maxShots`) + số shot đã dùng (`usedShots`) + ngưỡng cảnh báo (`warnShots`).
   Ghi nhận số shot đã bắn (`ShotLog`) cộng dồn `usedShots`; cảnh báo khi shot còn lại ≤ `warnShots` để thay tay cầm.

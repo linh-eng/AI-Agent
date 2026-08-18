@@ -21,6 +21,9 @@ import {
   FlaskConical,
   Cpu,
   Zap,
+  TrendingDown,
+  Wrench,
+  CreditCard,
   BarChart3,
   Users,
   Settings,
@@ -54,12 +57,20 @@ const NAV = [
     ],
   },
   {
-    section: "Dịch vụ & Thiết bị",
+    section: "Dịch vụ",
     items: [
       { href: "/services", label: "Liệu trình dịch vụ", icon: HeartPulse },
       { href: "/service-usage", label: "Ghi nhận dịch vụ", icon: ClipboardList },
       { href: "/service-stock", label: "Kho Dịch Vụ", icon: FlaskConical },
+    ],
+  },
+  {
+    section: "Quản lý tài sản",
+    items: [
       { href: "/assets", label: "Tài sản / Thiết bị", icon: Cpu },
+      { href: "/asset-depreciation", label: "Khấu hao", icon: TrendingDown },
+      { href: "/asset-maintenance", label: "Lịch bảo trì", icon: Wrench },
+      { href: "/asset-debts", label: "Công nợ", icon: CreditCard },
       { href: "/handpieces", label: "Tay cầm / Shot", icon: Zap },
     ],
   },

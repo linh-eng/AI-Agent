@@ -3,6 +3,21 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.9.0 — 2026-08-18
+- **Phân hệ "Quản lý tài sản"** (nhóm menu mới) — 3 trang báo cáo tổng hợp theo nhiều tài sản
+  & theo thời gian, đọc từ dữ liệu sẵn có (nhập liệu vẫn ở trang chi tiết tài sản):
+  - **Khấu hao** (`/asset-depreciation`): bảng chi tiết từng tài sản (nguyên giá / đã khấu hao
+    lũy kế / còn lại / % / khấu hao xong) + **bảng quá trình khấu hao theo năm gộp toàn danh mục**;
+    chọn mốc "tính đến ngày"; **xuất CSV**.
+  - **Lịch bảo trì** (`/asset-maintenance`): bảng theo dõi bảo trì định kỳ toàn bộ thiết bị —
+    lần gần nhất, kế tiếp, số ngày tới hạn, trạng thái (Quá hạn / Đến hạn / Bình thường);
+    thẻ tổng hợp số lượng; **xuất CSV**.
+  - **Công nợ tài sản** (`/asset-debts`): tổng hợp đồng / đã thanh toán / còn công nợ / tiến độ
+    theo từng tài sản + dòng tổng cộng; **xuất CSV**.
+- Menu cũ "Dịch vụ & Thiết bị" tách thành **"Dịch vụ"** và **"Quản lý tài sản"** (gộp Tài sản/Thiết bị,
+  Khấu hao, Lịch bảo trì, Công nợ, Tay cầm/Shot).
+- Chỉ thêm giao diện + API đọc — **không đổi database, không thêm quyền**. Cập nhật chỉ cần giải nén đè.
+
 ## 1.8.2 — 2026-08-18
 - **Thanh toán & Công nợ (rà soát bổ sung):**
   - Thêm **thanh tiến độ thanh toán** (% đã trả trên tổng hợp đồng).

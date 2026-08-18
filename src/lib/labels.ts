@@ -83,3 +83,30 @@ export const MAINTENANCE_TYPE_TONE: Record<string, Tone> = {
   REPAIR: "danger",
   INSPECTION: "muted",
 };
+
+// ----- Phương pháp khấu hao -----
+export const DEP_METHOD_LABEL: Record<string, string> = {
+  STRAIGHT_LINE: "Đường thẳng",
+  DECLINING: "Số dư giảm dần",
+  UNITS: "Theo sản lượng",
+};
+
+// ----- Hình thức quản lý công nợ tài sản -----
+export const ASSET_MANAGE_LABEL: Record<string, string> = {
+  DEBT: "Theo công nợ",
+  INVOICE: "Theo hóa đơn",
+  CONTRACT: "Theo hợp đồng",
+};
+
+// ----- Trạng thái lịch bảo trì -----
+export const MAINT_STATUS_LABEL: Record<string, string> = {
+  overdue: "Quá hạn",
+  due: "Đến hạn",
+  ok: "Bình thường",
+};
+
+export const MAINT_STATUS_TONE: Record<string, Tone> = {
+  overdue: "danger",
+  due: "warning",
+  ok: "success",
+};
