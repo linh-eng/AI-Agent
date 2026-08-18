@@ -1060,6 +1060,42 @@ async function main() {
     console.log("   ⚠️  Bỏ qua KPI demo:", (e as Error).message);
   }
 
+  // HR-PH5 — Lương thưởng demo: chính sách CP-000001 (COMPANY) PUBLISHED + sinh
+  // sự kiện thu nhập từ FACT (contribution + tiền thực thu). KHÔNG tính bảng lương.
+  try {
+    const existing = await prisma.compensationPolicy.findFirst({ where: { code: "CP-000001" } });
+    if (!existing) {
+      const { publishPolicyVersion, generateTreatmentIncentivesForSession, generateSalesCommissionForPayment } = await import("../src/lib/compensation");
+      const seedSession = { userId: null, name: "seed-demo", email: null, permissions: [], roles: [] } as any;
+      const policy = await prisma.compensationPolicy.create({
+        data: {
+          code: "CP-000001", name: "Chính sách lương thưởng chuẩn (công ty)", scopeType: "COMPANY", status: "ACTIVE", createdBy: "seed-demo",
+          versions: { create: { version: 1, effectiveFrom: new Date("2024-01-01T00:00:00Z"), status: "DRAFT", createdBy: "seed-demo" } },
+        },
+        include: { versions: true },
+      });
+      const vId = policy.versions[0].id;
+      await prisma.treatmentIncentiveRule.createMany({ data: [
+        { policyVersionId: vId, code: "TI-PRIMARY", contributionTypeCode: "PRIMARY_OPERATOR", basisType: "FIXED_PER_CONTRIBUTION", fixedAmount: 150_000 as any, weightMode: "IGNORE_WEIGHT" },
+        { policyVersionId: vId, code: "TI-MASTER", contributionTypeCode: "MASTER_SUPERVISION", basisType: "FIXED_PER_CONTRIBUTION", fixedAmount: 50_000 as any, weightMode: "IGNORE_WEIGHT" },
+      ] });
+      await prisma.commissionRule.create({ data: { policyVersionId: vId, code: "SC-CLOSER", basisType: "COLLECTED_CASH", targetType: "ALL", ratePercent: 3 as any, attributionRole: "CLOSER" } });
+      await publishPolicyVersion(seedSession, vId);
+
+      // Attribution CLOSER cho nvKTV trên hóa đơn của KH-100004 (nguồn tiền PT-000001 gắn hóa đơn này).
+      await prisma.salesAttribution.create({ data: { employeeId: nvKTV.id, sourceType: "INVOICE", sourceId: invLinh.id, attributionRole: "CLOSER", weight: 1 as any, employeeNameSnapshot: nvKTV.fullName, roleSnapshot: nvKTV.title, status: "ACTIVE", createdBy: "seed-demo" } });
+
+      // Sinh event: thưởng dịch vụ buổi SS-100001 + hoa hồng phiếu thu PT-000001.
+      const ti = await generateTreatmentIncentivesForSession(seedSession, sLinh1.id);
+      const pt1 = await prisma.payment.findFirst({ where: { code: "PT-000001" } });
+      let sc = { created: 0 };
+      if (pt1) sc = await generateSalesCommissionForPayment(seedSession, pt1.id);
+      console.log(`   Lương thưởng demo: CP-000001 PUBLISHED — thưởng dịch vụ ${ti.created} event (KTV 150k + Master 50k), hoa hồng ${sc.created} event (3%×5tr = 150k CLOSER).`);
+    }
+  } catch (e) {
+    console.log("   ⚠️  Bỏ qua Lương thưởng demo:", (e as Error).message);
+  }
+
   console.log("   Vật tư demo: JetPeel 100ml (còn 82ml), Vật tư khách hàng 10đv (còn 5).");
   console.log("✅ Seed DEMO hoàn tất: 7 khách (KH-100001..007), brand Klapp, CN RF/HIFU,");
   console.log("   protocol DEMO có version, kho vật tư spa, 2 chiến dịch, báo giá 3 phương án.");

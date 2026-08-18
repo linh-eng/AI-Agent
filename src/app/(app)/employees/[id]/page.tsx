@@ -20,6 +20,7 @@ const TABS = [
   { k: "sched", label: "E. Lịch làm việc" }, { k: "leave", label: "F. Nghỉ phép" },
   { k: "kpi", label: "G. Hoạt động & Đánh giá" },
   { k: "contrib", label: "H. Đóng góp chuyên môn" },
+  { k: "comp", label: "I. Thu nhập (thưởng/hoa hồng)" },
 ];
 
 export default function EmployeeDetailPage() {
@@ -186,7 +187,30 @@ export default function EmployeeDetailPage() {
       )}
 
       {tab === "contrib" && <ContributionTab employeeId={id} />}
+      {tab === "comp" && <CompensationTab employeeId={id} />}
     </div>
+  );
+}
+
+// HR-PH5 — Sự kiện thu nhập của nhân sự (read-only). KHÔNG phải bảng lương (HR-PH6).
+function CompensationTab({ employeeId }: { employeeId: string }) {
+  const [rows, setRows] = useState<any[]>([]);
+  const EVT: Record<string, string> = { SALES_COMMISSION: "Hoa hồng bán", TREATMENT_INCENTIVE: "Thưởng dịch vụ", KPI_BONUS: "Thưởng KPI", REVERSAL: "Hoàn tác", ADJUSTMENT: "Điều chỉnh" };
+  useEffect(() => { apiFetch<any[]>(`/api/compensation-events?employeeId=${employeeId}`).then(setRows).catch(() => setRows([])); }, [employeeId]);
+  const net = rows.reduce((s, r) => s + Number(r.amount), 0);
+  return (
+    <Card><CardContent className="p-0">
+      <div className="overflow-x-auto"><table className="w-full text-sm">
+        <thead><tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground"><th className="px-3 py-2">Ngày</th><th className="px-3 py-2">Loại</th><th className="px-3 py-2 text-right">Số tiền</th><th className="px-3 py-2">Trạng thái</th><th className="px-3 py-2">Vì sao</th></tr></thead>
+        <tbody>{rows.length === 0 ? <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">Chưa có sự kiện thu nhập.</td></tr> :
+          rows.map((r) => <tr key={r.id} className={`border-b last:border-0 ${r.status === "REVERSED" || r.eventType === "REVERSAL" ? "text-muted-foreground" : ""}`}>
+            <td className="px-3 py-2">{formatDate(r.eventDate)}</td><td className="px-3 py-2">{EVT[r.eventType] ?? r.eventType}</td>
+            <td className={`px-3 py-2 text-right font-medium ${Number(r.amount) < 0 ? "text-red-600" : ""}`}>{formatCurrency(Number(r.amount))}</td>
+            <td className="px-3 py-2">{r.status}</td><td className="px-3 py-2 text-xs text-muted-foreground">{r.calculationSnapshot?.why ?? ""}</td>
+          </tr>)}</tbody>
+      </table></div>
+      <div className="flex items-center justify-between px-3 py-2 text-xs text-muted-foreground"><span>Bằng chứng thu nhập (append-only) — chưa gộp kỳ lương (HR-PH6).</span><span className="font-medium">Tạm tính (net): {formatCurrency(net)}</span></div>
+    </CardContent></Card>
   );
 }
 

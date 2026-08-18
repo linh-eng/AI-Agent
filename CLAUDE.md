@@ -2755,3 +2755,100 @@ Commission/incentive (diễn giải KPI→tiền) · PayrollPeriod/earning lines
 + sales KPI · aggregate performance score (weighted, cần công thức tường minh) · KpiRule PUBLISHED chuyển snapshot
 → bonus (payroll-private) · KPI reopen workflow (hiện LOCKED = cuối) · review FK backfill có xác nhận · branch-scoped
 RBAC (hiện org-wide) · self-service UI nhập/khiếu nại KPI.
+
+## HR-PH5: COMPENSATION POLICY + SALES ATTRIBUTION + COMMISSION + INCENTIVE + KPI BONUS (v0.34.0)
+
+Tạo **BẰNG CHỨNG thu nhập** (append-only ledger) từ FACT đáng tin — KHÔNG tính PayrollPeriod/payslip/thuế/
+BHXH/thanh toán (HR-PH6+). Thuần **additive, 0 DROP**. Migration **`Ze_hr_compensation`** (7 model + enums;
+tổng **41 migration**). **537 test / 53 file PASS** (506 + `test/hr-compensation.test.ts` 31). tsc sạch · lint
+0 lỗi · build OK · fresh deploy 41 migration + seed + seed:demo sạch.
+
+### 10 quyết định owner (đã duyệt) đã tuân thủ
+HYBRID comp · sales commission = **TIỀN THỰC THU** · treatment incentive = fixed Service/Role + contribution
+weight · multi-staff explicit role+weight · package HYBRID (fixed primary) · precedence Company→Branch→Role→
+Employee · KPI performance-only trừ khi PUBLISHED rule · correction = reversal/append-only · self-view own only ·
+**EmployeeRoleFee GIỮ costing-only**.
+
+### Audit nguồn (đã xác nhận bằng code)
+- **Tiền thực thu** = `Payment(voidedAt null) + Deposit(status ALLOCATED)` (khớp `invoicePaidAmount` hiện có).
+- **Treatment incentive** = `SessionStaffContribution` HIỆU LỰC (`entryKind=CONTRIBUTION AND status=ACTIVE`).
+- **KPI bonus** = `EmployeeKpiSnapshot` đã KHÓA + VERIFIED (mặc định).
+- **KHÔNG có phân bổ doanh thu theo cấu phần gói** → `PERCENT_ALLOCATED_REVENUE` **DEFER** (báo limitation).
+
+### Migration & schema (`Ze_hr_compensation`)
+7 model: **`CompensationPolicy`** (scope COMPANY/BRANCH/ROLE/EMPLOYEE + currentVersionId) · **`CompensationPolicyVersion`**
+(DRAFT→PUBLISHED→SUPERSEDED + sourceSnapshot bất biến) · **`CommissionRule`** (COLLECTED_CASH/targetType/rate/
+attributionRole) · **`TreatmentIncentiveRule`** (service/category/contributionType/role · FIXED_PER_SERVICE/
+FIXED_PER_CONTRIBUTION/PER_MINUTE · weightMode) · **`KpiBonusRule`** (kpiDef/comparator/threshold/tier/requireVerified)
+· **`SalesAttribution`** (FK nhân sự tường minh · @@unique[employee,sourceType,sourceId,role]) · **`CompensationEvent`**
+(append-only ledger · idempotencyKey @unique · reversalOfId · calculationSnapshot). 13 enum. Back-relation
+Employee `salesAttributions`/`compensationEvents`.
+
+### Engine — `src/lib/compensation.ts` (deterministic · idempotent · reversal-aware)
+- **`publishPolicyVersion`** — §4 xung đột precedence (cùng scope key + PUBLISHED + khoảng hiệu lực GIAO NHAU →
+  **409**, không tự chọn); đông cứng `sourceSnapshot`; supersede version cũ; set currentVersionId. **DRAFT không
+  sinh tiền.**
+- **`resolvePolicyForEmployee`** — precedence EMPLOYEE>ROLE>BRANCH>COMPANY (hiệu lực theo ngày); ambiguity cùng
+  độ cụ thể → **409**.
+- **`generateTreatmentIncentivesForSession`** — mỗi contribution ACTIVE → resolve policy + match rule (đặc thù
+  service/category/type/role, priority; tie→409) → FIXED/PER_MINUTE (+minimumMinutes/maxAmount); weight CHỈ khi
+  `APPLY_CONTRIBUTION_WEIGHT`; idempotent `TI:{contrib}:{rule}`. Contribution REVERSED → tự tạo **REVERSAL** (§Z).
+- **`generateSalesCommissionForPayment/Deposit`** — nguồn tiền thực thu; attribution INVOICE→fallback CUSTOMER;
+  rate%×basis×weight (+fixed); ngưỡng min/max; idempotent `SC:{src}:{id}:{emp}:{rule}`. **Void payment → reverse**.
+- **`generateKpiBonusesForPeriod`** — kỳ LOCKED; snapshot VERIFIED (LEGACY/INSUFFICIENT loại nếu requireVerified);
+  comparator/threshold/tier (bậc cao thắng); idempotent `KB:{snap}:{rule}`.
+- **`reverseCompensationEvent`** — bút toán bù (amount âm net 0), giữ gốc→REVERSED, chặn 2 lần/không reverse
+  REVERSAL, lý do bắt buộc. **KHÔNG hard-delete.**
+
+### API (reuse RBAC — KHÔNG thêm permission)
+`/api/compensation-policies`(+`[id]`) · `/api/compensation-policy-versions`(+`[id]/publish`) · `/api/commission-rules`
+· `/api/treatment-incentive-rules` · `/api/kpi-bonus-rules` · `/api/sales-attributions`(+`[id]` void) ·
+`/api/compensation-events`(self-scope) · `/api/compensation-events/[id]/reverse` · `/api/compensation/generate`
+(action tường minh: incentive/commission/kpi). Audit `COMPENSATION_POLICY_*`/`SALES_ATTRIBUTION_*`/
+`COMPENSATION_EVENT_CREATED|REVERSED`.
+- **RBAC (§29):** đọc org = `compensationPolicy.read` HOẶC `commission.read` (MANAGER/BOD) · quản lý (policy/rule/
+  attribution/generate/reverse) = `compensationPolicy.write` (MANAGER) · **self-view = FK `Employee.userId`**.
+  **KHÔNG dùng `finance.read`**; `payroll.*` TÁCH BIỆT (payroll.read đơn lẻ KHÔNG mở compensation).
+
+### UI
+- Workspace **`/compensation`** (Vận hành & Hệ thống, `compensationPolicy.read`): 3 tab **Chính sách** (tạo/version/
+  thêm rule/**Phát hành**) · **Attribution bán hàng** (gán FK theo nguồn) · **Sự kiện thu nhập** (sinh event tường
+  minh · lọc · **Hoàn tác** · cột "Vì sao" giải thích). Nav item "Lương thưởng".
+- **Hồ sơ nhân sự tab I** "Thu nhập (thưởng/hoa hồng)" — sự kiện của nhân sự (read-only) + tạm tính net. KHÔNG
+  hiển thị bảng lương.
+
+### Giải thích (explainability §26)
+Mỗi event có `calculationSnapshot`: why + policy/version + rule + basis + rate/fixed + weight + nguồn id → tái
+lập vì sao ra số tiền. Self-view + workspace hiển thị "Vì sao".
+
+### CSV (§35) — `docs/COMPENSATION_CSV.md`
+`compensation_policies`/`commission_rules`/`treatment_incentive_rules`/`kpi_bonus_rules`/`sales_attribution`
+(config/master; attribution chỉ FK, KHÔNG backfill tên). **KHÔNG** import `compensation_events`.
+
+### Chứng minh (test/hr-compensation.test.ts, 31 test → A–AS)
+Policy A–G (publish bất biến · supersede · **E precedence Company→…→Employee** · **F xung đột 409** · **G DRAFT
+không sinh tiền**) · Attribution H–M (FK tường minh · weight · **L legacy không tự attribute** · M sai→422) ·
+Commission N–U (**N tiền thực thu×%** · O/P từng phần+bổ sung · **Q void→reversal net 0** · **R cọc ALLOCATED** ·
+S idempotency · **T weight allocation** · U snapshot) · Incentive V–AC (fixed · per-minute · **X weight chỉ khi
+policy** · Y multi-staff · **Z/AA contribution reversal→comp reversal + correction** · **AB/AC Booking &
+EmployeeRoleFee KHÔNG dùng**) · Package AD–AF (**AD fixed không đổi theo chiết khấu gói** · **AE PERCENT_ALLOCATED
+deferred** · AF item gói resolve đúng) · KPI AG–AL (**AG locked+VERIFIED** · **AH chưa khóa→409** · **AI
+LEGACY loại** · AJ tier · AK idempotency · AL snapshot nguồn) · RBAC/Self AM–AS (self own · **AO finance/payroll
+đơn lẻ→403** · AP read≠write · AQ commission.read · AR union). Full regression **537/53** không regression.
+
+### Demo (seed:demo) — CP-000001 PUBLISHED
+Chính sách công ty: incentive PRIMARY 150k + MASTER 50k, commission 3% CLOSER. Sinh: buổi SS-100001 → **thưởng
+dịch vụ KTV 150k + Master 50k**; phiếu thu PT-000001 (5tr) → **hoa hồng 150k** (CLOSER nvKTV, attribution INVOICE).
+
+### CONFLICTS: KHÔNG CÓ
+Không redefine EmployeeRoleFee (costing-only) · không dùng attribution tên tự do làm sự thật · sales commission
+= tiền thực thu (KHÔNG dùng giá báo giá/nghĩa vụ hóa đơn) · không hard-delete event (reversal) · không tính
+PayrollPeriod · không đổi nghĩa Invoice/Payment · KHÔNG dùng `finance.read` cho privacy lương/hoa hồng · không
+đổi KPI snapshot đã khóa. Additive 0 DROP. Baseline HR-PH1/2/3/4 + KPI lock + Costing/Pricing + Booking + IA/RBAC
+(Mục 15) bất biến.
+
+### Deferred HR-PH6+
+PayrollPeriod/PayrollEmployeeSummary/payslip · thuế PIT/BHXH · thanh toán lương thật · accounting posting ·
+allocation doanh thu gói → per-component (mở PERCENT_ALLOCATED_REVENUE) · loyalty/voucher/prepaid engine (mới
+tách khái niệm) · attribution write points tự động ở workflow thương mại (hiện thủ công/API) · team bonus/
+allowance/deduction rule families.

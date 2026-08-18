@@ -2781,6 +2781,8 @@ model Employee {
   contributions      SessionStaffContribution[] // HR-PH3
   kpiSnapshots       EmployeeKpiSnapshot[] // HR-PH4
   reviews            SessionReview[] // HR-PH4 (FK bổ sung, snapshot technicianName giữ nguyên)
+  salesAttributions  SalesAttribution[] // HR-PH5
+  compensationEvents CompensationEvent[] // HR-PH5
   branchRef          Branch?                    @relation(fields: [branchId], references: [id]) // KHÔNG đổi tên field `branch`
   user               User?                      @relation(fields: [userId], references: [id])
 
@@ -3847,4 +3849,301 @@ model KpiTarget {
 
   @@index([kpiDefinitionId])
   @@map("kpi_targets")
+}
+
+// =============================================================================
+// HR-PH5 — COMPENSATION POLICY + SALES ATTRIBUTION + COMMISSION + TREATMENT
+// INCENTIVE + KPI BONUS (v0.34.0)
+// -----------------------------------------------------------------------------
+// Tạo BẰNG CHỨNG thu nhập (payroll-ready) nhưng KHÔNG ràng buộc kỳ lương. KHÔNG
+// tính PayrollPeriod/payslip/thuế/BHXH/thanh toán thật (HR-PH6+). Nguyên tắc:
+//  * EmployeeRoleFee GIỮ costing-only (KHÔNG dùng làm incentive).
+//  * Sales commission mặc định = TIỀN THỰC THU (Payment chưa hủy + Deposit đã
+//    phân bổ) — KHÔNG dùng nghĩa vụ hóa đơn/giá báo giá làm tiền thu.
+//  * Treatment incentive = từ SessionStaffContribution HIỆU LỰC (không từ Booking
+//    / staff dự kiến / giá retail đơn thuần).
+//  * KPI bonus CHỈ từ EmployeeKpiSnapshot đã KHÓA + VERIFIED (mặc định).
+//  * Chỉ version PUBLISHED sinh tiền. Append-only + reversal (không hard-delete).
+//  * SalesAttribution = FK nhân sự tường minh (KHÔNG backfill theo tên tự do).
+// =============================================================================
+
+enum CompScopeType {
+  COMPANY
+  BRANCH
+  ROLE
+  EMPLOYEE
+}
+
+enum CompVersionStatus {
+  DRAFT
+  PUBLISHED
+  SUPERSEDED
+}
+
+enum CommissionBasisType {
+  COLLECTED_CASH // mặc định (tiền thực thu)
+  INVOICE_NET
+  FIXED
+  OTHER
+}
+
+enum CompTargetType {
+  ALL
+  SERVICE
+  SERVICE_CATEGORY
+  PROTOCOL_PACKAGE
+  BRAND
+  CAMPAIGN
+}
+
+enum IncentiveBasisType {
+  FIXED_PER_SERVICE
+  FIXED_PER_CONTRIBUTION
+  PER_MINUTE
+  PERCENT_ALLOCATED_REVENUE // DEFER: chưa có phân bổ doanh thu theo cấu phần
+}
+
+enum IncentiveWeightMode {
+  IGNORE_WEIGHT
+  APPLY_CONTRIBUTION_WEIGHT
+}
+
+enum KpiBonusComparator {
+  GTE
+  GT
+  LTE
+  LT
+  EQ
+}
+
+enum KpiBonusType {
+  FIXED
+  RATE
+}
+
+enum AttributionRole {
+  ORIGINATOR
+  BOOKER
+  CONSULTANT
+  CLOSER
+  ACCOUNT_OWNER
+  COLLECTOR
+}
+
+enum AttributionStatus {
+  ACTIVE
+  VOID
+}
+
+enum CompSourceType {
+  CUSTOMER
+  BOOKING
+  PROPOSAL
+  INVOICE
+  PAYMENT
+  DEPOSIT
+  SESSION_CONTRIBUTION
+  KPI_SNAPSHOT
+}
+
+enum CompEventType {
+  SALES_COMMISSION
+  TREATMENT_INCENTIVE
+  KPI_BONUS
+  REVERSAL
+  ADJUSTMENT
+}
+
+enum CompEventStatus {
+  PENDING
+  ELIGIBLE
+  REVERSED
+  EXCLUDED
+}
+
+/// Chính sách lương thưởng — có VERSION. scope theo Company/Branch/Role/Employee.
+model CompensationPolicy {
+  id               String        @id @default(cuid())
+  code             String        @unique
+  name             String
+  scopeType        CompScopeType @default(COMPANY)
+  branchId         String? // scope BRANCH
+  roleCode         String? // scope ROLE
+  employeeId       String? // scope EMPLOYEE (override)
+  status           String        @default("ACTIVE") // ACTIVE | ARCHIVED
+  currentVersionId String? // version PUBLISHED hiện hành
+  note             String?
+  createdBy        String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @default(now()) @updatedAt
+
+  versions CompensationPolicyVersion[]
+
+  @@index([scopeType])
+  @@map("compensation_policies")
+}
+
+/// Phiên bản chính sách — PUBLISHED bất biến (đông cứng rule qua sourceSnapshot).
+model CompensationPolicyVersion {
+  id             String            @id @default(cuid())
+  policyId       String
+  version        Int
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?
+  status         CompVersionStatus @default(DRAFT)
+  sourceSnapshot Json? // snapshot rule lúc publish (bằng chứng)
+  supersedesId   String?
+  createdBy      String?
+  createdAt      DateTime          @default(now())
+  publishedBy    String?
+  publishedAt    DateTime?
+
+  policy          CompensationPolicy       @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  commissionRules CommissionRule[]
+  incentiveRules  TreatmentIncentiveRule[]
+  kpiBonusRules   KpiBonusRule[]
+
+  @@unique([policyId, version])
+  @@index([status])
+  @@map("compensation_policy_versions")
+}
+
+/// Rule hoa hồng bán hàng.
+model CommissionRule {
+  id              String              @id @default(cuid())
+  policyVersionId String
+  code            String
+  basisType       CommissionBasisType @default(COLLECTED_CASH)
+  targetType      CompTargetType      @default(ALL)
+  targetId        String?
+  ratePercent     Decimal?            @db.Decimal(9, 4)
+  fixedAmount     Decimal?            @db.Decimal(18, 2)
+  thresholdMin    Decimal?            @db.Decimal(18, 2)
+  thresholdMax    Decimal?            @db.Decimal(18, 2)
+  attributionRole AttributionRole? // rule chỉ áp cho vai trò attribution cụ thể (null = mọi vai trò được attribute)
+  priority        Int                 @default(0)
+  isActive        Boolean             @default(true)
+  note            String?
+
+  policyVersion CompensationPolicyVersion @relation(fields: [policyVersionId], references: [id], onDelete: Cascade)
+
+  @@index([policyVersionId])
+  @@map("commission_rules")
+}
+
+/// Rule thưởng thực hiện dịch vụ (treatment incentive) — nguồn = contribution.
+model TreatmentIncentiveRule {
+  id                   String              @id @default(cuid())
+  policyVersionId      String
+  code                 String
+  serviceId            String?
+  serviceCategoryId    String?
+  contributionTypeCode String?
+  employeeRoleCode     String?
+  basisType            IncentiveBasisType  @default(FIXED_PER_CONTRIBUTION)
+  fixedAmount          Decimal?            @db.Decimal(18, 2)
+  perMinuteAmount      Decimal?            @db.Decimal(18, 2)
+  ratePercent          Decimal?            @db.Decimal(9, 4)
+  weightMode           IncentiveWeightMode @default(IGNORE_WEIGHT)
+  minimumMinutes       Int?
+  maxAmount            Decimal?            @db.Decimal(18, 2)
+  priority             Int                 @default(0)
+  isActive             Boolean             @default(true)
+  note                 String?
+
+  policyVersion CompensationPolicyVersion @relation(fields: [policyVersionId], references: [id], onDelete: Cascade)
+
+  @@index([policyVersionId])
+  @@map("treatment_incentive_rules")
+}
+
+/// Rule thưởng KPI — CHỈ từ snapshot đã KHÓA + VERIFIED (mặc định).
+model KpiBonusRule {
+  id              String             @id @default(cuid())
+  policyVersionId String
+  code            String
+  kpiDefinitionId String
+  comparator      KpiBonusComparator @default(GTE)
+  threshold       Decimal            @db.Decimal(18, 3)
+  bonusType       KpiBonusType       @default(FIXED)
+  fixedAmount     Decimal?           @db.Decimal(18, 2)
+  rate            Decimal?           @db.Decimal(9, 4)
+  tier            Int                @default(0)
+  requireVerified Boolean            @default(true) // chỉ VERIFIED mới đủ điều kiện (mặc định)
+  priority        Int                @default(0)
+  isActive        Boolean            @default(true)
+  note            String?
+
+  policyVersion CompensationPolicyVersion @relation(fields: [policyVersionId], references: [id], onDelete: Cascade)
+
+  @@index([policyVersionId])
+  @@map("kpi_bonus_rules")
+}
+
+/// Attribution thương mại TƯỜNG MINH (FK nhân sự) — KHÔNG suy từ createdBy tên tự do.
+model SalesAttribution {
+  id                   String            @id @default(cuid())
+  employeeId           String
+  sourceType           CompSourceType
+  sourceId             String
+  attributionRole      AttributionRole
+  weight               Decimal           @default(1) @db.Decimal(6, 3)
+  branchId             String?
+  effectiveAt          DateTime          @default(now())
+  employeeNameSnapshot String
+  roleSnapshot         String?
+  sourceSnapshot       Json?
+  status               AttributionStatus @default(ACTIVE)
+  voidReason           String?
+  voidedBy             String?
+  voidedAt             DateTime?
+  createdBy            String?
+  createdAt            DateTime          @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([employeeId, sourceType, sourceId, attributionRole])
+  @@index([sourceType, sourceId])
+  @@index([employeeId])
+  @@map("sales_attributions")
+}
+
+/// Sổ sự kiện thu nhập (payroll-ready, KHÔNG buộc kỳ lương). Append-only + reversal.
+model CompensationEvent {
+  id                  String          @id @default(cuid())
+  employeeId          String
+  eventType           CompEventType
+  sourceType          CompSourceType
+  sourceId            String
+  sourceLineId        String? // vd contribution line / payment id / snapshot id
+  policyVersionId     String
+  ruleId              String
+  eventDate           DateTime
+  basisAmount         Decimal?        @db.Decimal(18, 2)
+  quantity            Decimal?        @db.Decimal(14, 3)
+  rate                Decimal?        @db.Decimal(9, 4)
+  weight              Decimal?        @db.Decimal(6, 3)
+  amount              Decimal         @db.Decimal(18, 2)
+  currency            String          @default("VND")
+  calculationSnapshot Json // bằng chứng: vì sao ra số tiền này
+  employeeSnapshot    String?
+  branchSnapshot      String?
+  status              CompEventStatus @default(ELIGIBLE)
+  reversalOfId        String? // trỏ event gốc (khi REVERSAL)
+  reversedAt          DateTime?
+  reversedBy          String?
+  reversalReason      String?
+  idempotencyKey      String          @unique
+  createdBy           String?
+  createdAt           DateTime        @default(now())
+
+  employee   Employee            @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  reversalOf CompensationEvent?  @relation("CompEventReversal", fields: [reversalOfId], references: [id])
+  reversals  CompensationEvent[] @relation("CompEventReversal")
+
+  @@index([employeeId])
+  @@index([eventType])
+  @@index([sourceType, sourceId])
+  @@index([status])
+  @@map("compensation_events")
 }

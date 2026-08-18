@@ -1064,3 +1064,74 @@ export const kpiTargetCreateSchema = z.object({
   effectiveTo: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
 });
+
+// ---------------------------------------------------------------------------
+// HR-PH5 — COMPENSATION (policy/rules/attribution/events)
+// ---------------------------------------------------------------------------
+export const compPolicyCreateSchema = z.object({
+  name: z.string().min(1),
+  scopeType: z.enum(["COMPANY", "BRANCH", "ROLE", "EMPLOYEE"]).optional(),
+  branchId: z.string().optional().nullable(),
+  roleCode: z.string().optional().nullable(),
+  employeeId: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export const compVersionCreateSchema = z.object({
+  policyId: z.string().min(1),
+  effectiveFrom: z.string().min(8),
+  effectiveTo: z.string().optional().nullable(),
+});
+export const commissionRuleSchema = z.object({
+  policyVersionId: z.string().min(1),
+  code: z.string().min(1),
+  basisType: z.enum(["COLLECTED_CASH", "INVOICE_NET", "FIXED", "OTHER"]).optional(),
+  targetType: z.enum(["ALL", "SERVICE", "SERVICE_CATEGORY", "PROTOCOL_PACKAGE", "BRAND", "CAMPAIGN"]).optional(),
+  targetId: z.string().optional().nullable(),
+  ratePercent: z.coerce.number().optional().nullable(),
+  fixedAmount: z.coerce.number().optional().nullable(),
+  thresholdMin: z.coerce.number().optional().nullable(),
+  thresholdMax: z.coerce.number().optional().nullable(),
+  attributionRole: z.enum(["ORIGINATOR", "BOOKER", "CONSULTANT", "CLOSER", "ACCOUNT_OWNER", "COLLECTOR"]).optional().nullable(),
+  priority: z.coerce.number().int().optional(),
+  isActive: z.boolean().optional(),
+});
+export const incentiveRuleSchema = z.object({
+  policyVersionId: z.string().min(1),
+  code: z.string().min(1),
+  serviceId: z.string().optional().nullable(),
+  serviceCategoryId: z.string().optional().nullable(),
+  contributionTypeCode: z.string().optional().nullable(),
+  employeeRoleCode: z.string().optional().nullable(),
+  basisType: z.enum(["FIXED_PER_SERVICE", "FIXED_PER_CONTRIBUTION", "PER_MINUTE", "PERCENT_ALLOCATED_REVENUE"]).optional(),
+  fixedAmount: z.coerce.number().optional().nullable(),
+  perMinuteAmount: z.coerce.number().optional().nullable(),
+  ratePercent: z.coerce.number().optional().nullable(),
+  weightMode: z.enum(["IGNORE_WEIGHT", "APPLY_CONTRIBUTION_WEIGHT"]).optional(),
+  minimumMinutes: z.coerce.number().int().optional().nullable(),
+  maxAmount: z.coerce.number().optional().nullable(),
+  priority: z.coerce.number().int().optional(),
+  isActive: z.boolean().optional(),
+});
+export const kpiBonusRuleSchema = z.object({
+  policyVersionId: z.string().min(1),
+  code: z.string().min(1),
+  kpiDefinitionId: z.string().min(1),
+  comparator: z.enum(["GTE", "GT", "LTE", "LT", "EQ"]).optional(),
+  threshold: z.coerce.number(),
+  bonusType: z.enum(["FIXED", "RATE"]).optional(),
+  fixedAmount: z.coerce.number().optional().nullable(),
+  rate: z.coerce.number().optional().nullable(),
+  tier: z.coerce.number().int().optional(),
+  requireVerified: z.boolean().optional(),
+  priority: z.coerce.number().int().optional(),
+  isActive: z.boolean().optional(),
+});
+export const salesAttributionSchema = z.object({
+  employeeId: z.string().min(1),
+  sourceType: z.enum(["CUSTOMER", "BOOKING", "PROPOSAL", "INVOICE", "PAYMENT", "DEPOSIT", "SESSION_CONTRIBUTION", "KPI_SNAPSHOT"]),
+  sourceId: z.string().min(1),
+  attributionRole: z.enum(["ORIGINATOR", "BOOKER", "CONSULTANT", "CLOSER", "ACCOUNT_OWNER", "COLLECTOR"]),
+  weight: z.coerce.number().positive().optional(),
+  branchId: z.string().optional().nullable(),
+});
+export const compReverseSchema = z.object({ reason: z.string().min(1) });
