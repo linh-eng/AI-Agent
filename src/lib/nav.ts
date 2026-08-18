@@ -9,7 +9,7 @@ import {
   PackagePlus, ScanBarcode, Boxes, Wrench, Gauge, ClipboardList, PackageMinus,
   ShieldCheck, Hammer, BarChart3, CalendarDays, HeartPulse, ListTodo, Building2,
   Cpu, ScrollText, ShoppingBag, FileText, FileSpreadsheet, BookOpen, Tag,
-  Megaphone, Receipt, Wallet, Settings, MessageCircleHeart, Images, Upload,
+  Megaphone, Receipt, Wallet, Settings, MessageCircleHeart, Images, Upload, Gift,
   Sparkles, Calculator, TrendingUp,
   type LucideIcon,
 } from "lucide-react";
@@ -63,6 +63,8 @@ export const NAV_GROUPS: NavGroup[] = [
         ],
       },
       { href: "/followups", label: "CSKH & Follow-up", icon: MessageCircleHeart, perm: ["followup.apply", "followup.write", "task.write"] },
+      // LOY-PH1 — Khách hàng thân thiết / Ví trả trước / Voucher. Gate loyalty.read.
+      { href: "/loyalty", label: "Khách hàng thân thiết", icon: Gift, perm: "loyalty.read" },
       { href: "/tasks", label: "Công việc", icon: ListTodo, perm: "task.write" },
     ],
   },

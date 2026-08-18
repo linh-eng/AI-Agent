@@ -2927,3 +2927,75 @@ Payslip PDF/export · thanh toán lương thật (bank file) · hạch toán k�
 Nhân sự→Chấm công→Đóng góp→KPI→Lương thưởng→**Bảng lương** đã đóng trọn vòng. Nghiệp vụ lõi (Kho THNG 7 phase +
 Spa 41 mục + HR PH1–6) hoàn tất. Còn lại: **Loyalty/Prepaid** (domain mới, cần owner spec) + **blocker hạ tầng
 production** (DB provider/S3/Vercel/backup vận hành/Sentry — cần admin) + nợ kỹ thuật nhỏ lẻ (đã liệt kê từng phase).
+
+## LOY-PH1: KHÁCH HÀNG THÂN THIẾT · HẠNG · VÍ TRẢ TRƯỚC · VOUCHER (v0.36.0)
+
+Domain **mới, additive** — chương trình khách hàng thân thiết chạy SONG SONG, KHÔNG đổi ngữ nghĩa
+Invoice/Payment/Deposit. Migration **`Zg_loyalty`** (7 model + 4 enum; tổng **43 migration**). tsc sạch ·
+lint 0 lỗi · build OK · fresh deploy 43 migration + seed + seed:demo sạch. **test/loyalty.test.ts** (19, A–X).
+
+### Quyết định thiết kế (owner-safe, tài liệu hóa)
+Tách 4 khái niệm: (1) **ĐIỂM** tích lũy · (2) **HẠNG** thành viên · (3) **VÍ TRẢ TRƯỚC** (stored-value,
+KHÁC Deposit gắn hóa đơn) · (4) **VOUCHER** (FIXED/PERCENT). KHÔNG trộn với "phương thức thanh toán".
+- **Điểm TÍCH từ TIỀN THỰC THU** (Payment chưa hủy), tỷ lệ theo hạng (`pointsPerThousand`) hoặc mặc định
+  (1 điểm/1.000₫). Idempotent theo paymentId.
+- **ĐỔI điểm → cộng VÍ TRẢ TRƯỚC** (1 điểm = 1.000₫). Ledger APPEND-ONLY + `balanceAfter`; khóa dòng
+  `FOR UPDATE` khi trừ (chống âm/đua). KHÔNG hard-delete.
+- **Ví/voucher KHÔNG tự trừ vào Invoice** (giữ nguyên tài chính) — điểm tích hợp mỏng khi lập hóa đơn để
+  owner quyết định hạch toán sau (báo limitation).
+
+### Migration & schema (`Zg_loyalty`)
+Enum `LoyaltyTxnType`(EARN/REDEEM/ADJUST/EXPIRE) · `PrepaidTxnType`(TOP_UP/REDEEM/REFUND/ADJUST) ·
+`VoucherType`(FIXED/PERCENT) · `VoucherStatus`(ACTIVE/USED/EXPIRED/VOID). Model: **`MembershipTier`**
+(ngưỡng chi tiêu + tỷ lệ tích + ưu đãi) · **`LoyaltyAccount`**(customer @unique: pointsBalance/tier/
+lifetimeSpend) + **`LoyaltyTransaction`**(ledger) · **`PrepaidAccount`**(balance) + **`PrepaidTransaction`**
+(ledger) · **`Voucher`**(code/type/value/maxDiscount/minSpend/maxRedemptions/expiry/status) +
+**`VoucherRedemption`**(append-only, idempotent theo voucher+hóa đơn). Back-relation Customer.
+
+### Engine — `src/lib/loyalty.ts`
+`earnPointsForPayment` (idempotent, tỷ lệ theo hạng, cập nhật lifetime + recompute tier) · `adjustPoints` ·
+`redeemPointsToPrepaid` (đổi điểm → ví, chặn thiếu điểm) · `topUpPrepaid`/`redeemPrepaid`/`refundPrepaid`
+(FOR UPDATE, chặn âm) · `computeVoucherDiscount`/`validateVoucher` (FIXED/PERCENT + trần + minSpend +
+expiry + lượt + gán khách) · `redeemVoucher` (khóa voucher, idempotent theo hóa đơn TRƯỚC validate, tăng
+lượt → USED khi hết) · `loyaltySummary`. Audit `LOYALTY_POINTS_*`/`PREPAID_*`/`VOUCHER_*`.
+
+### RBAC (thêm — owner-approved additive)
+**`loyalty.read`** (gộp CLINIC_READ — mọi vai trò spa xem) · **`loyalty.write`** (MANAGER/RECEPTION/CASHIER
+thao tác). ADMIN qua ALL_PERMISSIONS. **Cổng khách** xem điểm/ví/voucher CỦA MÌNH (whitelist trường, không
+lộ nội bộ) qua `/api/portal/loyalty` (scope theo phiên portal).
+
+### API / UI
+API: `/api/membership-tiers` · `/api/loyalty/[customerId]` (summary) · `/api/loyalty/actions` (earn/
+adjustPoints/redeemPoints/topup/redeemPrepaid/refundPrepaid) · `/api/vouchers`(+`[id]` void) ·
+`/api/vouchers/validate` · `/api/vouchers/redeem` · `/api/portal/loyalty`. UI workspace **`/loyalty`**
+(Khách hàng & Hành trình, `loyalty.read`): tab Thành viên (tra khách → điểm/ví/voucher + thao tác) · Hạng
+thành viên · Voucher (tạo + kiểm tra). Nav item "Khách hàng thân thiết".
+
+### CSV — `docs/LOYALTY_CSV.md`
+`membership_tiers` + `vouchers` (config). KHÔNG import ledger (điểm/ví/lượt sinh từ engine).
+
+### Chứng minh (test/loyalty.test.ts, 19 test → A–X)
+Points A–F (tích từ tiền thực thu · **B idempotent** · **C void không tích** · **D hạng tự lên** · E đổi
+điểm→ví · F chặn thiếu điểm + ledger balanceAfter) · Prepaid G–L (nạp/trừ · **I chặn âm** · **J đồng thời
+FOR UPDATE** · **K không đụng Payment/Deposit** · L refund) · Voucher M–S (FIXED · **N PERCENT+trần** ·
+O minSpend · P expiry · **Q+R lượt+USED+idempotent hóa đơn** · **S không tự trừ hóa đơn**) · RBAC/Portal
+T–X (loyalty.write cần cho ghi · 403/401 · **khách xem điểm/ví của mình qua portal, whitelist**).
+
+### Demo (seed:demo)
+3 hạng (Thường/Bạc/VIP). KH-100004 tích **5000 điểm** (từ PT-000001 5tr) + nạp **ví 1.000.000₫**;
+2 voucher (WELCOME100 giảm 100k, VIP20 giảm 20% trần 300k).
+
+### CONFLICTS: KHÔNG CÓ
+Ví trả trước KHÁC Deposit (không trộn) · điểm từ tiền thực thu (không dùng nghĩa vụ hóa đơn) · ví/voucher
+KHÔNG tự trừ Invoice/Payment/Deposit (tài chính bất biến) · ledger append-only + FOR UPDATE (không âm/không
+hard-delete). Additive 0 DROP. Thêm 2 permission loyalty.* (owner-approved). Baseline Mục 2–16 + HR-PH1..6
+bất biến.
+
+### Deferred (điểm tích hợp mỏng — owner quyết định)
+Áp ví/voucher trực tiếp giảm hóa đơn khi lập (hạch toán) · điểm hết hạn tự động (EXPIRE cron) · ưu đãi hạng
+tự áp vào giá bán · quy đổi điểm↔quà tặng vật lý · tích điểm tự động khi thu tiền (hiện thao tác tường minh).
+
+## TRẠNG THÁI TỔNG (cập nhật) — nghiệp vụ hoàn tất
+Kho THNG 7 phase + Spa 41 mục + HR-PH1..6 + **LOY-PH1 (khách hàng thân thiết)** đã xong. Còn lại **chỉ
+blocker hạ tầng production** (DB provider/S3/Vercel/backup vận hành/Sentry — cần admin) + nợ kỹ thuật nhỏ
+lẻ đã liệt kê từng phase. Không còn domain nghiệp vụ lớn nào chờ xây.

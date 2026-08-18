@@ -1068,6 +1068,9 @@ model Customer {
   invoices             Invoice[]
   deposits             Deposit[]
   careProcessInstances CareProcessInstance[]
+  loyaltyAccount       LoyaltyAccount? // LOY-PH1
+  prepaidAccount       PrepaidAccount? // LOY-PH1
+  vouchers             Voucher[] // LOY-PH1 (voucher gán riêng khách)
   marketingCampaign    MarketingCampaign?        @relation(fields: [campaignId], references: [id])
 
   @@index([phone])
@@ -4287,4 +4290,184 @@ model EmployeePayrollLine {
   @@index([employeeId])
   @@index([status])
   @@map("employee_payroll_lines")
+}
+
+// =============================================================================
+// LOY-PH1 — KHÁCH HÀNG THÂN THIẾT · HẠNG THÀNH VIÊN · VÍ TRẢ TRƯỚC · VOUCHER (v0.36.0)
+// -----------------------------------------------------------------------------
+// Domain mới, additive — CHẠY SONG SONG, KHÔNG đổi ngữ nghĩa Invoice/Payment/Deposit.
+// QUYẾT ĐỊNH THIẾT KẾ (owner-safe, tài liệu hóa):
+//  * Tách 4 khái niệm: (1) ĐIỂM tích lũy (loyalty points) · (2) HẠNG thành viên
+//    (membership tier) · (3) VÍ TRẢ TRƯỚC (stored-value, KHÁC Deposit gắn hóa đơn)
+//    · (4) VOUCHER (giảm giá FIXED/PERCENT). KHÔNG trộn với "phương thức thanh toán".
+//  * Điểm TÍCH từ TIỀN THỰC THU (Payment chưa hủy) — KHÔNG từ nghĩa vụ hóa đơn.
+//  * ĐỔI điểm → cộng VÍ TRẢ TRƯỚC (giá trị lưu trữ), truy vết đầy đủ.
+//  * Ledger APPEND-ONLY + `balanceAfter` mỗi dòng; khóa dòng `SELECT … FOR UPDATE`
+//    khi trừ (chống âm/đua). KHÔNG hard-delete (đảo bằng ADJUST/REFUND/VOID).
+//  * Ví/voucher KHÔNG tự trừ vào Invoice (giữ nguyên tài chính) — dùng khi lập
+//    hóa đơn là điểm tích hợp mỏng để owner quyết định hạch toán sau.
+// =============================================================================
+
+enum LoyaltyTxnType {
+  EARN
+  REDEEM
+  ADJUST
+  EXPIRE
+}
+
+enum PrepaidTxnType {
+  TOP_UP
+  REDEEM
+  REFUND
+  ADJUST
+}
+
+enum VoucherType {
+  FIXED
+  PERCENT
+}
+
+enum VoucherStatus {
+  ACTIVE
+  USED
+  EXPIRED
+  VOID
+}
+
+/// Hạng thành viên (cấu hình) — ngưỡng theo tổng chi tiêu, tỷ lệ tích điểm, ưu đãi.
+model MembershipTier {
+  id                String   @id @default(cuid())
+  code              String   @unique
+  name              String
+  minLifetimeSpend  Decimal  @default(0) @db.Decimal(18, 2) // ngưỡng lên hạng (theo tổng chi tiêu)
+  pointsPerThousand Decimal  @default(1) @db.Decimal(9, 3) // số điểm/1.000₫ tiền thực thu
+  discountPercent   Decimal  @default(0) @db.Decimal(6, 3) // ưu đãi mặc định của hạng (%)
+  sortOrder         Int      @default(0)
+  isActive          Boolean  @default(true)
+  note              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+
+  accounts LoyaltyAccount[]
+
+  @@map("membership_tiers")
+}
+
+/// Tài khoản thân thiết của khách — số dư ĐIỂM + hạng + tổng chi tiêu tích lũy.
+model LoyaltyAccount {
+  id            String   @id @default(cuid())
+  customerId    String   @unique
+  tierId        String?
+  pointsBalance Int      @default(0)
+  lifetimeSpend Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  customer     Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tier         MembershipTier?      @relation(fields: [tierId], references: [id])
+  transactions LoyaltyTransaction[]
+
+  @@map("loyalty_accounts")
+}
+
+/// Sổ điểm — APPEND-ONLY, mỗi dòng ghi `balanceAfter`.
+model LoyaltyTransaction {
+  id               String         @id @default(cuid())
+  loyaltyAccountId String
+  type             LoyaltyTxnType
+  points           Int // dương (EARN/ADJUST+) hoặc âm (REDEEM/EXPIRE/ADJUST−)
+  balanceAfter     Int
+  sourceType       String? // PAYMENT / MANUAL / REDEEM_TO_PREPAID …
+  sourceId         String?
+  note             String?
+  idempotencyKey   String?        @unique
+  createdBy        String?
+  createdAt        DateTime       @default(now())
+
+  account LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id], onDelete: Cascade)
+
+  @@index([loyaltyAccountId])
+  @@map("loyalty_transactions")
+}
+
+/// Ví trả trước (stored-value) — KHÁC Deposit (Deposit gắn hóa đơn). Số dư TIỀN.
+model PrepaidAccount {
+  id         String   @id @default(cuid())
+  customerId String   @unique
+  balance    Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  customer     Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  transactions PrepaidTransaction[]
+
+  @@map("prepaid_accounts")
+}
+
+/// Sổ ví trả trước — APPEND-ONLY, `balanceAfter`; TOP_UP/REDEEM/REFUND/ADJUST.
+model PrepaidTransaction {
+  id               String         @id @default(cuid())
+  prepaidAccountId String
+  type             PrepaidTxnType
+  amount           Decimal        @db.Decimal(18, 2) // dương (nạp) hoặc âm (trừ)
+  balanceAfter     Decimal        @db.Decimal(18, 2)
+  method           PaymentMethod? // với TOP_UP tiền thật
+  sourceType       String? // MANUAL / LOYALTY_REDEEM / INVOICE …
+  sourceId         String? // invoiceId khi dùng ví trả cho hóa đơn (metadata truy vết)
+  note             String?
+  idempotencyKey   String?        @unique
+  voidedAt         DateTime?
+  voidReason       String?
+  voidedBy         String?
+  createdBy        String?
+  createdAt        DateTime       @default(now())
+
+  account PrepaidAccount @relation(fields: [prepaidAccountId], references: [id], onDelete: Cascade)
+
+  @@index([prepaidAccountId])
+  @@map("prepaid_transactions")
+}
+
+/// Voucher / phiếu giảm giá — FIXED (số tiền) hoặc PERCENT (%).
+model Voucher {
+  id             String        @id @default(cuid())
+  code           String        @unique
+  name           String
+  type           VoucherType
+  value          Decimal       @db.Decimal(18, 2) // số tiền (FIXED) hoặc % (PERCENT)
+  maxDiscount    Decimal?      @db.Decimal(18, 2) // trần giảm cho PERCENT
+  minSpend       Decimal?      @db.Decimal(18, 2) // chi tiêu tối thiểu để dùng
+  customerId     String? // gán riêng 1 khách (null = dùng chung)
+  maxRedemptions Int           @default(1)
+  redeemedCount  Int           @default(0)
+  expiresAt      DateTime?
+  status         VoucherStatus @default(ACTIVE)
+  note           String?
+  createdBy      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @default(now()) @updatedAt
+
+  customer    Customer?           @relation(fields: [customerId], references: [id])
+  redemptions VoucherRedemption[]
+
+  @@map("vouchers")
+}
+
+/// Lượt dùng voucher — APPEND-ONLY (idempotent theo voucher+hóa đơn).
+model VoucherRedemption {
+  id             String   @id @default(cuid())
+  voucherId      String
+  customerId     String?
+  invoiceId      String? // truy vết (không tự trừ hóa đơn)
+  spendAmount    Decimal? @db.Decimal(18, 2)
+  discountAmount Decimal  @db.Decimal(18, 2)
+  note           String?
+  idempotencyKey String?  @unique
+  createdBy      String?
+  createdAt      DateTime @default(now())
+
+  voucher Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@index([voucherId])
+  @@map("voucher_redemptions")
 }

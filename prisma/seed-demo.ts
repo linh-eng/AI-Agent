@@ -1121,6 +1121,31 @@ async function main() {
     console.log("   ⚠️  Bỏ qua Bảng lương demo:", (e as Error).message);
   }
 
+  // LOY-PH1 — Khách hàng thân thiết demo: hạng + tích điểm + ví + voucher.
+  try {
+    const existing = await prisma.membershipTier.findFirst({ where: { code: "STD" } });
+    if (!existing) {
+      const { earnPointsForPayment, topUpPrepaid } = await import("../src/lib/loyalty");
+      const seedSession = { userId: null, name: "seed-demo", email: null, permissions: [], roles: [] } as any;
+      await prisma.membershipTier.createMany({ data: [
+        { code: "STD", name: "Thường", minLifetimeSpend: 0 as any, pointsPerThousand: 1 as any, discountPercent: 0 as any, sortOrder: 1 },
+        { code: "SILVER", name: "Bạc", minLifetimeSpend: 5_000_000 as any, pointsPerThousand: 1.5 as any, discountPercent: 3 as any, sortOrder: 2 },
+        { code: "VIP", name: "VIP", minLifetimeSpend: 20_000_000 as any, pointsPerThousand: 2 as any, discountPercent: 5 as any, sortOrder: 3 },
+      ] });
+      // Tích điểm cho KH-100004 từ phiếu thu PT-000001 (5tr) + nạp ví 1tr
+      const pt1 = await prisma.payment.findFirst({ where: { code: "PT-000001" } });
+      let earned = 0;
+      if (pt1) { const r = await earnPointsForPayment(seedSession, pt1.id); earned = (r as any).earned ?? 0; }
+      await topUpPrepaid(seedSession, kDangPD.id, 1_000_000, { method: "CASH", note: "Nạp ví demo" });
+      // Voucher demo
+      await prisma.voucher.create({ data: { code: "WELCOME100", name: "Chào mừng giảm 100k", type: "FIXED", value: 100_000 as any, minSpend: 500_000 as any, maxRedemptions: 100, createdBy: "seed-demo" } });
+      await prisma.voucher.create({ data: { code: "VIP20", name: "VIP giảm 20% (trần 300k)", type: "PERCENT", value: 20 as any, maxDiscount: 300_000 as any, maxRedemptions: 50, createdBy: "seed-demo" } });
+      console.log(`   Khách thân thiết demo: 3 hạng (Thường/Bạc/VIP) — KH-100004 tích ${earned} điểm (từ PT-000001) + ví 1.000.000₫; 2 voucher (WELCOME100, VIP20).`);
+    }
+  } catch (e) {
+    console.log("   ⚠️  Bỏ qua Khách thân thiết demo:", (e as Error).message);
+  }
+
   console.log("   Vật tư demo: JetPeel 100ml (còn 82ml), Vật tư khách hàng 10đv (còn 5).");
   console.log("✅ Seed DEMO hoàn tất: 7 khách (KH-100001..007), brand Klapp, CN RF/HIFU,");
   console.log("   protocol DEMO có version, kho vật tư spa, 2 chiến dịch, báo giá 3 phương án.");

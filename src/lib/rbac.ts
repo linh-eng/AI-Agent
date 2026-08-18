@@ -145,6 +145,10 @@ export const PERMISSIONS = {
   COMPENSATION_POLICY_READ: "compensationPolicy.read", // xem chính sách lương thưởng
   COMPENSATION_POLICY_WRITE: "compensationPolicy.write", // tạo/sửa chính sách lương thưởng
   COMMISSION_READ: "commission.read", // xem hoa hồng cấp tổ chức
+
+  // LOY-PH1 — Khách hàng thân thiết / Ví trả trước / Voucher (front-desk)
+  LOYALTY_READ: "loyalty.read", // xem điểm/hạng/ví/voucher của khách
+  LOYALTY_WRITE: "loyalty.write", // tích/đổi điểm, nạp/trừ ví, phát/dùng voucher
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -172,6 +176,7 @@ const CLINIC_READ: PermissionCode[] = [
   PERMISSIONS.INVOICE_READ,
   PERMISSIONS.HR_READ,
   PERMISSIONS.STAFF_READ,
+  PERMISSIONS.LOYALTY_READ,
 ];
 
 /**
@@ -296,6 +301,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.COMPENSATION_POLICY_READ,
     PERMISSIONS.COMPENSATION_POLICY_WRITE,
     PERMISSIONS.COMMISSION_READ,
+    PERMISSIONS.LOYALTY_WRITE,
   ],
 
   // Lễ tân: tạo khách, đặt lịch, nhận thanh toán, chốt phương án, gửi hướng dẫn
@@ -318,6 +324,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PROPOSAL_ACCEPT,
     PERMISSIONS.CARE_WRITE,
     PERMISSIONS.MEDIA_WRITE,
+    PERMISSIONS.LOYALTY_WRITE,
   ],
 
   // CSKH: nhật ký chăm sóc, ÁP quy trình + xử lý task; KHÔNG sửa mẫu quy trình (mục 9)
@@ -358,6 +365,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.PRICE_WRITE,
     PERMISSIONS.PRICEFLOOR_READ,
     PERMISSIONS.PRICEFLOOR_WRITE,
+    PERMISSIONS.LOYALTY_WRITE,
   ],
 
   // Marketing: chiến dịch, nguồn khách, catalog sản phẩm bán lẻ, ROI, báo cáo

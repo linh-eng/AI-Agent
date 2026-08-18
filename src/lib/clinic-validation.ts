@@ -1165,3 +1165,44 @@ export const payrollPeriodCreateSchema = z.object({
   branchId: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
 }).refine((v) => v.endDate >= v.startDate, { message: "Ngày kết thúc phải ≥ ngày bắt đầu", path: ["endDate"] });
+
+// ---------------------------------------------------------------------------
+// LOY-PH1 — Loyalty / Membership / Prepaid / Voucher
+// ---------------------------------------------------------------------------
+export const membershipTierSchema = z.object({
+  code: z.string().min(1).max(60),
+  name: z.string().min(1),
+  minLifetimeSpend: z.coerce.number().nonnegative().optional(),
+  pointsPerThousand: z.coerce.number().nonnegative().optional(),
+  discountPercent: z.coerce.number().min(0).max(100).optional(),
+  sortOrder: z.coerce.number().int().optional(),
+  isActive: z.boolean().optional(),
+});
+export const loyaltyActionSchema = z.object({
+  action: z.enum(["earn", "adjustPoints", "redeemPoints", "topup", "redeemPrepaid", "refundPrepaid"]),
+  customerId: z.string().optional(),
+  paymentId: z.string().optional(),
+  points: z.coerce.number().int().optional(),
+  amount: z.coerce.number().optional(),
+  method: z.string().optional(),
+  invoiceId: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export const voucherCreateSchema = z.object({
+  code: z.string().min(1).max(60),
+  name: z.string().min(1),
+  type: z.enum(["FIXED", "PERCENT"]),
+  value: z.coerce.number().positive(),
+  maxDiscount: z.coerce.number().optional().nullable(),
+  minSpend: z.coerce.number().optional().nullable(),
+  customerId: z.string().optional().nullable(),
+  maxRedemptions: z.coerce.number().int().positive().optional(),
+  expiresAt: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export const voucherRedeemSchema = z.object({
+  code: z.string().min(1),
+  spend: z.coerce.number().positive(),
+  customerId: z.string().optional().nullable(),
+  invoiceId: z.string().optional().nullable(),
+});
