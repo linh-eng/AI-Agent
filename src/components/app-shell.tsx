@@ -24,6 +24,7 @@ import {
   TrendingDown,
   Wrench,
   CreditCard,
+  FileSpreadsheet,
   BarChart3,
   Users,
   Settings,
@@ -87,6 +88,7 @@ const NAV = [
   {
     section: "Hệ thống",
     items: [
+      { href: "/import", label: "Nhập liệu Excel", icon: FileSpreadsheet },
       { href: "/users", label: "Người dùng", icon: Users, perm: PERMISSIONS.USER_MANAGE },
       { href: "/settings", label: "Cài đặt công ty", icon: Settings, perm: PERMISSIONS.SETTING_MANAGE },
       { href: "/backup", label: "Sao lưu & Phục hồi", icon: DatabaseBackup, perm: PERMISSIONS.USER_MANAGE },

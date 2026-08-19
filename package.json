@@ -1,6 +1,6 @@
 {
   "name": "sophia-wellness-warehouse",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "private": true,
   "description": "Webapp quản lý kho Sophia Wellness — Nhập/Xuất kho, tồn theo lô & hạn sử dụng, cảnh báo",
   "scripts": {
@@ -30,6 +30,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.5.4",
+    "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

@@ -65,6 +65,12 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
   đặt lại mật khẩu, **xoá người dùng** (không cho tự khoá/tự xoá; chặn xoá khi đã phát sinh chứng từ hoặc
   là admin duy nhất — nên khoá thay vì xoá). **Tự đổi mật khẩu:** mọi người dùng đổi mật khẩu của mình qua
   nút ở góc trên (POST `/api/account/password`, xác thực mật khẩu hiện tại).
+- **Nhập liệu bằng Excel:** trang `/import` (nhóm Hệ thống) — tạo hàng loạt Sản phẩm / Tài sản / Nhập kho /
+  Xuất kho từ `.xlsx`. Khai báo cột gom ở `src/lib/import-service.ts` (`SPECS`) dùng chung để sinh **form mẫu**
+  (`GET /api/import/template?entity=…`, kèm sheet Hướng dẫn) và **đọc/kiểm tra** khi nhập (`POST /api/import/[entity]`
+  nhận multipart). Nhập kho/Xuất kho nhiều dòng gộp theo cột "Mã phiếu"; tái dùng `createReceipt`/`createIssue`
+  (giữ sinh lô + bút toán + FEFO). Tham chiếu nhóm hàng/kho/NCC/SKU theo mã hoặc tên; báo lỗi theo từng dòng/phiếu.
+  Phân quyền theo `*.write` của từng mục. Dùng thư viện `xlsx` (SheetJS).
 - **Cài đặt công ty/thương hiệu:** `CompanySetting` (1 bản ghi id="company") — tên, logo (data URI),
   địa chỉ, ĐT, MST; hiển thị ở sidebar, trang đăng nhập (GET `/api/settings` công khai) và **đầu phiếu in**.
 - **Dashboard:** số liệu tổng hợp + biểu đồ (giá trị tồn theo nhóm, cơ cấu cảnh báo) + phiếu gần đây.

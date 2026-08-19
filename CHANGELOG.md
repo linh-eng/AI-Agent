@@ -3,6 +3,17 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.10.0 — 2026-08-19
+- **Nhập liệu bằng Excel** (menu Hệ thống → *Nhập liệu Excel*): tạo hàng loạt cho **Sản phẩm,
+  Tài sản/Thiết bị, Nhập kho, Xuất kho** từ file `.xlsx`.
+  - Mỗi mục có nút **Tải form mẫu** (.xlsx gồm sheet dữ liệu + sheet *Hướng dẫn* có ví dụ từng cột).
+  - Tải file lên → hệ thống **kiểm tra & báo lỗi theo từng dòng/phiếu** (SKU trùng, thiếu nhóm hàng/kho/NCC,
+    thiếu số lượng, xuất vượt tồn…), dòng hợp lệ vẫn được tạo.
+  - **Nhập kho / Xuất kho nhiều dòng**: gộp theo cột *“Mã phiếu (gộp dòng)”*; tái dùng đúng nghiệp vụ hiện có
+    (sinh lô + bút toán khi nhập; **FEFO** khi xuất). Tham chiếu nhóm hàng/kho/NCC/SKU theo **mã hoặc tên**.
+  - Phân quyền theo từng mục (chỉ hiện mục người dùng có quyền tạo).
+- Thêm thư viện đọc Excel (`xlsx`) → khi cập nhật **nhớ chạy `npm install`** (không cần `prisma:push`).
+
 ## 1.9.0 — 2026-08-18
 - **Phân hệ "Quản lý tài sản"** (nhóm menu mới) — 3 trang báo cáo tổng hợp theo nhiều tài sản
   & theo thời gian, đọc từ dữ liệu sẵn có (nhập liệu vẫn ở trang chi tiết tài sản):
