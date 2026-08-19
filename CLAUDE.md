@@ -3160,3 +3160,23 @@ Enbioment Serum, Beta Gel, Herb & Mineral Mist — công dụng/dung tích/đị
 **xuất/nhập được qua CSV** dataset `protocol-steps` (nested) đã có. **Code-only additive** (KHÔNG migration mới;
 tổng vẫn **45 migration**). Xác thực: tsc sạch · build OK · seed:demo fresh = **11 protocol DMK** · full
 regression **592/57 PASS**.
+
+### Sửa trình bày dữ liệu chi tiết sản phẩm DMK (v0.37.8) — canonical/alias · pro↔home · provenance
+Theo yêu cầu "Product detail data correction" — dữ liệu sản phẩm KHÔNG trộn professional directions với
+home-care guidance, KHÔNG dùng alias thay canonical, KHÔNG đặt sai field (contraindication/precaution), KHÔNG
+biến package size thành dosage, badge KHÔNG làm hiểu sai taxonomy. **Code-only additive** (KHÔNG migration/schema/
+RBAC — không mở Catalogue C2; tổng vẫn **45 migration**). **607 test / 58 file** (+15 `test/dmk-product-data.test.ts`).
+- **Sửa seed data (nguồn sự thật)**: Actrol "Bột khóa viêm" (bỏ wording không nguồn) · Beta Gel → BOTH (có ngữ
+  cảnh chuyên nghiệp/recovery, không home-only) · Pore Reduction canonical (bỏ "Plus" khỏi tên; alias phụ) ·
+  Pro Alpha #1 thêm CĐ "Da quá nhiều dầu" + rõ 2 ml + warm occlusion 5-8′ · **Prozyme: heat/moisture KHÔNG phải
+  contraindication** → CĐ page-backed "Da khô thiếu dầu", điều kiện nhiệt/ẩm chuyển vào directions; monograph
+  15-25′ KHÔNG gộp Acne Body 5-15′ · Quick Peel giữ 3-5′ + CĐ "Da mỏng yếu, dễ đỏ" · Sebum Soak/Epitoxyl tách
+  Chuyên nghiệp (`usage`) ↔ Tại nhà (`frequency`) · Melanotech/Enbioment → BOTH (có định lượng chuyên nghiệp).
+- **Trình bày (evidence sheet)**: title = canonical name + dòng "Tên khác / Alias"; chip **"Ngữ cảnh sử dụng"**
+  (Chuyên nghiệp / Tại nhà / Cả hai) tách khỏi Nhóm SP; **provenance badge** mỗi card (VERIFIED_PAGE /
+  PARTNER_BRAND_SOURCE / PENDING_SOURCE…); "Dung tích (đóng gói)" KHÔNG phải dosage; field thiếu nguồn hiện
+  "Chưa đủ nguồn xác minh" (không tự điền); HOLD (Cryo Pro-X 1–10, đặt tên Herb & Mineral/Mist/HMM) hiện cảnh
+  báo nguồn thay vì tự chốt. Header: "Dữ liệu seed hiện tại — mỗi bản ghi có provenance riêng".
+- **Giới hạn trung thực**: `SpaProduct` KHÔNG có cột provenance/alias/context — alias & provenance là lớp TRÌNH
+  BÀY (gán theo cách sourcing), KHÔNG bịa cột DB. Data fix nằm ở field thật (name/category/type/contraindications/
+  usage/frequency), khóa bằng `test/dmk-product-data.test.ts` (15). Không mở C2, không sửa Protocol/TrainingPath.
