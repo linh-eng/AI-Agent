@@ -64,7 +64,7 @@ export default function DataIoPage() {
           <div className="flex flex-wrap gap-1">
             {ds.columns.map((c) => <span key={c.header} className={`rounded border px-2 py-0.5 text-xs ${c.required ? "border-teal-400 bg-teal-50 font-medium" : "border-muted"}`}>{c.header}{c.required ? " *" : ""}{c.type !== "string" ? ` · ${c.type === "enum" ? c.enum?.join("/") : c.ref ? `mã ${c.ref}` : c.type}` : ""}</span>)}
           </div>
-          <div className="mt-1 text-xs text-muted-foreground">* = bắt buộc. Cột "mã …" điền MÃ của bản ghi liên quan (vd categoryCode = mã nhóm dịch vụ). Ngày định dạng yyyy-MM-dd. Danh sách (roles) ngăn cách bằng dấu | .</div>
+          <div className="mt-1 text-xs text-muted-foreground">* = bắt buộc. Tiêu đề cột bằng <b>tiếng Việt</b> đúng tên trường trên phần mềm. Cột "Mã …" điền MÃ của bản ghi liên quan (vd "Mã nhóm" = mã nhóm dịch vụ). Ngày định dạng yyyy-MM-dd. Danh sách (Vai trò) ngăn cách bằng dấu | .</div>
         </CardContent></Card>
       )}
 

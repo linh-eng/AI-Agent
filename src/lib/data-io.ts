@@ -75,85 +75,115 @@ const KPI_DIR = ["HIGHER_BETTER", "LOWER_BETTER", "NEUTRAL"];
 const PC_KIND = ["EARNING", "DEDUCTION"];
 const PC_CALC = ["FIXED", "PERCENT_BASE", "PERCENT_GROSS"];
 const PC_SCOPE = ["COMPANY", "ROLE", "EMPLOYEE"];
+const CARE_KIND = ["PRE_CARE", "POST_CARE", "GENERAL", "FOLLOW_UP"];
 
+// Tiêu đề cột = TIẾNG VIỆT (đúng tên trường hiển thị trên phần mềm). `key` = tên field DB.
+// Khi NHẬP, hệ thống nhận CẢ tiêu đề tiếng Việt LẪN tên field tiếng Anh (alias) — tương thích ngược.
 export const DATASETS: Record<string, Dataset> = {
   "membership-tiers": {
     key: "membership-tiers", label: "Hạng thành viên", group: "Khách hàng thân thiết", model: "membershipTier", naturalKey: "code",
     readPerm: "loyalty.read", writePerm: "loyalty.write",
     columns: [
-      { key: "code", header: "code", required: true }, { key: "name", header: "name", required: true },
-      { key: "minLifetimeSpend", header: "minLifetimeSpend", type: "number" }, { key: "pointsPerThousand", header: "pointsPerThousand", type: "number" },
-      { key: "discountPercent", header: "discountPercent", type: "number" }, { key: "sortOrder", header: "sortOrder", type: "number" }, { key: "isActive", header: "isActive", type: "boolean" },
+      { key: "code", header: "Mã", required: true }, { key: "name", header: "Tên hạng", required: true },
+      { key: "minLifetimeSpend", header: "Mức chi tối thiểu", type: "number" }, { key: "pointsPerThousand", header: "Điểm/1.000đ", type: "number" },
+      { key: "discountPercent", header: "Chiết khấu (%)", type: "number" }, { key: "sortOrder", header: "Thứ tự", type: "number" }, { key: "isActive", header: "Đang dùng", type: "boolean" },
     ],
   },
   vouchers: {
     key: "vouchers", label: "Voucher", group: "Khách hàng thân thiết", model: "voucher", naturalKey: "code",
     readPerm: "loyalty.read", writePerm: "loyalty.write",
     columns: [
-      { key: "code", header: "code", required: true }, { key: "name", header: "name", required: true },
-      { key: "type", header: "type", type: "enum", enum: VOUCHER_TYPE, required: true }, { key: "value", header: "value", type: "number", required: true },
-      { key: "maxDiscount", header: "maxDiscount", type: "number" }, { key: "minSpend", header: "minSpend", type: "number" },
-      { key: "maxRedemptions", header: "maxRedemptions", type: "number" }, { key: "expiresAt", header: "expiresAt", type: "date" },
+      { key: "code", header: "Mã", required: true }, { key: "name", header: "Tên voucher", required: true },
+      { key: "type", header: "Loại", type: "enum", enum: VOUCHER_TYPE, required: true }, { key: "value", header: "Giá trị", type: "number", required: true },
+      { key: "maxDiscount", header: "Giảm tối đa", type: "number" }, { key: "minSpend", header: "Đơn tối thiểu", type: "number" },
+      { key: "maxRedemptions", header: "Số lượt tối đa", type: "number" }, { key: "expiresAt", header: "Hết hạn", type: "date" },
     ],
   },
   customers: {
     key: "customers", label: "Khách hàng", group: "Khách hàng & Hành trình", model: "customer", naturalKey: "code",
     readPerm: "customer.read", writePerm: "customer.write",
     columns: [
-      { key: "code", header: "code", required: true }, { key: "fullName", header: "fullName", required: true },
-      { key: "phone", header: "phone" }, { key: "email", header: "email" }, { key: "gender", header: "gender", type: "enum", enum: GENDER },
-      { key: "dob", header: "dob", type: "date" }, { key: "source", header: "source" }, { key: "group", header: "group" },
-      { key: "assignedTo", header: "assignedTo" }, { key: "note", header: "note" },
+      { key: "code", header: "Mã KH", required: true }, { key: "fullName", header: "Họ tên", required: true },
+      { key: "phone", header: "Điện thoại" }, { key: "email", header: "Email" }, { key: "gender", header: "Giới tính", type: "enum", enum: GENDER },
+      { key: "dob", header: "Ngày sinh", type: "date" }, { key: "source", header: "Nguồn" }, { key: "group", header: "Nhóm" },
+      { key: "assignedTo", header: "Phụ trách" }, { key: "note", header: "Ghi chú" },
     ],
   },
   "service-categories": {
     key: "service-categories", label: "Nhóm dịch vụ", group: "Thư viện chuyên môn", model: "serviceCategory", naturalKey: "code",
     readPerm: "service.read", writePerm: "service.write",
-    columns: [{ key: "code", header: "code", required: true }, { key: "name", header: "name", required: true }, { key: "description", header: "description" }, { key: "isActive", header: "isActive", type: "boolean" }],
+    columns: [{ key: "code", header: "Mã", required: true }, { key: "name", header: "Tên nhóm", required: true }, { key: "description", header: "Mô tả" }, { key: "isActive", header: "Đang dùng", type: "boolean" }],
   },
   services: {
     key: "services", label: "Dịch vụ", group: "Thư viện chuyên môn", model: "service", naturalKey: "code",
     readPerm: "service.read", writePerm: "service.write",
     transform: (d) => ({ ...d, ...(d.status ? { isActive: d.status === "ACTIVE" } : {}) }),
     columns: [
-      { key: "code", header: "code", required: true }, { key: "name", header: "name", required: true },
-      { key: "categoryCode", header: "categoryCode", ref: { model: "serviceCategory", codeField: "code", fk: "categoryId" } },
-      { key: "durationMinutes", header: "durationMinutes", type: "number" }, { key: "standardPrice", header: "standardPrice", type: "number" },
-      { key: "expectedCost", header: "expectedCost", type: "number" }, { key: "status", header: "status", type: "enum", enum: SVC_STATUS },
+      { key: "code", header: "Mã", required: true }, { key: "name", header: "Tên dịch vụ", required: true },
+      { key: "categoryCode", header: "Mã nhóm", ref: { model: "serviceCategory", codeField: "code", fk: "categoryId" } },
+      { key: "durationMinutes", header: "Thời lượng (phút)", type: "number" }, { key: "standardPrice", header: "Giá chuẩn", type: "number" },
+      { key: "expectedCost", header: "Giá vốn dự kiến", type: "number" }, { key: "status", header: "Trạng thái", type: "enum", enum: SVC_STATUS },
     ],
   },
   "spa-products": {
     key: "spa-products", label: "Sản phẩm spa", group: "Thư viện chuyên môn", model: "spaProduct", naturalKey: "sku",
     readPerm: "library.read", writePerm: "catalog.write",
     columns: [
-      { key: "sku", header: "sku", required: true }, { key: "name", header: "name", required: true },
-      { key: "brandCode", header: "brandCode", ref: { model: "brand", codeField: "code", fk: "brandId" } },
-      { key: "category", header: "category" }, { key: "productType", header: "productType", type: "enum", enum: PROD_TYPE },
-      { key: "sellingPrice", header: "sellingPrice", type: "number" }, { key: "cost", header: "cost", type: "number" }, { key: "isActive", header: "isActive", type: "boolean" },
+      { key: "sku", header: "SKU", required: true }, { key: "name", header: "Tên sản phẩm", required: true },
+      { key: "brandCode", header: "Mã thương hiệu", ref: { model: "brand", codeField: "code", fk: "brandId" } },
+      { key: "category", header: "Danh mục" }, { key: "productType", header: "Loại sản phẩm", type: "enum", enum: PROD_TYPE },
+      { key: "sellingPrice", header: "Giá bán", type: "number" }, { key: "cost", header: "Giá vốn", type: "number" }, { key: "isActive", header: "Đang dùng", type: "boolean" },
     ],
   },
   technologies: {
     key: "technologies", label: "Công nghệ", group: "Thư viện chuyên môn", model: "technology", naturalKey: "code",
     readPerm: "library.read", writePerm: "technology.write",
     columns: [
-      { key: "code", header: "code", required: true }, { key: "name", header: "name", required: true }, { key: "group", header: "group" },
-      { key: "brandCode", header: "brandCode", ref: { model: "brand", codeField: "code", fk: "brandId" } },
-      { key: "deviceModel", header: "deviceModel" }, { key: "area", header: "area" }, { key: "durationMinutes", header: "durationMinutes", type: "number" }, { key: "isActive", header: "isActive", type: "boolean" },
+      { key: "code", header: "Mã", required: true }, { key: "name", header: "Tên công nghệ", required: true }, { key: "group", header: "Nhóm" },
+      { key: "brandCode", header: "Mã thương hiệu", ref: { model: "brand", codeField: "code", fk: "brandId" } },
+      { key: "deviceModel", header: "Model thiết bị" }, { key: "area", header: "Vùng điều trị" }, { key: "durationMinutes", header: "Thời lượng (phút)", type: "number" }, { key: "isActive", header: "Đang dùng", type: "boolean" },
     ],
   },
   brands: {
     key: "brands", label: "Thương hiệu", group: "Thư viện chuyên môn", model: "brand", naturalKey: "code",
     readPerm: "library.read", writePerm: "brand.write",
-    columns: [{ key: "code", header: "code", required: true }, { key: "name", header: "name", required: true }, { key: "description", header: "description" }, { key: "isActive", header: "isActive", type: "boolean" }],
+    columns: [{ key: "code", header: "Mã", required: true }, { key: "name", header: "Tên thương hiệu", required: true }, { key: "description", header: "Mô tả" }, { key: "isActive", header: "Đang dùng", type: "boolean" }],
+  },
+  "care-instructions": {
+    key: "care-instructions", label: "Hướng dẫn chăm sóc", group: "Thư viện chuyên môn", model: "careInstruction", naturalKey: "code",
+    readPerm: "library.read", writePerm: "care.write",
+    columns: [
+      { key: "code", header: "Mã", required: true }, { key: "title", header: "Tiêu đề", required: true },
+      { key: "kind", header: "Loại", type: "enum", enum: CARE_KIND }, { key: "category", header: "Danh mục" },
+      { key: "content", header: "Nội dung" }, { key: "isActive", header: "Đang dùng", type: "boolean" },
+    ],
   },
   "booking-resources": {
     key: "booking-resources", label: "Tài nguyên (phòng/giường/máy)", group: "Khách hàng & Hành trình", model: "bookingResource", naturalKey: "code",
     readPerm: "booking.read", writePerm: "booking.write",
     columns: [
-      { key: "code", header: "code", required: true }, { key: "name", header: "name", required: true },
-      { key: "type", header: "type", type: "enum", enum: RES_TYPE, required: true },
-      { key: "parentCode", header: "parentCode", ref: { model: "bookingResource", codeField: "code", fk: "parentId" } },
-      { key: "isActive", header: "isActive", type: "boolean" },
+      { key: "code", header: "Mã", required: true }, { key: "name", header: "Tên tài nguyên", required: true },
+      { key: "type", header: "Loại", type: "enum", enum: RES_TYPE, required: true },
+      { key: "parentCode", header: "Mã phòng cha", ref: { model: "bookingResource", codeField: "code", fk: "parentId" } },
+      { key: "isActive", header: "Đang dùng", type: "boolean" },
+    ],
+  },
+  "marketing-campaigns": {
+    key: "marketing-campaigns", label: "Chiến dịch marketing", group: "Marketing", model: "marketingCampaign", naturalKey: "code",
+    readPerm: "marketing.read", writePerm: "marketing.write",
+    columns: [
+      { key: "code", header: "Mã", required: true }, { key: "name", header: "Tên chiến dịch", required: true },
+      { key: "channel", header: "Kênh" }, { key: "startDate", header: "Bắt đầu", type: "date" }, { key: "endDate", header: "Kết thúc", type: "date" },
+      { key: "budget", header: "Ngân sách", type: "number" }, { key: "targetGroup", header: "Nhóm mục tiêu" }, { key: "owner", header: "Phụ trách" },
+      { key: "status", header: "Trạng thái" }, { key: "note", header: "Ghi chú" },
+    ],
+  },
+  branches: {
+    key: "branches", label: "Chi nhánh", group: "Vận hành & Hệ thống", model: "branch", naturalKey: "code",
+    readPerm: "staff.read", writePerm: "staff.write",
+    columns: [
+      { key: "code", header: "Mã", required: true }, { key: "name", header: "Tên chi nhánh", required: true },
+      { key: "timezone", header: "Múi giờ" }, { key: "address", header: "Địa chỉ" }, { key: "isActive", header: "Đang dùng", type: "boolean" }, { key: "note", header: "Ghi chú" },
     ],
   },
   employees: {
@@ -161,29 +191,29 @@ export const DATASETS: Record<string, Dataset> = {
     readPerm: "staff.read", writePerm: "staff.write",
     transform: (d) => ({ ...d, ...(d.status ? { isActive: d.status === "ACTIVE" } : {}) }),
     columns: [
-      { key: "code", header: "code", required: true }, { key: "fullName", header: "fullName", required: true },
-      { key: "phone", header: "phone" }, { key: "email", header: "email" }, { key: "title", header: "title" },
-      { key: "roles", header: "roles", type: "list" }, { key: "branch", header: "branch" },
-      { key: "status", header: "status", type: "enum", enum: EMP_STATUS }, { key: "dob", header: "dob", type: "date" }, { key: "startDate", header: "startDate", type: "date" },
+      { key: "code", header: "Mã NV", required: true }, { key: "fullName", header: "Họ tên", required: true },
+      { key: "phone", header: "Điện thoại" }, { key: "email", header: "Email" }, { key: "title", header: "Chức danh" },
+      { key: "roles", header: "Vai trò", type: "list" }, { key: "branch", header: "Chi nhánh" },
+      { key: "status", header: "Trạng thái", type: "enum", enum: EMP_STATUS }, { key: "dob", header: "Ngày sinh", type: "date" }, { key: "startDate", header: "Ngày vào làm", type: "date" },
     ],
   },
   "kpi-definitions": {
     key: "kpi-definitions", label: "Định nghĩa KPI", group: "Vận hành & Hệ thống", model: "kpiDefinition", naturalKey: "code",
     readPerm: "attendance.read", writePerm: "attendance.write",
     columns: [
-      { key: "code", header: "code", required: true }, { key: "name", header: "name", required: true },
-      { key: "category", header: "category", type: "enum", enum: KPI_CAT, required: true }, { key: "unit", header: "unit" },
-      { key: "calculationType", header: "calculationType", type: "enum", enum: KPI_CALC }, { key: "sourceType", header: "sourceType", type: "enum", enum: KPI_SRC },
-      { key: "direction", header: "direction", type: "enum", enum: KPI_DIR }, { key: "sortOrder", header: "sortOrder", type: "number" }, { key: "isActive", header: "isActive", type: "boolean" },
+      { key: "code", header: "Mã", required: true }, { key: "name", header: "Tên KPI", required: true },
+      { key: "category", header: "Nhóm KPI", type: "enum", enum: KPI_CAT, required: true }, { key: "unit", header: "Đơn vị" },
+      { key: "calculationType", header: "Cách tính", type: "enum", enum: KPI_CALC }, { key: "sourceType", header: "Nguồn dữ liệu", type: "enum", enum: KPI_SRC },
+      { key: "direction", header: "Chiều tốt", type: "enum", enum: KPI_DIR }, { key: "sortOrder", header: "Thứ tự", type: "number" }, { key: "isActive", header: "Đang dùng", type: "boolean" },
     ],
   },
   "payroll-component-rules": {
     key: "payroll-component-rules", label: "Phụ cấp / Khấu trừ lương", group: "Vận hành & Hệ thống", model: "payrollComponentRule", naturalKey: "code",
     readPerm: "payroll.read", writePerm: "payroll.write",
     columns: [
-      { key: "code", header: "code", required: true }, { key: "name", header: "name", required: true },
-      { key: "kind", header: "kind", type: "enum", enum: PC_KIND, required: true }, { key: "calcType", header: "calcType", type: "enum", enum: PC_CALC },
-      { key: "value", header: "value", type: "number", required: true }, { key: "scope", header: "scope", type: "enum", enum: PC_SCOPE }, { key: "scopeRef", header: "scopeRef" }, { key: "isActive", header: "isActive", type: "boolean" },
+      { key: "code", header: "Mã", required: true }, { key: "name", header: "Tên khoản", required: true },
+      { key: "kind", header: "Loại", type: "enum", enum: PC_KIND, required: true }, { key: "calcType", header: "Cách tính", type: "enum", enum: PC_CALC },
+      { key: "value", header: "Giá trị", type: "number", required: true }, { key: "scope", header: "Phạm vi", type: "enum", enum: PC_SCOPE }, { key: "scopeRef", header: "Áp dụng cho" }, { key: "isActive", header: "Đang dùng", type: "boolean" },
     ],
   },
 };
@@ -249,8 +279,12 @@ function coerce(raw: string, c: Col): { value: any } | { error: string } {
 type RowResult = { index: number; status: "NEW" | "UPDATE" | "ERROR"; errors: string[]; key?: string };
 
 async function buildRows(ds: Dataset, header: string[], dataRows: string[][]) {
-  // map header → cột (theo header trùng, không phân biệt hoa/thường)
-  const colByHeader = new Map(ds.columns.map((c) => [c.header.toLowerCase(), c]));
+  // map header → cột (nhận CẢ tiêu đề tiếng Việt LẪN tên field tiếng Anh `key` — alias tương thích ngược)
+  const colByHeader = new Map<string, Col>();
+  for (const c of ds.columns) {
+    colByHeader.set(c.header.trim().toLowerCase(), c);
+    colByHeader.set(c.key.trim().toLowerCase(), c);
+  }
   const idx = header.map((h) => colByHeader.get(h.trim().toLowerCase()));
   // prefetch code→id cho ref
   const refCodeMaps = new Map<string, Map<string, string>>();

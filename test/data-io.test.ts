@@ -70,7 +70,8 @@ describe("DATA-IO · Export / template (A–C)", () => {
     const res = await exportCsv("membership-tiers");
     expect(res.status).toBe(200);
     const text = (await res.text()).replace(/^﻿/, "");
-    expect(text.split("\n")[0]).toContain("code");
+    expect(text.split("\n")[0]).toContain("Mã"); // tiêu đề tiếng Việt
+    expect(text.split("\n")[0]).toContain("Tên hạng");
     expect(text).toContain("VIP");
   });
 
@@ -78,8 +79,8 @@ describe("DATA-IO · Export / template (A–C)", () => {
     const u = await makeUser(LOY); await login(u.email);
     const text = (await (await template("vouchers")).text()).replace(/^﻿/, "");
     expect(text.split("\n").length).toBe(1);
-    expect(text).toContain("code");
-    expect(text).toContain("type");
+    expect(text).toContain("Mã"); // tiêu đề tiếng Việt
+    expect(text).toContain("Loại");
   });
 });
 
@@ -94,7 +95,7 @@ describe("DATA-IO · Import upsert (D–J)", () => {
     const p = await D(await preview("vouchers", csv));
     expect(p.counts.willCreate).toBe(1);
     expect(p.counts.willError).toBe(1); // thiếu name
-    expect(p.results[1].errors.join()).toContain("name");
+    expect(p.results[1].errors.join()).toContain("Tên voucher");
   });
 
   it("E: nhập tạo mới bản ghi", async () => {
@@ -125,7 +126,7 @@ describe("DATA-IO · Import upsert (D–J)", () => {
     const csv = "code,name,type,value\nX,x,GIAMGIA,100";
     const p = await D(await preview("vouchers", csv));
     expect(p.counts.willError).toBe(1);
-    expect(p.results[0].errors.join()).toContain("type");
+    expect(p.results[0].errors.join()).toContain("Loại");
   });
 
   it("I: FK theo MÃ (categoryCode → categoryId) — resolve đúng + báo lỗi mã sai", async () => {
@@ -141,7 +142,7 @@ describe("DATA-IO · Import upsert (D–J)", () => {
     const badCsv = "code,name,categoryCode\nDV-Y,Dịch vụ Y,KHONG-CO";
     const p = await D(await preview("services", badCsv));
     expect(p.counts.willError).toBe(1);
-    expect(p.results[0].errors.join()).toContain("categoryCode");
+    expect(p.results[0].errors.join()).toContain("Mã nhóm");
   });
 
   it("J: xuất rồi nhập lại (round-trip) giữ nguyên dữ liệu; date + số parse đúng", async () => {
@@ -178,5 +179,61 @@ describe("DATA-IO · RBAC (K–L)", () => {
     expect((await exportCsv("employees")).status).toBe(403); // không staff.read
     jar.clear();
     expect((await exportCsv("membership-tiers")).status).toBe(401);
+  });
+});
+
+describe("DATA-IO · Tiêu đề TIẾNG VIỆT + mục nhập liệu bổ sung (M–P)", () => {
+  beforeAll(async () => { await prisma.$executeRawUnsafe("TRUNCATE auth_throttles RESTART IDENTITY CASCADE").catch(() => {}); });
+  beforeEach(async () => { await resetDb(); });
+  afterAll(async () => { await prisma.$disconnect().catch(() => {}); });
+
+  it("M: tiêu đề XUẤT là tiếng Việt + NHẬP theo tiêu đề tiếng Việt (round-trip)", async () => {
+    const u = await makeUser(LOY); await login(u.email);
+    await prisma.membershipTier.create({ data: { code: "VIP", name: "VIP", pointsPerThousand: 2 as any } });
+    const text = (await (await exportCsv("membership-tiers")).text()).replace(/^﻿/, "");
+    const head = text.split("\n")[0];
+    expect(head).toContain("Mã"); expect(head).toContain("Tên hạng"); expect(head).toContain("Chiết khấu (%)");
+    expect(head).not.toContain("pointsPerThousand"); // KHÔNG lộ tên field tiếng Anh ở tiêu đề
+    // nhập lại bằng CHÍNH tiêu đề tiếng Việt (round-trip)
+    await prisma.membershipTier.deleteMany({});
+    const r = await D(await doImport("membership-tiers", text));
+    expect(r.created).toBe(1);
+    expect((await prisma.membershipTier.findUnique({ where: { code: "VIP" } }))!.name).toBe("VIP");
+  });
+
+  it("N: NHẬP chấp nhận tiêu đề tiếng Việt HOẶC tên field tiếng Anh (alias tương thích)", async () => {
+    const u = await makeUser(LOY); await login(u.email);
+    // tiếng Việt
+    const vi = await D(await doImport("membership-tiers", "Mã,Tên hạng,Điểm/1.000đ\nA,Hạng A,2"));
+    expect(vi.created).toBe(1);
+    // tiếng Anh (file cũ) vẫn chạy
+    const en = await D(await doImport("membership-tiers", "code,name,pointsPerThousand\nB,Hạng B,3"));
+    expect(en.created).toBe(1);
+    expect(Number((await prisma.membershipTier.findUnique({ where: { code: "A" } }))!.pointsPerThousand)).toBe(2);
+    expect(Number((await prisma.membershipTier.findUnique({ where: { code: "B" } }))!.pointsPerThousand)).toBe(3);
+  });
+
+  it("O: mục nhập liệu BỔ SUNG — Chi nhánh (branches) xuất + nhập theo mã", async () => {
+    const u = await makeUser([PERMISSIONS.STAFF_READ, PERMISSIONS.STAFF_WRITE]); await login(u.email);
+    const rows = await D(await listDs());
+    expect(rows.map((r: any) => r.key)).toContain("branches");
+    // nhập chi nhánh mới bằng tiêu đề tiếng Việt
+    const r = await D(await doImport("branches", "Mã,Tên chi nhánh,Địa chỉ\nCN-01,Cơ sở 1,123 Lê Lợi"));
+    expect(r.created).toBe(1);
+    const b = await prisma.branch.findUnique({ where: { code: "CN-01" } });
+    expect(b!.name).toBe("Cơ sở 1"); expect(b!.address).toBe("123 Lê Lợi");
+  });
+
+  it("P: mục nhập liệu BỔ SUNG — Hướng dẫn chăm sóc (care-instructions) + Chiến dịch marketing", async () => {
+    const u = await makeUser([PERMISSIONS.LIBRARY_READ, PERMISSIONS.CARE_WRITE, PERMISSIONS.MARKETING_READ, PERMISSIONS.MARKETING_WRITE]); await login(u.email);
+    const keys = (await D(await listDs())).map((r: any) => r.key);
+    expect(keys).toContain("care-instructions");
+    expect(keys).toContain("marketing-campaigns");
+    const care = await D(await doImport("care-instructions", "Mã,Tiêu đề,Loại,Nội dung\nHD-01,Chăm sóc sau laser,POST_CARE,Tránh nắng 7 ngày"));
+    expect(care.created).toBe(1);
+    expect((await prisma.careInstruction.findUnique({ where: { code: "HD-01" } }))!.kind).toBe("POST_CARE");
+    const mk = await D(await doImport("marketing-campaigns", "Mã,Tên chiến dịch,Kênh,Ngân sách\nMK-01,Hè 2026,Facebook,50000000"));
+    expect(mk.created).toBe(1);
+    expect(Number((await prisma.marketingCampaign.findUnique({ where: { code: "MK-01" } }))!.budget)).toBe(50000000);
   });
 });

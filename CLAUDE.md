@@ -3098,3 +3098,17 @@ booking-level duration không service/không end vẫn chạy (tương thích c�
 ### CONFLICTS: KHÔNG CÓ
 Additive (1 cột nullable, 0 DROP) · serviceId đã nullable từ trước · conflict engine/giá/floor/P3-P4 items
 bất biến · tái dùng permission booking.read/write (không thêm quyền). Full regression giữ xanh.
+
+### DATA-IO nâng cấp (v0.37.2) — tiêu đề TIẾNG VIỆT + thêm mục nhập liệu
+Theo yêu cầu: các mục có nhập liệu đều có Nhập/Xuất CSV; **tiêu đề cột bằng tiếng Việt** đúng tên trường
+hiển thị trên phần mềm. Code-only additive (0 migration). **590 test** (data-io 11→15, thêm M–P).
+- **Tiêu đề tiếng Việt:** `Col.header` đổi sang nhãn tiếng Việt (Mã / Tên / Giá chuẩn / Thời lượng (phút) /
+  Đang dùng…); `Col.key` giữ tên field DB. Xuất/Mẫu in tiêu đề tiếng Việt; thông báo lỗi cũng dùng nhãn VN
+  ("Thiếu Tên voucher", "Loại: phải thuộc [FIXED/PERCENT]", "Mã nhóm: mã … không tồn tại").
+- **Nhập nhận CẢ tiêu đề tiếng Việt LẪN tên field tiếng Anh** (alias trong `buildRows`) → file cũ (header
+  tiếng Anh) vẫn nhập được; round-trip xuất→nhập bằng tiêu đề tiếng Việt cũng đúng.
+- **+3 mục nhập liệu** (tổng **15 dataset**): **Chi nhánh** (`branches`, staff.read/write) · **Hướng dẫn
+  chăm sóc** (`care-instructions`, library.read/care.write) · **Chiến dịch marketing** (`marketing-campaigns`,
+  marketing.read/write; KHÔNG xuất `cost` nhạy cảm). Tất cả upsert theo mã, FK bằng mã, không xóa.
+- **Test M–P:** M tiêu đề VN + round-trip · N nhập chấp nhận VN/EN alias · O branches xuất+nhập · P
+  care-instructions + marketing-campaigns nhập theo tiêu đề VN. Vẫn giữ nguyên tắc chỉ danh mục (không giao dịch).
