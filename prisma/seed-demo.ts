@@ -1493,9 +1493,9 @@ async function main() {
   if (svcDmkP4 && svcPicoP4 && !(await prisma.booking.findUnique({ where: { code: "BK-100040" } }))) {
     const { snapshotBookingItems } = await import("../src/lib/booking-items");
     // Bảng giá VIP (thấp hơn giá chuẩn) cho 2 dịch vụ.
-    for (const [sid, vip] of [[svcDmkP4.id, 2_100_000], [svcPicoP4.id, 1_500_000]] as const) {
+    for (const [sid, vip, nm] of [[svcDmkP4.id, 2_100_000, "DMK Enzyme Treatment"], [svcPicoP4.id, 1_500_000, "Laser Pico điều trị sắc tố"]] as const) {
       const has = await prisma.priceRule.findFirst({ where: { targetType: "SERVICE", targetId: sid, priceType: "VIP" } });
-      if (!has) await prisma.priceRule.create({ data: { targetType: "SERVICE", targetId: sid, priceType: "VIP", price: vip, isActive: true, createdBy: "Trần Quản Lý" } });
+      if (!has) await prisma.priceRule.create({ data: { targetType: "SERVICE", targetId: sid, targetName: nm, priceType: "VIP", price: vip, isActive: true, createdBy: "Trần Quản Lý" } });
     }
     // Khách VIP + booking 2 dịch vụ → item snapshot theo giá VIP.
     const kVip = await prisma.customer.upsert({ where: { code: "KH-100010" }, update: { group: "VIP" }, create: { code: "KH-100010", fullName: "Ngô Khách VIP", group: "VIP", phone: "0977000010" } });

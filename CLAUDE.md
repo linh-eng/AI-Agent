@@ -3201,3 +3201,10 @@ DV03 700k/560k · DV04 1.150k/950k · DV05 630k/500k · DV06 980k/780k · DV07 1
 DV09 2.150k/1.750k. Upsert `update: { standardPrice }` → chạy lại cập nhật giá lẻ. **Code-only additive**
 (KHÔNG migration; tổng vẫn **45 migration**). `test/dmk-pricing.test.ts` (11) khóa bảng giá + VIP<lẻ. Xác thực:
 tsc sạch · build OK · full regression **618/59 PASS**.
+
+### Fix Bảng giá — hiển thị TÊN thay vì id thô (v0.38.1)
+Lỗi: 2 rule giá cũ (PH4 demo) tạo KHÔNG có `targetName` → Bảng giá hiển thị **id thô** (cmt066…) thay vì tên
+dịch vụ (UI render `targetName ?? targetId`). Fix: `GET /api/price-rules` **enrich `targetName`** giải từ thực
+thể đích (Service/Product/Technology/Package) khi thiếu — chỉ lúc đọc, KHÔNG ghi DB → sửa cả row cũ lẫn rule
+tạo qua UI mà bỏ trống tên. Seed 2 rule demo bổ sung `targetName`. `test/price-rule-name.test.ts` (1 HTTP thật).
+Code-only additive (0 migration). Xác thực: tsc sạch · build OK · full regression **619/60 PASS**.

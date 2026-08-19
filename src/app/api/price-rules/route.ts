@@ -22,6 +22,21 @@ export const GET = handle(async (req) => {
     orderBy: [{ targetType: "asc" }, { createdAt: "desc" }],
     take: 400,
   });
+
+  // Bổ sung tên hiển thị cho các rule thiếu targetName (giải từ thực thể đích),
+  // tránh hiển thị id thô trên Bảng giá. Không ghi DB — chỉ enrich lúc đọc.
+  const missing = rules.filter((r) => !r.targetName);
+  if (missing.length) {
+    const idsByType: Record<string, string[]> = {};
+    for (const r of missing) (idsByType[r.targetType] ??= []).push(r.targetId);
+    const nameMap = new Map<string, string>();
+    const collect = (rows: { id: string; name: string }[]) => rows.forEach((x) => nameMap.set(x.id, x.name));
+    if (idsByType.SERVICE) collect(await prisma.service.findMany({ where: { id: { in: idsByType.SERVICE } }, select: { id: true, name: true } }));
+    if (idsByType.PRODUCT) collect((await prisma.spaProduct.findMany({ where: { id: { in: idsByType.PRODUCT } }, select: { id: true, name: true } })));
+    if (idsByType.TECHNOLOGY) collect(await prisma.technology.findMany({ where: { id: { in: idsByType.TECHNOLOGY } }, select: { id: true, name: true } }));
+    if (idsByType.PACKAGE) collect(await prisma.brandProtocol.findMany({ where: { id: { in: idsByType.PACKAGE } }, select: { id: true, name: true } }));
+    for (const r of rules) if (!r.targetName && nameMap.has(r.targetId)) r.targetName = nameMap.get(r.targetId)!;
+  }
   return ok(rules);
 });
 
