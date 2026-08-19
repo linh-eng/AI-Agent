@@ -953,12 +953,19 @@ export const sessionReorderSchema = z.object({
 // =============================================================================
 const overheadMethodEnum = z.enum(["MANUAL", "FIXED_PER_SERVICE", "PER_MINUTE"]);
 
+// Dòng chi phí phát sinh (thêm bằng nút "+") — gộp vào "Chi phí khác (F)".
+export const costingExtraLineSchema = z.object({
+  name: z.string().trim().min(1, "Tên chi phí"),
+  amount: z.coerce.number().min(0),
+});
+
 const costingBase = z.object({
   materialOverride: z.coerce.number().min(0).optional().nullable(),
   materialOverrideReason: z.string().trim().min(1).optional().nullable(),
   equipmentCost: z.coerce.number().min(0).optional(),
   facilityCost: z.coerce.number().min(0).optional(),
   otherCost: z.coerce.number().min(0).optional(),
+  extraCostLines: z.array(costingExtraLineSchema).max(50).optional(),
   overheadMethod: overheadMethodEnum.optional(),
   overheadValue: z.coerce.number().min(0).optional(),
   durationMinutes: z.coerce.number().int().min(0).optional().nullable(),

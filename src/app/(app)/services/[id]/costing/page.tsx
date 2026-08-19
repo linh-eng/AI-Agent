@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, Save, RefreshCw, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Plus, Save, RefreshCw, CheckCircle2, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,9 @@ export default function ServiceCostingPage() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<any>({ overheadMethod: "MANUAL", overheadValue: 0, equipmentCost: 0, facilityCost: 0, otherCost: 0, materialOverride: "", materialOverrideReason: "" });
+  const [form, setForm] = useState<any>({ overheadMethod: "MANUAL", overheadValue: 0, equipmentCost: 0, facilityCost: 0, materialOverride: "", materialOverrideReason: "" });
+  const [extraLines, setExtraLines] = useState<{ name: string; amount: string }[]>([]);
+  const extraTotal = extraLines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,11 +62,12 @@ export default function ServiceCostingPage() {
   async function createDraft() {
     setBusy(true); setError(null); setWarnings([]);
     try {
+      const lines = extraLines.filter((l) => l.name.trim()).map((l) => ({ name: l.name.trim(), amount: Number(l.amount) || 0 }));
       const body: any = {
         serviceId: id,
         equipmentCost: Number(form.equipmentCost) || 0,
         facilityCost: Number(form.facilityCost) || 0,
-        otherCost: Number(form.otherCost) || 0,
+        extraCostLines: lines,
         overheadMethod: form.overheadMethod,
         overheadValue: Number(form.overheadValue) || 0,
       };
@@ -75,6 +78,7 @@ export default function ServiceCostingPage() {
       const res = await apiFetch<any>(`/api/service-costings`, { method: "POST", body });
       setWarnings(res.warnings ?? []);
       setShowForm(false);
+      setExtraLines([]);
       setSelId(res.id);
       await load();
     } catch (e: any) { setError(e?.message ?? "Không tạo được version"); }
@@ -153,7 +157,6 @@ export default function ServiceCostingPage() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div><Label>Thiết bị (đ)</Label><Input type="number" value={form.equipmentCost} onChange={(e) => setForm({ ...form, equipmentCost: e.target.value })} /></div>
                     <div><Label>Phòng / cơ sở (đ)</Label><Input type="number" value={form.facilityCost} onChange={(e) => setForm({ ...form, facilityCost: e.target.value })} /></div>
-                    <div><Label>Chi phí khác (đ)</Label><Input type="number" value={form.otherCost} onChange={(e) => setForm({ ...form, otherCost: e.target.value })} /></div>
                     <div>
                       <Label>Overhead — phương pháp</Label>
                       <Select value={form.overheadMethod} onChange={(e) => setForm({ ...form, overheadMethod: e.target.value })}>
@@ -161,6 +164,30 @@ export default function ServiceCostingPage() {
                       </Select>
                     </div>
                     <div><Label>{form.overheadMethod === "PER_MINUTE" ? "Overhead (đ/phút)" : "Overhead (đ)"}</Label><Input type="number" value={form.overheadValue} onChange={(e) => setForm({ ...form, overheadValue: e.target.value })} /></div>
+                  </div>
+
+                  {/* Chi phí khác / phát sinh — thêm bằng nút "+" */}
+                  <div className="rounded-md border border-dashed p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <Label className="mb-0">Chi phí khác / phát sinh</Label>
+                      <Button type="button" size="sm" variant="outline" onClick={() => setExtraLines((ls) => [...ls, { name: "", amount: "" }])}>
+                        <Plus className="mr-1 h-3.5 w-3.5" /> Thêm chi phí phát sinh
+                      </Button>
+                    </div>
+                    {extraLines.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Chưa có chi phí phát sinh. Bấm “+” để thêm (ví dụ: phụ phí vật tư đặc biệt, chi phí ngoài định mức…).</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {extraLines.map((l, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <Input className="flex-1" placeholder="Tên chi phí (vd: Phụ phí gấp)" value={l.name} onChange={(e) => setExtraLines((ls) => ls.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
+                            <Input className="w-40" type="number" placeholder="Số tiền (đ)" value={l.amount} onChange={(e) => setExtraLines((ls) => ls.map((x, j) => j === i ? { ...x, amount: e.target.value } : x))} />
+                            <Button type="button" size="sm" variant="ghost" onClick={() => setExtraLines((ls) => ls.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                          </div>
+                        ))}
+                        <div className="flex justify-end pt-1 text-sm"><span className="text-muted-foreground">Tổng chi phí phát sinh:&nbsp;</span><b>{formatCurrency(extraTotal)}</b></div>
+                      </div>
+                    )}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div><Label>Ghi đè vật tư (đ, tùy chọn)</Label><Input type="number" placeholder="để trống = dùng số tự tính" value={form.materialOverride} onChange={(e) => setForm({ ...form, materialOverride: e.target.value })} /></div>
@@ -192,7 +219,10 @@ export default function ServiceCostingPage() {
                       <BR letter="D" label="Phòng / cơ sở (nhập tay)" value={money(sel.facilityCost)} />
                       <BR letter="" label="Chi phí trực tiếp" value={money(sel.directCost)} bold />
                       <BR letter="E" label={`Overhead (${OVERHEAD_METHOD_LABEL[sel.overheadMethod] ?? sel.overheadMethod})`} value={money(sel.overheadCost)} />
-                      <BR letter="F" label="Chi phí khác" value={money(sel.otherCost)} />
+                      <BR letter="F" label="Chi phí khác / phát sinh" value={money(sel.otherCost)} />
+                      {Array.isArray(sel.extraCostLines) && sel.extraCostLines.map((l: any, i: number) => (
+                        <BR key={i} letter="" label={`↳ ${l.name}`} value={money(l.amount)} />
+                      ))}
                       <BR letter="G" label="TỔNG GIÁ VỐN DỰ KIẾN" value={money(sel.totalEstimatedCost)} bold highlight />
                     </tbody>
                   </table>

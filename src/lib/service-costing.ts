@@ -192,6 +192,8 @@ export async function computeCostSources(serviceId: string, at: Date = new Date(
 // Dựng dữ liệu tính đầy đủ cho một version (kết hợp live sources + manual inputs)
 // -----------------------------------------------------------------------------
 
+export interface CostExtraLine { name: string; amount: number }
+
 export interface CostingComputeInput {
   serviceVersion?: number | null;
   durationMinutes?: number | null;
@@ -199,8 +201,15 @@ export interface CostingComputeInput {
   equipmentCost?: number | null;
   facilityCost?: number | null;
   otherCost?: number | null;
+  extraCostLines?: CostExtraLine[] | null;
   overheadMethod?: string | null;
   overheadValue?: number | null;
+}
+
+/** Chuẩn hóa danh sách chi phí phát sinh + tổng tiền. */
+export function normalizeExtraLines(lines?: CostExtraLine[] | null): { lines: CostExtraLine[]; total: number } {
+  const arr = Array.isArray(lines) ? lines.filter((l) => l && l.name && num(l.amount) >= 0).map((l) => ({ name: String(l.name), amount: num(l.amount) })) : [];
+  return { lines: arr, total: arr.reduce((s, l) => s + l.amount, 0) };
 }
 
 export interface CostingComputed {
@@ -213,6 +222,7 @@ export interface CostingComputed {
   equipmentCost: number;
   facilityCost: number;
   otherCost: number;
+  extraCostLines: CostExtraLine[];
   overheadMethod: string;
   overheadValue: number;
   overheadCost: number;
@@ -234,7 +244,9 @@ export async function computeCosting(serviceId: string, input: CostingComputeInp
 
   const equipmentCost = num(input.equipmentCost);
   const facilityCost = num(input.facilityCost);
-  const otherCost = num(input.otherCost);
+  // Chi phí khác (F) = tổng các dòng chi phí phát sinh (nút "+"); nếu không có dòng, dùng số nhập tay.
+  const extra = normalizeExtraLines(input.extraCostLines);
+  const otherCost = extra.lines.length > 0 ? extra.total : num(input.otherCost);
   const overheadMethod = (input.overheadMethod as string) ?? "MANUAL";
   const overheadValue = num(input.overheadValue);
   const overheadCost = computeOverhead({ method: overheadMethod, value: overheadValue, minutes: durationMinutes });
@@ -251,6 +263,7 @@ export async function computeCosting(serviceId: string, input: CostingComputeInp
     finalMaterialCost,
     laborCost: src.laborCost,
     equipmentCost, facilityCost, otherCost,
+    extraCostLines: extra.lines,
     overheadMethod, overheadValue, overheadCost,
     directCost, totalEstimatedCost,
     materialInputs: src.materialInputs, laborInputs: src.laborInputs, warnings: src.warnings,
@@ -269,6 +282,7 @@ export function buildSourceSnapshot(c: CostingComputed) {
       facilityInput: c.facilityCost,
       overheadInput: { method: c.overheadMethod, value: c.overheadValue, minutes: c.durationMinutes, amount: c.overheadCost },
       otherInput: c.otherCost,
+      extraCostLines: c.extraCostLines,
       capturedAt: new Date().toISOString(),
     })
   );
@@ -287,6 +301,7 @@ export function computedToData(c: CostingComputed): Prisma.ServiceCostingVersion
     equipmentCost: c.equipmentCost,
     facilityCost: c.facilityCost,
     otherCost: c.otherCost,
+    extraCostLines: (c.extraCostLines && c.extraCostLines.length ? c.extraCostLines : null) as any,
     overheadMethod: c.overheadMethod as any,
     overheadValue: c.overheadValue,
     overheadCost: c.overheadCost,
@@ -300,7 +315,7 @@ export function computedToData(c: CostingComputed): Prisma.ServiceCostingVersion
 // -----------------------------------------------------------------------------
 export const COSTING_SENSITIVE_FIELDS = [
   "computedMaterialCost", "materialOverride", "finalMaterialCost", "laborCost",
-  "equipmentCost", "facilityCost", "otherCost", "overheadValue", "overheadCost",
+  "equipmentCost", "facilityCost", "otherCost", "extraCostLines", "overheadValue", "overheadCost",
   "directCost", "totalEstimatedCost", "sourceSnapshot",
 ] as const;
 
@@ -324,6 +339,7 @@ export async function createCostingVersion(input: {
   equipmentCost?: number | null;
   facilityCost?: number | null;
   otherCost?: number | null;
+  extraCostLines?: CostExtraLine[] | null;
   overheadMethod?: string | null;
   overheadValue?: number | null;
   durationMinutes?: number | null;
@@ -361,6 +377,7 @@ export async function updateCostingVersion(versionId: string, patch: {
   equipmentCost?: number | null;
   facilityCost?: number | null;
   otherCost?: number | null;
+  extraCostLines?: CostExtraLine[] | null;
   overheadMethod?: string | null;
   overheadValue?: number | null;
   durationMinutes?: number | null;
@@ -375,6 +392,7 @@ export async function updateCostingVersion(versionId: string, patch: {
     equipmentCost: patch.equipmentCost !== undefined ? patch.equipmentCost : num(v.equipmentCost),
     facilityCost: patch.facilityCost !== undefined ? patch.facilityCost : num(v.facilityCost),
     otherCost: patch.otherCost !== undefined ? patch.otherCost : num(v.otherCost),
+    extraCostLines: patch.extraCostLines !== undefined ? patch.extraCostLines : ((v.extraCostLines as any) ?? null),
     overheadMethod: patch.overheadMethod !== undefined ? patch.overheadMethod : v.overheadMethod,
     overheadValue: patch.overheadValue !== undefined ? patch.overheadValue : num(v.overheadValue),
     durationMinutes: patch.durationMinutes !== undefined ? patch.durationMinutes : v.durationMinutes,
@@ -410,6 +428,7 @@ export async function recalculateCostingVersion(versionId: string) {
     equipmentCost: num(v.equipmentCost),
     facilityCost: num(v.facilityCost),
     otherCost: num(v.otherCost),
+    extraCostLines: (v.extraCostLines as any) ?? null,
     overheadMethod: v.overheadMethod,
     overheadValue: num(v.overheadValue),
     durationMinutes: v.durationMinutes,
@@ -430,6 +449,7 @@ export async function publishCostingVersion(versionId: string, actor?: string | 
     equipmentCost: num(v.equipmentCost),
     facilityCost: num(v.facilityCost),
     otherCost: num(v.otherCost),
+    extraCostLines: (v.extraCostLines as any) ?? null,
     overheadMethod: v.overheadMethod,
     overheadValue: num(v.overheadValue),
     durationMinutes: v.durationMinutes,

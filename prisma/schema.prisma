@@ -3360,7 +3360,8 @@ model ServiceCostingVersion {
   // --- Manual components ---
   equipmentCost Decimal @default(0) @db.Decimal(18, 2) // thiết bị (nhập tay PH1)
   facilityCost  Decimal @default(0) @db.Decimal(18, 2) // phòng/giường/cơ sở (nhập tay PH1)
-  otherCost     Decimal @default(0) @db.Decimal(18, 2)
+  otherCost     Decimal @default(0) @db.Decimal(18, 2) // = tổng extraCostLines nếu có, else nhập tay
+  extraCostLines Json? // [{name, amount}] — chi phí phát sinh thêm bằng nút "+"; gộp vào otherCost
 
   // --- OVERHEAD (vận hành) — theo phương pháp phân bổ tối giản ---
   overheadMethod CostAllocationType @default(MANUAL)
