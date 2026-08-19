@@ -3191,3 +3191,13 @@ Dùng khối tái sử dụng: chọn peel 5 chương trình (Desquamate/Pro Alp
 trình (RVT/Hydradermaze/Alphazyme/Alkaline Wash/Rhinovac/Vitamin A Peel) + phục hồi hàng rào bảo vệ da (8 SP).
 **Code-only additive** (KHÔNG migration; tổng vẫn **45 migration**). Xuất/nhập qua CSV `protocol-steps`. Xác thực:
 tsc sạch · build OK · seed:demo fresh = **20 protocol DMK** · full regression **607/58 PASS**.
+
+### Giá lẻ dịch vụ DMK (DV01–DV09) + giảm giá VIP (v0.38.0)
+Theo "Bảng giá trị liệu DMK gợi ý cho đại lý" (PDF khách gửi) — tạo **9 dịch vụ** `DV-DMK-DV01..DV09`
+(category "Trị liệu DMK", link `defaultProtocolId` sang PROTO-DMK-DVxx) với **giá lẻ** (cột GIÁ LẺ) và
+**giảm giá VIP** = cột "3 buổi trở lên" (thấp hơn) qua **PriceRule priceType VIP** (dùng lại pricing resolver
+PH2/PH4 sẵn có — khách thường lấy standardPrice, khách VIP lấy giá VIP). Bảng: DV01/02 lẻ 450k · VIP 360k ·
+DV03 700k/560k · DV04 1.150k/950k · DV05 630k/500k · DV06 980k/780k · DV07 1.650k/1.350k · DV08 1.050k/850k ·
+DV09 2.150k/1.750k. Upsert `update: { standardPrice }` → chạy lại cập nhật giá lẻ. **Code-only additive**
+(KHÔNG migration; tổng vẫn **45 migration**). `test/dmk-pricing.test.ts` (11) khóa bảng giá + VIP<lẻ. Xác thực:
+tsc sạch · build OK · full regression **618/59 PASS**.

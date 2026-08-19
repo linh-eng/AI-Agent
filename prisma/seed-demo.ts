@@ -676,6 +676,35 @@ async function main() {
   console.log("   Protocol DMK theo bước: ACNE(9)+AGING(10)+PIGMENT(18)+BIHAKU(7)+SKIN-MATRIX(8)+FINISH-DRY(8)+FINISH-ACNE(6)+ALPHAZYME(9)+HYDRADERMAZE(9)+ALKALINE-FACE(21)+DESQUAMATE(17).");
   console.log(`   Quy trình dịch vụ DMK: ${dmkServices.map((s) => s.code.replace("PROTO-DMK-", "")).join("+")} (${dmkServices.length} DV).`);
 
+  // === Giá lẻ dịch vụ DMK (DV01–DV09) + giảm giá VIP (từ "Bảng giá trị liệu DMK gợi ý cho đại lý") ===
+  // retail = cột GIÁ LẺ; vip = cột GIÁ (3 buổi trở lên) — VIP hưởng mức thấp hơn.
+  const catDMKsv = await prisma.serviceCategory.upsert({ where: { code: "DM-DMK" }, update: {}, create: { code: "DM-DMK", name: "Trị liệu DMK" } });
+  const dmkPrices: Record<string, { retail: number; vip: number; minutes: number; name: string }> = {
+    DV01: { retail: 450_000, vip: 360_000, minutes: 60, name: "DMK_DV01 — Detox sạch sâu, giảm dầu mụn" },
+    DV02: { retail: 450_000, vip: 360_000, minutes: 60, name: "DMK_DV02 — Detox căng bóng, sáng mịn" },
+    DV03: { retail: 700_000, vip: 560_000, minutes: 60, name: "DMK_DV03 — Peel chuyên sâu, thay mới bề mặt da" },
+    DV04: { retail: 1_150_000, vip: 950_000, minutes: 75, name: "DMK_DV04 — Enzyme Therapy #1, phục hồi da từ gốc" },
+    DV05: { retail: 630_000, vip: 500_000, minutes: 30, name: "DMK_DV05 — (Cộng thêm) Enzyme siết cơ theo vùng" },
+    DV06: { retail: 980_000, vip: 780_000, minutes: 30, name: "DMK_DV06 — (Cộng thêm) Enzyme siết cơ toàn diện" },
+    DV07: { retail: 1_650_000, vip: 1_350_000, minutes: 95, name: "DMK_DV07 — Peel chuyên sâu + Enzyme Therapy" },
+    DV08: { retail: 1_050_000, vip: 850_000, minutes: 60, name: "DMK_DV08 — Tái cấu trúc peel đa tầng" },
+    DV09: { retail: 2_150_000, vip: 1_750_000, minutes: 95, name: "DMK_DV09 — Peel đa tầng + Enzyme Therapy" },
+  };
+  for (const s of dmkServices) {
+    const key = s.code.replace("PROTO-DMK-", "");
+    const p = dmkPrices[key];
+    if (!p) continue;
+    const proto = await prisma.brandProtocol.findUnique({ where: { code: s.code }, select: { id: true } });
+    const svc = await prisma.service.upsert({
+      where: { code: "DV-DMK-" + key },
+      update: { standardPrice: p.retail }, // "cập nhật giá lẻ" khi chạy lại
+      create: { code: "DV-DMK-" + key, name: p.name, categoryId: catDMKsv.id, status: "ACTIVE", durationMinutes: p.minutes, standardPrice: p.retail, expectedCost: 0, version: 1, defaultProtocolId: proto?.id ?? null },
+    });
+    const hasVip = await prisma.priceRule.findFirst({ where: { targetType: "SERVICE", targetId: svc.id, priceType: "VIP" } });
+    if (!hasVip) await prisma.priceRule.create({ data: { targetType: "SERVICE", targetId: svc.id, targetName: p.name, priceType: "VIP", price: p.vip, isActive: true, createdBy: "Trần Quản Lý" } });
+  }
+  console.log("   Giá lẻ + giảm giá VIP cho 9 dịch vụ DMK (DV01–DV09): lẻ 450k–2.150k, VIP 360k–1.750k.");
+
   // === Redesign P2 · Protocol compose NHIỀU Service (coexistence) — "Điều trị sắc tố kết hợp" ===
   const techPico = await prisma.technology.upsert({
     where: { code: "CN-PICO" }, update: {},
