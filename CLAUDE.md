@@ -2999,3 +2999,63 @@ tự áp vào giá bán · quy đổi điểm↔quà tặng vật lý · tích �
 Kho THNG 7 phase + Spa 41 mục + HR-PH1..6 + **LOY-PH1 (khách hàng thân thiết)** đã xong. Còn lại **chỉ
 blocker hạ tầng production** (DB provider/S3/Vercel/backup vận hành/Sentry — cần admin) + nợ kỹ thuật nhỏ
 lẻ đã liệt kê từng phase. Không còn domain nghiệp vụ lớn nào chờ xây.
+
+## DATA-IO: NHẬP / XUẤT CSV DÙNG CHUNG cho danh mục (v0.37.0)
+
+Khung **nhập/xuất CSV dùng chung** để đổ dữ liệu danh mục/master nhanh (bulk) — theo yêu cầu "yêu cầu đều
+có CSV nhập và xuất để có thể đổ dữ liệu được nhanh hơn". Thuần **additive, code-only — KHÔNG migration,
+KHÔNG đổi schema** (tổng vẫn **43 migration**). tsc sạch · lint 0 lỗi · build OK. **test/data-io.test.ts**
+(11 test A–L).
+
+### Nguyên tắc AN TOÀN (blocker)
+- **CHỈ danh mục/master** (upsert theo MÃ). **KHÔNG import dữ liệu giao dịch/sổ cái** (hóa đơn/thanh toán/
+  buổi/ledger/compensation/payroll/loyalty ledger) — bảo toàn tính đúng tài chính + append-only đã nghiệm thu.
+- **NHẬP = UPSERT theo khóa tự nhiên** (`code`/`sku`): mã đã có → **cập nhật**, mã mới → **thêm**; **KHÔNG
+  xóa** bản ghi ngoài file (không hard-delete, không mất dữ liệu). Bỏ qua dòng lỗi (báo cáo lý do).
+- **FK bằng MÃ** (không phải id): cột `categoryCode`/`brandCode`/`parentCode` → resolve sang `categoryId`/
+  `brandId`/`parentId`. Mã sai → lỗi dòng (không tạo bừa). **XUẤT** cũng hiển thị FK bằng mã → **round-trip**.
+
+### Engine — `src/lib/data-io.ts` (registry-based)
+- **`parseCsv`/`toCsv`** tự viết (ngoặc kép, phẩy & xuống dòng trong ô, escape `""`). Xuất kèm **BOM** để
+  Excel đọc UTF-8. Coerce kiểu: number/boolean/date (`yyyy-MM-dd`)/enum (allowlist)/list (`|` hoặc `,`).
+- **`Dataset` registry** (12 thực thể): `{ key, label, group, model, naturalKey, readPerm, writePerm?,
+  columns[], transform? }`. `transform` đồng bộ suy field (vd `status→isActive`). Không `writePerm` = chỉ XUẤT.
+- API engine: `exportDataset` (findMany + prefetch id→code) · `templateCsv` (chỉ tiêu đề) · `previewImport`
+  (dry-run: NEW/UPDATE/ERROR + counts `willCreate/willUpdate/willError`) · `commitImport` (upsert theo mã,
+  bỏ dòng lỗi → `{total, created, updated, skippedError, errors[]}`) · `listDatasets(perms)` (lọc readPerm +
+  cờ `canWrite`).
+
+### 12 dataset + RBAC (tái dùng permission — KHÔNG thêm quyền mới)
+`membership-tiers`·`vouchers` (loyalty.read/write) · `customers` (customer.read/write) · `service-categories`·
+`services` (service.read/write; services FK `categoryCode`→category + `status→isActive`) · `spa-products`
+(library.read/**catalog.write**; FK `brandCode`) · `technologies` (library.read/**technology.write**; FK
+brand) · `brands` (library.read/**brand.write**) · `booking-resources` (booking.read/write; enum ROOM/BED/
+MACHINE + self-ref `parentCode`) · `employees` (staff.read/write; `roles` list + `status→isActive`) ·
+`kpi-definitions` (attendance.read/write) · `payroll-component-rules` (payroll.read/write). Đọc = readPerm,
+ghi = writePerm; **enforce ở SERVER** từng route (thiếu đọc → 403, ẩn danh → 401, thiếu ghi → preview/import 403).
+
+### API / UI
+- API `/api/data-io` (GET listDatasets theo `session.permissions`) · `/api/data-io/[key]/export` (readPerm,
+  CSV + BOM + content-disposition attachment) · `/[key]/template` (readPerm, header-only) · `/[key]/preview`
+  (writePerm, dry-run, ≤5000 dòng) · `/[key]/import` (writePerm, commit + audit `DATA_IMPORTED`).
+- UI **`/data-io`** (Vận hành & Hệ thống, hiện nếu có quyền ghi ≥1 danh mục): chọn loại dữ liệu (dropdown
+  gom nhóm) → **Tải mẫu / Xuất CSV / Nhập** (dán hoặc tải file → **Xem trước** Thêm mới/Cập nhật/Lỗi từng
+  dòng → **Nhập**). Chip cột (bắt buộc/kiểu/enum/mã-FK). Nav item "Nhập/Xuất dữ liệu (CSV)".
+- Doc `docs/DATA_IO_CSV.md` (12 dataset, định dạng, quyền).
+
+### Chứng minh (test/data-io.test.ts, 11 test → A–L, HTTP thật trên Postgres)
+A liệt kê dataset theo quyền · B xuất CSV có tiêu đề+dữ liệu · C mẫu = 1 dòng tiêu đề · D preview phân loại
+NEW/ERROR (thiếu cột bắt buộc) · E import tạo mới · **F+G upsert theo mã** (lần 2 → UPDATE, KHÔNG tạo trùng,
+**KHÔNG xóa** bản ghi KEEP ngoài file) · H enum sai → lỗi · **I FK theo mã** (categoryCode→categoryId +
+transform isActive; mã sai → lỗi) · **J round-trip** (xuất→xóa→nhập lại giữ nguyên; date+số parse đúng) ·
+K chỉ-đọc xuất OK / nhập 403 (canWrite=false) · L không quyền đọc → 403, ẩn danh → 401.
+
+### CONFLICTS: KHÔNG CÓ
+Code-only additive (0 migration/0 schema change) · chỉ danh mục (không đụng giao dịch/sổ cái) · upsert theo
+mã (không hard-delete) · tái dùng permission Mục 15 + LOY/HR (không thêm quyền) · audit `DATA_IMPORTED`.
+Baseline toàn bộ (Mục 2–16 + HR-PH1..6 + LOY-PH1 + Pricing/Costing + IA/RBAC) bất biến.
+
+### Nợ / phạm vi
+Chỉ 12 danh mục "an toàn" (upsert theo mã) — thực thể giao dịch chỉ **xuất** qua báo cáo/CSV sẵn có, **không
+nhập** qua DATA-IO (theo thiết kế). Có thể thêm dataset danh mục mới bằng cách khai thêm entry trong
+`DATASETS` (không cần migration). `.xlsx` trực tiếp chưa (hiện CSV).

@@ -1,0 +1,182 @@
+// =============================================================================
+// DATA-IO — Nhập/Xuất CSV danh mục. Chứng minh A–L.
+//   Export/template A–C · Import upsert D–H · FK-by-code + enum + date I–J ·
+//   RBAC K–L. Upsert theo mã (không xóa dữ liệu ngoài file); dry-run preview.
+// =============================================================================
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+
+const { jar } = vi.hoisted(() => ({ jar: new Map<string, string>() }));
+vi.mock("next/headers", () => ({
+  cookies: () => ({
+    get: (n: string) => { const v = jar.get(n); return v === undefined ? undefined : { name: n, value: v }; },
+    set: (n: string, v: string) => { jar.set(n, v); },
+    delete: (n: string) => { jar.delete(n); },
+  }),
+}));
+
+import { prisma } from "@/lib/prisma";
+import { hashPassword } from "@/lib/auth";
+import { resetDb, uniq } from "./helpers";
+import { PERMISSIONS } from "@/lib/rbac";
+import { POST as staffLogin } from "@/app/api/auth/login/route";
+import { GET as listRaw } from "@/app/api/data-io/route";
+import { GET as exportRaw } from "@/app/api/data-io/[key]/export/route";
+import { GET as templateRaw } from "@/app/api/data-io/[key]/template/route";
+import { POST as previewRaw } from "@/app/api/data-io/[key]/preview/route";
+import { POST as importRaw } from "@/app/api/data-io/[key]/import/route";
+
+let ip = 0;
+async function rj(res: Response) { const t = await res.text(); try { return t ? JSON.parse(t) : null; } catch { return null; } }
+const D = async (res: Response) => { const j = await rj(res); return j && "data" in j ? j.data : j; };
+async function makeUser(perms: string[]) {
+  const email = `${uniq("c")}@thng.com.vn`.toLowerCase();
+  const user = await prisma.user.create({ data: { email, name: "U " + uniq("n"), passwordHash: await hashPassword("matkhau123") } });
+  const role = await prisma.role.create({ data: { code: uniq("ROLE"), name: "R" } });
+  await prisma.userRole.create({ data: { userId: user.id, roleId: role.id } });
+  for (const c of perms) { const p = await prisma.permission.upsert({ where: { code: c }, update: {}, create: { code: c } }); await prisma.rolePermission.create({ data: { roleId: role.id, permissionId: p.id } }); }
+  return { email, userId: user.id };
+}
+async function login(email: string) {
+  jar.clear();
+  await staffLogin(new Request("http://t/api/auth/login", { method: "POST", headers: { "content-type": "application/json", "x-forwarded-for": `10.81.0.${++ip}` }, body: JSON.stringify({ email, password: "matkhau123" }) }), {} as any);
+}
+const J = (b: unknown) => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
+const listDs = () => listRaw(new Request("http://t/api/data-io"), {} as any);
+const exportCsv = (key: string) => exportRaw(new Request("http://t/x"), { params: { key } } as any);
+const template = (key: string) => templateRaw(new Request("http://t/x"), { params: { key } } as any);
+const preview = (key: string, csv: string) => previewRaw(new Request("http://t/x", J({ csv })), { params: { key } } as any);
+const doImport = (key: string, csv: string) => importRaw(new Request("http://t/x", J({ csv })), { params: { key } } as any);
+
+const LOY = [PERMISSIONS.LOYALTY_READ, PERMISSIONS.LOYALTY_WRITE];
+const SVC = [PERMISSIONS.SERVICE_READ, PERMISSIONS.SERVICE_WRITE];
+
+describe("DATA-IO · Export / template (A–C)", () => {
+  beforeAll(async () => { await prisma.$executeRawUnsafe("TRUNCATE auth_throttles RESTART IDENTITY CASCADE").catch(() => {}); });
+  beforeEach(async () => { await resetDb(); });
+  afterAll(async () => { await prisma.$disconnect().catch(() => {}); });
+
+  it("A: liệt kê dataset theo quyền (chỉ cái có readPerm)", async () => {
+    const u = await makeUser(LOY); await login(u.email);
+    const rows = await D(await listDs());
+    const keys = rows.map((r: any) => r.key);
+    expect(keys).toContain("membership-tiers");
+    expect(keys).toContain("vouchers");
+    expect(keys).not.toContain("employees"); // không có staff.read
+  });
+
+  it("B: xuất CSV có tiêu đề + dữ liệu", async () => {
+    const u = await makeUser(LOY); await login(u.email);
+    await prisma.membershipTier.create({ data: { code: "VIP", name: "VIP", minLifetimeSpend: 5_000_000 as any, pointsPerThousand: 2 as any } });
+    const res = await exportCsv("membership-tiers");
+    expect(res.status).toBe(200);
+    const text = (await res.text()).replace(/^﻿/, "");
+    expect(text.split("\n")[0]).toContain("code");
+    expect(text).toContain("VIP");
+  });
+
+  it("C: tải mẫu = chỉ dòng tiêu đề", async () => {
+    const u = await makeUser(LOY); await login(u.email);
+    const text = (await (await template("vouchers")).text()).replace(/^﻿/, "");
+    expect(text.split("\n").length).toBe(1);
+    expect(text).toContain("code");
+    expect(text).toContain("type");
+  });
+});
+
+describe("DATA-IO · Import upsert (D–J)", () => {
+  beforeAll(async () => { await prisma.$executeRawUnsafe("TRUNCATE auth_throttles RESTART IDENTITY CASCADE").catch(() => {}); });
+  beforeEach(async () => { await resetDb(); });
+  afterAll(async () => { await prisma.$disconnect().catch(() => {}); });
+
+  it("D: xem trước phân loại Thêm mới / Lỗi (thiếu cột bắt buộc)", async () => {
+    const u = await makeUser(LOY); await login(u.email);
+    const csv = "code,name,type,value\nGIAM50,Giảm 50k,FIXED,50000\nBADROW,,FIXED,1000";
+    const p = await D(await preview("vouchers", csv));
+    expect(p.counts.willCreate).toBe(1);
+    expect(p.counts.willError).toBe(1); // thiếu name
+    expect(p.results[1].errors.join()).toContain("name");
+  });
+
+  it("E: nhập tạo mới bản ghi", async () => {
+    const u = await makeUser(LOY); await login(u.email);
+    const csv = "code,name,minLifetimeSpend,pointsPerThousand\nSTD,Thường,0,1\nVIP,VIP,5000000,2";
+    const r = await D(await doImport("membership-tiers", csv));
+    expect(r.created).toBe(2);
+    expect(await prisma.membershipTier.count()).toBe(2);
+    expect(Number((await prisma.membershipTier.findUnique({ where: { code: "VIP" } }))!.pointsPerThousand)).toBe(2);
+  });
+
+  it("F+G: nhập lần 2 → UPDATE theo mã (không tạo trùng, không xóa cái khác)", async () => {
+    const u = await makeUser(LOY); await login(u.email);
+    await prisma.membershipTier.create({ data: { code: "STD", name: "Thường", pointsPerThousand: 1 as any } });
+    await prisma.membershipTier.create({ data: { code: "KEEP", name: "Giữ nguyên" } }); // không có trong file
+    const csv = "code,name,pointsPerThousand\nSTD,Thường mới,3";
+    const r = await D(await doImport("membership-tiers", csv));
+    expect(r.updated).toBe(1);
+    expect(r.created).toBe(0);
+    const std = await prisma.membershipTier.findUnique({ where: { code: "STD" } });
+    expect(std!.name).toBe("Thường mới");
+    expect(Number(std!.pointsPerThousand)).toBe(3);
+    expect(await prisma.membershipTier.findUnique({ where: { code: "KEEP" } })).not.toBeNull(); // KHÔNG bị xóa
+  });
+
+  it("H: enum sai → lỗi (không nhập)", async () => {
+    const u = await makeUser(LOY); await login(u.email);
+    const csv = "code,name,type,value\nX,x,GIAMGIA,100";
+    const p = await D(await preview("vouchers", csv));
+    expect(p.counts.willError).toBe(1);
+    expect(p.results[0].errors.join()).toContain("type");
+  });
+
+  it("I: FK theo MÃ (categoryCode → categoryId) — resolve đúng + báo lỗi mã sai", async () => {
+    const u = await makeUser(SVC); await login(u.email);
+    await prisma.serviceCategory.create({ data: { code: "NHOM-RF", name: "Nhóm RF" } });
+    const okCsv = "code,name,categoryCode,standardPrice,status\nDV-X,Dịch vụ X,NHOM-RF,500000,ACTIVE";
+    const r = await D(await doImport("services", okCsv));
+    expect(r.created).toBe(1);
+    const svc = await prisma.service.findUnique({ where: { code: "DV-X" }, include: { category: true } });
+    expect(svc!.category!.code).toBe("NHOM-RF");
+    expect(svc!.isActive).toBe(true); // transform status→isActive
+    // mã nhóm không tồn tại → lỗi
+    const badCsv = "code,name,categoryCode\nDV-Y,Dịch vụ Y,KHONG-CO";
+    const p = await D(await preview("services", badCsv));
+    expect(p.counts.willError).toBe(1);
+    expect(p.results[0].errors.join()).toContain("categoryCode");
+  });
+
+  it("J: xuất rồi nhập lại (round-trip) giữ nguyên dữ liệu; date + số parse đúng", async () => {
+    const u = await makeUser(LOY); await login(u.email);
+    await prisma.voucher.create({ data: { code: "RT", name: "Round trip", type: "PERCENT", value: 20 as any, maxDiscount: 300000 as any, expiresAt: new Date("2026-12-31T00:00:00Z") } });
+    const csv = (await (await exportCsv("vouchers")).text()).replace(/^﻿/, "");
+    await prisma.voucher.deleteMany({});
+    const r = await D(await doImport("vouchers", csv));
+    expect(r.created).toBe(1);
+    const v = await prisma.voucher.findUnique({ where: { code: "RT" } });
+    expect(Number(v!.value)).toBe(20);
+    expect(Number(v!.maxDiscount)).toBe(300000);
+    expect(v!.expiresAt?.toISOString().slice(0, 10)).toBe("2026-12-31");
+  });
+});
+
+describe("DATA-IO · RBAC (K–L)", () => {
+  beforeAll(async () => { await prisma.$executeRawUnsafe("TRUNCATE auth_throttles RESTART IDENTITY CASCADE").catch(() => {}); });
+  beforeEach(async () => { await resetDb(); });
+  afterAll(async () => { await prisma.$disconnect().catch(() => {}); });
+
+  it("K: chỉ đọc → xuất được, NHẬP bị chặn 403", async () => {
+    const u = await makeUser([PERMISSIONS.LOYALTY_READ]); await login(u.email);
+    expect((await exportCsv("membership-tiers")).status).toBe(200);
+    expect((await preview("membership-tiers", "code,name\nA,B")).status).toBe(403);
+    expect((await doImport("membership-tiers", "code,name\nA,B")).status).toBe(403);
+    // dataset chỉ hiện canWrite=false
+    const rows = await D(await listDs());
+    expect(rows.find((r: any) => r.key === "membership-tiers").canWrite).toBe(false);
+  });
+
+  it("L: không có quyền đọc dataset → 403; ẩn danh → 401", async () => {
+    const u = await makeUser([PERMISSIONS.TREATMENT_READ]); await login(u.email);
+    expect((await exportCsv("employees")).status).toBe(403); // không staff.read
+    jar.clear();
+    expect((await exportCsv("membership-tiers")).status).toBe(401);
+  });
+});

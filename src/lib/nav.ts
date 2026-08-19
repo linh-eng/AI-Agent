@@ -118,6 +118,8 @@ export const NAV_GROUPS: NavGroup[] = [
       // HR-PH6 — workspace bảng lương (kỳ lương/phiếu lương/cấu hình). Gate payroll.read.
       { href: "/payroll", label: "Bảng lương", icon: Receipt, perm: "payroll.read" },
       { href: "/import-customers", label: "Nhập khách hàng", icon: Upload, perm: "customer.write" },
+      // DATA-IO — nhập/xuất CSV danh mục dùng chung. Hiện nếu có quyền ghi ít nhất 1 danh mục.
+      { href: "/data-io", label: "Nhập/Xuất dữ liệu (CSV)", icon: Upload, perm: ["customer.write", "service.write", "catalog.write", "brand.write", "technology.write", "booking.write", "staff.write", "loyalty.write", "payroll.write", "attendance.write"] },
       { href: "/users", label: "Quản trị người dùng", icon: ShieldCheck, perm: "user.manage" },
       { href: "/settings", label: "Cài đặt", icon: Settings, perm: "setting.write" },
     ],
