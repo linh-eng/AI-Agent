@@ -41,7 +41,7 @@ echo.
 echo ============================================================
 echo   XONG! Chay  start-windows.bat  de khoi dong webapp.
 echo   Truy cap: http://172.168.11.60:9500   (Cong khach: /portal)
-echo   Dang nhap: quanly@thng.com.vn / quanly123
+echo   Dang nhap: quanly@sophia.com.vn / quanly123
 echo ============================================================
 pause
 exit /b 0
