@@ -217,6 +217,98 @@ async function main() {
     },
   });
 
+  // === Protocol DMK theo BƯỚC (đúng bảng trị liệu DMK: Bước · Tên trị liệu · Mục đích) ===
+  // Nguồn: bảng "Hệ thống trị liệu" DMK do khách hàng cung cấp. Lưu steps.items = {group,name,purpose}.
+  await prisma.brandProtocol.upsert({
+    where: { code: "PROTO-DMK-ACNE" }, update: {},
+    create: {
+      code: "PROTO-DMK-ACNE", name: "DMK — Hệ thống trị liệu cho da mụn", kind: "BRAND", brandId: brDMK.id,
+      status: "ACTIVE", version: 1, compositionMode: "LEGACY_STEPS",
+      purpose: "Trị liệu da mụn theo hệ thống DMK (chọn 1 trị liệu bề mặt phù hợp tình trạng).",
+      steps: { items: [
+        { group: "Detox", name: "Sebum Soak, Epitoxyl", purpose: "Tan dầu, tăng thấm hút chuyển hóa" },
+        { group: "Trị liệu bề mặt (chọn 1)", name: "Prozyme", purpose: "Da nhiều dầu, dày sừng, viêm" },
+        { group: "Trị liệu bề mặt (chọn 1)", name: "Cryo Pro-X", purpose: "Mụn trên nền da yếu, mụn loạn khuẩn; da bớt sừng dầu, bít tắc, cần thải độc, phục hồi cấu trúc; mụn viêm, mụn nội tiết, sẹo đỏ trên nền da yếu" },
+        { group: "Trị liệu bề mặt (chọn 1)", name: "Quick Peel + Cryo Pro-X", purpose: "Mụn nội tiết, mụn cục chưa có đầu" },
+        { group: "Trị liệu bề mặt (chọn 1)", name: "Alkaline Wash", purpose: "Xử lý nhiều vấn đề sừng – mụn viêm – mụn chai xơ – sẹo" },
+        { group: "Trị liệu bề mặt (chọn 1)", name: "Desquamate", purpose: "Giảm sừng hiệu quả và an toàn cho da mẫn cảm hoặc sau Alkaline Wash" },
+        { group: "Trị liệu bề mặt (chọn 1)", name: "Actrol Powder", purpose: "" },
+        { group: "Phục hồi", name: "Enzyme (pha Aqua hoặc Exoderma) — Enzyme 1,2,3", purpose: "Giảm sưng nề; nhanh lành thương; phục hồi cấu trúc" },
+        { group: "Tăng đề kháng / Khóa viêm", name: "Beta Gel, Solar Damage, Actrol Powder", purpose: "" },
+      ] },
+      recommendedFreq: "7–14 ngày/lần", createdBy: "Trần Quản Lý",
+    },
+  });
+  await prisma.brandProtocol.upsert({
+    where: { code: "PROTO-DMK-AGING" }, update: {},
+    create: {
+      code: "PROTO-DMK-AGING", name: "DMK — Hệ thống trị liệu lão hóa", kind: "BRAND", brandId: brDMK.id,
+      status: "ACTIVE", version: 1, compositionMode: "LEGACY_STEPS",
+      purpose: "Trị liệu lão hóa theo hệ thống DMK (chọn trị liệu bề mặt theo tình trạng da).",
+      steps: { items: [
+        { group: "Detox", name: "Sebum Soak, Epitoxyl", purpose: "Mở kênh dẫn, tăng thấm hút chuyển hóa" },
+        { group: "Trị liệu bề mặt", name: "Prozyme", purpose: "Da không làm sạch tốt, có dầu, bít tắc" },
+        { group: "Trị liệu bề mặt", name: "Pro Alpha 1", purpose: "Da dày sừng, nhiều nếp nhăn nông" },
+        { group: "Trị liệu bề mặt", name: "Bihaku 1 ngày (Pro Alpha 1 + Super Bright)", purpose: "Da sừng vừa, da cần làm tươi mới, giàu sức sống" },
+        { group: "Trị liệu bề mặt", name: "Cryo Pro-X", purpose: "Da hơi mỏng, cần cải thiện sắc thái, chuyển hóa, đều màu, quầng thâm bọng mắt" },
+        { group: "Trị liệu bề mặt", name: "Quick Peel", purpose: "Da khỏe ít sừng, tái xỉn, cần cải thiện sắc thái, chuyển hóa, đều màu, quầng thâm bọng mắt" },
+        { group: "Trị liệu bề mặt", name: "Bihaku 7 ngày, 12 ngày", purpose: "Da khỏe cần cải thiện cả bề mặt và sắc tố" },
+        { group: "Trị liệu bề mặt", name: "RP", purpose: "Nhăn sâu" },
+        { group: "Phục hồi", name: "Enzyme 1", purpose: "Bề mặt, nhăn" },
+        { group: "Phục hồi", name: "Enzyme 1,2,3", purpose: "Nhăn sâu, cơ, mao mạch" },
+      ] },
+      recommendedFreq: "Theo liệu trình", createdBy: "Trần Quản Lý",
+    },
+  });
+  await prisma.brandProtocol.upsert({
+    where: { code: "PROTO-DMK-PIGMENT" }, update: {},
+    create: {
+      code: "PROTO-DMK-PIGMENT", name: "DMK — Hệ thống trị liệu sắc tố", kind: "BRAND", brandId: brDMK.id,
+      status: "ACTIVE", version: 1, compositionMode: "LEGACY_STEPS",
+      purpose: "Trị liệu sắc tố theo hệ thống DMK: loại bỏ → dày khỏe da/tăng đáp ứng → ức chế làm sáng → sửa chữa hàng rào bảo vệ.",
+      steps: { items: [
+        { group: "Loại bỏ", name: "Desquamate", purpose: "" },
+        { group: "Loại bỏ", name: "Cryo Pro-X", purpose: "" },
+        { group: "Loại bỏ", name: "Quick Peel", purpose: "" },
+        { group: "Loại bỏ", name: "Bihaku", purpose: "" },
+        { group: "Loại bỏ", name: "Alkaline Wash", purpose: "" },
+        { group: "Dày khỏe da, tăng đáp ứng", name: "Enzyme 1", purpose: "Bình thường TB sắc tố" },
+        { group: "Dày khỏe da, tăng đáp ứng", name: "Enzyme 1,2,3", purpose: "Dày khỏe da, giảm mỏng đỏ; thu nhỏ mao mạch" },
+        { group: "Ức chế, làm sáng", name: "Melanotech Drops", purpose: "" },
+        { group: "Ức chế, làm sáng", name: "Melanotech Crème", purpose: "" },
+        { group: "Ức chế, làm sáng", name: "Super Bright", purpose: "" },
+        { group: "Ức chế, làm sáng", name: "Direct Vitamin C Serum", purpose: "" },
+        { group: "Ức chế, làm sáng", name: "FibroMax C", purpose: "" },
+        { group: "Ức chế, làm sáng", name: "Revitosin", purpose: "" },
+        { group: "Ức chế, làm sáng", name: "Revise A", purpose: "" },
+        { group: "Sửa chữa hàng rào bảo vệ", name: "Bộ Enbioment", purpose: "Hàng rào vi sinh" },
+        { group: "Sửa chữa hàng rào bảo vệ", name: "Dầu khoáng", purpose: "Hàng rào hóa học" },
+        { group: "Sửa chữa hàng rào bảo vệ", name: "EFA Ultra", purpose: "Hàng rào vật lý" },
+        { group: "Sửa chữa hàng rào bảo vệ", name: "Beta Gel", purpose: "Miễn dịch nội sinh" },
+      ] },
+      recommendedFreq: "Theo liệu trình", createdBy: "Trần Quản Lý",
+    },
+  });
+  await prisma.brandProtocol.upsert({
+    where: { code: "PROTO-DMK-BIHAKU" }, update: {},
+    create: {
+      code: "PROTO-DMK-BIHAKU", name: "DMK — Bihaku 7–14 ngày (lịch trình)", kind: "BRAND", brandId: brDMK.id,
+      status: "ACTIVE", version: 1, compositionMode: "LEGACY_STEPS",
+      purpose: "Lịch trình Bihaku tại spa + tại nhà (7–14 ngày). Bihaku 1 = 1ml Pro Alpha 1 + 1ml Super Bright.",
+      steps: { items: [
+        { group: "Ngày 1", name: "Tại spa: Sebum Soak → Enzyme 1 pha Desquamate → bôi Bihaku", purpose: "Chiết về nhà mỗi loại 3ml (Bihaku 1 = 1ml Pro Alpha 1 + 1ml Bright)" },
+        { group: "Ngày 2,3,4", name: "Tại nhà: rửa mặt, 1 lớp mỏng Beta Gel → bôi hỗn hợp Bihaku", purpose: "Ngày 4 nếu da hồng nhiều, có bong thì có thể ngừng" },
+        { group: "Ngày 5,6", name: "Dưỡng (sáng & tối)", purpose: "" },
+        { group: "Ngày 7", name: "Tại spa: RM → Epitoxyl → Enzyme 1 pha Desquamate → bôi Bihaku", purpose: "Chiết về nhà mỗi loại 2ml" },
+        { group: "Ngày 8,9", name: "Tại nhà: rửa mặt, 1 lớp mỏng Beta Gel → bôi hỗn hợp Bihaku", purpose: "" },
+        { group: "Ngày 10,11", name: "Dưỡng (sáng & tối)", purpose: "" },
+        { group: "Ngày 12–14", name: "Tại spa: RM → Epitoxyl → Enzyme 1 pha Desquamate → cấp dưỡng như bình thường", purpose: "" },
+      ] },
+      recommendedFreq: "Liệu trình 7–14 ngày", createdBy: "Trần Quản Lý",
+    },
+  });
+  console.log("   Protocol DMK theo bước: ACNE (9) + AGING (10) + PIGMENT (18) + BIHAKU (7 ngày).");
+
   // === Redesign P2 · Protocol compose NHIỀU Service (coexistence) — "Điều trị sắc tố kết hợp" ===
   const techPico = await prisma.technology.upsert({
     where: { code: "CN-PICO" }, update: {},

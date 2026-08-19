@@ -236,4 +236,39 @@ describe("DATA-IO · Tiêu đề TIẾNG VIỆT + mục nhập liệu bổ sung 
     expect(mk.created).toBe(1);
     expect(Number((await prisma.marketingCampaign.findUnique({ where: { code: "MK-01" } }))!.budget)).toBe(50000000);
   });
+
+  it("Q: Protocol dịch vụ theo BƯỚC (nested) — nhập nhiều dòng/1 protocol → gom thành steps.items", async () => {
+    const u = await makeUser([PERMISSIONS.LIBRARY_READ, PERMISSIONS.PROTOCOL_WRITE]); await login(u.email);
+    const keys = (await D(await listDs())).map((r: any) => r.key);
+    expect(keys).toContain("protocol-steps");
+    // 3 dòng cùng 1 mã protocol → 1 BrandProtocol có 3 bước (group/name/purpose)
+    const csv = [
+      "Mã protocol,Tên protocol,Bước,Tên trị liệu,Mục đích",
+      "PRO-ACNE,Trị liệu da mụn,Detox,Sebum Soak,Tan dầu",
+      "PRO-ACNE,Trị liệu da mụn,Trị liệu bề mặt,Prozyme,Da nhiều dầu dày sừng",
+      "PRO-ACNE,Trị liệu da mụn,Phục hồi,Enzyme 1,Giảm sưng nề",
+    ].join("\n");
+    const r = await D(await doImport("protocol-steps", csv));
+    expect(r.created).toBe(1);
+    const p = await prisma.brandProtocol.findUnique({ where: { code: "PRO-ACNE" } });
+    expect(p!.name).toBe("Trị liệu da mụn");
+    const items = (p!.steps as any).items;
+    expect(items).toHaveLength(3);
+    expect(items[0]).toMatchObject({ group: "Detox", name: "Sebum Soak", purpose: "Tan dầu" });
+    expect(items[2].name).toBe("Enzyme 1");
+  });
+
+  it("R: nested protocol — XUẤT ra dòng/bước + nhập lại (round-trip) UPDATE thay toàn bộ bước", async () => {
+    const u = await makeUser([PERMISSIONS.LIBRARY_READ, PERMISSIONS.PROTOCOL_WRITE]); await login(u.email);
+    await prisma.brandProtocol.create({ data: { code: "PRO-AGE", name: "Lão hóa", kind: "BRAND", status: "ACTIVE", compositionMode: "LEGACY_STEPS", steps: { items: [{ group: "Detox", name: "Sebum Soak", purpose: "Mở kênh dẫn" }, { group: "Bề mặt", name: "RP", purpose: "Nhăn sâu" }] } } as any });
+    const text = (await (await exportCsv("protocol-steps")).text()).replace(/^﻿/, "");
+    expect(text.split("\n")[0]).toContain("Mã protocol"); // tiêu đề tiếng Việt
+    expect(text).toContain("PRO-AGE"); expect(text).toContain("RP");
+    // nhập lại (chỉ 1 bước) → UPDATE thay toàn bộ steps (còn 1 bước)
+    const r = await D(await doImport("protocol-steps", "Mã protocol,Tên protocol,Bước,Tên trị liệu,Mục đích\nPRO-AGE,Lão hóa,Bề mặt,Quick Peel,Da khỏe"));
+    expect(r.updated).toBe(1); expect(r.created).toBe(0);
+    const items = (await prisma.brandProtocol.findUnique({ where: { code: "PRO-AGE" } }))!.steps as any;
+    expect(items.items).toHaveLength(1);
+    expect(items.items[0].name).toBe("Quick Peel");
+  });
 });

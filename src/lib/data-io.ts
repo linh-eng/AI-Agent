@@ -60,6 +60,7 @@ export type Dataset = {
   readPerm: string; writePerm?: string; // không có writePerm → chỉ XUẤT
   columns: Col[];
   transform?: (data: any) => any; // chỉnh data trước khi upsert (vd đồng bộ isActive)
+  nested?: boolean; // dataset LỒNG (nhiều dòng/1 bản ghi) — vd protocol theo bước; xử lý riêng
 };
 
 const GENDER = ["MALE", "FEMALE", "OTHER"];
@@ -158,6 +159,15 @@ export const DATASETS: Record<string, Dataset> = {
       { key: "content", header: "Nội dung" }, { key: "isActive", header: "Đang dùng", type: "boolean" },
     ],
   },
+  "protocol-steps": {
+    key: "protocol-steps", label: "Protocol dịch vụ (theo bước)", group: "Thư viện chuyên môn", model: "brandProtocol", naturalKey: "code",
+    readPerm: "library.read", writePerm: "protocol.write", nested: true,
+    columns: [
+      { key: "protocolCode", header: "Mã protocol", required: true }, { key: "protocolName", header: "Tên protocol" },
+      { key: "group", header: "Bước" }, { key: "stepName", header: "Tên trị liệu", required: true },
+      { key: "purpose", header: "Mục đích" }, { key: "durationMinutes", header: "Thời lượng (phút)", type: "number" },
+    ],
+  },
   "booking-resources": {
     key: "booking-resources", label: "Tài nguyên (phòng/giường/máy)", group: "Khách hàng & Hành trình", model: "bookingResource", naturalKey: "code",
     readPerm: "booking.read", writePerm: "booking.write",
@@ -232,10 +242,88 @@ function fmt(val: any, type?: ColType): string {
   return String(val);
 }
 
+// ---------------------------------------------------------------------------
+// NESTED — Protocol theo bước: mỗi DÒNG CSV = 1 bước; gom theo "Mã protocol".
+// Lưu vào BrandProtocol.steps = { items: [{ group, name, purpose, durationMinutes? }] }.
+// ---------------------------------------------------------------------------
+function mapNestedRows(ds: Dataset, header: string[], dataRows: string[][]) {
+  const byH = new Map<string, Col>();
+  for (const c of ds.columns) { byH.set(c.header.trim().toLowerCase(), c); byH.set(c.key.trim().toLowerCase(), c); }
+  const idx = header.map((h) => byH.get(h.trim().toLowerCase()));
+  return dataRows.map((cells) => {
+    const row: any = {}; const errors: string[] = [];
+    idx.forEach((c, i) => {
+      if (!c) return;
+      const res = coerce(cells[i] ?? "", c);
+      if ("error" in res) { errors.push(res.error); return; }
+      if (res.value !== undefined) row[c.key] = res.value;
+    });
+    for (const c of ds.columns) if (c.required && row[c.key] == null) errors.push(`Thiếu ${c.header}`);
+    return { row, errors };
+  });
+}
+
+async function exportProtocolSteps(): Promise<string> {
+  const ds = DATASETS["protocol-steps"];
+  const header = ds.columns.map((c) => c.header);
+  const protos = await m("brandProtocol").findMany({ orderBy: { code: "asc" }, select: { code: true, name: true, steps: true } });
+  const out: (string | number | null)[][] = [];
+  for (const p of protos) {
+    const items = Array.isArray((p.steps as any)?.items) ? (p.steps as any).items : [];
+    if (!items.length) continue; // chỉ xuất protocol CÓ bước (đúng cấu trúc theo-bước)
+    for (const it of items) out.push([p.code, p.name, it.group ?? "", it.name ?? "", it.purpose ?? "", it.durationMinutes ?? ""]);
+  }
+  return toCsv(header, out);
+}
+
+async function previewProtocolSteps(header: string[], dataRows: string[][]) {
+  const ds = DATASETS["protocol-steps"];
+  const parsed = mapNestedRows(ds, header, dataRows);
+  const codes = Array.from(new Set(parsed.filter((p) => !p.errors.length && p.row.protocolCode).map((p) => String(p.row.protocolCode))));
+  const existing = codes.length ? await m("brandProtocol").findMany({ where: { code: { in: codes } }, select: { code: true } }) : [];
+  const existSet = new Set(existing.map((e: any) => String(e.code)));
+  const results: RowResult[] = parsed.map((p, i) => {
+    if (p.errors.length) return { index: i, status: "ERROR", errors: p.errors };
+    return { index: i, status: existSet.has(String(p.row.protocolCode)) ? "UPDATE" : "NEW", errors: [], key: p.row.protocolCode };
+  });
+  const newCodes = new Set(codes.filter((c) => !existSet.has(c)));
+  return { results, counts: { willCreate: newCodes.size, willUpdate: existSet.size, willError: results.filter((r) => r.status === "ERROR").length } };
+}
+
+async function commitProtocolSteps(header: string[], dataRows: string[][]) {
+  const parsed = mapNestedRows(DATASETS["protocol-steps"], header, dataRows);
+  const errors: { index: number; reason: string }[] = [];
+  let skippedError = 0;
+  // Gom dòng HỢP LỆ theo Mã protocol (bỏ dòng lỗi).
+  const groups = new Map<string, { name?: string; items: any[] }>();
+  parsed.forEach((p, i) => {
+    if (p.errors.length) { skippedError++; errors.push({ index: i, reason: p.errors.join("; ") }); return; }
+    const code = String(p.row.protocolCode);
+    const g = groups.get(code) ?? { name: undefined, items: [] };
+    if (!g.name && p.row.protocolName) g.name = String(p.row.protocolName);
+    g.items.push({ group: p.row.group ?? undefined, name: String(p.row.stepName), purpose: p.row.purpose ?? undefined, ...(p.row.durationMinutes != null ? { durationMinutes: p.row.durationMinutes } : {}) });
+    groups.set(code, g);
+  });
+  let created = 0, updated = 0;
+  for (const [code, g] of groups) {
+    const existed = await m("brandProtocol").findUnique({ where: { code }, select: { id: true, name: true } });
+    const steps = { items: g.items };
+    if (existed) {
+      await m("brandProtocol").update({ where: { code }, data: { steps, ...(g.name ? { name: g.name } : {}) } });
+      updated++;
+    } else {
+      await m("brandProtocol").create({ data: { code, name: g.name ?? code, kind: "BRAND", status: "ACTIVE", compositionMode: "LEGACY_STEPS", steps } });
+      created++;
+    }
+  }
+  return { total: parsed.length, created, updated, skippedError, errors };
+}
+
 /** XUẤT toàn bộ bản ghi của 1 dataset → CSV (FK hiển thị bằng mã). */
 export async function exportDataset(key: string): Promise<string> {
   const ds = DATASETS[key];
   if (!ds) throw new Error("Dataset không tồn tại");
+  if (ds.nested) return exportProtocolSteps();
   const rows = await m(ds.model).findMany({ orderBy: { [ds.naturalKey]: "asc" } });
   // prefetch id→code cho các cột ref
   const refMaps = new Map<string, Map<string, string>>();
@@ -314,6 +402,7 @@ async function buildRows(ds: Dataset, header: string[], dataRows: string[][]) {
 export async function previewImport(key: string, header: string[], dataRows: string[][]): Promise<{ results: RowResult[]; counts: { willCreate: number; willUpdate: number; willError: number } }> {
   const ds = DATASETS[key];
   if (!ds) throw new Error("Dataset không tồn tại");
+  if (ds.nested) return previewProtocolSteps(header, dataRows);
   const built = await buildRows(ds, header, dataRows);
   const keys = built.map((b) => b.naturalVal).filter(Boolean);
   const existing = keys.length ? await m(ds.model).findMany({ where: { [ds.naturalKey]: { in: keys } }, select: { [ds.naturalKey]: true } }) : [];
@@ -329,6 +418,7 @@ export async function previewImport(key: string, header: string[], dataRows: str
 export async function commitImport(key: string, header: string[], dataRows: string[][]): Promise<{ total: number; created: number; updated: number; skippedError: number; errors: { index: number; reason: string }[] }> {
   const ds = DATASETS[key];
   if (!ds) throw new Error("Dataset không tồn tại");
+  if (ds.nested) return commitProtocolSteps(header, dataRows);
   const built = await buildRows(ds, header, dataRows);
   let created = 0, updated = 0, skippedError = 0;
   const errors: { index: number; reason: string }[] = [];
@@ -350,5 +440,5 @@ export async function commitImport(key: string, header: string[], dataRows: stri
 export function listDatasets(perms: string[]) {
   return Object.values(DATASETS)
     .filter((d) => perms.includes(d.readPerm))
-    .map((d) => ({ key: d.key, label: d.label, group: d.group, canWrite: !!d.writePerm && perms.includes(d.writePerm), columns: d.columns.map((c) => ({ header: c.header, required: !!c.required, type: c.type ?? "string", enum: c.enum, ref: c.ref ? c.ref.model : undefined })) }));
+    .map((d) => ({ key: d.key, label: d.label, group: d.group, canWrite: !!d.writePerm && perms.includes(d.writePerm), nested: !!d.nested, columns: d.columns.map((c) => ({ header: c.header, required: !!c.required, type: c.type ?? "string", enum: c.enum, ref: c.ref ? c.ref.model : undefined })) }));
 }

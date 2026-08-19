@@ -3112,3 +3112,19 @@ hiển thị trên phần mềm. Code-only additive (0 migration). **590 test** 
   marketing.read/write; KHÔNG xuất `cost` nhạy cảm). Tất cả upsert theo mã, FK bằng mã, không xóa.
 - **Test M–P:** M tiêu đề VN + round-trip · N nhập chấp nhận VN/EN alias · O branches xuất+nhập · P
   care-instructions + marketing-campaigns nhập theo tiêu đề VN. Vẫn giữ nguyên tắc chỉ danh mục (không giao dịch).
+
+### DATA-IO — Protocol dịch vụ theo BƯỚC (nested CSV) + seed 2 hệ thống DMK (v0.37.3)
+Theo yêu cầu: protocol của dịch vụ cũng có CSV tuân thủ cấu trúc bảng trị liệu DMK (Bước · Tên trị liệu ·
+Mục đích). Code-only additive (0 migration). **592 test** (data-io 15→17, thêm Q–R).
+- **Dataset LỒNG (nested)** `protocol-steps` "Protocol dịch vụ (theo bước)": mỗi DÒNG CSV = 1 bước, gom
+  theo **Mã protocol**. Cột (tiếng Việt): Mã protocol · Tên protocol · Bước · Tên trị liệu · Mục đích ·
+  Thời lượng (phút). Lưu vào `BrandProtocol.steps = {items:[{group,name,purpose,durationMinutes?}]}`
+  (LEGACY_STEPS). `Dataset.nested` → engine rẽ nhánh `exportProtocolSteps`/`previewProtocolSteps`/
+  `commitProtocolSteps`. Nhập = upsert theo Mã protocol, **thay TOÀN BỘ bước** của protocol đó; tạo mới nếu
+  chưa có. RBAC library.read (đọc) / protocol.write (ghi).
+- **Seed 4 hệ thống DMK** (từ ảnh khách gửi): `PROTO-DMK-ACNE` "trị liệu cho da mụn" (9 bước) ·
+  `PROTO-DMK-AGING` "trị liệu lão hóa" (10) · `PROTO-DMK-PIGMENT` "trị liệu sắc tố" (18, 4 nhóm: loại bỏ /
+  dày khỏe da / ức chế làm sáng / sửa chữa hàng rào) · `PROTO-DMK-BIHAKU` "Bihaku 7–14 ngày" (lịch trình
+  tại spa + tại nhà). Brand DMK, ACTIVE.
+- **Test Q–R:** Q nhập nhiều dòng/1 protocol → gom steps.items đúng group/name/purpose · R xuất ra dòng/bước
+  + nhập lại (round-trip) UPDATE thay toàn bộ bước. Tổng **16 dataset** (thêm protocol-steps).
