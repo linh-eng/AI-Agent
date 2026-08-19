@@ -564,7 +564,117 @@ async function main() {
       recommendedFreq: "Theo liệu trình", createdBy: "Trần Quản Lý",
     },
   });
+  // === Quy trình DỊCH VỤ DMK theo bước (DV01–DV09, từ bảng đào tạo khách gửi) ===
+  // Khối tái sử dụng: chọn peel (2 biến thể) + phục hồi hàng rào bảo vệ da.
+  const peelChoice5 = (g: string) => [
+    { group: g, name: "3.1 Desquamate", purpose: "Dành cho da yếu, khô, mất nước, sần rát (10-20 phút)." },
+    { group: g, name: "3.2 Pro Alpha #1", purpose: "Dành cho da khô, thiếu nước, sần, muốn căng bóng (5-8 phút)." },
+    { group: g, name: "3.3 Bihaku (Pro Alpha 1 + Super Bright)", purpose: "Da khô, thiếu nước, sần, muốn căng bóng và sáng da, giảm sạm nám (5-8 phút)." },
+    { group: g, name: "3.4 Prozyme", purpose: "Dành cho da nhiều dầu, bít tắc, mụn, quá dày sừng (10-20 phút)." },
+    { group: g, name: "3.5 Quick Peel", purpose: "Da không đều màu, tối xỉn, thâm quầng mắt, rãnh rỗng, mụn viêm, thâm đỏ, giãn mạch máu (3-5 phút)." },
+  ];
+  const peelChoice6 = (g: string) => [
+    { group: g, name: "RVT", purpose: "Desquamate: loại bỏ sừng nhẹ nhàng. Red Vein + Herb Mineral: giảm thâm đỏ, viêm sâu, giãn mạch (15 phút)." },
+    { group: g, name: "Hydradermaze", purpose: "Prozyme: giảm sừng, bít tắc, dầu nhờn. Pro Alpha 1: da căng mọng giảm nhăn." },
+    { group: g, name: "Alphazyme", purpose: "Pro Alpha 1: da căng mọng giảm nhăn. Prozyme: giảm sừng, bít tắc, dầu nhờn." },
+    { group: g, name: "Alkaline Wash", purpose: "Xử lý nhiều vấn đề cùng lúc: mụn, sẹo, viêm, bít tắc hoặc da kháng trị (2-3 phút/vùng, 3 vùng/mặt)." },
+    { group: g, name: "Rhinovac", purpose: "Alkaline Wash + Pro Alpha 1: làm mềm mô sừng, giảm bít tắc sâu, da dày sừng khô, mụn ẩn, sẹo (18 phút)." },
+    { group: g, name: "Vitamin A Peel (Option 1)", purpose: "Pro Alpha 1 + Pro Alpha 2 + Revitosin: trẻ hóa, thu nhỏ LCL, sáng da, giảm bít tắc sâu (10 phút)." },
+  ];
+  const barrierRecovery = (g: string) => [
+    { group: g, name: "Pore Reduction", purpose: "Thu nhỏ lỗ chân lông, giảm viêm." },
+    { group: g, name: "Melanotech Drops", purpose: "Chống tăng sinh sắc tố tầng sâu." },
+    { group: g, name: "Enbioment Serum", purpose: "Phục hồi hệ vi sinh, giảm đỏ rát." },
+    { group: g, name: "Beta Gel", purpose: "Tăng cường miễn dịch, làm lành, khỏe da." },
+    { group: g, name: "Herbal Pigment Oil", purpose: "Mô phỏng tuyến dầu tốt cho da." },
+    { group: g, name: "Herb & Mineral Mist", purpose: "Xịt khoáng cấp nước dạng phân cực." },
+    { group: g, name: "Solar Damage", purpose: "Cấp nước tầng sâu, không bết dính." },
+    { group: g, name: "Actrol Powder (nếu có mụn viêm và vết thương hở)", purpose: "Giảm viêm, hút dịch, se viêm." },
+  ];
+  const enzyme1 = (g: string) => ({ group: g, name: "Trị liệu Enzyme Therapy #1", purpose: "Phục hồi da chuyên sâu từ bên trong: kích hoạt tuần hoàn; thanh lọc hệ bạch huyết; thúc đẩy các men enzyme hoạt động tối ưu.", durationMinutes: 45 });
+  const dmkServices: { code: string; name: string; purpose: string; items: any[] }[] = [
+    { code: "PROTO-DMK-DV01", name: "DMK_DV01 — Detox sạch sâu nang lông, giảm dầu, mụn (60 phút)", purpose: "Quy trình dịch vụ detox sạch sâu, giảm dầu, mụn.", items: [
+      { group: "B1", name: "Tẩy trang + rửa mặt", purpose: "Loại bỏ lớp trang điểm, KCN, bụi bẩn trên da.", durationMinutes: 3 },
+      { group: "B2", name: "Tẩy da chết", purpose: "Loại bỏ lớp sừng cằn cỗi, giúp da hấp thu dưỡng chất tốt hơn.", durationMinutes: 4 },
+      { group: "B3", name: "Ủ Sebum Soak", purpose: "Làm loãng bã nhờn, nới lỏng bít tắc, sạch sâu nang lông.", durationMinutes: 5 },
+      { group: "B4", name: "Hút dầu + làm sạch", purpose: "", durationMinutes: 5 },
+      { group: "B5", name: "Lấy mụn (nếu có)", purpose: "", durationMinutes: 15 },
+      { group: "B6", name: "Tiêu độc Epitoxyl", purpose: "Thải độc, se viêm, cho da rạng rỡ.", durationMinutes: 5 },
+      { group: "B7", name: "Đắp mặt nạ Acu Masque", purpose: "Giảm viêm, dịu da, kiểm soát bã nhờn.", durationMinutes: 20 },
+      { group: "B8", name: "Phục hồi khóa dưỡng: Solar Damage + Actrol Powder", purpose: "Cấp nước, dịu và khỏe da; kháng khuẩn, se viêm.", durationMinutes: 3 },
+    ] },
+    { code: "PROTO-DMK-DV02", name: "DMK_DV02 — Detox sạch sâu nang lông, căng bóng, sáng mịn (60 phút)", purpose: "Quy trình dịch vụ detox + căng bóng, sáng mịn.", items: [
+      { group: "B1", name: "Tẩy trang + rửa mặt", purpose: "Loại bỏ lớp trang điểm, KCN, bụi bẩn trên da.", durationMinutes: 3 },
+      { group: "B2", name: "Tẩy da chết", purpose: "Loại bỏ lớp sừng cằn cỗi, giúp da hấp thu dưỡng chất tốt hơn.", durationMinutes: 4 },
+      { group: "B3", name: "Ủ Sebum Soak", purpose: "Làm loãng bã nhờn, nới lỏng bít tắc, sạch sâu nang lông.", durationMinutes: 5 },
+      { group: "B4", name: "Hút dầu + làm sạch", purpose: "", durationMinutes: 5 },
+      { group: "B5", name: "Lấy mụn (nếu có)", purpose: "", durationMinutes: 15 },
+      { group: "B6", name: "Tiêu độc Epitoxyl", purpose: "Thải độc, se viêm, cho da rạng rỡ.", durationMinutes: 5 },
+      { group: "B7", name: "Đắp mặt nạ Hydrating Masque", purpose: "Cấp nước sâu, làm dịu da, giúp da căng bóng, láng mịn.", durationMinutes: 20 },
+      { group: "B8", name: "Phục hồi khóa dưỡng: Dầu Herbal Pigment Oil + Xịt Herb Mineral Mist; Solar Damage", purpose: "Thiết lập màng acid tức thì, tránh mất nước qua da; cấp nước, dịu và khỏe da.", durationMinutes: 3 },
+    ] },
+    { code: "PROTO-DMK-DV03", name: "DMK_DV03 — Trị liệu Peel chuyên sâu, thay mới bề mặt da (50-70 phút)", purpose: "Peel chuyên sâu thay mới bề mặt da; chọn chương trình peel theo tình trạng da.", items: [
+      { group: "B1", name: "Tẩy trang + rửa mặt", purpose: "Loại bỏ lớp trang điểm, KCN, bụi bẩn trên da.", durationMinutes: 3 },
+      { group: "B2", name: "Tiêu độc Epitoxyl", purpose: "Thải độc, se viêm, cho da rạng rỡ.", durationMinutes: 5 },
+      ...peelChoice5("B3 — Chọn chương trình Peel (peel chồng peel)"),
+      { group: "B4", name: "Lấy mụn (nếu có)", purpose: "", durationMinutes: 15 },
+      { group: "B5", name: "Đắp mặt nạ Hydrating Masque", purpose: "Cấp nước tầng sâu cho da.", durationMinutes: 20 },
+      { group: "B6", name: "Phục hồi khóa dưỡng: Dầu Herbal Pigment Oil + Xịt Herb Mineral Mist; Solar Damage; Actrol Powder (nếu có mụn viêm)", purpose: "Thiết lập màng acid tức thì, tránh mất nước qua da; cấp nước, dịu và khỏe da.", durationMinutes: 3 },
+    ] },
+    { code: "PROTO-DMK-DV04", name: "DMK_DV04 — Công nghệ Enzyme Therapy #1, phục hồi da từ gốc (65-85 phút)", purpose: "Enzyme Therapy #1 phục hồi da từ gốc.", items: [
+      { group: "B1", name: "Tẩy trang + rửa mặt", purpose: "Loại bỏ lớp trang điểm, KCN, bụi bẩn trên da.", durationMinutes: 3 },
+      { group: "B2", name: "Tẩy da chết", purpose: "Loại bỏ lớp sừng cằn cỗi, giúp da hấp thu dưỡng chất tốt hơn.", durationMinutes: 4 },
+      { group: "B3", name: "Sebum Soak", purpose: "Làm loãng bã nhờn, nới lỏng bít tắc, sạch sâu nang lông.", durationMinutes: 5 },
+      { group: "B4", name: "Hút dầu — làm sạch", purpose: "", durationMinutes: 5 },
+      { group: "B5", name: "Lấy mụn (nếu có)", purpose: "", durationMinutes: 15 },
+      { group: "B6", name: "Tiêu độc Epitoxyl", purpose: "Thải độc, se viêm, cho da rạng rỡ.", durationMinutes: 5 },
+      enzyme1("B7"),
+      ...barrierRecovery("B8 — Phục hồi các hàng rào bảo vệ da"),
+    ] },
+    { code: "PROTO-DMK-DV05", name: "DMK_DV05 — (Cộng thêm) Enzyme siết cơ theo vùng (Enzyme 2)", purpose: "Add-on siết cơ theo vùng (chỉ đắp vùng mặt, rãnh cười). KH muốn cải thiện thêm nâng cơ, giảm nhăn.", items: [
+      { group: "Enzyme siết cơ", name: "Trị liệu Enzyme Therapy #2", purpose: "Tác động lên 57 nhóm cơ vùng mặt, cổ; giúp da săn chắc, cải thiện rõ nếp nhăn, da mịn màng căng bóng." },
+      { group: "Phạm vi", name: "Siết cơ theo vùng", purpose: "Chỉ đắp vùng mặt, rãnh cười." },
+    ] },
+    { code: "PROTO-DMK-DV06", name: "DMK_DV06 — (Cộng thêm) Enzyme siết cơ toàn diện (Enzyme 2+3)", purpose: "Add-on siết cơ toàn diện vùng mặt, cổ, ức. KH muốn cải thiện thêm nâng cơ, giảm nhăn.", items: [
+      { group: "Enzyme siết cơ", name: "Trị liệu Enzyme Therapy #2", purpose: "Tác động lên 57 nhóm cơ vùng mặt, cổ; giúp da săn chắc, cải thiện rõ nếp nhăn, da mịn màng căng bóng." },
+      { group: "Enzyme siết cơ", name: "Trị liệu Enzyme Therapy #3", purpose: "Bắt buộc kết hợp cùng Enzyme 2 để tăng hiệu quả cải thiện cơ, đốt cháy mỡ thừa, hỗ trợ thành mạch." },
+      { group: "Phạm vi", name: "Siết cơ toàn diện", purpose: "Vùng mặt, cổ, ức." },
+    ] },
+    { code: "PROTO-DMK-DV07", name: "DMK_DV07 — Trị liệu Peel chuyên sâu kết hợp phục hồi đa tầng Enzyme Therapy (85-105 phút)", purpose: "Peel chuyên sâu + Enzyme Therapy #1.", items: [
+      { group: "B1", name: "Tẩy trang + rửa mặt", purpose: "Loại bỏ lớp trang điểm, KCN, bụi bẩn trên da.", durationMinutes: 3 },
+      { group: "B2", name: "Ủ Sebum Soak", purpose: "Làm loãng bã nhờn, nới lỏng bít tắc, sạch sâu nang lông.", durationMinutes: 5 },
+      { group: "B3", name: "Hút dầu + làm sạch", purpose: "", durationMinutes: 5 },
+      { group: "B4", name: "Lấy mụn (nếu có)", purpose: "", durationMinutes: 15 },
+      { group: "B5", name: "Tiêu độc Epitoxyl", purpose: "Thải độc, se viêm, cho da rạng rỡ.", durationMinutes: 5 },
+      ...peelChoice5("B6 — Chọn chương trình Peel"),
+      enzyme1("B7"),
+      ...barrierRecovery("B8 — Phục hồi các hàng rào bảo vệ da"),
+    ] },
+    { code: "PROTO-DMK-DV08", name: "DMK_DV08 — Tái cấu trúc peel đa tầng (peel chồng peel) (50-70 phút)", purpose: "Tái cấu trúc peel đa tầng theo tình trạng da.", items: [
+      { group: "B1", name: "Tẩy trang + rửa mặt", purpose: "Loại bỏ lớp trang điểm, KCN, bụi bẩn trên da.", durationMinutes: 3 },
+      { group: "B2", name: "Tiêu độc Epitoxyl", purpose: "Thải độc, se viêm, cho da rạng rỡ.", durationMinutes: 5 },
+      ...peelChoice6("B3 — Chọn chương trình Peel"),
+      { group: "B4", name: "Lấy mụn (nếu có)", purpose: "", durationMinutes: 15 },
+      ...barrierRecovery("B5 — Phục hồi các hàng rào bảo vệ da"),
+    ] },
+    { code: "PROTO-DMK-DV09", name: "DMK_DV09 — Trị liệu Peel đa tầng kết hợp phục hồi đa tầng Enzyme Therapy (90-100 phút)", purpose: "Peel đa tầng + Enzyme Therapy #1.", items: [
+      { group: "B1", name: "Tẩy trang + rửa mặt", purpose: "Loại bỏ lớp trang điểm, KCN, bụi bẩn trên da.", durationMinutes: 3 },
+      { group: "B2", name: "Tiêu độc Epitoxyl", purpose: "Thải độc, se viêm, cho da rạng rỡ.", durationMinutes: 5 },
+      ...peelChoice6("B3 — Chọn chương trình Peel"),
+      { group: "B4", name: "Lấy mụn (nếu có)", purpose: "", durationMinutes: 15 },
+      enzyme1("B5"),
+      ...barrierRecovery("B6 — Phục hồi các hàng rào bảo vệ da"),
+    ] },
+  ];
+  for (const s of dmkServices) {
+    await prisma.brandProtocol.upsert({
+      where: { code: s.code }, update: {},
+      create: { code: s.code, name: s.name, kind: "BRAND", brandId: brDMK.id, status: "ACTIVE", version: 1,
+        compositionMode: "LEGACY_STEPS", purpose: s.purpose, steps: { items: s.items }, recommendedFreq: "Theo liệu trình", createdBy: "Trần Quản Lý" },
+    });
+  }
   console.log("   Protocol DMK theo bước: ACNE(9)+AGING(10)+PIGMENT(18)+BIHAKU(7)+SKIN-MATRIX(8)+FINISH-DRY(8)+FINISH-ACNE(6)+ALPHAZYME(9)+HYDRADERMAZE(9)+ALKALINE-FACE(21)+DESQUAMATE(17).");
+  console.log(`   Quy trình dịch vụ DMK: ${dmkServices.map((s) => s.code.replace("PROTO-DMK-", "")).join("+")} (${dmkServices.length} DV).`);
 
   // === Redesign P2 · Protocol compose NHIỀU Service (coexistence) — "Điều trị sắc tố kết hợp" ===
   const techPico = await prisma.technology.upsert({

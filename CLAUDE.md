@@ -3180,3 +3180,14 @@ RBAC — không mở Catalogue C2; tổng vẫn **45 migration**). **607 test / 
 - **Giới hạn trung thực**: `SpaProduct` KHÔNG có cột provenance/alias/context — alias & provenance là lớp TRÌNH
   BÀY (gán theo cách sourcing), KHÔNG bịa cột DB. Data fix nằm ở field thật (name/category/type/contraindications/
   usage/frequency), khóa bằng `test/dmk-product-data.test.ts` (15). Không mở C2, không sửa Protocol/TrainingPath.
+
+### Quy trình dịch vụ DMK theo bước — DV01–DV09 (v0.37.9)
+Theo bảng đào tạo "Quy trình trị liệu" khách gửi — thêm **9 protocol dịch vụ** (dạng protocol riêng,
+`BrandProtocol.steps` LEGACY_STEPS; group=bước/lựa chọn · name=thao tác · purpose=công dụng · durationMinutes=thời gian):
+`PROTO-DMK-DV01` Detox giảm dầu mụn (8) · `DV02` Detox căng bóng sáng mịn (8) · `DV03` Peel chuyên sâu (10) ·
+`DV04` Enzyme Therapy #1 (15) · `DV05` Enzyme siết cơ theo vùng — add-on (2) · `DV06` Enzyme siết cơ toàn diện — add-on (3) ·
+`DV07` Peel + Enzyme Therapy (19) · `DV08` Tái cấu trúc peel đa tầng (17) · `DV09` Peel đa tầng + Enzyme Therapy (18).
+Dùng khối tái sử dụng: chọn peel 5 chương trình (Desquamate/Pro Alpha #1/Bihaku/Prozyme/Quick Peel) hoặc 6 chương
+trình (RVT/Hydradermaze/Alphazyme/Alkaline Wash/Rhinovac/Vitamin A Peel) + phục hồi hàng rào bảo vệ da (8 SP).
+**Code-only additive** (KHÔNG migration; tổng vẫn **45 migration**). Xuất/nhập qua CSV `protocol-steps`. Xác thực:
+tsc sạch · build OK · seed:demo fresh = **20 protocol DMK** · full regression **607/58 PASS**.
