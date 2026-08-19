@@ -46,7 +46,7 @@ function ImportCard({ entity, label, desc }: { entity: string; label: string; de
   }
 
   return (
-    <Card>
+    <Card id={entity} className="scroll-mt-20">
       <CardContent className="p-5">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-primary/10 text-primary">

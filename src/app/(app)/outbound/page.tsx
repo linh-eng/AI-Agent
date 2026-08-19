@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, FileSpreadsheet } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -53,11 +53,18 @@ export default function OutboundPage() {
         description="Phiếu xuất (bán / dùng nội bộ / hủy) — tự phân bổ lô theo FEFO, trừ tồn ngay khi lưu."
         action={
           canWrite && (
-            <Link href="/outbound/new">
-              <Button>
-                <Plus className="h-4 w-4" /> Tạo phiếu xuất
-              </Button>
-            </Link>
+            <>
+              <Link href="/import#outbound">
+                <Button variant="outline">
+                  <FileSpreadsheet className="h-4 w-4" /> Nhập Excel
+                </Button>
+              </Link>
+              <Link href="/outbound/new">
+                <Button>
+                  <Plus className="h-4 w-4" /> Tạo phiếu xuất
+                </Button>
+              </Link>
+            </>
           )
         }
       />

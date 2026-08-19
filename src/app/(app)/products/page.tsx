@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Pencil } from "lucide-react";
+import Link from "next/link";
+import { Plus, Pencil, FileSpreadsheet } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -208,9 +209,16 @@ export default function ProductsPage() {
         description="Hàng hóa trong kho — chế độ quản lý theo lô (có HSD) hoặc theo số lượng."
         action={
           canWrite && (
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> Thêm sản phẩm
-            </Button>
+            <>
+              <Link href="/import#product">
+                <Button variant="outline">
+                  <FileSpreadsheet className="h-4 w-4" /> Nhập Excel
+                </Button>
+              </Link>
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4" /> Thêm sản phẩm
+              </Button>
+            </>
           )
         }
       />

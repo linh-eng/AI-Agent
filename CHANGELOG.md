@@ -3,6 +3,11 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.10.1 — 2026-08-19
+- Thêm nút **“Nhập Excel”** ngay trong trang **Sản phẩm, Tài sản/Thiết bị, Nhập kho, Xuất kho**
+  (cạnh nút “Thêm…”) — bấm là mở thẳng đúng mục ở trang *Nhập liệu Excel*. Không cần vào menu Hệ thống nữa.
+- Chỉ sửa giao diện — không đổi database, không thêm quyền.
+
 ## 1.10.0 — 2026-08-19
 - **Nhập liệu bằng Excel** (menu Hệ thống → *Nhập liệu Excel*): tạo hàng loạt cho **Sản phẩm,
   Tài sản/Thiết bị, Nhập kho, Xuất kho** từ file `.xlsx`.

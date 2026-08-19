@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, FileSpreadsheet } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -211,9 +211,16 @@ export default function AssetsPage() {
         description="Theo dõi thiết bị & máy theo serial, trạng thái sử dụng và hạn bảo hành."
         action={
           canWrite && (
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> Thêm tài sản
-            </Button>
+            <>
+              <Link href="/import#asset">
+                <Button variant="outline">
+                  <FileSpreadsheet className="h-4 w-4" /> Nhập Excel
+                </Button>
+              </Link>
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4" /> Thêm tài sản
+              </Button>
+            </>
           )
         }
       />

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, FileSpreadsheet } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -52,11 +52,18 @@ export default function InboundPage() {
         description="Phiếu nhập từ nhà cung cấp — ghi nhận lô & HSD, cộng tồn ngay khi lưu."
         action={
           canWrite && (
-            <Link href="/inbound/new">
-              <Button>
-                <Plus className="h-4 w-4" /> Tạo phiếu nhập
-              </Button>
-            </Link>
+            <>
+              <Link href="/import#inbound">
+                <Button variant="outline">
+                  <FileSpreadsheet className="h-4 w-4" /> Nhập Excel
+                </Button>
+              </Link>
+              <Link href="/inbound/new">
+                <Button>
+                  <Plus className="h-4 w-4" /> Tạo phiếu nhập
+                </Button>
+              </Link>
+            </>
           )
         }
       />
