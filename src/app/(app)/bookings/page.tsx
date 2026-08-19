@@ -516,12 +516,12 @@ function ConflictBlock({ conflicts, suggestions, canOverride, overrideReason, se
 }
 
 /* ===================== Create modal ===================== */
-const EMPTY = { customerId: "", serviceId: "", scheduledAt: "", durationMinutes: "", technician: "", master: "", room: "", bed: "", machine: "", planId: "", stageId: "", sessionNumber: "", price: "", deposit: "", note: "" };
+const EMPTY = { customerId: "", serviceId: "", serviceMinutes: "", scheduledAt: "", expectedEndAt: "", durationMinutes: "", technician: "", master: "", room: "", bed: "", machine: "", planId: "", stageId: "", sessionNumber: "", price: "", deposit: "", note: "" };
 
 function BookingFormModal({ open, prefill, onClose, customers, services, employees, resources, canOverride, onSaved }: { open: boolean; prefill?: Record<string, string> | null; onClose: () => void; customers: Customer[]; services: Service[]; employees: Employee[]; resources: Resource[]; canOverride: boolean; onSaved: () => void }) {
   const [form, setForm] = useState({ ...EMPTY });
   const [assistants, setAssistants] = useState<string[]>([]);
-  const [extraItems, setExtraItems] = useState<string[]>([]); // Redesign P3 — dịch vụ bổ sung (item[0] = form.serviceId)
+  const [extraItems, setExtraItems] = useState<{ serviceId: string; minutes: string }[]>([]); // dịch vụ bổ sung + thời gian riêng từng dịch vụ (item[0] = form.serviceId)
   const [linkSessionId, setLinkSessionId] = useState<string | null>(null);
   const opts = useResourceOptions(employees, resources);
   const [error, setError] = useState<string | null>(null);
@@ -546,7 +546,7 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
       if (prefill.customerId) apiFetch<any[]>(`/api/treatment-plans?customerId=${prefill.customerId}`).then(setPlans).catch(() => {});
       if (prefill.planId) apiFetch<any>(`/api/treatment-plans/${prefill.planId}`).then((p) => setStages(p.stages ?? [])).catch(() => {});
       const svc = prefill.serviceId ? services.find((s) => s.id === prefill.serviceId) : null;
-      if (svc?.durationMinutes) setForm((f) => ({ ...f, durationMinutes: String(svc.durationMinutes) }));
+      if (svc?.durationMinutes) setForm((f) => ({ ...f, serviceMinutes: String(svc.durationMinutes) }));
     } else {
       setForm({ ...EMPTY }); setLinkSessionId(null);
     }
@@ -575,10 +575,10 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
     setPlans([]); setStages([]);
     if (id) apiFetch<any[]>(`/api/treatment-plans?customerId=${id}`).then(setPlans).catch(() => {});
   }
-  // Chọn dịch vụ → tự lấy thời lượng chuẩn.
+  // Chọn dịch vụ → tự điền thời gian dịch vụ (ô "phút" bên cạnh) theo thời lượng chuẩn.
   function onService(id: string) {
     const svc = services.find((s) => s.id === id);
-    set({ serviceId: id, durationMinutes: svc?.durationMinutes ? String(svc.durationMinutes) : form.durationMinutes });
+    set({ serviceId: id, serviceMinutes: svc?.durationMinutes ? String(svc.durationMinutes) : form.serviceMinutes });
     setFloor(null);
   }
   // Chọn phác đồ → nạp giai đoạn.
@@ -588,34 +588,46 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
     if (id) apiFetch<any>(`/api/treatment-plans/${id}`).then((p) => setStages(p.stages ?? [])).catch(() => {});
   }
 
+  // Tổng thời lượng dự kiến khi nhiều dịch vụ (tuần tự) = Σ thời gian từng dịch vụ
+  // (ưu tiên thời gian NHẬP tay bên cạnh; nếu trống → lấy thời lượng chuẩn của dịch vụ).
+  const multiTotalDuration = useMemo(() => {
+    if (extraItems.length === 0) return null;
+    const rows = [{ serviceId: form.serviceId, minutes: form.serviceMinutes }, ...extraItems].filter((r) => r.serviceId);
+    return rows.reduce((s, r) => s + (Number(r.minutes) || services.find((x) => x.id === r.serviceId)?.durationMinutes || 0), 0);
+  }, [extraItems, form.serviceId, form.serviceMinutes, services]);
+
   const endPreview = useMemo(() => {
     if (!form.scheduledAt) return null;
-    const dur = Number(form.durationMinutes) || 60;
+    // Ưu tiên: dự kiến hoàn thành nhập tay > thời lượng ghi đè > tổng thời gian dịch vụ > mặc định 60′.
+    if (form.expectedEndAt) return new Date(form.expectedEndAt);
+    const dur = Number(form.durationMinutes) || (multiTotalDuration || 0) || Number(form.serviceMinutes) || 60;
     return new Date(new Date(form.scheduledAt).getTime() + dur * 60_000);
-  }, [form.scheduledAt, form.durationMinutes]);
+  }, [form.scheduledAt, form.expectedEndAt, form.durationMinutes, form.serviceMinutes, multiTotalDuration]);
 
   function buildBody(extra: Record<string, unknown> = {}) {
     const body: any = { ...form, ...extra };
     body.assistants = assistants.length ? assistants : undefined;
     if (linkSessionId) body.sessionId = linkSessionId; // gắn ngược buổi dự kiến (mục 11–12)
-    // Redesign P3 — nếu có dịch vụ bổ sung: gửi items = [dịch vụ chính, ...bổ sung]. Server
-    // tự snapshot thời lượng/giá + đặt Booking.serviceId = item đầu (tương thích ngược).
-    const allItems = [form.serviceId, ...extraItems].filter(Boolean);
-    if (extraItems.length > 0 && allItems.length > 0) {
-      body.items = allItems.map((serviceId) => ({ serviceId }));
+    // Nhiều dịch vụ + thời gian RIÊNG từng dịch vụ: gửi items = [dịch vụ chính, ...bổ sung],
+    // mỗi item kèm durationSnapshot (phút). Server đặt Booking.serviceId = item đầu (tương thích ngược).
+    const validExtras = extraItems.filter((x) => x.serviceId);
+    if (validExtras.length > 0 && form.serviceId) {
+      body.items = [
+        { serviceId: form.serviceId, ...(form.serviceMinutes ? { durationSnapshot: Number(form.serviceMinutes) } : {}) },
+        ...validExtras.map((x) => ({ serviceId: x.serviceId, ...(x.minutes ? { durationSnapshot: Number(x.minutes) } : {}) })),
+      ];
+    } else if (form.serviceId && form.serviceMinutes && !body.durationMinutes) {
+      // 1 dịch vụ + có nhập thời gian riêng → dùng làm thời lượng booking.
+      body.durationMinutes = form.serviceMinutes;
     }
-    ["serviceId", "durationMinutes", "technician", "master", "room", "bed", "machine", "planId", "stageId", "sessionNumber", "price", "deposit", "note"].forEach((k) => { if (!body[k]) delete body[k]; });
+    // expectedEndAt: gửi ISO (thời gian dự kiến hoàn thành). serviceMinutes chỉ là trường UI.
+    if (form.expectedEndAt) body.expectedEndAt = parseVnLocal(form.expectedEndAt).toISOString();
+    delete body.serviceMinutes;
+    ["serviceId", "durationMinutes", "technician", "master", "room", "bed", "machine", "planId", "stageId", "sessionNumber", "price", "deposit", "note", "expectedEndAt"].forEach((k) => { if (!body[k]) delete body[k]; });
     if (!body.assistants) delete body.assistants;
     ["durationMinutes", "sessionNumber", "price", "deposit"].forEach((k) => { if (body[k]) body[k] = Number(body[k]); });
     return body;
   }
-
-  // Tổng thời lượng dự kiến khi nhiều dịch vụ (tuần tự) = Σ thời lượng từng dịch vụ.
-  const multiTotalDuration = useMemo(() => {
-    if (extraItems.length === 0) return null;
-    const ids = [form.serviceId, ...extraItems].filter(Boolean);
-    return ids.reduce((s, id) => s + (services.find((x) => x.id === id)?.durationMinutes ?? 0), 0);
-  }, [extraItems, form.serviceId, services]);
 
   async function submit(opts: { allowConflict?: boolean; allowBelowFloor?: boolean } = {}) {
     setSaving(true); setError(null);
@@ -647,23 +659,35 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
             {customers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.fullName}</option>)}
           </Select>
         </div>
+        {/* Thời gian ĐẾN + DỰ KIẾN HOÀN THÀNH — booking KHÔNG cần dịch vụ cố định */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5"><Label>Dịch vụ chính</Label><Select value={form.serviceId} onChange={(e) => onService(e.target.value)}><option value="">—</option>{services.map((s) => <option key={s.id} value={s.id}>{s.name}{s.durationMinutes ? ` (${s.durationMinutes}′)` : ""}</option>)}</Select></div>
-          <div className="space-y-1.5"><Label>Bắt đầu *</Label><Input type="datetime-local" value={form.scheduledAt} onChange={(e) => set({ scheduledAt: e.target.value })} required /></div>
+          <div className="space-y-1.5"><Label>Thời gian đến *</Label><Input type="datetime-local" value={form.scheduledAt} onChange={(e) => set({ scheduledAt: e.target.value })} required /></div>
+          <div className="space-y-1.5"><Label>Dự kiến hoàn thành</Label><Input type="datetime-local" value={form.expectedEndAt} min={form.scheduledAt || undefined} onChange={(e) => set({ expectedEndAt: e.target.value })} /></div>
         </div>
+        <p className="-mt-2 text-[11px] text-muted-foreground">Chỉ cần <b>thời gian đến</b> và <b>dự kiến hoàn thành</b> là đủ tạo lịch. Dịch vụ bên dưới là <b>không bắt buộc</b> — có thể thêm sau khi khách tới.</p>
 
-        {/* Redesign P3 — nhiều dịch vụ trong 1 lần đến (1 booking) */}
+        {/* Dịch vụ (không bắt buộc) — mỗi dịch vụ có trường THỜI GIAN riêng bên cạnh */}
         <div className="rounded-md border border-dashed p-3">
-          <div className="mb-2 text-xs font-medium text-muted-foreground">Dịch vụ bổ sung trong lần đến này (1 lịch = nhiều dịch vụ){multiTotalDuration != null ? ` · tổng ~${multiTotalDuration}′` : ""}</div>
+          <div className="mb-2 text-xs font-medium text-muted-foreground">Dịch vụ trong lần đến này (không bắt buộc — có thể nhiều dịch vụ){multiTotalDuration != null ? ` · tổng ~${multiTotalDuration}′` : ""}</div>
+          {/* Dịch vụ chính (item #1) + thời gian riêng */}
+          <div className="mb-2 flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">1</span>
+            <Select className="flex-1" value={form.serviceId} onChange={(e) => onService(e.target.value)}>
+              <option value="">— Chọn dịch vụ (có thể để trống) —</option>
+              {services.map((s) => <option key={s.id} value={s.id}>{s.name}{s.durationMinutes ? ` (${s.durationMinutes}′)` : ""}</option>)}
+            </Select>
+            <Input className="w-24" type="number" placeholder="phút" title="Thời gian dịch vụ (phút)" value={form.serviceMinutes} onChange={(e) => set({ serviceMinutes: e.target.value })} />
+          </div>
           {extraItems.length > 0 && (
             <div className="mb-2 space-y-1.5">
-              {extraItems.map((sid, i) => (
+              {extraItems.map((row, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">{i + 2}</span>
-                  <Select className="flex-1" value={sid} onChange={(e) => setExtraItems(extraItems.map((x, j) => (j === i ? e.target.value : x)))}>
+                  <Select className="flex-1" value={row.serviceId} onChange={(e) => setExtraItems(extraItems.map((x, j) => (j === i ? { ...x, serviceId: e.target.value } : x)))}>
                     <option value="">— Chọn dịch vụ —</option>
                     {services.map((s) => <option key={s.id} value={s.id}>{s.name}{s.durationMinutes ? ` (${s.durationMinutes}′)` : ""}</option>)}
                   </Select>
+                  <Input className="w-24" type="number" placeholder="phút" title="Thời gian dịch vụ (phút)" value={row.minutes} onChange={(e) => setExtraItems(extraItems.map((x, j) => (j === i ? { ...x, minutes: e.target.value } : x)))} />
                   <Button type="button" size="icon" variant="ghost" disabled={i === 0} onClick={() => { const n = [...extraItems]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; setExtraItems(n); }} title="Lên">↑</Button>
                   <Button type="button" size="icon" variant="ghost" disabled={i === extraItems.length - 1} onClick={() => { const n = [...extraItems]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; setExtraItems(n); }} title="Xuống">↓</Button>
                   <Button type="button" size="icon" variant="ghost" onClick={() => setExtraItems(extraItems.filter((_, j) => j !== i))}><X className="h-4 w-4 text-destructive" /></Button>
@@ -671,12 +695,12 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
               ))}
             </div>
           )}
-          <Button type="button" size="sm" variant="outline" onClick={() => setExtraItems([...extraItems, ""])}><Plus className="h-3.5 w-3.5" /> Thêm dịch vụ</Button>
-          {extraItems.length > 0 && <p className="mt-1 text-[11px] text-muted-foreground">Dịch vụ #1 = &quot;Dịch vụ chính&quot; ở trên. Thời lượng = tổng các dịch vụ (tuần tự); tài nguyên/nhân sự dùng chung cho cả lần đến.</p>}
+          <Button type="button" size="sm" variant="outline" onClick={() => setExtraItems([...extraItems, { serviceId: "", minutes: "" }])}><Plus className="h-3.5 w-3.5" /> Thêm dịch vụ</Button>
+          <p className="mt-1 text-[11px] text-muted-foreground">Ô <b>phút</b> bên cạnh mỗi dịch vụ = thời gian dự kiến của dịch vụ đó (bỏ trống → lấy thời lượng chuẩn). Tài nguyên/nhân sự dùng chung cho cả lần đến.</p>
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1.5"><Label>Thời lượng (phút)</Label><Input type="number" placeholder="60" value={form.durationMinutes} onChange={(e) => set({ durationMinutes: e.target.value })} /></div>
-          <div className="space-y-1.5 col-span-2"><Label>Giờ kết thúc dự kiến</Label><div className="flex h-9 items-center rounded-md border border-input bg-muted/40 px-3 text-sm">{form.scheduledAt ? `${hhmm(form.scheduledAt)} – ${endPreview ? hhmm(endPreview) : "—"}` : "— chọn giờ bắt đầu —"}</div></div>
+          <div className="space-y-1.5"><Label>Thời lượng (phút) — ghi đè</Label><Input type="number" placeholder="tự tính" value={form.durationMinutes} onChange={(e) => set({ durationMinutes: e.target.value })} /></div>
+          <div className="space-y-1.5 col-span-2"><Label>Khung giờ (tự tính)</Label><div className="flex h-9 items-center rounded-md border border-input bg-muted/40 px-3 text-sm">{form.scheduledAt ? `${hhmm(form.scheduledAt)} – ${endPreview ? hhmm(endPreview) : "—"}` : "— chọn giờ đến —"}</div></div>
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1.5"><Label>Kỹ thuật viên chính</Label><SearchableSelect options={opts.technicians} value={form.technician} onChange={(v) => set({ technician: v })} placeholder="Chọn KTV" /></div>
@@ -794,7 +818,8 @@ function BookingDetailModal({ id, onClose, canWrite, canOverride, employees, res
   if (!b) return <Modal open onClose={onClose} title="Chi tiết lịch hẹn"><p className="text-muted-foreground">Đang tải...</p></Modal>;
 
   const dur = b.durationMinutes ?? 60;
-  const end = new Date(new Date(b.scheduledAt).getTime() + dur * 60000);
+  // Ưu tiên "thời gian dự kiến hoàn thành" đã lưu; nếu không có → suy từ thời lượng.
+  const end = b.expectedEndAt ? new Date(b.expectedEndAt) : new Date(new Date(b.scheduledAt).getTime() + dur * 60000);
   const st = b.status as string;
   const history = Array.isArray(b.rescheduleHistory) ? b.rescheduleHistory : [];
   const overrides = Array.isArray(b.overrideLog) ? b.overrideLog : [];

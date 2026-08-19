@@ -77,9 +77,13 @@ export const POST = handle(async (req) => {
   // Dịch vụ chính giữ ở Booking.serviceId để conflict/giá/tương thích cũ hoạt động nguyên vẹn.
   const primaryServiceId = parsed.serviceId ?? (items && items.length > 0 ? items[0].serviceId : undefined) ?? null;
 
-  // Tự lấy thời lượng chuẩn (mục 5). Nhiều dịch vụ tuần tự → tổng = Σ item.durationSnapshot,
-  // trừ khi người dùng nhập durationMinutes thủ công (giữ compatibility override).
+  // Tự lấy thời lượng chuẩn (mục 5). Ưu tiên: durationMinutes thủ công > suy từ
+  // "thời gian dự kiến hoàn thành" (booking không cần dịch vụ cố định) > Σ item > dịch vụ.
   let durationMinutes = parsed.durationMinutes ?? undefined;
+  if ((durationMinutes == null || durationMinutes <= 0) && parsed.expectedEndAt) {
+    const diff = Math.round((+new Date(parsed.expectedEndAt) - +new Date(parsed.scheduledAt)) / 60_000);
+    if (diff > 0) durationMinutes = diff;
+  }
   if ((durationMinutes == null || durationMinutes <= 0) && itemsSnap.length > 0) {
     durationMinutes = totalItemsDuration(itemsSnap);
   }

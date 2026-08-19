@@ -3059,3 +3059,42 @@ Baseline toàn bộ (Mục 2–16 + HR-PH1..6 + LOY-PH1 + Pricing/Costing + IA/R
 Chỉ 12 danh mục "an toàn" (upsert theo mã) — thực thể giao dịch chỉ **xuất** qua báo cáo/CSV sẵn có, **không
 nhập** qua DATA-IO (theo thiết kế). Có thể thêm dataset danh mục mới bằng cách khai thêm entry trong
 `DATASETS` (không cần migration). `.xlsx` trực tiếp chưa (hiện CSV).
+
+## Booking linh hoạt — không cần dịch vụ cố định + thời gian riêng từng dịch vụ (v0.37.1)
+
+Theo yêu cầu: **booking chưa cần xác định dịch vụ cố định** — chỉ cần ghi thông tin + **thời gian đến**
+và **thời gian dự kiến hoàn thành**; dịch vụ có thể **nhiều** và **mỗi dịch vụ có ô thời gian riêng bên
+cạnh**. Thuần **additive, 0 DROP**. Migration **`Zh_booking_expected_end`** (1 ADD COLUMN nullable; tổng
+**44 migration**). tsc sạch · lint 0 lỗi · build OK. **test/booking-flexible.test.ts** (6 test A–F).
+
+### Migration & schema (`Zh_booking_expected_end`)
+`Booking` +`expectedEndAt DateTime?` (thời gian dự kiến HOÀN THÀNH). `Booking.serviceId` **đã nullable từ
+trước** (không đổi) → booking không dịch vụ vốn hợp lệ ở tầng DB. `BookingItem.durationSnapshot` (đã có từ
+P3) = thời gian RIÊNG từng dịch vụ (không thêm cột).
+
+### Backend
+- Validation `bookingCreateSchema` +`expectedEndAt` (dateOpt); `bookingItemSchema.durationSnapshot` giữ nguyên.
+- **POST/PATCH `/api/bookings`**: suy `durationMinutes` theo ưu tiên **durationMinutes thủ công > khoảng
+  (đến→hoàn thành) > Σ item.durationSnapshot > thời lượng dịch vụ**. Lưu `expectedEndAt`. Conflict engine vẫn
+  dùng `durationMinutes` (suy ra) → không đổi logic trùng lịch. Booking không dịch vụ: `serviceId=null`,
+  duration = khoảng thời gian.
+- Nhiều dịch vụ: `items[]` mỗi item mang `durationSnapshot` (phút riêng) → lưu đúng, KHÔNG ép lấy thời lượng
+  chuẩn; `Booking.serviceId` = item đầu (tương thích ngược P3/P4; giá/segment/floor giữ nguyên).
+
+### UI `/bookings` (form tạo lịch)
+- Hàng đầu: **Thời gian đến \*** (scheduledAt) + **Dự kiến hoàn thành** (expectedEndAt) — nhắc rõ "chỉ cần 2
+  mốc này là đủ; dịch vụ không bắt buộc".
+- Khối **Dịch vụ (không bắt buộc)**: mỗi dòng = chọn dịch vụ + ô **phút** RIÊNG bên cạnh (bỏ trống → thời
+  lượng chuẩn). Dịch vụ #1 = dịch vụ chính. `↑/↓` đổi thứ tự, xóa. Tổng ~N′.
+- "Khung giờ (tự tính)" ưu tiên: dự kiến hoàn thành > thời lượng ghi đè > Σ phút dịch vụ > 60′. Chi tiết lịch
+  ưu tiên hiển thị `expectedEndAt`; danh sách dịch vụ hiện phút riêng từng dịch vụ (đã có từ P3).
+
+### Chứng minh (test/booking-flexible.test.ts, 6 test A–F, HTTP thật)
+A tạo booking KHÔNG dịch vụ (đến 02:00 + hoàn thành 03:30 → serviceId null, duration=90, 0 item) · B
+expectedEndAt lưu & đọc lại đúng · C durationMinutes thủ công thắng expectedEndAt · D nhiều dịch vụ mỗi cái
+phút riêng (20+15 → tổng 35, KHÔNG phải 60+45) · E PATCH set expectedEndAt → duration tính lại (75) · F
+booking-level duration không service/không end vẫn chạy (tương thích cũ).
+
+### CONFLICTS: KHÔNG CÓ
+Additive (1 cột nullable, 0 DROP) · serviceId đã nullable từ trước · conflict engine/giá/floor/P3-P4 items
+bất biến · tái dùng permission booking.read/write (không thêm quyền). Full regression giữ xanh.

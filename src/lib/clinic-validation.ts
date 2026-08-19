@@ -217,6 +217,7 @@ export const bookingCreateSchema = z.object({
   serviceId: z.string().optional().nullable(),
   items: bookingItemsSchema.optional(), // Redesign P3 — nhiều dịch vụ; item[0] = dịch vụ chính
   scheduledAt: dateReq,
+  expectedEndAt: dateOpt, // Thời gian dự kiến hoàn thành (không cần dịch vụ cố định)
   durationMinutes: z.coerce.number().int().positive().optional().nullable(),
   branch: z.string().optional().nullable(),
   room: z.string().optional().nullable(),

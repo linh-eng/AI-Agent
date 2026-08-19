@@ -70,9 +70,16 @@ export const PATCH = handle(async (req, { params }) => {
     }
   }
 
+  // Suy thời lượng từ "thời gian dự kiến hoàn thành" khi có (và không nhập durationMinutes/không gửi items).
+  if (rest.expectedEndAt && rest.durationMinutes == null && itemsSnap === null) {
+    const startAt = rest.scheduledAt ?? current.scheduledAt;
+    const diff = Math.round((+new Date(rest.expectedEndAt) - +new Date(startAt)) / 60_000);
+    if (diff > 0) data.durationMinutes = diff;
+  }
+
   const next = {
     scheduledAt: rest.scheduledAt ?? current.scheduledAt,
-    durationMinutes: rest.durationMinutes ?? current.durationMinutes,
+    durationMinutes: (data.durationMinutes as number | undefined) ?? rest.durationMinutes ?? current.durationMinutes,
     technician: rest.technician ?? current.technician,
     master: rest.master ?? current.master,
     room: rest.room ?? current.room,

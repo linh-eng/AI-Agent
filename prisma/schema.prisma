@@ -1283,8 +1283,9 @@ model Booking {
   code              String        @unique // Mã booking
   customerId        String
   serviceId         String?
-  scheduledAt       DateTime // Ngày + giờ
+  scheduledAt       DateTime // Ngày + giờ (thời gian ĐẾN)
   durationMinutes   Int?
+  expectedEndAt     DateTime? // Thời gian dự kiến HOÀN THÀNH (additive — booking không cần dịch vụ cố định)
   branch            String?
   room              String? // Phòng
   bed               String? // Giường
