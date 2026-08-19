@@ -1898,6 +1898,10 @@ model SpaProduct {
   benefits           String? // Công dụng
   suitableFor        String? // Tình trạng phù hợp
   usage              String? // Hướng dẫn sử dụng
+  ingredients        String? // Thành phần
+  contraindications  String? // Chống chỉ định
+  frequency          String? // Tần suất sử dụng
+  volume             String? // Dung tích
   sellingPrice       Decimal?    @db.Decimal(18, 2)
   cost               Decimal?    @db.Decimal(18, 2) // Giá vốn (nhạy cảm)
   productType        ProductType @default(HOME_CARE)

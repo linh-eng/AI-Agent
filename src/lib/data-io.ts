@@ -133,7 +133,10 @@ export const DATASETS: Record<string, Dataset> = {
       { key: "sku", header: "SKU", required: true }, { key: "name", header: "Tên sản phẩm", required: true },
       { key: "brandCode", header: "Mã thương hiệu", ref: { model: "brand", codeField: "code", fk: "brandId" } },
       { key: "category", header: "Danh mục" }, { key: "productType", header: "Loại sản phẩm", type: "enum", enum: PROD_TYPE },
-      { key: "sellingPrice", header: "Giá bán", type: "number" }, { key: "cost", header: "Giá vốn", type: "number" }, { key: "isActive", header: "Đang dùng", type: "boolean" },
+      { key: "sellingPrice", header: "Giá bán", type: "number" }, { key: "cost", header: "Giá vốn", type: "number" },
+      { key: "ingredients", header: "Thành phần" }, { key: "benefits", header: "Công dụng" }, { key: "suitableFor", header: "Chỉ định" },
+      { key: "contraindications", header: "Chống chỉ định" }, { key: "usage", header: "Cách dùng" }, { key: "frequency", header: "Tần suất" }, { key: "volume", header: "Dung tích" },
+      { key: "isActive", header: "Đang dùng", type: "boolean" },
     ],
   },
   technologies: {

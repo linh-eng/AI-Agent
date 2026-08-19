@@ -36,7 +36,7 @@ export default function CatalogPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "", brandId: "", category: "", productType: "HOME_CARE",
-    sellingPrice: "", cost: "", benefits: "", suitableFor: "", usage: "", description: "",
+    sellingPrice: "", cost: "", benefits: "", suitableFor: "", usage: "", description: "", ingredients: "", contraindications: "", frequency: "", volume: "",
   });
 
   async function load() {
@@ -56,7 +56,7 @@ export default function CatalogPage() {
       Object.keys(body).forEach((k) => { if (body[k] === "") delete body[k]; });
       await apiFetch("/api/spa-products", { method: "POST", body: JSON.stringify(body) });
       setOpen(false);
-      setForm({ name: "", brandId: "", category: "", productType: "HOME_CARE", sellingPrice: "", cost: "", benefits: "", suitableFor: "", usage: "", description: "" });
+      setForm({ name: "", brandId: "", category: "", productType: "HOME_CARE", sellingPrice: "", cost: "", benefits: "", suitableFor: "", usage: "", description: "", ingredients: "", contraindications: "", frequency: "", volume: "" });
       load();
     } catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); }
   }
@@ -127,8 +127,16 @@ export default function CatalogPage() {
             <div className="space-y-1.5"><Label>Giá vốn (₫)</Label><Input type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></div>
             <div className="space-y-1.5"><Label>Tình trạng phù hợp</Label><Input value={form.suitableFor} onChange={(e) => setForm({ ...form, suitableFor: e.target.value })} /></div>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5"><Label>Thành phần</Label><Input value={form.ingredients} onChange={(e) => setForm({ ...form, ingredients: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Chống chỉ định</Label><Input value={form.contraindications} onChange={(e) => setForm({ ...form, contraindications: e.target.value })} /></div>
+          </div>
           <div className="space-y-1.5"><Label>Công dụng</Label><Input value={form.benefits} onChange={(e) => setForm({ ...form, benefits: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Hướng dẫn sử dụng</Label><Input value={form.usage} onChange={(e) => setForm({ ...form, usage: e.target.value })} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5"><Label>Tần suất</Label><Input value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Dung tích</Label><Input value={form.volume} onChange={(e) => setForm({ ...form, volume: e.target.value })} /></div>
+          </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setOpen(false)}>Hủy</Button><Button type="submit">Lưu</Button></div>
         </form>

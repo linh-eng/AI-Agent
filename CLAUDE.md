@@ -3128,3 +3128,23 @@ Mục đích). Code-only additive (0 migration). **592 test** (data-io 15→17, 
   Brand DMK, ACTIVE.
 - **Test Q–R:** Q nhập nhiều dòng/1 protocol → gom steps.items đúng group/name/purpose · R xuất ra dòng/bước
   + nhập lại (round-trip) UPDATE thay toàn bộ bước. Tổng **16 dataset** (thêm protocol-steps).
+
+### Thông tin chi tiết Sản phẩm spa (v0.37.5) — Thành phần/CCĐ/Tần suất/Dung tích + seed DMK
+Theo yêu cầu: bổ sung thông tin sản phẩm theo tài liệu đào tạo DMK. Migration **`Zi_spa_product_info`**
+(4 cột nullable, additive 0 DROP; tổng **45 migration**).
+- `SpaProduct` +`ingredients` (Thành phần) +`contraindications` (Chống chỉ định) +`frequency` (Tần suất)
+  +`volume` (Dung tích). Đã có sẵn `description/benefits/suitableFor/usage`. Validation + form Catalog
+  (/catalog) + CSV dataset `spa-products` (thêm 7 cột thông tin, tiêu đề tiếng Việt) cập nhật theo.
+- **Seed 8 sản phẩm DMK** đầy đủ thông tin (từ ảnh khách gửi): Sebum Soak · Epitoxyl · Prozyme · Cryo Pro-X ·
+  Quick Peel · Pro Alpha #1 · Pro Alpha #2 · Super Bright — mỗi SP có thành phần/công dụng/chỉ định/CCĐ/
+  cách dùng/tần suất/dung tích. Upsert theo SKU (update cả info khi chạy lại).
+- Xác thực: tsc sạch · build OK · data-io 17 test PASS · seed:demo fresh tạo đủ 8 SP DMK có info.
+
+### Bổ sung sản phẩm DMK đợt 2 (v0.37.6) — tổng 20 SP DMK có thông tin
+Theo ảnh khách gửi đợt 2 — thêm **12 sản phẩm DMK** vào `dmkProducts` (seed-demo.ts), mỗi SP có công dụng/
+chỉ định (+CCĐ/cách dùng/dung tích khi có): Alkaline Wash · Pore Reduction Plus · Melanotech Drops ·
+Enbioment Serum · Beta Gel · FibroMax C · Herb & Mineral Mist (home-care) · Seba-E · Herbal Pigment Oil ·
+Contra-Derm · Solar Damage · Actrol Powder. Loop seed thêm `type` (PROFESSIONAL/HOME_CARE/BOTH) theo từng SP
+(mặc định PROFESSIONAL). **Code-only additive** (dùng lại migration `Zi_spa_product_info`, KHÔNG migration mới;
+tổng vẫn **45 migration**). Xác thực: tsc sạch · build OK · seed:demo fresh = **20 SP DMK** có info · full
+regression **592/57 PASS**.
