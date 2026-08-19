@@ -307,7 +307,65 @@ async function main() {
       recommendedFreq: "Liệu trình 7–14 ngày", createdBy: "Trần Quản Lý",
     },
   });
-  console.log("   Protocol DMK theo bước: ACNE (9) + AGING (10) + PIGMENT (18) + BIHAKU (7 ngày).");
+  // Ma trận chọn trị liệu theo tình trạng da (Da nhiều dầu / Da ít dầu).
+  await prisma.brandProtocol.upsert({
+    where: { code: "PROTO-DMK-SKIN-MATRIX" }, update: {},
+    create: {
+      code: "PROTO-DMK-SKIN-MATRIX", name: "DMK — Chọn trị liệu theo tình trạng da (nhiều dầu / ít dầu)", kind: "BRAND", brandId: brDMK.id,
+      status: "ACTIVE", version: 1, compositionMode: "LEGACY_STEPS",
+      purpose: "Bảng quyết định chọn trị liệu theo tình trạng da (yếu → rất khỏe) và độ dầu (da nhiều dầu / da ít dầu).",
+      steps: { items: [
+        { group: "Yếu, mẫn cảm", name: "Da nhiều dầu", purpose: "Sebum Soak; Enzyme" },
+        { group: "Yếu, mẫn cảm", name: "Da ít dầu", purpose: "Sebum Soak (cân nhắc); Enzyme pha Exoderma Peel" },
+        { group: "Hơi yếu", name: "Da nhiều dầu", purpose: "Sebum Soak; Prozyme; Enzyme" },
+        { group: "Hơi yếu", name: "Da ít dầu", purpose: "Thường đi kèm hơi đỏ, khô căng, mụn nội tiết, quầng thâm, da không đều màu — Sebum Soak bắt buộc; Cryo (peel lạnh); Enzyme" },
+        { group: "Khỏe", name: "Da nhiều dầu", purpose: "Sebum Soak; Prozyme; Enzyme" },
+        { group: "Khỏe", name: "Da ít dầu", purpose: "Sebum Soak 3 phút; dày sừng → Pro Alpha 1; sừng vừa phải → Bihaku 1 ngày; hầu như không sừng/quầng thâm/da tái xỉn vàng → Peel nóng Quick Peel → Enzyme pha Aqua d'herb" },
+        { group: "Rất khỏe, dày sừng, mụn viêm, sẹo lõm", name: "Da nhiều dầu", purpose: "Alkaline Wash + Enzyme" },
+        { group: "Rất khỏe, dày sừng, mụn viêm, sẹo lõm", name: "Da ít dầu", purpose: "Bihaku 7 ngày; Bihaku 12 ngày; Pro Alpha 1" },
+      ] },
+      recommendedFreq: "Tùy tình trạng da", createdBy: "Trần Quản Lý",
+    },
+  });
+  // Kết thúc trị liệu — da khô ít dầu (sản phẩm kết thúc + cách dùng).
+  await prisma.brandProtocol.upsert({
+    where: { code: "PROTO-DMK-FINISH-DRY" }, update: {},
+    create: {
+      code: "PROTO-DMK-FINISH-DRY", name: "DMK — Kết thúc trị liệu (da khô ít dầu)", kind: "BRAND", brandId: brDMK.id,
+      status: "ACTIVE", version: 1, compositionMode: "LEGACY_STEPS",
+      purpose: "Quy trình sản phẩm kết thúc trị liệu cho da khô, ít dầu.",
+      steps: { items: [
+        { group: "Sản phẩm kết thúc", name: "Pore Reductions", purpose: "Giảm đỏ, giảm viêm, ngừa kích ứng, thu nhỏ lỗ chân lông — 2 giọt mỗi vùng, nhỏ đến đâu xoa luôn đến đó" },
+        { group: "Sản phẩm kết thúc", name: "Melanotech Drops", purpose: "Chống tăng sinh sắc tố tầng sâu — 2 giọt mỗi vùng, nhỏ đến đâu xoa luôn đến đó" },
+        { group: "Sản phẩm kết thúc", name: "Enbioment Serum", purpose: "Tái tạo hệ vi sinh, làm dịu da đỏ rát, mẫn cảm — 1ml toàn mặt, bôi nhiều hơn ở vùng khô đỏ rát" },
+        { group: "Sản phẩm kết thúc", name: "Beta Gel", purpose: "Tăng cường miễn dịch nội sinh, phục hồi tổn thương — 1ml toàn mặt, bôi nhiều hơn ở vùng khô đỏ rát" },
+        { group: "Sản phẩm kết thúc", name: "Herbal Pigment Oil", purpose: "Thay thế chất dầu tự nhiên trên bề mặt da cho da thiếu dầu — 3 giọt chấm đều toàn mặt" },
+        { group: "Sản phẩm kết thúc", name: "Herb & Mineral Mist", purpose: "Xịt khoáng đẩy sâu tinh chất, tái thiết lập màng axit — xịt 5 xịt toàn mặt" },
+        { group: "Sản phẩm kết thúc", name: "Solar Damage Gel", purpose: "Dưỡng ẩm và khóa ẩm tầng sâu — 1ml toàn mặt" },
+        { group: "Sản phẩm kết thúc", name: "Soleil Defence SPF50+", purpose: "Bảo vệ da khỏi tia UVA và UVB" },
+      ] },
+      recommendedFreq: "Mỗi buổi", createdBy: "Trần Quản Lý",
+    },
+  });
+  // Kết thúc dịch vụ — da dầu mụn (sản phẩm kết thúc + cách dùng).
+  await prisma.brandProtocol.upsert({
+    where: { code: "PROTO-DMK-FINISH-ACNE" }, update: {},
+    create: {
+      code: "PROTO-DMK-FINISH-ACNE", name: "DMK — Kết thúc dịch vụ (da dầu mụn)", kind: "BRAND", brandId: brDMK.id,
+      status: "ACTIVE", version: 1, compositionMode: "LEGACY_STEPS",
+      purpose: "Quy trình sản phẩm kết thúc dịch vụ cho da dầu mụn.",
+      steps: { items: [
+        { group: "Sản phẩm kết thúc", name: "Pore Reductions", purpose: "Giảm đỏ, giảm viêm, ngừa kích ứng, thu nhỏ lỗ chân lông — 2 giọt mỗi vùng, nhỏ đến đâu xoa luôn đến đó" },
+        { group: "Sản phẩm kết thúc", name: "Melanotech", purpose: "Chống tăng sinh sắc tố tầng sâu — 2 giọt mỗi vùng, nhỏ đến đâu xoa luôn đến đó" },
+        { group: "Sản phẩm kết thúc", name: "Beta Gel", purpose: "Tăng cường miễn dịch nội sinh, phục hồi tổn thương — 1ml toàn mặt, bôi nhiều hơn ở vùng viêm" },
+        { group: "Sản phẩm kết thúc", name: "Herb & Mineral Mist", purpose: "Xịt khoáng đẩy sâu tinh chất, tái thiết lập màng axit — xịt 5 xịt toàn mặt" },
+        { group: "Sản phẩm kết thúc", name: "Solar Damage Gel", purpose: "Dưỡng ẩm và khóa ẩm tầng sâu — 1ml toàn mặt" },
+        { group: "Sản phẩm kết thúc", name: "Actrol Powder", purpose: "Tạo màng khóa viêm, hút dịch và dầu thừa — dùng chổi Enzyme khô để phủ 1 lớp thật mỏng toàn mặt" },
+      ] },
+      recommendedFreq: "Mỗi buổi", createdBy: "Trần Quản Lý",
+    },
+  });
+  console.log("   Protocol DMK theo bước: ACNE(9)+AGING(10)+PIGMENT(18)+BIHAKU(7)+SKIN-MATRIX(8)+FINISH-DRY(8)+FINISH-ACNE(6).");
 
   // === Redesign P2 · Protocol compose NHIỀU Service (coexistence) — "Điều trị sắc tố kết hợp" ===
   const techPico = await prisma.technology.upsert({

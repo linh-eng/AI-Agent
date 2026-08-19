@@ -3122,9 +3122,9 @@ Mục đích). Code-only additive (0 migration). **592 test** (data-io 15→17, 
   (LEGACY_STEPS). `Dataset.nested` → engine rẽ nhánh `exportProtocolSteps`/`previewProtocolSteps`/
   `commitProtocolSteps`. Nhập = upsert theo Mã protocol, **thay TOÀN BỘ bước** của protocol đó; tạo mới nếu
   chưa có. RBAC library.read (đọc) / protocol.write (ghi).
-- **Seed 4 hệ thống DMK** (từ ảnh khách gửi): `PROTO-DMK-ACNE` "trị liệu cho da mụn" (9 bước) ·
-  `PROTO-DMK-AGING` "trị liệu lão hóa" (10) · `PROTO-DMK-PIGMENT` "trị liệu sắc tố" (18, 4 nhóm: loại bỏ /
-  dày khỏe da / ức chế làm sáng / sửa chữa hàng rào) · `PROTO-DMK-BIHAKU` "Bihaku 7–14 ngày" (lịch trình
-  tại spa + tại nhà). Brand DMK, ACTIVE.
+- **Seed 7 protocol DMK** (từ ảnh khách gửi): ACNE (9 bước) · AGING (10) · PIGMENT (18, 4 nhóm) · BIHAKU
+  (lịch trình 7–14 ngày) · **SKIN-MATRIX** (ma trận chọn trị liệu theo tình trạng da: nhiều dầu/ít dầu, 8) ·
+  **FINISH-DRY** (kết thúc trị liệu da khô ít dầu, 8) · **FINISH-ACNE** (kết thúc dịch vụ da dầu mụn, 6).
+  Brand DMK, ACTIVE.
 - **Test Q–R:** Q nhập nhiều dòng/1 protocol → gom steps.items đúng group/name/purpose · R xuất ra dòng/bước
   + nhập lại (round-trip) UPDATE thay toàn bộ bước. Tổng **16 dataset** (thêm protocol-steps).
