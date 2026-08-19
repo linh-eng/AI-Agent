@@ -3148,3 +3148,15 @@ Contra-Derm · Solar Damage · Actrol Powder. Loop seed thêm `type` (PROFESSION
 (mặc định PROFESSIONAL). **Code-only additive** (dùng lại migration `Zi_spa_product_info`, KHÔNG migration mới;
 tổng vẫn **45 migration**). Xác thực: tsc sạch · build OK · seed:demo fresh = **20 SP DMK** có info · full
 regression **592/57 PASS**.
+
+### Protocol DMK đợt 3 (v0.37.7) — Alphazyme · Hydradermaze · Alkaline Wash · Desquamate
+Theo ảnh đào tạo DMK khách gửi — thêm **4 protocol** (dạng "protocol riêng", `BrandProtocol.steps` LEGACY_STEPS,
+group=bước/giai đoạn · name=thao tác/SP · purpose=chi tiết): `PROTO-DMK-ALPHAZYME` (Pro Alpha 1 + Prozyme, 9
+bước) · `PROTO-DMK-HYDRADERMAZE` (Prozyme + Pro Alpha 1, 9) · `PROTO-DMK-ALKALINE-FACE` (quy trình điều trị vùng
+Mặt: 8 bước + lưu ý thao tác theo tình trạng + chăm sóc sau 2-3 ngày & từ ngày thứ 3, **21 mục**) ·
+`PROTO-DMK-DESQUAMATE` (điều trị da mẫn cảm/dày sừng bằng Enzyme #1 + ủ siêu dưỡng, **17 mục** — có định lượng
+7 giọt/0.4ml/1ml…). Đồng thời **chuẩn hóa info** 5 SP theo đúng tài liệu (Pore Reduction Plus, Melanotech Drops,
+Enbioment Serum, Beta Gel, Herb & Mineral Mist — công dụng/dung tích/định lượng khớp slide). Các protocol này
+**xuất/nhập được qua CSV** dataset `protocol-steps` (nested) đã có. **Code-only additive** (KHÔNG migration mới;
+tổng vẫn **45 migration**). Xác thực: tsc sạch · build OK · seed:demo fresh = **11 protocol DMK** · full
+regression **592/57 PASS**.
