@@ -1671,14 +1671,31 @@ async function main() {
         { employeeId: nvKieu.id, amount: 7_000_000 as any, effectiveFrom: new Date("2026-01-01T00:00:00Z"), createdBy: "seed-demo" },
         { employeeId: nvThanh.id, amount: 7_000_000 as any, effectiveFrom: new Date("2026-01-01T00:00:00Z"), createdBy: "seed-demo" },
       ] });
-      // Phụ cấp + khấu trừ demo (giá trị minh họa — chủ DN tự khai theo quy định)
+      // Phụ cấp + khấu trừ. Khai theo NHÓM để KHÔNG đụng chéo (mgmt vs NV spa).
       await prisma.payrollComponentRule.createMany({ data: [
-        { code: "PC-ANTRUA", name: "Phụ cấp ăn trưa", kind: "EARNING", calcType: "FIXED", value: 730_000 as any, scope: "COMPANY", sortOrder: 1, createdBy: "seed-demo" },
-        { code: "BHXH-NV", name: "BHXH/BHYT/BHTN (khai tay 10.5%)", kind: "DEDUCTION", calcType: "PERCENT_BASE", value: 10.5 as any, scope: "COMPANY", sortOrder: 2, createdBy: "seed-demo" },
+        // Nhân viên quản lý/VP (khai riêng từng NV — minh họa)
+        { code: "PC-ANTRUA-KTV", name: "Phụ cấp ăn trưa", kind: "EARNING", calcType: "FIXED", value: 730_000 as any, scope: "EMPLOYEE", scopeRef: nvKTV.id, sortOrder: 1, createdBy: "seed-demo" },
+        { code: "BHXH-KTV", name: "BHXH/BHYT/BHTN (khai tay 10.5%)", kind: "DEDUCTION", calcType: "PERCENT_BASE", value: 10.5 as any, scope: "EMPLOYEE", scopeRef: nvKTV.id, sortOrder: 2, createdBy: "seed-demo" },
+        { code: "PC-ANTRUA-MAS", name: "Phụ cấp ăn trưa", kind: "EARNING", calcType: "FIXED", value: 730_000 as any, scope: "EMPLOYEE", scopeRef: nvMaster.id, sortOrder: 1, createdBy: "seed-demo" },
+        { code: "BHXH-MAS", name: "BHXH/BHYT/BHTN (khai tay 10.5%)", kind: "DEDUCTION", calcType: "PERCENT_BASE", value: 10.5 as any, scope: "EMPLOYEE", scopeRef: nvMaster.id, sortOrder: 2, createdBy: "seed-demo" },
+        // === CÔNG THỨC LƯƠNG SOPHIA (NV spa, scope ROLE "Spa") — theo chủ DN cung cấp ===
+        // Cộng: lương chính (EmployeeBaseSalary 7tr) + xăng 500k + ăn 660k + chuyên cần 900k
+        //       + "Cập nhật dữ liệu" 500k (khai riêng từng NV) + Tour fee/thưởng (biến động, nhập tháng).
+        { code: "SPA-XANG", name: "Phụ cấp xăng", kind: "EARNING", calcType: "FIXED", value: 500_000 as any, scope: "ROLE", scopeRef: "Spa", sortOrder: 10, createdBy: "seed-demo" },
+        { code: "SPA-AN", name: "Phụ cấp ăn", kind: "EARNING", calcType: "FIXED", value: 660_000 as any, scope: "ROLE", scopeRef: "Spa", sortOrder: 11, createdBy: "seed-demo" },
+        { code: "SPA-CHUYENCAN", name: "Chuyên cần (đủ công)", kind: "EARNING", calcType: "FIXED", value: 900_000 as any, scope: "ROLE", scopeRef: "Spa", sortOrder: 12, createdBy: "seed-demo" },
+        // Trừ: BH trên mức lương ĐÓNG 5.800.000₫ (BHXH đóng 6% do cty hỗ trợ 2%) + đoàn phí = 551.000₫.
+        { code: "SPA-BHXH", name: "BHXH (6% × mức đóng 5.800.000)", kind: "DEDUCTION", calcType: "FIXED", value: 348_000 as any, scope: "ROLE", scopeRef: "Spa", sortOrder: 20, createdBy: "seed-demo" },
+        { code: "SPA-BHYT", name: "BHYT (1,5% × 5.800.000)", kind: "DEDUCTION", calcType: "FIXED", value: 87_000 as any, scope: "ROLE", scopeRef: "Spa", sortOrder: 21, createdBy: "seed-demo" },
+        { code: "SPA-BHTN", name: "BHTN (1% × 5.800.000)", kind: "DEDUCTION", calcType: "FIXED", value: 58_000 as any, scope: "ROLE", scopeRef: "Spa", sortOrder: 22, createdBy: "seed-demo" },
+        { code: "SPA-DPCD", name: "Đoàn phí công đoàn (1% × 5.800.000)", kind: "DEDUCTION", calcType: "FIXED", value: 58_000 as any, scope: "ROLE", scopeRef: "Spa", sortOrder: 23, createdBy: "seed-demo" },
+        // "Cập nhật dữ liệu" 500k — khai RIÊNG từng nhân viên (áp dụng từ 3/2026).
+        { code: "CU-KIEU", name: "Cập nhật dữ liệu (từ 3/2026)", kind: "EARNING", calcType: "FIXED", value: 500_000 as any, scope: "EMPLOYEE", scopeRef: nvKieu.id, sortOrder: 13, createdBy: "seed-demo" },
+        { code: "CU-THANH", name: "Cập nhật dữ liệu (từ 3/2026)", kind: "EARNING", calcType: "FIXED", value: 500_000 as any, scope: "EMPLOYEE", scopeRef: nvThanh.id, sortOrder: 13, createdBy: "seed-demo" },
       ] });
       const period = await prisma.payrollPeriod.create({ data: { code: "PR-000001", name: "Lương tháng 08/2026", periodType: "MONTHLY", startDate: new Date("2026-08-01T00:00:00Z"), endDate: new Date("2026-08-31T00:00:00Z"), status: "DRAFT", createdBy: "seed-demo" } });
       const res = await calculatePayrollPeriod(seedSession, period.id);
-      console.log(`   Bảng lương demo: PR-000001 (08/2026) — đã tính ${res.employees} phiếu (gộp thưởng HR-PH5 + lương CB + phụ cấp − BHXH khai tay). DRAFT, duyệt ở /payroll.`);
+      console.log(`   Bảng lương demo: PR-000001 (08/2026) — đã tính ${res.employees} phiếu. NV spa theo công thức Sophia: Lương chính 7.000.000 + xăng 500k + ăn 660k + chuyên cần 900k + cập nhật 500k = gộp 9.560.000 − BH 551.000 = thực nhận 9.009.000₫ (chưa gồm Tour fee/thưởng nhập theo tháng). DRAFT, duyệt ở /payroll.`);
     }
   } catch (e) {
     console.log("   ⚠️  Bỏ qua Bảng lương demo:", (e as Error).message);
