@@ -52,6 +52,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/customers", label: "Khách hàng", icon: Users, perm: "customer.read" },
       { href: "/bookings", label: "Lịch hẹn", icon: CalendarDays, perm: "booking.read" },
       { href: "/treatment-plans", label: "Kế hoạch điều trị", icon: HeartPulse, perm: "treatment.read" },
+      { href: "/prescriptions", label: "Kê toa", icon: FileText, perm: "customer.read" },
       { href: "/before-after", label: "Thư viện ảnh & Đánh giá", icon: Images, perm: "customer.read" },
       { href: "/proposals", label: "Báo giá", icon: FileSpreadsheet, perm: "proposal.read" },
       // IA-PH2 — nhóm nested "Hóa đơn & Thanh toán" (parent KHÔNG có href, chỉ toggle).

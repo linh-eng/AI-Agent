@@ -17,6 +17,7 @@ import { SessionExecutions } from "@/components/session-executions";
 import { SessionStaff } from "@/components/session-staff";
 import { SessionContributions } from "@/components/session-contributions";
 import { SessionReview } from "@/components/session-review";
+import { SessionPrescription } from "@/components/session-prescription";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import { SESSION_STATUS_LABEL, SESSION_STATUS_TONE } from "@/lib/clinic-labels";
@@ -411,6 +412,11 @@ export default function SessionExecutionPage() {
         {/* G — Đánh giá & Báo cáo */}
         <Block letter="G" title="Đánh giá & Báo cáo" hint="Đánh giá của KHÁCH (hài lòng, KTV, nhận xét) tách riêng với BÁO CÁO nội bộ của KTV. Báo cáo nội bộ không hiển thị cho khách.">
           <SessionReview sessionId={id} canWrite={canWrite && (!completed || edit)} defaultTechnician={s.performer ?? ""} />
+        </Block>
+
+        {/* H — Kê toa sau thực hiện */}
+        <Block letter="H" title="Kê toa sau thực hiện" hint="Kê sản phẩm dùng tại nhà + lời dặn cho khách; toa 'Đã kê' được khóa, in cho khách và lưu vào hồ sơ (timeline).">
+          <SessionPrescription sessionId={id} customerId={s.customerId} canWrite={canWrite} defaultIssuedBy={s.performer ?? ""} />
         </Block>
 
         {/* Lịch sử chỉnh sửa sau hoàn thành (mục 29, 32) */}

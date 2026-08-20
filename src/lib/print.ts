@@ -57,3 +57,32 @@ export function printDeliveryNote(order: any, delivery: any) {
      </div>`
   );
 }
+
+/** In toa/kê toa sau thực hiện (spa). Toa gồm sản phẩm dùng tại nhà + lời dặn. */
+export function printPrescription(p: any, brandName = "Sophia Care") {
+  const esc = (s: unknown) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
+  const d = (v: unknown) => (v ? new Date(v as string).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) : "");
+  const rows = (p.items ?? []).map((it: any, i: number) => `<tr>
+    <td>${i + 1}</td><td>${esc(it.name)}</td>
+    <td>${it.quantity != null ? Number(it.quantity) : ""} ${esc(it.unit)}</td>
+    <td>${esc(it.usage)}</td><td>${esc(it.frequency)}</td><td>${esc(it.timing)}</td>
+    <td>${it.durationDays ? esc(it.durationDays) + " ngày" : ""}</td></tr>`).join("");
+  const body = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div><h1>${esc(brandName)}</h1><div class="muted">TOA CHĂM SÓC SAU THỰC HIỆN</div></div>
+      <div class="mono" style="text-align:right">${esc(p.code)}<br><span class="muted">${d(p.issuedAt || p.createdAt)}</span></div>
+    </div>
+    <h2>Khách hàng</h2>
+    <div class="muted">${esc(p.customer?.fullName)} · ${esc(p.customer?.code)}${p.customer?.phone ? " · " + esc(p.customer.phone) : ""}</div>
+    ${p.diagnosis ? `<h2>Nhận định</h2><div>${esc(p.diagnosis)}</div>` : ""}
+    <h2>Sản phẩm kê dùng tại nhà</h2>
+    <table><thead><tr><th>#</th><th>Sản phẩm</th><th>SL</th><th>Cách dùng</th><th>Tần suất</th><th>Thời điểm</th><th>Thời gian</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7" class="muted">— Không có sản phẩm —</td></tr>'}</tbody></table>
+    ${p.advice ? `<h2>Lời dặn</h2><div>${esc(p.advice)}</div>` : ""}
+    ${p.followUpDate ? `<div style="margin-top:8px" class="muted">Hẹn tái khám: <b>${d(p.followUpDate)}</b></div>` : ""}
+    <div style="margin-top:36px;display:flex;justify-content:space-between">
+      <div class="muted">Người kê: ${esc(p.issuedBy || "")}</div>
+      <div style="text-align:center">Chữ ký<br><br><br>____________________</div>
+    </div>`;
+  openPrint(`Toa ${p.code}`, body);
+}

@@ -1071,6 +1071,7 @@ model Customer {
   loyaltyAccount       LoyaltyAccount? // LOY-PH1
   prepaidAccount       PrepaidAccount? // LOY-PH1
   vouchers             Voucher[] // LOY-PH1 (voucher gán riêng khách)
+  prescriptions        Prescription[] // Kê toa sau thực hiện
   marketingCampaign    MarketingCampaign?        @relation(fields: [campaignId], references: [id])
 
   @@index([phone])
@@ -1562,6 +1563,7 @@ model TreatmentSession {
   staffContributions SessionStaffContribution[] // HR-PH3
   review             SessionReview?
   executionItems     SessionExecutionItem[] // Redesign P4 — mỗi dịch vụ thực tế đã làm
+  prescriptions      Prescription[] // Kê toa sau thực hiện
 
   @@index([planId, sessionNumber])
   @@index([customerId])
@@ -1919,6 +1921,7 @@ model SpaProduct {
   sessionMaterials SessionMaterial[]
   stepProducts     ServiceStepProduct[]
   stepOptions      ServiceStepOption[]
+  prescriptionItems PrescriptionItem[]
 
   @@map("spa_products")
 }
@@ -4507,4 +4510,61 @@ model VoucherRedemption {
 
   @@index([voucherId])
   @@map("voucher_redemptions")
+}
+
+// ============================================================================
+// KÊ TOA SAU THỰC HIỆN (Prescription) — sau buổi trị liệu, KTV/bác sĩ kê sản phẩm
+// dùng tại nhà + lời dặn cho khách; in được + lưu vào hồ sơ khách (timeline).
+// Thuần additive; KHÔNG trừ kho (đây là toa/tư vấn, không phải bán hàng).
+// ============================================================================
+enum PrescriptionStatus {
+  DRAFT // nháp (đang soạn)
+  ISSUED // đã kê (khóa nội dung, in cho khách)
+  CANCELLED // đã hủy
+}
+
+model Prescription {
+  id         String             @id @default(cuid())
+  code       String             @unique // KT-xxxxxx
+  customerId String
+  sessionId  String? // buổi liên quan (nếu kê sau buổi)
+  status     PrescriptionStatus @default(DRAFT)
+  diagnosis  String? // nhận định / tình trạng da
+  advice     String? // lời dặn chung
+  followUpDate DateTime? // hẹn tái khám (nếu có)
+  issuedBy   String? // người kê (tên — đồng nhất quy ước tác nhân = tên)
+  issuedAt   DateTime?
+  cancelledAt DateTime?
+  cancelReason String?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  customer Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  session  TreatmentSession?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  items    PrescriptionItem[]
+
+  @@index([customerId])
+  @@index([sessionId])
+  @@map("prescriptions")
+}
+
+model PrescriptionItem {
+  id             String   @id @default(cuid())
+  prescriptionId String
+  spaProductId   String? // liên kết Catalog (nếu chọn từ danh mục)
+  name           String // tên sản phẩm/hạng mục (hiển thị)
+  quantity       Decimal? @db.Decimal(14, 3)
+  unit           String?
+  usage          String? // cách dùng
+  frequency      String? // tần suất (VD 2 lần/ngày)
+  timing         String? // thời điểm (sáng/tối)
+  durationDays   Int? // dùng trong bao nhiêu ngày
+  note           String?
+  sortOrder      Int      @default(0)
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  product      SpaProduct?  @relation(fields: [spaProductId], references: [id])
+
+  @@index([prescriptionId])
+  @@map("prescription_items")
 }

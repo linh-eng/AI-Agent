@@ -3357,3 +3357,26 @@ TreatmentSession/Customer). **Code-only additive** (KHÔNG migration/schema; t�
   giảm nợ · finance thấy số · non-finance mask null · RBAC 403/401. Full regression **633/63 PASS**; tsc sạch.
 - **Ghi chú:** đây là báo cáo spa cốt lõi; có thể mở rộng thêm báo cáo con (doanh thu theo KTV, commission,
   điểm thưởng, phân hạng KH…) theo mẫu MySpa ở phase sau. Báo cáo KHO THNG (`/reports`) giữ nguyên.
+
+### Kê toa sau thực hiện — Prescription (v0.39.0)
+Theo yêu cầu "hoàn chỉnh: kê toa sau thực hiện" (giữ nguyên phần cũ). Sau buổi trị liệu, KTV/bác sĩ **kê toa
+chăm sóc** (sản phẩm dùng tại nhà + lời dặn) cho khách; toa in được + **lưu vào hồ sơ khách (timeline)**.
+Migration **`Zm_prescription`** (2 bảng `prescriptions`/`prescription_items` + enum `PrescriptionStatus`;
+additive 0 DROP; tổng **49 migration**). **641 test / 64 file PASS** (+`test/prescription.test.ts` 6). tsc sạch.
+- **Schema:** `Prescription` (code KT-xxxxxx · customerId · sessionId? · status DRAFT/ISSUED/CANCELLED ·
+  diagnosis/advice/followUpDate/issuedBy/issuedAt · cancel*) + `PrescriptionItem` (spaProductId? · name ·
+  quantity/unit · usage/frequency/timing/durationDays · note · sortOrder). **KHÔNG trừ kho** (là toa/tư vấn).
+  Back-relation Customer/TreatmentSession/SpaProduct.
+- **Lib** `src/lib/prescription.ts` (nextPrescriptionCode, include, buildPrescriptionItems, nhãn) +
+  `src/lib/print.ts::printPrescription` (in toa: header brand + khách + bảng SP + lời dặn + chữ ký).
+- **API:** `/api/prescriptions` (GET lọc customerId/sessionId/status; POST tạo DRAFT + audit
+  `PRESCRIPTION_CREATED`) · `/api/prescriptions/[id]` (GET; PATCH: `action=issue` → ISSUED + **ghi
+  CrmActivity AFTERCARE vào timeline khách** + audit; `action=cancel` lý do bắt buộc; sửa nội dung **chỉ khi
+  DRAFT**, toa đã kê BẤT BIẾN → 409). RBAC: tạo/kê = `treatment.write`, xem = `customer.read`.
+- **UI:** màn Ghi nhận buổi `/sessions/[id]` **khối H "Kê toa sau thực hiện"**
+  (`components/session-prescription.tsx`: chọn SP từ catalog tự điền cách dùng/tần suất + SL/ĐVT/thời điểm/
+  số ngày · nhận định · lời dặn · hẹn tái khám · **Lưu nháp / Kê & In**) · trang **`/prescriptions`** (danh
+  sách + lọc trạng thái, nhóm **Khách hàng & Hành trình → "Kê toa"**) · **`/prescriptions/[id]`** (chi tiết +
+  **In toa**). Toa ISSUED khóa nội dung; hiện timeline khách.
+- **Coexistence:** KHÔNG đụng ProductRecommendation/CareInstruction/Session cũ — kê toa là entity mới độc lập,
+  chỉ THÊM khối H + nav + route. RBAC/finance (Mục 15) bất biến.

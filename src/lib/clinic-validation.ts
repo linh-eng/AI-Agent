@@ -503,6 +503,37 @@ export const paymentVoidSchema = z.object({
   reason: z.string().min(1, "Nhập lý do hủy phiếu thu"),
 });
 
+// ----- Kê toa sau thực hiện (Prescription) -----
+const prescriptionItemSchema = z.object({
+  spaProductId: z.string().optional().nullable(),
+  name: z.string().min(1, "Nhập tên sản phẩm/hạng mục"),
+  quantity: z.coerce.number().nonnegative().optional().nullable(),
+  unit: z.string().optional().nullable(),
+  usage: z.string().optional().nullable(),
+  frequency: z.string().optional().nullable(),
+  timing: z.string().optional().nullable(),
+  durationDays: z.coerce.number().int().positive().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export const prescriptionCreateSchema = z.object({
+  customerId: z.string().min(1, "Chọn khách hàng"),
+  sessionId: z.string().optional().nullable(),
+  diagnosis: z.string().optional().nullable(),
+  advice: z.string().optional().nullable(),
+  followUpDate: dateOpt,
+  issuedBy: z.string().optional().nullable(),
+  items: z.array(prescriptionItemSchema).default([]),
+});
+export const prescriptionUpdateSchema = z.object({
+  diagnosis: z.string().optional().nullable(),
+  advice: z.string().optional().nullable(),
+  followUpDate: dateOpt,
+  issuedBy: z.string().optional().nullable(),
+  items: z.array(prescriptionItemSchema).optional(),
+  action: z.enum(["issue", "cancel"]).optional(),
+  cancelReason: z.string().optional().nullable(),
+});
+
 // ----- Tiền cọc (mục 17) -----
 export const depositCreateSchema = z.object({
   customerId: z.string().min(1),
