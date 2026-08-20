@@ -3389,3 +3389,21 @@ upsert idempotent; chỉ tạo brand DMK + 20 protocol `PROTO-DMK-*`, KHÔNG đ�
 migration/schema/app-code (không ảnh hưởng test). 20 protocol: ACNE·AGING·PIGMENT·BIHAKU·SKIN-MATRIX·FINISH-DRY·
 FINISH-ACNE·ALPHAZYME·HYDRADERMAZE·ALKALINE-FACE·DESQUAMATE·DV01–DV09. Xác thực DB dev: đủ 21 PROTO-DMK-* ở màn
 Protocol. Dùng: `npm run seed:dmk` trên bất kỳ DB nào. Nợ: dữ liệu DMK ở 2 nơi (seed-demo + seed-dmk) — hợp nhất sau.
+
+### Thư viện Klapp — brand + 9 protocol theo bước + 10 dịch vụ (giá lẻ) · script `seed:klapp` (v0.39.2)
+Theo yêu cầu "build thêm dịch vụ và protocol của Klapp" + "thêm giá lẻ của các dịch vụ này". Nguồn: bộ ảnh
+"Hướng dẫn sử dụng" Klapp + bảng giá do khách cung cấp. Script độc lập `prisma/seed-klapp.ts` (npm `seed:klapp`),
+upsert idempotent, chạy độc lập KHÔNG phụ thuộc guard seed-demo. **Code-only additive** — KHÔNG migration/schema/
+app-code (không ảnh hưởng test). Dùng: `npm run seed:klapp`.
+- **Brand** `BR-KLAPP` (Klapp Cosmetics — Đức).
+- **9 protocol `PROTO-KLAPP-*`** (BrandProtocol LEGACY_STEPS, kind BRAND, ACTIVE, mỗi bước = group/name/purpose,
+  có `durationMinutes` khi tài liệu ghi rõ; 2 bước Chuẩn bị dùng chung — Phân tích da + Massage thư giãn vùng đầu):
+  RETINOL-PROAGE (Retinol Triple Action PRO AGE) · VSHAPE-MASSAGE (kỹ thuật nâng cơ chữ V, 9 step) · HMLP
+  (Hyaluronic Multi Level Performance) · ASA-PEEL (thay da sinh học, có chống chỉ định) · HYDRA-COLLAGEN-SILK ·
+  HYALURONIC-MULTIPLE · CPURE (C Pure Face Infusion, sáng da Vitamin C) · CAVIAR (DNA cá tầm) · REPAGEN (Peptides).
+- **10 dịch vụ `DV-KLAPP-*`** (giá lẻ = giá bán hiện tại; giá gốc gạch ngang lưu trong mô tả). Nhóm **Klapp Skin
+  Boost** (`DM-KLAPP-BOOST`): Hydra Boost 600k · Reju Skin 600k · Calming 800k · Acne Care 600k · Acne Pro 800k.
+  Nhóm **Klapp Professional** (`DM-KLAPP-PRO`, gắn `defaultProtocolId`): ASA Peel 1.200k · C Pure 1.700k ·
+  Hyaluronic Multiple 1.600k · Caviar 1.700k · Repagen 1.800k. Chạy lại cập nhật `standardPrice` (giá lẻ).
+- 3 protocol thư viện chưa có dịch vụ giá riêng (Retinol PRO AGE, HMLP, Hydra Collagen Silk) + kỹ thuật V-Shape.
+  Xác thực DB dev: 9 PROTO-KLAPP-* + 10 DV-KLAPP-* ở màn Protocol/Dịch vụ (ảnh). tsc sạch · build OK.
