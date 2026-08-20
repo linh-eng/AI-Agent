@@ -145,6 +145,11 @@ async function main() {
     { code: "VR-000004", roleName: "Bác sĩ", certified: true, baseFee: 800_000, bonus: 150_000, tips: 0, commission: 0 },
     { code: "VR-000005", roleName: "Sales CV", certified: false, baseFee: 100_000, bonus: 0, tips: 0, commission: 200_000, commissionPercent: 5 },
     { code: "VR-000006", roleName: "Sales NV", certified: false, baseFee: 80_000, bonus: 0, tips: 0, commission: 120_000, commissionPercent: 3 },
+    // Tour fee (phí tour theo dịch vụ) — theo bảng lương THNG: có CC 30k, không CC 10k.
+    { code: "VR-000007", roleName: "Tour fee (dịch vụ)", certified: true, baseFee: 30_000, bonus: 0, tips: 0, commission: 0 },
+    { code: "VR-000008", roleName: "Tour fee (dịch vụ)", certified: false, baseFee: 10_000, bonus: 0, tips: 0, commission: 0 },
+    // Dịch vụ nhẹ (gội đầu / nail / chiếu đèn…) — tour fee cố định 10k.
+    { code: "VR-000009", roleName: "Gội đầu / Nail", certified: false, baseFee: 10_000, bonus: 0, tips: 0, commission: 0 },
   ];
   for (const r of roleRates) {
     await prisma.staffRoleRate.upsert({
@@ -1001,6 +1006,9 @@ async function main() {
   const nvSale = await prisma.employee.create({ data: { code: "NV-000004", fullName: "Đỗ Thu Ngân", phone: "0911000004", title: "Thu ngân/Lễ tân", branch: "CS1", status: "ACTIVE", roles: ["Sales", "Lễ tân"], defaultFee: 100_000 } });
   // Nhân sự đã NGHỈ VIỆC (mục 16): không được phân công booking/session mới; lịch sử giữ.
   await prisma.employee.create({ data: { code: "NV-000005", fullName: "Ngô Nghỉ Việc", phone: "0911000005", title: "KTV (cũ)", branch: "CS1", status: "RESIGNED", roles: ["Kỹ thuật viên"], defaultFee: 200_000 } });
+  // Nhân viên Sophia spa STT 10 & 11 (theo Bảng lương THNG T07.2026 — chỉ lấy 2 NV spa).
+  const nvKieu = await prisma.employee.create({ data: { code: "NV-000010", fullName: "Lê Diễm Kiều", title: "Nhân viên Spa", branch: "CS1", status: "ACTIVE", roles: ["Kỹ thuật viên", "Spa"], defaultFee: 30_000 } });
+  const nvThanh = await prisma.employee.create({ data: { code: "NV-000011", fullName: "Thạch Thị Thanh", title: "Nhân viên Spa", branch: "CS1", status: "ACTIVE", roles: ["Kỹ thuật viên", "Spa"], defaultFee: 30_000 } });
 
   // --- HR-PH1 (demo): Branch master + branchId + employmentType + liên kết tài khoản ---
   // Chi nhánh chuẩn hóa từ chuỗi legacy "CS1"; giữ nguyên Employee.branch (String).
@@ -1634,6 +1642,9 @@ async function main() {
       await prisma.employeeBaseSalary.createMany({ data: [
         { employeeId: nvKTV.id, amount: 10_000_000 as any, effectiveFrom: new Date("2026-01-01T00:00:00Z"), createdBy: "seed-demo" },
         { employeeId: nvMaster.id, amount: 15_000_000 as any, effectiveFrom: new Date("2026-01-01T00:00:00Z"), createdBy: "seed-demo" },
+        // NV Sophia spa (theo Bảng lương THNG T07.2026): lương chính 7.000.000₫.
+        { employeeId: nvKieu.id, amount: 7_000_000 as any, effectiveFrom: new Date("2026-01-01T00:00:00Z"), createdBy: "seed-demo" },
+        { employeeId: nvThanh.id, amount: 7_000_000 as any, effectiveFrom: new Date("2026-01-01T00:00:00Z"), createdBy: "seed-demo" },
       ] });
       // Phụ cấp + khấu trừ demo (giá trị minh họa — chủ DN tự khai theo quy định)
       await prisma.payrollComponentRule.createMany({ data: [
