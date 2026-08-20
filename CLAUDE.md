@@ -3423,3 +3423,21 @@ idempotent, chạy độc lập. **Code-only additive** — KHÔNG migration/sch
   — **`standardPrice=0` (CHƯA có giá)** vì file nguồn không kèm bảng giá; `update: {}` để KHÔNG ghi đè nếu chị đã
   nhập giá tay. **Nợ:** cần bảng giá Dermalogica + thêm biểu đồ trị liệu khác (Pro Bright/Pro Clear/Pro Firm/Pro
   Restore…) để mở rộng dải dịch vụ. Xác thực DB dev: 1 PROTO-DERMA-* (7 bước) + 1 DV-DERMA-* (ảnh). tsc sạch · build OK.
+
+### Dermalogica đợt 2 (v0.39.4) — thêm 3 protocol PRO Bright/Firm/Microneedling (tổng 4)
+Theo 3 biểu đồ trị liệu Dermalogica khách gửi tiếp (PRO Bright, PRO Firm, PRO Microneedling). Thêm vào
+`seed-dermalogica.ts` (cùng script, upsert idempotent). **Code-only additive** — KHÔNG migration/schema.
+- **`PROTO-DERMA-PRO-BRIGHT`** (Làm Sáng, 5 bước): Làm Sạch Gấp Đôi (PreCleanse + Special Cleansing Gel +
+  Daily Microfoliant) · Điều Trị Chuyên Sâu (One-Step Prep + UltraBright Peel + Neutralizing) · Tái Tạo Bề Mặt
+  (BioLumin-C Pro/PowerBright IonActive + Conductive Masque Base + Cooling Contour Masque) · Thoa Chồng Bảo Vệ ·
+  Chăm Sóc Tại Nhà. suitableFor = tăng sắc tố.
+- **`PROTO-DERMA-PRO-FIRM`** (Săn Chắc Da + Cổ, 6 bước): Làm Sạch Gấp Đôi (Skin Resurfacing Cleanser) · Tái Tạo
+  Bề Mặt (MultiVitamin Power Exfoliant) · Liệu Pháp Tiếp Xúc (mát-xa màng cơ/Gua Sha) · Điều Trị Chuyên Sâu
+  (Neck Refining Masque + LED Đỏ + Retinol 1% IonActive + vi dòng) · Thoa Chồng Bảo Vệ · Chăm Sóc Tại Nhà.
+- **`PROTO-DERMA-PRO-MICRONEEDLING`** (Vi kim 60′, 5 bước): Làm Sạch Gấp Đôi · Tái Tạo Bề Mặt (Pro Power Peel) ·
+  Phương Pháp Vi Kim (huyết thanh chuyên dụng + độ sâu kim 0.25–1.25mm + Kỹ Thuật Vi Kim Dermalogica) · Thoa
+  Chồng Bảo Vệ (hệ hoàn thiện theo lo lắng + Pro Restore) · Chăm Sóc Tại Nhà. **contraindications**: trị liệu
+  nâng cao chỉ chuyên gia CẤP PHÉP thực hiện.
+- **3 dịch vụ** `DV-DERMA-PRO-BRIGHT` (60′) · `DV-DERMA-PRO-FIRM` (75′) · `DV-DERMA-PRO-MICRONEEDLING` (60′),
+  gắn defaultProtocolId, **`standardPrice=0`** (chờ bảng giá). Tổng **4 protocol + 4 dịch vụ Dermalogica**.
+  Xác thực DB dev: 4 PROTO-DERMA-* (7/5/6/5 bước) + 4 DV-DERMA-* (ảnh). tsc sạch.
