@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Wrench, TrendingDown, CreditCard, Paperclip, Trash2, Upload, X } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Wrench, TrendingDown, CreditCard, Paperclip, Trash2, Upload, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -69,6 +69,7 @@ interface Asset {
   note?: string | null;
   contractValue?: number | null;
   managementType?: string | null;
+  paymentDueDate?: string | null;
   payments: Payment[];
   attachments: Attach[];
   cost?: number | null;
@@ -129,6 +130,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
 
   // Thanh toán & công nợ
   const [payOpen, setPayOpen] = useState(false);
+  const [editingPay, setEditingPay] = useState<any | null>(null);
   const [payForm, setPayForm] = useState({ amount: "", paidDate: "", method: "TRANSFER", bankInfo: "", payerType: "COMPANY", note: "" });
   const [payFile, setPayFile] = useState<File | null>(null);
   const [payBusy, setPayBusy] = useState(false);
@@ -184,7 +186,29 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     });
   }
 
-  async function addPayment(e: React.FormEvent) {
+  function openPayCreate() {
+    setEditingPay(null);
+    setPayErr(null);
+    setPayFile(null);
+    setPayForm({ amount: "", paidDate: "", method: "TRANSFER", bankInfo: "", payerType: "COMPANY", note: "" });
+    setPayOpen(true);
+  }
+  function openPayEdit(p: any) {
+    setEditingPay(p);
+    setPayErr(null);
+    setPayFile(null);
+    setPayForm({
+      amount: String(p.amount ?? ""),
+      paidDate: (p.paidDate ?? "").slice(0, 10),
+      method: p.method ?? "TRANSFER",
+      bankInfo: p.bankInfo ?? "",
+      payerType: p.payerType ?? "COMPANY",
+      note: p.note ?? "",
+    });
+    setPayOpen(true);
+  }
+
+  async function savePayment(e: React.FormEvent) {
     e.preventDefault();
     setPayErr(null);
     if (!payForm.amount || Number(payForm.amount) <= 0) return setPayErr("Nhập số tiền > 0.");
@@ -192,19 +216,23 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     if (payFile && payFile.size > MAX_FILE) return setPayErr("File ủy nhiệm chi vượt quá 5MB.");
     setPayBusy(true);
     try {
-      const res = await apiFetch<{ id: string }>(`/api/assets/${params.id}/payments`, {
-        method: "POST",
-        body: JSON.stringify({
-          amount: Number(payForm.amount),
-          paidDate: payForm.paidDate,
-          method: payForm.method,
-          bankInfo: payForm.bankInfo || null,
-          payerType: payForm.payerType,
-          note: payForm.note || null,
-        }),
+      const body = JSON.stringify({
+        amount: Number(payForm.amount),
+        paidDate: payForm.paidDate,
+        method: payForm.method,
+        bankInfo: payForm.bankInfo || null,
+        payerType: payForm.payerType,
+        note: payForm.note || null,
       });
-      if (payFile) await uploadFile(payFile, "PAYMENT_ORDER", res.id);
+      if (editingPay) {
+        await apiFetch(`/api/assets/${params.id}/payments/${editingPay.id}`, { method: "PATCH", body });
+        if (payFile) await uploadFile(payFile, "PAYMENT_ORDER", editingPay.id);
+      } else {
+        const res = await apiFetch<{ id: string }>(`/api/assets/${params.id}/payments`, { method: "POST", body });
+        if (payFile) await uploadFile(payFile, "PAYMENT_ORDER", res.id);
+      }
       setPayOpen(false);
+      setEditingPay(null);
       setPayForm({ amount: "", paidDate: "", method: "TRANSFER", bankInfo: "", payerType: "COMPANY", note: "" });
       setPayFile(null);
       load();
@@ -213,6 +241,14 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     } finally {
       setPayBusy(false);
     }
+  }
+
+  // Cập nhật ngày đến hạn thanh toán (lưu ở cấp tài sản).
+  async function saveDueDate(v: string) {
+    try {
+      await apiFetch(`/api/assets/${params.id}`, { method: "PATCH", body: JSON.stringify({ paymentDueDate: v || null }) });
+      load();
+    } catch {}
   }
   async function delPayment(pid: string) {
     if (!confirm("Xóa đợt thanh toán này?")) return;
@@ -314,8 +350,10 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
       {(() => {
         const method = data.depreciationMethod ?? "STRAIGHT_LINE";
         const isUnits = method === "UNITS";
+        // Tự động trích khấu hao bắt đầu từ Ngày bắt đầu (nếu có) hoặc NGÀY MUA.
+        const startBasis = data.depreciationStart ?? data.purchaseDate ?? null;
         const configured =
-          !!data.cost && (isUnits ? !!data.depreciationTotalUnits : !!data.depreciationMonths && !!data.depreciationStart);
+          !!data.cost && (isUnits ? !!data.depreciationTotalUnits : !!data.depreciationMonths && !!startBasis);
         if (!configured) {
           return canWrite ? (
             <Card className="mb-4">
@@ -330,7 +368,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
           cost: data.cost!,
           salvage: data.salvageValue ?? 0,
           months: data.depreciationMonths ?? 0,
-          start: data.depreciationStart ? new Date(data.depreciationStart) : new Date(),
+          start: startBasis ? new Date(startBasis) : new Date(),
           method,
           totalUnits: data.depreciationTotalUnits ?? null,
           usages: data.depreciationUsages.map((u) => ({ date: new Date(u.usageDate), units: u.units })),
@@ -363,7 +401,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                     </>
                   ) : (
                     <>
-                      <Info label="Bắt đầu khấu hao" value={formatDate(data.depreciationStart!)} />
+                      <Info label="Bắt đầu khấu hao" value={formatDate(startBasis!)} />
                       <Info label="Thời gian" value={`${months} tháng (≈ ${Math.floor(months / 12)} năm ${months % 12} tháng)`} />
                       <Info label="Khấu hao / tháng" value={`${formatNumber(dep.monthly)} đ`} />
                     </>
@@ -518,7 +556,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                 {data.managementType && <Badge tone="muted">{MANAGE_LABEL[data.managementType]}</Badge>}
               </div>
               {canManage && (
-                <Button size="sm" onClick={() => { setPayErr(null); setPayOpen(true); }}>
+                <Button size="sm" onClick={openPayCreate}>
                   <Plus className="h-4 w-4" /> Thêm đợt thanh toán
                 </Button>
               )}
@@ -534,7 +572,19 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                       {data.contractValue != null ? `${formatNumber(Math.max(0, owed))} đ` : "—"}
                     </div>
                   </div>
-                  <Info label="Số đợt đã trả" value={String(data.payments.length)} />
+                  <div>
+                    <div className="text-xs text-muted-foreground">Ngày đến hạn thanh toán</div>
+                    {canManage ? (
+                      <Input
+                        type="date"
+                        className="mt-0.5 h-8 w-40"
+                        defaultValue={(data.paymentDueDate ?? "").slice(0, 10)}
+                        onChange={(e) => saveDueDate(e.target.value)}
+                      />
+                    ) : (
+                      <div className="font-medium">{data.paymentDueDate ? formatDate(data.paymentDueDate) : "—"}</div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Tiến độ thanh toán */}
@@ -606,7 +656,10 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                             </TD>
                             <TD className="text-muted-foreground">{p.createdBy.name}</TD>
                             {canManage && (
-                              <TD className="text-right">
+                              <TD className="text-right whitespace-nowrap">
+                                <Button variant="ghost" size="icon" onClick={() => openPayEdit(p)} title="Sửa">
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
                                 <Button variant="ghost" size="icon" className="text-destructive" onClick={() => delPayment(p.id)} title="Xóa">
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -759,8 +812,8 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
       </Modal>
 
       {/* Thêm đợt thanh toán */}
-      <Modal open={payOpen} onClose={() => setPayOpen(false)} title="Thêm đợt thanh toán">
-        <form onSubmit={addPayment} className="space-y-4">
+      <Modal open={payOpen} onClose={() => setPayOpen(false)} title={editingPay ? "Sửa đợt thanh toán" : "Thêm đợt thanh toán"}>
+        <form onSubmit={savePayment} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Số tiền (đ) *</Label>

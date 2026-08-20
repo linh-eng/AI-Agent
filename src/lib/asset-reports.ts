@@ -35,6 +35,12 @@ export interface DepReportRow {
   percent: number;
   monthly: number;
   endDate: string | null;
+  // dữ liệu gốc để chỉnh sửa
+  salvageValue: number;
+  months: number | null;
+  depreciationStart: string | null;
+  purchaseDate: string | null;
+  totalUnits: number | null;
 }
 export interface DepYearAgg {
   year: number;
@@ -64,7 +70,7 @@ export async function getDepreciationReport(asOf = new Date()) {
         cost: a.cost!,
         salvage: a.salvageValue ?? 0,
         months: a.depreciationMonths ?? 0,
-        start: a.depreciationStart ?? a.createdAt,
+        start: a.depreciationStart ?? a.purchaseDate ?? a.createdAt,
         method,
         totalUnits: a.depreciationTotalUnits ?? null,
         usages: a.depreciationUsages.map((u) => ({ date: u.usageDate, units: u.units })),
@@ -85,6 +91,11 @@ export async function getDepreciationReport(asOf = new Date()) {
       percent: dep.percent,
       monthly: dep.monthly,
       endDate: dep.endDate ? dep.endDate.toISOString() : null,
+      salvageValue: a.salvageValue ?? 0,
+      months: a.depreciationMonths ?? null,
+      depreciationStart: a.depreciationStart ? a.depreciationStart.toISOString() : null,
+      purchaseDate: a.purchaseDate ? a.purchaseDate.toISOString() : null,
+      totalUnits: a.depreciationTotalUnits ?? null,
     });
     for (const y of dep.yearly) yearMap.set(y.year, (yearMap.get(y.year) ?? 0) + y.depreciation);
   }

@@ -233,6 +233,7 @@ const assetExtraFields = {
   maintenanceCycleMonths: z.number().int().positive().max(600).nullable().optional(),
   contractValue: z.number().nonnegative().nullable().optional(),
   managementType: z.enum(["DEBT", "INVOICE", "CONTRACT"]).nullable().optional(),
+  paymentDueDate: optionalString,
 };
 
 // Ghi nhận sản lượng (khấu hao theo sản lượng).

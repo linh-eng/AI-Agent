@@ -48,6 +48,7 @@ export default function ServiceUsagePage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [inventory, setInventory] = useState<InvRow[]>([]);
   const [form, setForm] = useState({ serviceId: "", warehouseId: "", sessions: "1", customerName: "", note: "" });
   // Hủy ghi nhận dịch vụ
@@ -111,7 +112,7 @@ export default function ServiceUsagePage() {
     e.preventDefault();
     setError(null);
     try {
-      await apiFetch("/api/service-usages", {
+      const res = await apiFetch<{ serviceStockWarning?: string | null }>("/api/service-usages", {
         method: "POST",
         body: JSON.stringify({
           serviceId: form.serviceId,
@@ -123,6 +124,11 @@ export default function ServiceUsagePage() {
       });
       setOpen(false);
       setForm((f) => ({ ...f, serviceId: "", sessions: "1", customerName: "", note: "" }));
+      setNotice(
+        res?.serviceStockWarning
+          ? `Đã ghi nhận, nhưng CHƯA cập nhật được Kho Dịch Vụ: ${res.serviceStockWarning}`
+          : "Đã ghi nhận dịch vụ và cập nhật Kho Dịch Vụ.",
+      );
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi");
@@ -142,6 +148,18 @@ export default function ServiceUsagePage() {
           )
         }
       />
+      {notice && (
+        <div
+          className={`mb-4 flex items-start justify-between gap-3 rounded-md border p-3 text-sm ${
+            notice.includes("CHƯA") ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-300 bg-emerald-50 text-emerald-700"
+          }`}
+        >
+          <span>{notice}</span>
+          <button className="text-xs underline opacity-70" onClick={() => setNotice(null)}>
+            Ẩn
+          </button>
+        </div>
+      )}
       <Card>
         <CardContent className="p-0">
           <Table>

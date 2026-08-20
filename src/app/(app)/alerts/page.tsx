@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CalendarClock, TrendingDown, ShieldCheck, Zap, Archive, Wrench } from "lucide-react";
+import { CalendarClock, TrendingDown, ShieldCheck, Zap, Archive, Wrench, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -68,6 +68,15 @@ interface MaintenanceDue {
   daysLeft: number;
   isOverdue: boolean;
 }
+interface DebtDue {
+  assetId: string;
+  code: string;
+  productName: string;
+  dueDate: string;
+  remaining: number;
+  daysLeft: number;
+  isOverdue: boolean;
+}
 
 export default function AlertsPage() {
   const [expiry, setExpiry] = useState<ExpiryAlert[]>([]);
@@ -76,6 +85,7 @@ export default function AlertsPage() {
   const [shots, setShots] = useState<ShotAlert[]>([]);
   const [unopened, setUnopened] = useState<UnopenedAlert[]>([]);
   const [maintenance, setMaintenance] = useState<MaintenanceDue[]>([]);
+  const [debts, setDebts] = useState<DebtDue[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -86,6 +96,7 @@ export default function AlertsPage() {
       shots: ShotAlert[];
       unopened: UnopenedAlert[];
       maintenance: MaintenanceDue[];
+      debts: DebtDue[];
     }>("/api/alerts")
       .then((d) => {
         setExpiry(d.expiry);
@@ -94,6 +105,7 @@ export default function AlertsPage() {
         setShots(d.shots ?? []);
         setUnopened(d.unopened ?? []);
         setMaintenance(d.maintenance ?? []);
+        setDebts(d.debts ?? []);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -364,6 +376,57 @@ export default function AlertsPage() {
                         <Badge tone="danger">Quá hạn {Math.abs(m.daysLeft)} ngày</Badge>
                       ) : (
                         <Badge tone="warning">Còn {m.daysLeft} ngày</Badge>
+                      )}
+                    </TD>
+                  </TR>
+                ))
+              )}
+            </TBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Công nợ tài sản đến hạn */}
+      <Card className="mt-6">
+        <CardContent className="p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-amber-600" />
+            <h3 className="font-semibold">Công nợ tài sản sắp/đến hạn</h3>
+            <Badge tone={debts.length ? "warning" : "success"}>{debts.length} tài sản</Badge>
+          </div>
+          <Table>
+            <THead>
+              <TR>
+                <TH>Mã TS</TH>
+                <TH>Tài sản</TH>
+                <TH>Đến hạn</TH>
+                <TH className="text-right">Còn công nợ</TH>
+                <TH className="text-right">Tình trạng</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {loading ? (
+                <TR>
+                  <TD colSpan={5} className="py-6 text-center text-muted-foreground">Đang tải…</TD>
+                </TR>
+              ) : debts.length === 0 ? (
+                <TR>
+                  <TD colSpan={5} className="py-6 text-center text-muted-foreground">Không có công nợ đến hạn 🎉</TD>
+                </TR>
+              ) : (
+                debts.map((d) => (
+                  <TR key={d.assetId}>
+                    <TD className="font-mono text-xs">
+                      <Link href={`/assets/${d.assetId}`} className="text-primary hover:underline">{d.code}</Link>
+                    </TD>
+                    <TD className="font-medium">{d.productName}</TD>
+                    <TD>{formatDate(d.dueDate)}</TD>
+                    <TD className="text-right font-medium text-red-600">{formatNumber(d.remaining)} đ</TD>
+                    <TD className="text-right">
+                      {d.isOverdue ? (
+                        <Badge tone="danger">Quá hạn {Math.abs(d.daysLeft)} ngày</Badge>
+                      ) : (
+                        <Badge tone="warning">Còn {d.daysLeft} ngày</Badge>
                       )}
                     </TD>
                   </TR>

@@ -95,7 +95,10 @@ export function computeDepreciation(input: DepInput, asOf = new Date()): DepResu
   // --- Khấu hao theo thời gian (đường thẳng / số dư giảm dần) ---
   if (!months || months <= 0 || !start || isNaN(start.getTime())) return null;
 
-  const sl = (cost - salvage) / months; // đường thẳng / tháng
+  // Đường thẳng: theo yêu cầu = Nguyên giá / Số tháng (KHÔNG trừ giá trị thu hồi),
+  // giá trị còn lại giảm dần về 0. Số dư giảm dần vẫn dừng ở giá trị thu hồi.
+  const sSal = method === "STRAIGHT_LINE" ? 0 : salvage;
+  const sl = (cost - sSal) / months; // đường thẳng / tháng
   let book = cost;
   let accToAsOf = 0;
   const perYear = new Map<number, number>(); // năm -> tổng khấu hao trong năm
@@ -104,12 +107,12 @@ export function computeDepreciation(input: DepInput, asOf = new Date()): DepResu
     let dep: number;
     if (method === "DECLINING") {
       const decl = book * (2 / months);
-      const slRemain = (book - salvage) / (months - m);
+      const slRemain = (book - sSal) / (months - m);
       dep = Math.max(decl, slRemain);
     } else {
       dep = sl;
     }
-    if (book - dep < salvage) dep = book - salvage;
+    if (book - dep < sSal) dep = book - sSal;
     if (dep < 0) dep = 0;
     book -= dep;
 
@@ -128,7 +131,7 @@ export function computeDepreciation(input: DepInput, asOf = new Date()): DepResu
     return { year, depreciation: r0(dep), accumulated: r0(acc), remaining: r0(cost - acc) };
   });
 
-  const accumulated = Math.min(r0(accToAsOf), r0(cost - salvage));
+  const accumulated = Math.min(r0(accToAsOf), r0(cost - sSal));
   return {
     method,
     monthly: r0(sl),

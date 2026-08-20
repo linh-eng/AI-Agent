@@ -482,6 +482,7 @@ model Asset {
   // (c) Thanh toán & công nợ
   contractValue  Float?           @map("contract_value")  // tổng giá trị hợp đồng/tài sản
   managementType AssetManageType? @map("management_type") // hình thức quản lý (công nợ/hóa đơn/hợp đồng)
+  paymentDueDate DateTime?        @map("payment_due_date") // ngày đến hạn thanh toán công nợ còn lại
 
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")

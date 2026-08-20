@@ -3,6 +3,21 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.12.0 — 2026-08-20
+- **Khấu hao tài sản:**
+  - **Chỉnh sửa khấu hao ngay tại trang Khấu hao** (nút ✏️ mỗi tài sản — nguyên giá, phương pháp, số tháng,
+    ngày bắt đầu, tổng sản lượng).
+  - **Tự trích khấu hao từ Ngày mua**: nếu không nhập “Ngày bắt đầu”, hệ thống dùng **Ngày mua**.
+  - **Đường thẳng theo đúng công thức**: Khấu hao/tháng = **Nguyên giá ÷ Số tháng**; Lũy kế = cộng dồn từ
+    ngày bắt đầu; **Giá trị còn lại = Nguyên giá − Lũy kế** (giảm dần về 0).
+- **Thanh toán & Công nợ tài sản:**
+  - **Sửa đợt thanh toán** (nút ✏️): cập nhật số tiền, ngày, phương thức, ngân hàng, chứng từ → **tự tính lại công nợ**.
+  - **Ngày đến hạn thanh toán** + **cảnh báo công nợ sắp/đến hạn** ở Trung tâm cảnh báo (badge menu đếm cả mục này).
+  - (Thông tin ngân hàng + đính kèm Ủy nhiệm chi/Hóa đơn VAT/Hợp đồng đã có sẵn.)
+- **Sửa lỗi đồng bộ Kho Dịch Vụ:** Ghi nhận dịch vụ nay **báo rõ** đã cập nhật Kho Dịch Vụ hay chưa
+  (trước đây lỗi bị ẩn). Lưu ý: chỉ hàng **“Theo dõi HSD”** mới vào Kho Dịch Vụ; cần đã chạy `prisma:push`.
+- ⚠️ Có thêm cột mới (ngày đến hạn thanh toán) → cần chạy **`npm run prisma:push`** khi cập nhật.
+
 ## 1.11.0 — 2026-08-20
 - **Lọc & Chỉnh sửa danh mục:**
   - **Nhà cung cấp:** thêm ô **tìm kiếm** (mã/tên/người liên hệ/ĐT/MST, bỏ dấu) + nút **Sửa** từng NCC.

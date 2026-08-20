@@ -56,6 +56,7 @@ export const POST = handle(async (req) => {
       maintenanceCycleMonths: input.maintenanceCycleMonths ?? null,
       contractValue: input.contractValue ?? null,
       managementType: input.managementType ?? null,
+      paymentDueDate: parseDate(input.paymentDueDate),
     },
     include: { product: { select: { sku: true, name: true } } },
   });

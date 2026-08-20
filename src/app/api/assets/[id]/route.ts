@@ -73,6 +73,7 @@ export const PATCH = handle(async (req, ctx) => {
       ...(input.maintenanceCycleMonths !== undefined ? { maintenanceCycleMonths: input.maintenanceCycleMonths } : {}),
       ...(input.contractValue !== undefined ? { contractValue: input.contractValue } : {}),
       ...(input.managementType !== undefined ? { managementType: input.managementType } : {}),
+      ...(input.paymentDueDate !== undefined ? { paymentDueDate: parseDate(input.paymentDueDate) } : {}),
     },
   });
   return ok(row);

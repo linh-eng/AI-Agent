@@ -82,14 +82,22 @@ export async function recordServiceUsage(input: ServiceUsageInput, userId: strin
     },
   });
 
-  // Cập nhật Kho Dịch Vụ (sổ theo dõi hàng đã mở nắp) — không chặn nếu lỗi.
-  await applyServiceStock(
-    issueItems.map((i) => ({ productId: i.productId, qty: i.quantity })),
-    input.warehouseId,
-    userId
-  ).catch((e) => console.error("[service-stock] applyServiceStock lỗi:", e));
+  // Cập nhật Kho Dịch Vụ (sổ theo dõi hàng đã mở nắp cho hàng requiresExpiry).
+  // Không chặn phiếu nếu lỗi, nhưng TRẢ CẢNH BÁO để giao diện báo cho người dùng
+  // (tránh "im lặng thất bại" khiến tưởng không đồng bộ).
+  let serviceStockWarning: string | null = null;
+  try {
+    await applyServiceStock(
+      issueItems.map((i) => ({ productId: i.productId, qty: i.quantity })),
+      input.warehouseId,
+      userId
+    );
+  } catch (e: any) {
+    serviceStockWarning = e?.message ?? "Không cập nhật được Kho Dịch Vụ";
+    console.error("[service-stock] applyServiceStock lỗi:", e);
+  }
 
-  return { id: usage.id, code: usage.code, issueId: issue.id, issueCode: issue.code };
+  return { id: usage.id, code: usage.code, issueId: issue.id, issueCode: issue.code, serviceStockWarning };
 }
 
 /**

@@ -251,6 +251,45 @@ export async function getMaintenanceDueAlerts(withinDays = 14): Promise<Maintena
   return out.sort((x, y) => x.daysLeft - y.daysLeft);
 }
 
+export interface DebtDueAlert {
+  assetId: string;
+  code: string;
+  productName: string;
+  dueDate: string;
+  remaining: number; // công nợ còn lại
+  daysLeft: number;
+  isOverdue: boolean;
+}
+
+/** Tài sản còn công nợ và sắp/đã đến hạn thanh toán (theo paymentDueDate). */
+export async function getDebtDueAlerts(withinDays = 14): Promise<DebtDueAlert[]> {
+  const assets = await prisma.asset.findMany({
+    where: { paymentDueDate: { not: null }, contractValue: { not: null, gt: 0 } },
+    include: {
+      product: { select: { name: true } },
+      payments: { select: { amount: true } },
+    },
+  });
+  const out: DebtDueAlert[] = [];
+  for (const a of assets) {
+    const paid = a.payments.reduce((s, p) => s + p.amount, 0);
+    const remaining = Math.round((a.contractValue ?? 0) - paid);
+    if (remaining <= 0) continue; // đã trả đủ
+    const left = daysUntil(a.paymentDueDate!);
+    if (left > withinDays) continue;
+    out.push({
+      assetId: a.id,
+      code: a.code,
+      productName: a.product.name,
+      dueDate: a.paymentDueDate!.toISOString(),
+      remaining,
+      daysLeft: left,
+      isOverdue: left < 0,
+    });
+  }
+  return out.sort((x, y) => x.daysLeft - y.daysLeft);
+}
+
 export interface ShotAlert {
   handpieceId: string;
   code: string;
