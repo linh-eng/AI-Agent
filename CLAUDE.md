@@ -3407,3 +3407,19 @@ app-code (không ảnh hưởng test). Dùng: `npm run seed:klapp`.
   Hyaluronic Multiple 1.600k · Caviar 1.700k · Repagen 1.800k. Chạy lại cập nhật `standardPrice` (giá lẻ).
 - 3 protocol thư viện chưa có dịch vụ giá riêng (Retinol PRO AGE, HMLP, Hydra Collagen Silk) + kỹ thuật V-Shape.
   Xác thực DB dev: 9 PROTO-KLAPP-* + 10 DV-KLAPP-* ở màn Protocol/Dịch vụ (ảnh). tsc sạch · build OK.
+
+### Thư viện Dermalogica — brand + protocol PRO Calm theo bước · script `seed:dermalogica` (v0.39.3)
+Theo yêu cầu "build tiếp thương hiệu dịch vụ khác — Dermalogica". Nguồn: **biểu đồ trị liệu Dermalogica "PRO
+Calm" (Làm Dịu)** khách gửi (PDF). Script độc lập `prisma/seed-dermalogica.ts` (npm `seed:dermalogica`), upsert
+idempotent, chạy độc lập. **Code-only additive** — KHÔNG migration/schema/app-code. Dùng: `npm run seed:dermalogica`.
+- **Brand** `BR-DERMA` (Dermalogica — đã có sẵn, upsert giữ nguyên).
+- **1 protocol `PROTO-DERMA-PRO-CALM`** (LEGACY_STEPS, kind BRAND, ACTIVE) — transcribe **trung thực** từ biểu đồ,
+  7 bước: (1) Làm Sạch Gấp Đôi (UltraCalming Cleanser ×2 + Sơ Đồ Khuôn Mặt) · (2) Tái Tạo Bề Mặt (Daily
+  Milkfoliant + Calming Botanical Mixer) · (3) Điều Trị Chuyên Sâu (UltraCalming Serum Concentrate + điện di ion/
+  siêu âm; đá lạnh/lăn ngọc bích cho da nhiệt nóng) · (4) Mặt Nạ Chuyên Dụng (chọn theo mức viêm sưng) · (5) Liệu
+  Pháp Tiếp Xúc (bạch huyết/ấn huyệt/thư giãn da đầu) · (6) Thoa Chồng Bảo Vệ (UltraCalming Mist + Serum + dưỡng
+  ẩm) · (7) Chăm Sóc Tại Nhà. Có `purpose`/`suitableFor` (da nhạy cảm)/`contraindications` (đánh giá mức viêm sưng).
+- **1 dịch vụ `DV-DERMA-PRO-CALM`** (nhóm `DM-DERMA-PRO` "Dermalogica Professional", 75′, gắn `defaultProtocolId`)
+  — **`standardPrice=0` (CHƯA có giá)** vì file nguồn không kèm bảng giá; `update: {}` để KHÔNG ghi đè nếu chị đã
+  nhập giá tay. **Nợ:** cần bảng giá Dermalogica + thêm biểu đồ trị liệu khác (Pro Bright/Pro Clear/Pro Firm/Pro
+  Restore…) để mở rộng dải dịch vụ. Xác thực DB dev: 1 PROTO-DERMA-* (7 bước) + 1 DV-DERMA-* (ảnh). tsc sạch · build OK.
