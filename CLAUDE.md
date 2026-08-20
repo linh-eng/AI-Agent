@@ -3250,3 +3250,33 @@ migration): Inshape (EMS+RF body & vùng chậu/vùng kín) · Winnage for Face 
 (đầu HR/AC/SR/Dr. Platon) · Laser CO2. Cùng brands sẵn có DMK/Klapp/Dermalogica. **Liên kết chéo & sửa tại chỗ:**
 Công nghệ là master data — màn `/technologies` cho thêm/sửa trực tiếp; Dịch vụ tham chiếu qua `technologyIds`/
 `defaultTechnologyId`; buổi thực hiện ghi `technologyId`. Xác thực: tsc sạch · build OK · seed = 17 công nghệ.
+
+### Phân quyền Giá & Thiết lập (v0.38.5) — Admin/Điều hành/Kế toán TOÀN QUYỀN; KTV/Sales chỉ đầu ra + khách hàng
+Theo quyết định phân quyền của chủ: **"Được tất cả các quyền: admin, điều hành, kế toán; KTV, Sales: giới hạn
+các thiết lập về dịch vụ, cơ chế, giá mua, phân hành nội bộ và chương trình MKT; được phép thực hiện các phần
+hành đầu ra, liên quan đến khách hàng."** Chỉ sửa `src/lib/rbac.ts` (ROLE_PERMISSIONS — nguồn sự thật) +
+cập nhật test theo ma trận mới. **KHÔNG migration, KHÔNG đổi schema/route** (backend guard đã enforce theo
+permission — Mục 15). Enforce ở SERVER, menu chỉ phản chiếu permission.
+- **`SPA_FULL_BUSINESS`** (const dùng chung): trọn bộ quyền nghiệp vụ spa (customer/crm/service/booking/
+  treatment/payment/deposit/invoice/setting/staff/pricefloor/followup/task/campaign/finance.read/brand/
+  technology/protocol/form/catalog/recommend/proposal/care/material/price/marketing/media/loyalty). **KHÔNG**
+  gồm `user.manage` (trục an ninh riêng — vẫn CHỈ Admin, chủ có thể mở sau) và **KHÔNG** gồm namespace
+  NHÂN SỰ/LƯƠNG (payroll/attendance/compensation/commission — tách biệt, chủ sở hữu riêng theo HR-PH1..6).
+- **BOD (Ban điều hành)** = `SPA_FULL_BUSINESS` + duyệt kho (inbound/outbound/disassembly/stockcount approve) +
+  **HR read-only** (attendance.read/payroll.read/compensation.read/commission.read). **MANAGER (Quản lý)** =
+  `SPA_FULL_BUSINESS` + **đủ quyền HR** (giữ nguyên HR-PH1..6). **CASHIER (Kế toán)** = `SPA_FULL_BUSINESS`
+  (toàn quyền nghiệp vụ giá/dịch vụ/marketing; KHÔNG user.manage, KHÔNG ghi lương → payroll vẫn của Quản lý).
+- **SPECIALIST (KTV)** — CHỈ đầu ra + khách hàng: treatment.write, material.write (ghi tiêu hao khi thực hiện),
+  proposal.write (lập báo giá), recommend.write, care.write, crm.write, task.write, media.write + CLINIC_READ.
+  **BỎ** protocol.write / technology.write / form.write (không thiết lập cơ chế), KHÔNG giá vốn/nội bộ/MKT.
+- **SALES (Kinh doanh)** — CHỈ đầu ra + khách hàng: customer.write, crm.write, booking.write, proposal.write,
+  recommend.write, care.write, task.write, media.write + CLINIC_READ (+ giữ quyền kho THNG cũ, env-gated).
+  KHÔNG service/protocol/technology/pricefloor/finance/marketing/user.
+- **Ảnh hưởng menu** (permission-based, không hard-code tên role): CASHIER/BOD nay thấy Marketing + Bảng giá +
+  Giá sàn + thiết lập dịch vụ (như Quản lý); KTV/Sales KHÔNG thấy Hóa đơn/Thanh toán/Bảng giá/Giá sàn/Marketing/
+  Quản trị user/Cài đặt — chỉ Khách hàng/Lịch hẹn/Kế hoạch điều trị/Báo giá/CSKH/Công việc/Thư viện ảnh.
+- **Test cập nhật theo ma trận mới** (thay đổi ma trận → cập nhật test): `rbac.test.ts` (KTV KHÔNG protocol.write),
+  `nav-rbac.test.ts` (CASHIER thấy Marketing), `rbac-matrix.test.ts` H (Kế toán toàn quyền nghiệp vụ, chỉ
+  user.manage DENY). HR RBAC (hr-foundation/attendance/compensation/payroll/kpi) **bất biến** — BOD/CASHIER
+  KHÔNG chạm namespace lương. Tài khoản demo: Kế toán `thungan@sophia.com.vn`/`thungan123`, KTV
+  `chuyenvien@sophia.com.vn`/`chuyenvien123`, Sales `kinhdoanh@sophia.com.vn`/`kinhdoanh123`.

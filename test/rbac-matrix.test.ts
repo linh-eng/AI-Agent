@@ -213,14 +213,18 @@ describe("Mục 15 · RBAC toàn hệ thống (HTTP thật)", () => {
     expect((await usersGet(jr("http://t/api/users"))).status).toBe(403);
   });
 
-  it("H · Thu ngân: thanh toán/hóa đơn/giá sàn + tài chính ALLOW; user.manage/protocol DENY", async () => {
+  it("H · Kế toán / Thu ngân: TOÀN QUYỀN nghiệp vụ (thanh toán/giá sàn/tài chính/protocol/marketing ALLOW); CHỈ user.manage DENY", async () => {
+    // Quyết định phân quyền của chủ: Kế toán = toàn quyền nghiệp vụ (như Quản lý).
+    // Ranh giới an ninh duy nhất giữ lại: user.manage (quản trị tài khoản đăng nhập) chỉ Admin.
     await loginAs([ROLES.CASHIER]);
     expect([200, 201, 422]).toContain((await paymentsPost(jr("http://t/api/payments", "POST", {}))).status);
     expect((await priceFloorsGet(jr("http://t/api/price-floors"))).status).toBe(200);
     expect((await serviceCostSeen()).expectedCost).not.toBeNull(); // có finance.read
-    // ngoài phạm vi
+    // Nay CÓ protocol.write + marketing.write (toàn quyền nghiệp vụ) → KHÔNG còn 403
+    expect((await protocolsPost(jr("http://t/api/brand-protocols", "POST", {}))).status).not.toBe(403);
+    expect([200, 201, 422]).toContain((await campaignsPost(jr("http://t/api/marketing-campaigns", "POST", {}))).status);
+    // Ranh giới còn lại: quản trị tài khoản đăng nhập vẫn chỉ Admin
     expect((await usersGet(jr("http://t/api/users"))).status).toBe(403);
-    expect((await protocolsPost(jr("http://t/api/brand-protocols", "POST", {}))).status).toBe(403); // không protocol.write
   });
 
   it("I · Marketing: chiến dịch ALLOW; HR/user/treatment/payment DENY", async () => {

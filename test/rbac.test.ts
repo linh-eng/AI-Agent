@@ -37,10 +37,12 @@ describe("RBAC — dữ liệu tài chính nhạy cảm", () => {
     expect(visible.cost).toBe(350000);
   });
 
-  it("SPECIALIST không có quyền xem/ghi tài chính nhưng có treatment/protocol", () => {
+  it("SPECIALIST (KTV): CÓ treatment (đầu ra); KHÔNG protocol/tài chính (bị giới hạn thiết lập cơ chế)", () => {
+    // Quyết định phân quyền của chủ: KTV chỉ phần hành ĐẦU RA + liên quan khách hàng,
+    // KHÔNG thiết lập dịch vụ/công nghệ/protocol (cơ chế) và KHÔNG giá vốn/nội bộ.
     const p = ROLE_PERMISSIONS[ROLES.SPECIALIST];
     expect(p.includes(PERMISSIONS.TREATMENT_WRITE)).toBe(true);
-    expect(p.includes(PERMISSIONS.PROTOCOL_WRITE)).toBe(true);
+    expect(p.includes(PERMISSIONS.PROTOCOL_WRITE)).toBe(false); // KTV không sửa protocol (cơ chế)
     expect(p.includes(PERMISSIONS.PAYMENT_READ)).toBe(false);
     expect(p.includes(PERMISSIONS.PRICE_WRITE)).toBe(false);
   });

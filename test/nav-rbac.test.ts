@@ -52,10 +52,11 @@ describe("Mục 15 · Sidebar permission-based (N)", () => {
     expect(m.has("Quản trị người dùng")).toBe(false);
   });
 
-  it("Thu ngân: CÓ Hóa đơn/Thanh toán/Bảng giá/Giá sàn; KHÔNG Marketing/Quản trị user", () => {
+  it("Thu ngân / Kế toán: TOÀN QUYỀN nghiệp vụ (Hóa đơn/Thanh toán/Bảng giá/Giá sàn/Marketing); KHÔNG Quản trị user", () => {
+    // Quyết định phân quyền của chủ: Kế toán nhận toàn bộ bộ quyền nghiệp vụ (như Quản lý),
+    // NHƯNG user.manage vẫn chỉ Admin → không thấy "Quản trị người dùng".
     const m = menuFor(ROLES.CASHIER);
-    for (const shown of ["Hóa đơn", "Thanh toán", "Bảng giá", "Giá sàn"]) expect(m.has(shown)).toBe(true);
-    expect(m.has("Marketing")).toBe(false);
+    for (const shown of ["Hóa đơn", "Thanh toán", "Bảng giá", "Giá sàn", "Marketing"]) expect(m.has(shown)).toBe(true);
     expect(m.has("Quản trị người dùng")).toBe(false);
   });
 
