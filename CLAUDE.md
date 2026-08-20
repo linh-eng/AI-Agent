@@ -3380,3 +3380,12 @@ additive 0 DROP; tổng **49 migration**). **641 test / 64 file PASS** (+`test/p
   **In toa**). Toa ISSUED khóa nội dung; hiện timeline khách.
 - **Coexistence:** KHÔNG đụng ProductRecommendation/CareInstruction/Session cũ — kê toa là entity mới độc lập,
   chỉ THÊM khối H + nav + route. RBAC/finance (Mục 15) bất biến.
+
+### Nạp riêng thư viện Protocol DMK — script `seed:dmk` (v0.39.1)
+Theo yêu cầu "nạp đủ 20 protocol DMK vào DB đang dùng". seed-demo có guard idempotent (đã có KH-100001 thì bỏ
+qua TOÀN BỘ) → DB seed từ trước KHÔNG nhận 20 protocol DMK thêm ở v0.37.3→v0.37.9. Bổ sung script độc lập
+`prisma/seed-dmk.ts` (npm `seed:dmk`): trích khối protocol DMK từ seed-demo, chạy độc lập KHÔNG phụ thuộc guard;
+upsert idempotent; chỉ tạo brand DMK + 20 protocol `PROTO-DMK-*`, KHÔNG đụng dữ liệu khác. Code-only, KHÔNG
+migration/schema/app-code (không ảnh hưởng test). 20 protocol: ACNE·AGING·PIGMENT·BIHAKU·SKIN-MATRIX·FINISH-DRY·
+FINISH-ACNE·ALPHAZYME·HYDRADERMAZE·ALKALINE-FACE·DESQUAMATE·DV01–DV09. Xác thực DB dev: đủ 21 PROTO-DMK-* ở màn
+Protocol. Dùng: `npm run seed:dmk` trên bất kỳ DB nào. Nợ: dữ liệu DMK ở 2 nơi (seed-demo + seed-dmk) — hợp nhất sau.
