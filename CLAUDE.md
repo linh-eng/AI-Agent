@@ -3221,3 +3221,16 @@ nullable `ServiceCostingVersion.extraCostLines`, additive 0 DROP; tổng **46 mi
   sinh"** (tên + số tiền + xóa + tổng); breakdown F hiện các dòng con "↳ tên = tiền".
 - `test/costing-extra-lines.test.ts` (3 HTTP thật): dòng gộp đúng vào tổng · publish bất biến + snapshot evidence
   · non-finance mask null. Code additive. Xác thực: tsc sạch · build OK · full regression **622/61 PASS**.
+
+### Giá vốn — nút "+" thêm chi phí phát sinh (v0.38.2)
+Theo yêu cầu xem "phòng thiết lập giá" (màn Giá vốn `/services/[id]/costing`: chi phí gợi ý = vật tư SOP + nhân
+sự phí vai trò) + **thêm nút "+" để add chi phí phát sinh**. Migration **`Zj_costing_extra_lines`** (1 cột JSON
+nullable `ServiceCostingVersion.extraCostLines`, additive 0 DROP; tổng **46 migration**).
+- **Mô hình:** "Chi phí khác (F)" giờ là **danh sách dòng** `[{name, amount}]` thêm bằng nút "+" (xóa từng dòng,
+  hiện tổng). `otherCost = Σ dòng` (nếu có dòng), else số nhập tay cũ → **công thức TỔNG không đổi** (direct +
+  overhead + other); version PUBLISHED cũ (không có dòng) bất biến. Lưu `extraCostLines` + vào `sourceSnapshot`.
+- **Mask theo `finance.read`** (extraCostLines chứa số tiền → thêm vào COSTING_SENSITIVE_FIELDS).
+- UI: form tạo bản nháp thay ô "Chi phí khác" đơn bằng khối "Chi phí khác / phát sinh" + **"+ Thêm chi phí phát
+  sinh"** (tên + số tiền + xóa + tổng); breakdown F hiện các dòng con "↳ tên = tiền".
+- `test/costing-extra-lines.test.ts` (3 HTTP thật): dòng gộp đúng vào tổng · publish bất biến + snapshot evidence
+  · non-finance mask null. Code additive. Xác thực: tsc sạch · build OK · full regression **622/61 PASS**.
