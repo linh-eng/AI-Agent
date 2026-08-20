@@ -7,7 +7,7 @@
 // =============================================================================
 import * as XLSX from "xlsx";
 import { prisma } from "./prisma";
-import { productCreateSchema, assetCreateSchema } from "./validation";
+import { productCreateSchema } from "./validation";
 import { createReceipt } from "./inbound-service";
 import { createIssue } from "./outbound-service";
 import { nextAssetCode } from "./codes";
@@ -36,9 +36,26 @@ export interface ImportError {
 }
 export interface ImportResult {
   created: number;
+  updated: number; // số bản ghi đã ĐIỀN BÙ ô trống (SKU/serial trùng)
   total: number;
   errors: ImportError[];
 }
+
+// Chỉ điền các ô ĐANG TRỐNG của bản ghi cũ bằng giá trị mới (không ghi đè dữ liệu đã có).
+function fillMissing(existing: any, incoming: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(incoming)) {
+    if (v === undefined || v === null || v === "") continue;
+    const cur = existing[k];
+    if (cur === undefined || cur === null || cur === "") out[k] = v;
+  }
+  return out;
+}
+const dOrNull = (v: any): Date | null => {
+  const iso = toISODate(v);
+  return iso ? new Date(iso) : null;
+};
+const intOrNull = (v: number | undefined): number | null => (v == null ? null : Math.trunc(v));
 
 // ---------------------------------------------------------------------------
 // Khai báo cột cho từng loại
@@ -275,6 +292,7 @@ export async function importProducts(rows: Record<string, any>[], _userId: strin
   const lk = await lookups();
   const errors: ImportError[] = [];
   let created = 0;
+  let updated = 0;
   let total = 0;
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
@@ -282,14 +300,36 @@ export async function importProducts(rows: Record<string, any>[], _userId: strin
     if (!str(r.sku) && !str(r.name)) continue; // dòng trống
     total++;
     try {
+      const sku = str(r.sku);
+      if (!sku) throw new Error("Thiếu mã SKU");
       let categoryId: string | undefined;
       const catRef = str(r.categoryCode);
       if (catRef) {
         categoryId = lk.cat.get(catRef.toLowerCase());
         if (!categoryId) throw new Error(`Không tìm thấy nhóm hàng "${catRef}"`);
       }
+
+      // Đã tồn tại SKU -> ĐIỀN BÙ các ô trống (không ghi đè dữ liệu cũ).
+      const existing = await prisma.product.findFirst({ where: { sku } });
+      if (existing) {
+        const upd = fillMissing(existing, {
+          name: str(r.name) || undefined,
+          barcode: str(r.barcode) || undefined,
+          brand: str(r.brand) || undefined,
+          categoryId,
+          minStock: num(r.minStock),
+          expiryAlertDays: num(r.expiryAlertDays),
+          note: str(r.note) || undefined,
+        });
+        if (Object.keys(upd).length > 0) {
+          await prisma.product.update({ where: { id: existing.id }, data: upd });
+          updated++;
+        }
+        continue; // không có ô trống nào để điền -> bỏ qua, không báo lỗi
+      }
+
       const input = productCreateSchema.parse({
-        sku: str(r.sku),
+        sku,
         name: str(r.name),
         barcode: str(r.barcode) || undefined,
         brand: str(r.brand) || undefined,
@@ -302,15 +342,17 @@ export async function importProducts(rows: Record<string, any>[], _userId: strin
         expiryAlertDays: num(r.expiryAlertDays) ?? null,
         note: str(r.note) || undefined,
       });
-      const exists = await prisma.product.findFirst({ where: { OR: [{ sku: input.sku }, ...(input.barcode ? [{ barcode: input.barcode }] : [])] }, select: { id: true } });
-      if (exists) throw new Error(`Mã SKU/mã vạch đã tồn tại`);
+      if (input.barcode) {
+        const dup = await prisma.product.findFirst({ where: { barcode: input.barcode }, select: { id: true } });
+        if (dup) throw new Error(`Mã vạch "${input.barcode}" đã tồn tại`);
+      }
       await prisma.product.create({ data: input });
       created++;
     } catch (e: any) {
       errors.push({ row: line, message: firstMsg(e) });
     }
   }
-  return { created, total, errors };
+  return { created, updated, total, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -320,6 +362,7 @@ export async function importAssets(rows: Record<string, any>[], _userId: string)
   const lk = await lookups();
   const errors: ImportError[] = [];
   let created = 0;
+  let updated = 0;
   let total = 0;
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
@@ -340,65 +383,53 @@ export async function importAssets(rows: Record<string, any>[], _userId: string)
         supplierId = lk.sup.get(str(r.supplierCode).toLowerCase());
         if (!supplierId) throw new Error(`Không tìm thấy NCC "${str(r.supplierCode)}"`);
       }
-      const input = assetCreateSchema.parse({
+      const serial = str(r.serialNumber) || null;
+
+      // Dữ liệu ở dạng Prisma (kèm ép kiểu ngày/số/enum).
+      const pdata = {
         productId: prod.id,
-        serialNumber: str(r.serialNumber) || undefined,
-        status: mapEnum(r.status, STATUS) ?? "IN_STOCK",
-        warehouseId,
-        supplierId,
-        location: str(r.location) || undefined,
-        purchaseDate: toISODate(r.purchaseDate),
-        warrantyUntil: toISODate(r.warrantyUntil),
+        serialNumber: serial,
+        status: (mapEnum(r.status, STATUS) as any) ?? "IN_STOCK",
+        warehouseId: warehouseId ?? null,
+        supplierId: supplierId ?? null,
+        location: str(r.location) || null,
+        purchaseDate: dOrNull(r.purchaseDate),
+        warrantyUntil: dOrNull(r.warrantyUntil),
         cost: num(r.cost) ?? null,
         salvageValue: num(r.salvageValue) ?? null,
-        depreciationStart: toISODate(r.depreciationStart),
-        depreciationMonths: num(r.depreciationMonths) ?? null,
+        depreciationStart: dOrNull(r.depreciationStart),
+        depreciationMonths: intOrNull(num(r.depreciationMonths)),
         depreciationMethod: (mapEnum(r.depreciationMethod, METHOD) as any) ?? null,
         depreciationTotalUnits: num(r.depreciationTotalUnits) ?? null,
-        warrantyVendor: str(r.warrantyVendor) || undefined,
-        warrantyMonths: num(r.warrantyMonths) ?? null,
-        maintenanceCycleMonths: num(r.maintenanceCycleMonths) ?? null,
+        warrantyVendor: str(r.warrantyVendor) || null,
+        warrantyMonths: intOrNull(num(r.warrantyMonths)),
+        maintenanceCycleMonths: intOrNull(num(r.maintenanceCycleMonths)),
         contractValue: num(r.contractValue) ?? null,
         managementType: (mapEnum(r.managementType, MANAGE) as any) ?? null,
-        note: str(r.note) || undefined,
-      });
-      const code = await nextAssetCode();
-      const { serialNumber } = input;
-      if (serialNumber) {
-        const dup = await prisma.asset.findFirst({ where: { serialNumber }, select: { id: true } });
-        if (dup) throw new Error(`Số serial "${serialNumber}" đã tồn tại`);
+        note: str(r.note) || null,
+      };
+
+      // Trùng SERIAL -> ĐIỀN BÙ ô trống của thiết bị đã có (serial là định danh duy nhất của 1 máy).
+      if (serial) {
+        const existing = await prisma.asset.findFirst({ where: { serialNumber: serial } });
+        if (existing) {
+          const upd = fillMissing(existing, pdata);
+          if (Object.keys(upd).length > 0) {
+            await prisma.asset.update({ where: { id: existing.id }, data: upd });
+            updated++;
+          }
+          continue;
+        }
       }
-      await prisma.asset.create({
-        data: {
-          code,
-          productId: input.productId,
-          serialNumber: input.serialNumber,
-          warehouseId: input.warehouseId,
-          status: input.status,
-          location: input.location,
-          purchaseDate: input.purchaseDate ? new Date(input.purchaseDate) : null,
-          warrantyUntil: input.warrantyUntil ? new Date(input.warrantyUntil) : null,
-          supplierId: input.supplierId,
-          note: input.note,
-          cost: input.cost ?? null,
-          salvageValue: input.salvageValue ?? null,
-          depreciationStart: input.depreciationStart ? new Date(input.depreciationStart) : null,
-          depreciationMonths: input.depreciationMonths ?? null,
-          depreciationMethod: input.depreciationMethod ?? null,
-          depreciationTotalUnits: input.depreciationTotalUnits ?? null,
-          warrantyVendor: input.warrantyVendor,
-          warrantyMonths: input.warrantyMonths ?? null,
-          maintenanceCycleMonths: input.maintenanceCycleMonths ?? null,
-          contractValue: input.contractValue ?? null,
-          managementType: input.managementType ?? null,
-        },
-      });
+
+      const code = await nextAssetCode();
+      await prisma.asset.create({ data: { code, ...pdata } });
       created++;
     } catch (e: any) {
       errors.push({ row: line, message: firstMsg(e) });
     }
   }
-  return { created, total, errors };
+  return { created, updated, total, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -451,7 +482,7 @@ export async function importReceipts(rows: Record<string, any>[], userId: string
       errors.push({ row: `Phiếu ${key}`, message: firstMsg(e) });
     }
   }
-  return { created, total: groups.size, errors };
+  return { created, updated: 0, total: groups.size, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -481,7 +512,7 @@ export async function importIssues(rows: Record<string, any>[], userId: string):
       errors.push({ row: `Phiếu ${key}`, message: firstMsg(e) });
     }
   }
-  return { created, total: groups.size, errors };
+  return { created, updated: 0, total: groups.size, errors };
 }
 
 function firstMsg(e: any): string {

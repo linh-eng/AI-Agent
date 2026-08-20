@@ -9,6 +9,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { focusNextOnEnter } from "@/lib/form";
+import { normalizeSearch } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 
@@ -32,6 +33,7 @@ export default function CategoriesPage() {
   const [editing, setEditing] = useState<Row | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY);
+  const [q, setQ] = useState("");
 
   async function load() {
     setLoading(true);
@@ -90,6 +92,8 @@ export default function CategoriesPage() {
     }
   }
 
+  const filtered = rows.filter((r) => normalizeSearch(`${r.code} ${r.name}`).includes(normalizeSearch(q)));
+
   return (
     <div>
       <PageHeader
@@ -103,6 +107,14 @@ export default function CategoriesPage() {
           )
         }
       />
+      <div className="mb-4">
+        <Input
+          placeholder="Tìm theo mã / tên nhóm…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -123,14 +135,14 @@ export default function CategoriesPage() {
                     Đang tải…
                   </TD>
                 </TR>
-              ) : rows.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <TR>
                   <TD colSpan={canWrite ? 6 : 5} className="py-8 text-center text-muted-foreground">
-                    Chưa có nhóm hàng
+                    {q ? "Không tìm thấy nhóm hàng phù hợp" : "Chưa có nhóm hàng"}
                   </TD>
                 </TR>
               ) : (
-                rows.map((r) => (
+                filtered.map((r) => (
                   <TR key={r.id}>
                     <TD className="font-mono font-medium">{r.code}</TD>
                     <TD>{r.name}</TD>

@@ -70,7 +70,9 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
   (`GET /api/import/template?entity=…`, kèm sheet Hướng dẫn) và **đọc/kiểm tra** khi nhập (`POST /api/import/[entity]`
   nhận multipart). Nhập kho/Xuất kho nhiều dòng gộp theo cột "Mã phiếu"; tái dùng `createReceipt`/`createIssue`
   (giữ sinh lô + bút toán + FEFO). Tham chiếu nhóm hàng/kho/NCC/SKU theo mã hoặc tên; báo lỗi theo từng dòng/phiếu.
-  Phân quyền theo `*.write` của từng mục. Dùng thư viện `xlsx` (SheetJS).
+  Phân quyền theo `*.write` của từng mục. Dùng thư viện `xlsx` (SheetJS). **Điền bù (không ghi đè):** khi nhập
+  Sản phẩm mà SKU đã có (hoặc Tài sản mà serial đã có) → chỉ điền các ô đang trống từ Excel (`fillMissing`),
+  giữ nguyên dữ liệu cũ; kết quả trả thêm `updated`.
 - **Cài đặt công ty/thương hiệu:** `CompanySetting` (1 bản ghi id="company") — tên, logo (data URI),
   địa chỉ, ĐT, MST; hiển thị ở sidebar, trang đăng nhập (GET `/api/settings` công khai) và **đầu phiếu in**.
 - **Dashboard:** số liệu tổng hợp + biểu đồ (giá trị tồn theo nhóm, cơ cấu cảnh báo) + phiếu gần đây.

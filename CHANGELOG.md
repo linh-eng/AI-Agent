@@ -3,6 +3,16 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.11.0 — 2026-08-20
+- **Lọc & Chỉnh sửa danh mục:**
+  - **Nhà cung cấp:** thêm ô **tìm kiếm** (mã/tên/người liên hệ/ĐT/MST, bỏ dấu) + nút **Sửa** từng NCC.
+  - **Thương hiệu:** thêm ô **tìm kiếm** + nút **Sửa** từng thương hiệu.
+  - **Nhóm hàng:** thêm ô **tìm kiếm** (mã/tên).
+- **Nhập Excel — điền bù dữ liệu còn thiếu (không ghi đè):** khi nhập **Sản phẩm** mà **SKU đã tồn tại**
+  (hoặc nhập **Tài sản** mà **số serial đã tồn tại**), hệ thống **chỉ điền vào các ô đang trống** từ file Excel,
+  **giữ nguyên** dữ liệu cũ đã có — thay vì báo lỗi trùng. Kết quả nhập hiển thị thêm số **“Điền bù ô trống”**.
+- Chỉ thêm/sửa giao diện + logic — không đổi database, không thêm quyền.
+
 ## 1.10.1 — 2026-08-19
 - Thêm nút **“Nhập Excel”** ngay trong trang **Sản phẩm, Tài sản/Thiết bị, Nhập kho, Xuất kho**
   (cạnh nút “Thêm…”) — bấm là mở thẳng đúng mục ở trang *Nhập liệu Excel*. Không cần vào menu Hệ thống nữa.

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 
-interface Result { created: number; total: number; errors: { row: string; message: string }[] }
+interface Result { created: number; updated: number; total: number; errors: { row: string; message: string }[] }
 
 const SECTIONS = [
   { entity: "product", label: "Sản phẩm", perm: PERMISSIONS.PRODUCT_WRITE,
@@ -89,8 +89,10 @@ function ImportCard({ entity, label, desc }: { entity: string; label: string; de
                 <div className={`flex items-center gap-2 rounded-md p-3 text-sm ${result.errors.length === 0 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>
                   {result.errors.length === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
                   <span>
-                    Thành công <b>{result.created}/{result.total}</b>
+                    Tạo mới <b>{result.created}</b>
+                    {result.updated > 0 && <> · Điền bù ô trống <b>{result.updated}</b></>}
                     {result.errors.length > 0 && <> · Lỗi <b>{result.errors.length}</b></>}
+                    <span className="opacity-70"> (trên {result.total} dòng)</span>
                   </span>
                 </div>
                 {result.errors.length > 0 && (
@@ -136,6 +138,9 @@ export default function ImportPage() {
         <b className="text-foreground">Cách dùng:</b> ① Bấm <b>Tải form mẫu</b> → ② mở bằng Excel, đọc sheet <b>“Hướng dẫn”</b> rồi điền
         vào sheet dữ liệu (không xóa dòng tiêu đề) → ③ <b>Chọn file</b> → ④ <b>Nhập lên hệ thống</b>. Các mã tham chiếu
         (nhóm hàng, kho, NCC, SKU) phải đã tồn tại trong hệ thống.
+        <br />
+        <b className="text-foreground">Điền bù dữ liệu:</b> nếu <b>SKU sản phẩm</b> hoặc <b>số serial thiết bị</b> đã có, hệ thống
+        chỉ <b>điền vào các ô còn trống</b> từ file Excel — <b>không ghi đè</b> dữ liệu cũ đã có.
       </div>
       {visible.length === 0 ? (
         <Card><CardContent className="p-8 text-center text-muted-foreground">

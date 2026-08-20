@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -9,6 +9,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { focusNextOnEnter } from "@/lib/form";
+import { normalizeSearch } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 
@@ -21,6 +22,7 @@ interface Row {
   email?: string | null;
   address?: string | null;
   taxCode?: string | null;
+  note?: string | null;
 }
 
 const EMPTY = { code: "", name: "", contactPerson: "", phone: "", email: "", address: "", taxCode: "", note: "" };
@@ -30,8 +32,10 @@ export default function SuppliersPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Row | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY);
+  const [q, setQ] = useState("");
 
   async function load() {
     setLoading(true);
@@ -45,11 +49,38 @@ export default function SuppliersPage() {
     load();
   }, []);
 
-  async function create(e: React.FormEvent) {
+  function openCreate() {
+    setEditing(null);
+    setForm(EMPTY);
+    setError(null);
+    setOpen(true);
+  }
+  function openEdit(r: Row) {
+    setEditing(r);
+    setForm({
+      code: r.code,
+      name: r.name,
+      contactPerson: r.contactPerson ?? "",
+      phone: r.phone ?? "",
+      email: r.email ?? "",
+      address: r.address ?? "",
+      taxCode: r.taxCode ?? "",
+      note: r.note ?? "",
+    });
+    setError(null);
+    setOpen(true);
+  }
+
+  async function save(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     try {
-      await apiFetch("/api/suppliers", { method: "POST", body: JSON.stringify(form) });
+      if (editing) {
+        const { code, ...rest } = form; // không đổi mã khi sửa
+        await apiFetch(`/api/suppliers/${editing.id}`, { method: "PATCH", body: JSON.stringify(rest) });
+      } else {
+        await apiFetch("/api/suppliers", { method: "POST", body: JSON.stringify(form) });
+      }
       setOpen(false);
       setForm(EMPTY);
       load();
@@ -58,6 +89,11 @@ export default function SuppliersPage() {
     }
   }
 
+  const filtered = rows.filter((r) =>
+    normalizeSearch(`${r.code} ${r.name} ${r.contactPerson ?? ""} ${r.phone ?? ""} ${r.taxCode ?? ""}`).includes(normalizeSearch(q)),
+  );
+  const cols = canWrite ? 8 : 7;
+
   return (
     <div>
       <PageHeader
@@ -65,12 +101,20 @@ export default function SuppliersPage() {
         description="Danh sách nhà cung cấp — dùng khi lập phiếu nhập kho."
         action={
           canWrite && (
-            <Button onClick={() => setOpen(true)}>
+            <Button onClick={openCreate}>
               <Plus className="h-4 w-4" /> Thêm NCC
             </Button>
           )
         }
       />
+      <div className="mb-4">
+        <Input
+          placeholder="Tìm theo mã / tên / người liên hệ / ĐT / MST…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="max-w-md"
+        />
+      </div>
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -83,23 +127,24 @@ export default function SuppliersPage() {
                 <TH>Email</TH>
                 <TH>Địa chỉ</TH>
                 <TH>Mã số thuế</TH>
+                {canWrite && <TH className="text-right">Sửa</TH>}
               </TR>
             </THead>
             <TBody>
               {loading ? (
                 <TR>
-                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <TD colSpan={cols} className="py-8 text-center text-muted-foreground">
                     Đang tải…
                   </TD>
                 </TR>
-              ) : rows.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <TR>
-                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">
-                    Chưa có nhà cung cấp
+                  <TD colSpan={cols} className="py-8 text-center text-muted-foreground">
+                    {q ? "Không tìm thấy nhà cung cấp phù hợp" : "Chưa có nhà cung cấp"}
                   </TD>
                 </TR>
               ) : (
-                rows.map((r) => (
+                filtered.map((r) => (
                   <TR key={r.id}>
                     <TD className="font-mono font-medium">{r.code}</TD>
                     <TD>{r.name}</TD>
@@ -108,6 +153,13 @@ export default function SuppliersPage() {
                     <TD className="text-muted-foreground">{r.email ?? "—"}</TD>
                     <TD className="text-muted-foreground">{r.address ?? "—"}</TD>
                     <TD className="text-muted-foreground">{r.taxCode ?? "—"}</TD>
+                    {canWrite && (
+                      <TD className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(r)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </TD>
+                    )}
                   </TR>
                 ))
               )}
@@ -116,12 +168,12 @@ export default function SuppliersPage() {
         </CardContent>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Thêm nhà cung cấp">
-        <form onSubmit={create} onKeyDown={focusNextOnEnter} className="space-y-4">
+      <Modal open={open} onClose={() => setOpen(false)} title={editing ? `Sửa NCC ${editing.code}` : "Thêm nhà cung cấp"}>
+        <form onSubmit={save} onKeyDown={focusNextOnEnter} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Mã *</Label>
-              <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
+              <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required disabled={!!editing} />
             </div>
             <div className="space-y-1.5">
               <Label>Mã số thuế</Label>
