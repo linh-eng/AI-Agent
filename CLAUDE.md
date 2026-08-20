@@ -3340,3 +3340,20 @@ tổng **48 migration**).
   mã lồng sai → lỗi dòng; tự-lồng → null.
 - **Test** `test/data-io.test.ts` U (lồng dịch vụ con đúng + chống tự-lồng + mã lồng sai → lỗi + xuất có cột).
   Full regression **633/62 PASS**; tsc sạch.
+
+### Báo cáo kinh doanh SPA — /bao-cao (v0.38.9)
+Theo yêu cầu "cho báo cáo dashboard" (trang `/reports` cũ là báo cáo KHO THNG phần cứng — không phải spa).
+Thêm **trang Báo cáo kinh doanh Spa** tổng hợp từ dữ liệu sẵn có (Invoice/Payment/Deposit/Booking/
+TreatmentSession/Customer). **Code-only additive** (KHÔNG migration/schema; tổng vẫn **48 migration**).
+- **`src/lib/spa-reports.ts`** `buildSpaReport(now?)`: KPI (doanh thu tháng/năm, công nợ, booking hôm nay,
+  buổi thực hiện, khách mới, tổng khách, HĐ còn nợ) · doanh thu 12 tháng · thu theo phương thức · lịch hẹn
+  theo trạng thái · **công nợ theo khách** · **top dịch vụ theo lượt (năm)**. Doanh thu = **Payment CHƯA HỦY
+  + Deposit ĐÃ PHÂN BỔ** (tiền thực thu, khớp `invoicePaidAmount`); công nợ = Σ(total − đã trả) hóa đơn
+  chưa hủy. `maskSpaReport` che doanh thu/công nợ/phương thức khi thiếu `finance.read`.
+- **API** `GET /api/spa-reports` (gate `booking.read`; mask ở SERVER theo `finance.read`).
+- **UI** `/bao-cao` (nhóm **Tổng quan**, sau "Tổng quan"): thẻ KPI + biểu đồ cột doanh thu 12 tháng + bảng
+  (mỗi bảng **xuất CSV** client-side) + nút **In báo cáo**. Non-finance: số tài chính ẩn, giữ số đếm vận hành.
+- **Test** `test/spa-reports.test.ts` (5, A–E): doanh thu loại phiếu hủy · deposit allocated cộng doanh thu/
+  giảm nợ · finance thấy số · non-finance mask null · RBAC 403/401. Full regression **633/63 PASS**; tsc sạch.
+- **Ghi chú:** đây là báo cáo spa cốt lõi; có thể mở rộng thêm báo cáo con (doanh thu theo KTV, commission,
+  điểm thưởng, phân hạng KH…) theo mẫu MySpa ở phase sau. Báo cáo KHO THNG (`/reports`) giữ nguyên.

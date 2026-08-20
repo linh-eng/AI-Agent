@@ -43,6 +43,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "Tổng quan",
     items: [
       { href: "/crm", label: "Tổng quan", icon: LayoutDashboard, perm: "booking.read" },
+      { href: "/bao-cao", label: "Báo cáo kinh doanh", icon: BarChart3, perm: "booking.read" },
     ],
   },
   {
