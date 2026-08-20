@@ -28,6 +28,7 @@ export default function RecommendedPricePage() {
   const [floorData, setFloorData] = useState<any>(null); // /api/price-floors/[id]
   const [versions, setVersions] = useState<any[]>([]);
   const [selId, setSelId] = useState<string | null>(null);
+  const [adjPrice, setAdjPrice] = useState<string>(""); // giá điều chỉnh (nhập tay để thử)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -111,6 +112,46 @@ export default function RecommendedPricePage() {
           <Link href={`/price-floor/${id}`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Xem Giá sàn</Link>
         </div>
       </CardContent></Card>
+
+      {/* ① Giá điều chỉnh + % giảm tối đa (so với giá chuẩn, không được dưới giá sàn) */}
+      {(() => {
+        const maxDiscountPct = (standardPrice != null && floorPrice != null && floorPrice <= standardPrice && standardPrice > 0)
+          ? ((standardPrice - floorPrice) / standardPrice) * 100 : null;
+        const adj = adjPrice === "" ? null : Number(adjPrice);
+        const adjDiscountPct = (adj != null && standardPrice != null && standardPrice > 0) ? ((standardPrice - adj) / standardPrice) * 100 : null;
+        const belowFloor = adj != null && floorPrice != null && adj + 1e-6 < floorPrice;
+        return (
+          <Card><CardContent className="space-y-3 p-4">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+              <div className="font-semibold">Giá điều chỉnh &amp; mức giảm</div>
+              {maxDiscountPct != null ? (
+                <div className="text-muted-foreground">Giá có thể <b className="text-foreground">giảm tối đa {maxDiscountPct.toFixed(1)}%</b> (từ giá chuẩn {money(standardPrice)} về giá sàn {money(floorPrice)}).</div>
+              ) : (
+                <div className="text-xs text-muted-foreground">Chưa đủ dữ liệu (cần Giá chuẩn + Giá sàn ACTIVE) để tính % giảm tối đa.</div>
+              )}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[240px_1fr] sm:items-end">
+              <div>
+                <Label>Giá điều chỉnh (đ)</Label>
+                <Input type="number" placeholder="Nhập giá muốn bán" value={adjPrice} onChange={(e) => setAdjPrice(e.target.value)} />
+              </div>
+              <div className="text-sm">
+                {adj == null ? (
+                  <span className="text-muted-foreground">Nhập giá điều chỉnh để xem mức giảm &amp; kiểm tra so với giá sàn.</span>
+                ) : (
+                  <div className="space-y-1">
+                    <div>Mức giảm so với giá chuẩn: <b>{adjDiscountPct != null ? `${adjDiscountPct.toFixed(1)}%` : "—"}</b>{adjDiscountPct != null && adjDiscountPct < 0 ? " (cao hơn giá chuẩn)" : ""}</div>
+                    {belowFloor
+                      ? <div className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-red-700">⚠ Giá điều chỉnh <b>DƯỚI giá sàn</b> ({money(floorPrice)}) — cần người có quyền duyệt bán dưới sàn.</div>
+                      : floorPrice != null && <div className="text-emerald-600">✓ Trong khung cho phép (≥ giá sàn {money(floorPrice)}).</div>}
+                  </div>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">Công cụ tính nhanh — KHÔNG tự sửa giá chuẩn/giá bán. Bán dưới giá sàn phải qua duyệt (Giá sàn / Báo giá).</p>
+          </CardContent></Card>
+        );
+      })()}
 
       {loading ? <Card><CardContent className="py-8 text-center text-muted-foreground">Đang tải…</CardContent></Card> : (
         <div className="grid gap-4 md:grid-cols-[240px_1fr]">

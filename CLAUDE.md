@@ -3234,3 +3234,10 @@ nullable `ServiceCostingVersion.extraCostLines`, additive 0 DROP; tổng **46 mi
   sinh"** (tên + số tiền + xóa + tổng); breakdown F hiện các dòng con "↳ tên = tiền".
 - `test/costing-extra-lines.test.ts` (3 HTTP thật): dòng gộp đúng vào tổng · publish bất biến + snapshot evidence
   · non-finance mask null. Code additive. Xác thực: tsc sạch · build OK · full regression **622/61 PASS**.
+
+### Giá điều chỉnh + % giảm tối đa (v0.38.3) — nhóm ①
+Trên màn **Giá bán đề xuất** (`/services/[id]/recommended-price`): thêm khối **"Giá điều chỉnh & mức giảm"**:
+ghi chú **"Giá có thể giảm tối đa X%"** = (giá chuẩn − giá sàn ACTIVE)/giá chuẩn; ô **Giá điều chỉnh** (nhập
+tay) → hiện **% giảm so với giá chuẩn** + **cảnh báo đỏ nếu DƯỚI giá sàn** (phải duyệt), xanh nếu trong khung.
+Công cụ tính nhanh client-side — KHÔNG tự sửa giá chuẩn/giá bán, KHÔNG schema/API/migration. Xác thực: tsc
+sạch · build OK · full regression giữ nguyên.
