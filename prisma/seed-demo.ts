@@ -749,6 +749,31 @@ async function main() {
   }
   console.log("   Giá lẻ + giảm giá VIP cho 9 dịch vụ DMK (DV01–DV09): lẻ 450k–2.150k, VIP 360k–1.750k.");
 
+  // === DMK ENZYME BODY (phục hồi/săn chắc/tái tạo da cơ thể) — bảng giá body ===
+  // retail = GIÁ LẺ; vip = LIỆU TRÌNH 03 LẦN (thấp hơn). Gói toàn diện = 1 dịch vụ combo.
+  const catDMKbody = await prisma.serviceCategory.upsert({ where: { code: "DM-DMK-BODY" }, update: {}, create: { code: "DM-DMK-BODY", name: "DMK Enzyme Body" } });
+  const dmkBody: { code: string; name: string; retail: number; vip?: number; minutes: number }[] = [
+    { code: "DV-DMK-BODY-BUNG", name: "DMK Enzyme Body — Vùng bụng", retail: 1_080_000, vip: 890_000, minutes: 60 },
+    { code: "DV-DMK-BODY-BAPTAY", name: "DMK Enzyme Body — Vùng bắp tay", retail: 800_000, vip: 690_000, minutes: 60 },
+    { code: "DV-DMK-BODY-DUI", name: "DMK Enzyme Body — Vùng đùi", retail: 1_080_000, vip: 890_000, minutes: 60 },
+    { code: "DV-DMK-BODY-MONG", name: "DMK Enzyme Body — Vùng mông", retail: 1_950_000, vip: 1_750_000, minutes: 60 },
+    // Gói toàn diện (bụng + bắp tay + đùi + mông) — giá trọn gói.
+    { code: "DV-DMK-BODY-FULL", name: "DMK Enzyme Body — Toàn diện (bụng·bắp tay·đùi·mông)", retail: 4_650_000, minutes: 120 },
+  ];
+  for (const b of dmkBody) {
+    const svc = await prisma.service.upsert({
+      where: { code: b.code },
+      update: { standardPrice: b.retail }, // "cập nhật giá bán" khi chạy lại
+      create: { code: b.code, name: b.name, categoryId: catDMKbody.id, status: "ACTIVE", durationMinutes: b.minutes, standardPrice: b.retail, expectedCost: 0, version: 1 },
+    });
+    if (b.vip != null) {
+      const hasVip = await prisma.priceRule.findFirst({ where: { targetType: "SERVICE", targetId: svc.id, priceType: "VIP" } });
+      if (!hasVip) await prisma.priceRule.create({ data: { targetType: "SERVICE", targetId: svc.id, targetName: b.name, priceType: "VIP", price: b.vip, isActive: true, createdBy: "Trần Quản Lý" } });
+      else await prisma.priceRule.updateMany({ where: { targetType: "SERVICE", targetId: svc.id, priceType: "VIP" }, data: { price: b.vip, targetName: b.name } });
+    }
+  }
+  console.log("   DMK Enzyme Body: 4 vùng (bụng/bắp tay/đùi/mông) lẻ 800k–1.950k · liệu trình 3 lần 690k–1.750k + gói toàn diện 4.650.000₫.");
+
   // === Redesign P2 · Protocol compose NHIỀU Service (coexistence) — "Điều trị sắc tố kết hợp" ===
   const techPico = await prisma.technology.upsert({
     where: { code: "CN-PICO" }, update: {},
