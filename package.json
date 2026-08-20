@@ -1,6 +1,6 @@
 {
   "name": "thng-warehouse",
-  "version": "0.39.4",
+  "version": "0.39.5",
   "private": true,
   "description": "Webapp quản lý kho THNG — Nhập/Xuất/Lắp ráp/Tháo dỡ/Truy vết Serial",
   "scripts": {
@@ -23,7 +23,8 @@
     "start:lan": "next start -H 0.0.0.0 -p 9500",
     "seed:dmk": "tsx prisma/seed-dmk.ts",
     "seed:klapp": "tsx prisma/seed-klapp.ts",
-    "seed:dermalogica": "tsx prisma/seed-dermalogica.ts"
+    "seed:dermalogica": "tsx prisma/seed-dermalogica.ts",
+    "seed:dermalogica:products": "tsx prisma/seed-dermalogica-products.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

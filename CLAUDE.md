@@ -3441,3 +3441,20 @@ Theo 3 biểu đồ trị liệu Dermalogica khách gửi tiếp (PRO Bright, PR
 - **3 dịch vụ** `DV-DERMA-PRO-BRIGHT` (60′) · `DV-DERMA-PRO-FIRM` (75′) · `DV-DERMA-PRO-MICRONEEDLING` (60′),
   gắn defaultProtocolId, **`standardPrice=0`** (chờ bảng giá). Tổng **4 protocol + 4 dịch vụ Dermalogica**.
   Xác thực DB dev: 4 PROTO-DERMA-* (7/5/6/5 bước) + 4 DV-DERMA-* (ảnh). tsc sạch.
+
+### Dermalogica đợt 3 (v0.39.5) — 28 sản phẩm catalog · script `seed:dermalogica:products`
+Theo tài liệu kiến thức sản phẩm Dermalogica (Google Doc) khách gửi. Script độc lập
+`prisma/seed-dermalogica-products.ts` (npm `seed:dermalogica:products`) — parse **trung thực** từ doc (mỗi SP:
+Đây-là-gì/Lợi-ích → `description`, Cách-dùng → `usage`, Thành-phần-chính → `ingredients`), embed inline, upsert
+theo `sku`. **Code-only additive** — KHÔNG migration/schema.
+- **28 SpaProduct `DERMA-*`** (brand Dermalogica, `productType=HOME_CARE` mặc định): PreCleanse · Special
+  Cleansing Gel · Clearing Skin Wash · Daily Microfoliant/Superfoliant/Milkfoliant · Multi-Active Toner ·
+  Antioxidant HydraMist · Active Moist · Skin Smoothing Cream · Intensive Moisture Balance · Prisma Protect
+  SPF30 · Invisible Physical Defense SPF30 · Dynamic Skin Recovery SPF50 · PowerBright Moisturizer SPF50 · Skin
+  Perfect Primer SPF30 · MultiVitamin Thermafoliant/Power Recovery Masque · Melting Moisture Masque · Skin
+  Hydrating Masque · Phyto Replenish Oil · Overnight Repair Serum · MultiVitamin Power Firm · BioLumin-C Eye
+  Serum · Age Reversal Eye Complex · Stress Positive Eye Lift · Intensive Eye Repair · Renewal Lip Complex.
+- `update` khi chạy lại chỉ cập nhật description/usage/ingredients (không đụng cost/giá do người dùng nhập).
+  **Nợ:** `productType` mặc định HOME_CARE (doc là "kê toa/chăm sóc tại nhà" — phân loại chuyên nghiệp/home
+  chi tiết cần rà thêm); một vài SP trong doc chưa tách được sạch (fragment) — 28/34 SP lấy đủ 3 trường.
+  Xác thực DB dev: 28 SpaProduct DERMA-* ở màn Sản phẩm (ảnh). tsc sạch.
