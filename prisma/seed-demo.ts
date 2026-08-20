@@ -115,6 +115,27 @@ async function main() {
     where: { code: "CN-LED" }, update: {},
     create: { code: "CN-LED", name: "Ánh sáng LED sinh học", group: "LED", deviceModel: "Bio-LED", area: "Mặt", durationMinutes: 10, indications: "Kháng viêm, phục hồi", contraindications: "Nhạy sáng" },
   });
+
+  // === Danh mục CÔNG NGHỆ CAO của phòng dịch vụ (theo thiết bị khách khai) ===
+  const hiTechs: { code: string; name: string; group: string; area?: string; indications?: string; contraindications?: string; deviceModel?: string }[] = [
+    { code: "CN-INSHAPE", name: "Inshape (EMS + RF) — Body & vùng chậu", group: "EMS + RF", area: "Body, vùng chậu, cơ sàn chậu / vùng kín nữ", indications: "Săn cơ, giảm mỡ, phục hồi cơ sàn chậu, se khít vùng kín", contraindications: "Thai kỳ, cấy ghép kim loại/điện tử, đang hành kinh (vùng chậu)" },
+    { code: "CN-WINNAGE", name: "Winnage for Face (EMS + RF)", group: "EMS + RF", area: "Mặt: má (cheek), mắt (eye), nọng cằm (double chin), trán (forehead)", indications: "Nâng cơ mặt, giảm nọng, săn chắc vùng mắt/trán", contraindications: "Thai kỳ, cấy ghép kim loại vùng mặt" },
+    { code: "CN-RF-ENDO", name: "RF nội mô (Endo RF)", group: "RF", area: "Mặt & Body", indications: "Làm săn chắc, trẻ hóa nội mô, cải thiện chảy xệ", contraindications: "Thai kỳ, cấy ghép kim loại" },
+    { code: "CN-TISSUE-REPAIR", name: "Chăm sóc vùng mô tổn thương", group: "Phục hồi mô", area: "Vùng da/mô tổn thương", indications: "Hỗ trợ phục hồi mô tổn thương, làm lành" },
+    { code: "CN-LYMPH", name: "Chăm sóc bạch huyết", group: "Dẫn lưu bạch huyết", area: "Mặt & Body", indications: "Dẫn lưu bạch huyết, giảm phù, thải độc, thư giãn" },
+    { code: "CN-COLD-PLASMA", name: "Plasma lạnh chăm sóc vết thương", group: "Plasma", area: "Vùng vết thương", indications: "Kháng khuẩn, hỗ trợ lành vết thương", contraindications: "Theo chỉ định chuyên môn" },
+    { code: "CN-PHOTOCOAG", name: "Quang đông chăm sóc body", group: "Quang đông", area: "Body", indications: "Chăm sóc body bằng công nghệ quang đông" },
+    { code: "CN-JETPEEL", name: "JetPeel (áp lực) — Tóc / Face / Body", group: "JetPeel", area: "Tóc, Mặt, Body", indications: "Làm sạch, đưa dưỡng chất bằng áp lực; chăm sóc tóc/da/body" },
+    { code: "CN-CELLINAS", name: "RF vi điểm CellinaS", group: "RF vi điểm (Fractional RF)", deviceModel: "CellinaS", area: "Mặt & Body", indications: "Trẻ hóa, se khít lỗ chân lông, sẹo rỗ, tái tạo bằng RF vi điểm", contraindications: "Thai kỳ, da đang viêm nhiễm cấp" },
+    { code: "CN-FINEBEAM", name: "Laser Finebeam", group: "Laser", deviceModel: "Finebeam", area: "Mặt & Body", indications: "Điều trị sắc tố/trẻ hóa theo chỉ định laser" },
+    { code: "CN-ADVATX", name: "Laser Advatx", group: "Laser", deviceModel: "AdvaTx", area: "Mặt & Body", indications: "Mạch máu, đỏ da, sắc tố, trẻ hóa (laser vàng/hồng ngoại)" },
+    { code: "CN-FORMA-LIGHT", name: "LPS Forma Light (đầu HR / AC / SR / Dr. Platon)", group: "IPL / LPS", deviceModel: "Forma Light", area: "Mặt & Body", indications: "Đa năng theo đầu tip: HR (triệt lông), AC (mụn), SR (trẻ hóa da), Dr. Platon" },
+    { code: "CN-CO2", name: "Laser CO2 (Fractional CO2)", group: "Laser", deviceModel: "CO2", area: "Mặt & Body", indications: "Tái tạo bề mặt, sẹo rỗ, nốt ruồi/mụn thịt, trẻ hóa", contraindications: "Thai kỳ, da đang nhiễm trùng, sẹo lồi" },
+  ];
+  for (const t of hiTechs) {
+    await prisma.technology.upsert({ where: { code: t.code }, update: {}, create: { code: t.code, name: t.name, group: t.group, area: t.area ?? null, indications: t.indications ?? null, contraindications: t.contraindications ?? null, deviceModel: t.deviceModel ?? null } });
+  }
+  console.log(`   Công nghệ cao phòng dịch vụ: ${hiTechs.length} công nghệ (Inshape/Winnage/RF nội mô/JetPeel/CellinaS/Finebeam/Advatx/Forma Light/CO2…).`);
   const spDmkCleanser = await prisma.spaProduct.upsert({ where: { sku: "SP-DMK-CLEANSER" }, update: {}, create: { sku: "SP-DMK-CLEANSER", name: "DMK Deep Pore Cleanser", brandId: brDMK.id, category: "Làm sạch", productType: "PROFESSIONAL", sellingPrice: 0, cost: 100_000 } });
   const spDmkEnzyme1 = await prisma.spaProduct.upsert({ where: { sku: "SP-DMK-ENZ1" }, update: {}, create: { sku: "SP-DMK-ENZ1", name: "DMK Enzyme Masque #1", brandId: brDMK.id, category: "Enzyme", productType: "PROFESSIONAL", sellingPrice: 0, cost: 200_000 } });
   const spDmkEnzyme2 = await prisma.spaProduct.upsert({ where: { sku: "SP-DMK-ENZ2" }, update: {}, create: { sku: "SP-DMK-ENZ2", name: "DMK Enzyme Masque #2", brandId: brDMK.id, category: "Enzyme", productType: "PROFESSIONAL", sellingPrice: 0, cost: 250_000 } });

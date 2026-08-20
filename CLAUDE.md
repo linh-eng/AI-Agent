@@ -3241,3 +3241,12 @@ ghi chú **"Giá có thể giảm tối đa X%"** = (giá chuẩn − giá sàn 
 tay) → hiện **% giảm so với giá chuẩn** + **cảnh báo đỏ nếu DƯỚI giá sàn** (phải duyệt), xanh nếu trong khung.
 Công cụ tính nhanh client-side — KHÔNG tự sửa giá chuẩn/giá bán, KHÔNG schema/API/migration. Xác thực: tsc
 sạch · build OK · full regression giữ nguyên.
+
+### Danh mục công nghệ cao phòng dịch vụ (v0.38.4)
+Theo danh sách thiết bị khách khai — thêm **13 công nghệ cao** vào seed (`technology.upsert`, additive, KHÔNG
+migration): Inshape (EMS+RF body & vùng chậu/vùng kín) · Winnage for Face (EMS+RF: cheek/eye/double chin/forehead)
+· RF nội mô (face & body) · Chăm sóc mô tổn thương · Chăm sóc bạch huyết · Plasma lạnh (vết thương) · Quang đông
+(body) · JetPeel (tóc/face/body áp lực) · RF vi điểm CellinaS · Laser Finebeam · Laser Advatx · LPS Forma Light
+(đầu HR/AC/SR/Dr. Platon) · Laser CO2. Cùng brands sẵn có DMK/Klapp/Dermalogica. **Liên kết chéo & sửa tại chỗ:**
+Công nghệ là master data — màn `/technologies` cho thêm/sửa trực tiếp; Dịch vụ tham chiếu qua `technologyIds`/
+`defaultTechnologyId`; buổi thực hiện ghi `technologyId`. Xác thực: tsc sạch · build OK · seed = 17 công nghệ.
