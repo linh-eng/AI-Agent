@@ -3280,3 +3280,25 @@ permission — Mục 15). Enforce ở SERVER, menu chỉ phản chiếu permissi
   user.manage DENY). HR RBAC (hr-foundation/attendance/compensation/payroll/kpi) **bất biến** — BOD/CASHIER
   KHÔNG chạm namespace lương. Tài khoản demo: Kế toán `thungan@sophia.com.vn`/`thungan123`, KTV
   `chuyenvien@sophia.com.vn`/`chuyenvien123`, Sales `kinhdoanh@sophia.com.vn`/`kinhdoanh123`.
+
+### Chi phí nhân sự theo VAI TRÒ trong Giá vốn (v0.38.6, nhóm ②)
+Theo yêu cầu "chi phí thiết lập cho từng KTV có/không chứng chỉ, master, bác sĩ, sales CV/NV, thưởng/tips/hoa
+hồng, chi phí khác phát sinh" + quyết định của chủ: **"Cả hai: bảng đơn giá vai trò + cho ghi đè tại dịch vụ."**
+Migration **`Zk_staff_role_rates`** (1 cột JSON nullable `ServiceCostingVersion.laborCostLines` + 1 bảng
+`StaffRoleRate`; additive 0 DROP; tổng **47 migration**). tsc sạch · build OK · `test/staff-role-rates.test.ts` (8).
+- **Bảng đơn giá vai trò (`StaffRoleRate`)**: code VR-xxxxxx · roleName · certified (KTV có/chưa CC) · baseFee ·
+  bonus · tips · commission (tiền) · commissionPercent (tham khảo). Trang **`/staff-role-rates`** (nhóm "Giá &
+  Chính sách", nav "Đơn giá nhân sự") — thêm/sửa/bật-tắt (soft, không hard-delete). Số tiền **mask theo
+  `finance.read`**; đọc `pricefloor.read`, ghi `pricefloor.write`.
+- **Dòng chi phí nhân sự trong Giá vốn (`laborCostLines`)**: màn `/services/[id]/costing` — khối "Chi phí nhân
+  sự theo vai trò" với nút **"Lấy theo dịch vụ"** (nạp từ `staffRequirements` khớp Bảng đơn giá) + **"Thêm vai
+  trò"** (dropdown bảng đơn giá tự điền phí/thưởng/tips/hoa hồng, **cho ghi đè** từng dòng). `laborCost = Σ dòng
+  (quantity × (baseFee+bonus+tips+commission))` khi CÓ dòng; **rỗng → auto** từ `staffRequirements ×
+  EmployeeRoleFee` (tương thích ngược, published cũ bất biến). Breakdown hiện sub-line "↳ Vai trò ×SL".
+- **Bất biến/mask**: `laborCostLines` vào `computedToData`/`sourceSnapshot`/`COSTING_SENSITIVE_FIELDS`; publish
+  đông cứng — sửa Bảng đơn giá sau KHÔNG đổi version PUBLISHED (test E). `otherCost`/công thức TỔNG không đổi.
+- **CSV**: thêm dataset DATA-IO **`staff-role-rates`** (đọc/nhập `finance.read`/`pricefloor.write`, tiêu đề
+  tiếng Việt, upsert theo mã). **Demo (seed:demo)**: 6 vai trò VR-000001..006 (KTV có CC 250k+50k+30k / KTV
+  chưa CC 150k / Master 500k / Bác sĩ 800k / Sales CV 100k+hh 200k / Sales NV 80k+hh 120k).
+- **RBAC**: tái dùng `pricefloor.read/write` + `finance.read` — KHÔNG thêm permission. `staff_role_rates` là
+  DỮ LIỆU GIÁ VỐN (finance-private), độc lập với payroll/`EmployeeRoleFee` (costing rate) — không trộn.

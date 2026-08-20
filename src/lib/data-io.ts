@@ -191,6 +191,19 @@ export const DATASETS: Record<string, Dataset> = {
       { key: "status", header: "Trạng thái" }, { key: "note", header: "Ghi chú" },
     ],
   },
+  "staff-role-rates": {
+    // ② Bảng đơn giá nhân sự — dữ liệu tài chính: chỉ finance.read đọc/nhập/xuất.
+    key: "staff-role-rates", label: "Đơn giá nhân sự", group: "Giá & Chính sách", model: "staffRoleRate", naturalKey: "code",
+    readPerm: "finance.read", writePerm: "pricefloor.write",
+    columns: [
+      { key: "code", header: "Mã", required: true }, { key: "roleName", header: "Tên vai trò", required: true },
+      { key: "certified", header: "Có chứng chỉ", type: "boolean" },
+      { key: "baseFee", header: "Phí cơ bản", type: "number" }, { key: "bonus", header: "Thưởng", type: "number" },
+      { key: "tips", header: "Tips", type: "number" }, { key: "commission", header: "Hoa hồng", type: "number" },
+      { key: "commissionPercent", header: "Hoa hồng (%)", type: "number" },
+      { key: "isActive", header: "Đang dùng", type: "boolean" }, { key: "note", header: "Ghi chú" },
+    ],
+  },
   branches: {
     key: "branches", label: "Chi nhánh", group: "Vận hành & Hệ thống", model: "branch", naturalKey: "code",
     readPerm: "staff.read", writePerm: "staff.write",

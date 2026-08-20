@@ -136,6 +136,24 @@ async function main() {
     await prisma.technology.upsert({ where: { code: t.code }, update: {}, create: { code: t.code, name: t.name, group: t.group, area: t.area ?? null, indications: t.indications ?? null, contraindications: t.contraindications ?? null, deviceModel: t.deviceModel ?? null } });
   }
   console.log(`   Công nghệ cao phòng dịch vụ: ${hiTechs.length} công nghệ (Inshape/Winnage/RF nội mô/JetPeel/CellinaS/Finebeam/Advatx/Forma Light/CO2…).`);
+
+  // ② Bảng đơn giá NHÂN SỰ theo vai trò (dùng cho chi phí nhân sự trong Giá vốn dịch vụ).
+  const roleRates: { code: string; roleName: string; certified: boolean; baseFee: number; bonus: number; tips: number; commission: number; commissionPercent?: number }[] = [
+    { code: "VR-000001", roleName: "Kỹ thuật viên", certified: true, baseFee: 250_000, bonus: 50_000, tips: 30_000, commission: 0, commissionPercent: 0 },
+    { code: "VR-000002", roleName: "Kỹ thuật viên", certified: false, baseFee: 150_000, bonus: 20_000, tips: 20_000, commission: 0 },
+    { code: "VR-000003", roleName: "Master", certified: true, baseFee: 500_000, bonus: 100_000, tips: 50_000, commission: 0 },
+    { code: "VR-000004", roleName: "Bác sĩ", certified: true, baseFee: 800_000, bonus: 150_000, tips: 0, commission: 0 },
+    { code: "VR-000005", roleName: "Sales CV", certified: false, baseFee: 100_000, bonus: 0, tips: 0, commission: 200_000, commissionPercent: 5 },
+    { code: "VR-000006", roleName: "Sales NV", certified: false, baseFee: 80_000, bonus: 0, tips: 0, commission: 120_000, commissionPercent: 3 },
+  ];
+  for (const r of roleRates) {
+    await prisma.staffRoleRate.upsert({
+      where: { code: r.code },
+      update: { baseFee: r.baseFee, bonus: r.bonus, tips: r.tips, commission: r.commission, commissionPercent: r.commissionPercent ?? null },
+      create: { code: r.code, roleName: r.roleName, certified: r.certified, baseFee: r.baseFee, bonus: r.bonus, tips: r.tips, commission: r.commission, commissionPercent: r.commissionPercent ?? null },
+    });
+  }
+  console.log(`   Đơn giá nhân sự theo vai trò: ${roleRates.length} vai trò (KTV có/chưa CC · Master · Bác sĩ · Sales CV/NV) — dùng cho chi phí nhân sự Giá vốn.`);
   const spDmkCleanser = await prisma.spaProduct.upsert({ where: { sku: "SP-DMK-CLEANSER" }, update: {}, create: { sku: "SP-DMK-CLEANSER", name: "DMK Deep Pore Cleanser", brandId: brDMK.id, category: "Làm sạch", productType: "PROFESSIONAL", sellingPrice: 0, cost: 100_000 } });
   const spDmkEnzyme1 = await prisma.spaProduct.upsert({ where: { sku: "SP-DMK-ENZ1" }, update: {}, create: { sku: "SP-DMK-ENZ1", name: "DMK Enzyme Masque #1", brandId: brDMK.id, category: "Enzyme", productType: "PROFESSIONAL", sellingPrice: 0, cost: 200_000 } });
   const spDmkEnzyme2 = await prisma.spaProduct.upsert({ where: { sku: "SP-DMK-ENZ2" }, update: {}, create: { sku: "SP-DMK-ENZ2", name: "DMK Enzyme Masque #2", brandId: brDMK.id, category: "Enzyme", productType: "PROFESSIONAL", sellingPrice: 0, cost: 250_000 } });

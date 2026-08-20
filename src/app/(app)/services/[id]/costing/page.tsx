@@ -37,6 +37,23 @@ export default function ServiceCostingPage() {
   const [form, setForm] = useState<any>({ overheadMethod: "MANUAL", overheadValue: 0, equipmentCost: 0, facilityCost: 0, materialOverride: "", materialOverrideReason: "" });
   const [extraLines, setExtraLines] = useState<{ name: string; amount: string }[]>([]);
   const extraTotal = extraLines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
+  // ② Chi phí nhân sự theo vai trò (bảng đơn giá + ghi đè tại dịch vụ)
+  const [laborLines, setLaborLines] = useState<any[]>([]);
+  const [rateCatalog, setRateCatalog] = useState<any[]>([]);
+  const laborLineTotal = (l: any) => (Number(l.quantity) || 1) * ((Number(l.baseFee) || 0) + (Number(l.bonus) || 0) + (Number(l.tips) || 0) + (Number(l.commission) || 0));
+  const laborTotal = laborLines.reduce((s, l) => s + laborLineTotal(l), 0);
+  function addLaborLine() { setLaborLines((ls) => [...ls, { roleCode: "", roleName: "", certified: false, quantity: 1, baseFee: 0, bonus: 0, tips: 0, commission: 0, source: "OVERRIDE" }]); }
+  function pickRate(i: number, code: string) {
+    const r = rateCatalog.find((x) => x.code === code);
+    setLaborLines((ls) => ls.map((x, j) => j === i ? (r ? { roleCode: r.code, roleName: r.roleName, certified: r.certified, quantity: x.quantity || 1, baseFee: Number(r.baseFee) || 0, bonus: Number(r.bonus) || 0, tips: Number(r.tips) || 0, commission: Number(r.commission) || 0, source: "CATALOG" } : { ...x, roleCode: "" }) : x));
+  }
+  async function loadLaborDefaults() {
+    try {
+      const res = await apiFetch<any>(`/api/service-costings/labor-defaults?serviceId=${id}`);
+      setLaborLines((res.lines ?? []).map((l: any) => ({ ...l, quantity: l.quantity ?? 1 })));
+      if (res.warnings?.length) setWarnings((w) => [...w, ...res.warnings]);
+    } catch { /* ignore */ }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,6 +73,7 @@ export default function ServiceCostingPage() {
     }
   }, [id]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { apiFetch<any[]>(`/api/staff-role-rates?active=1`).then(setRateCatalog).catch(() => setRateCatalog([])); }, []);
 
   const sel = versions.find((v) => v.id === selId) ?? null;
 
@@ -63,8 +81,14 @@ export default function ServiceCostingPage() {
     setBusy(true); setError(null); setWarnings([]);
     try {
       const lines = extraLines.filter((l) => l.name.trim()).map((l) => ({ name: l.name.trim(), amount: Number(l.amount) || 0 }));
+      const labor = laborLines.filter((l) => String(l.roleName || "").trim()).map((l) => ({
+        roleCode: l.roleCode || null, roleName: String(l.roleName).trim(), certified: !!l.certified,
+        quantity: Number(l.quantity) || 1, baseFee: Number(l.baseFee) || 0, bonus: Number(l.bonus) || 0,
+        tips: Number(l.tips) || 0, commission: Number(l.commission) || 0, source: l.source || "OVERRIDE",
+      }));
       const body: any = {
         serviceId: id,
+        laborCostLines: labor,
         equipmentCost: Number(form.equipmentCost) || 0,
         facilityCost: Number(form.facilityCost) || 0,
         extraCostLines: lines,
@@ -79,6 +103,7 @@ export default function ServiceCostingPage() {
       setWarnings(res.warnings ?? []);
       setShowForm(false);
       setExtraLines([]);
+      setLaborLines([]);
       setSelId(res.id);
       await load();
     } catch (e: any) { setError(e?.message ?? "Không tạo được version"); }
@@ -111,6 +136,7 @@ export default function ServiceCostingPage() {
         title={`Giá vốn dịch vụ${service ? " · " + service.name : ""}`}
         description="Nền tảng giá vốn có version — tách khỏi Giá sàn. Vật tư từ SOP, nhân sự từ phí vai trò; thiết bị/cơ sở/overhead nhập tay."
         action={<div className="flex items-center gap-3">
+          <Link href="/staff-role-rates" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">Đơn giá nhân sự →</Link>
           <Link href={`/services/${id}/recommended-price`} className="inline-flex items-center gap-1 text-sm text-primary hover:underline">Giá đề xuất →</Link>
           <Link href="/services" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ArrowLeft className="h-4 w-4" /> Về Dịch vụ</Link>
         </div>}
@@ -166,6 +192,57 @@ export default function ServiceCostingPage() {
                     <div><Label>{form.overheadMethod === "PER_MINUTE" ? "Overhead (đ/phút)" : "Overhead (đ)"}</Label><Input type="number" value={form.overheadValue} onChange={(e) => setForm({ ...form, overheadValue: e.target.value })} /></div>
                   </div>
 
+                  {/* B. Chi phí nhân sự theo vai trò (bảng đơn giá + ghi đè tại dịch vụ) */}
+                  <div className="rounded-md border border-dashed p-3">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <Label className="mb-0">Chi phí nhân sự theo vai trò</Label>
+                      <div className="flex gap-2">
+                        <Button type="button" size="sm" variant="outline" onClick={loadLaborDefaults}>
+                          <RefreshCw className="mr-1 h-3.5 w-3.5" /> Lấy theo dịch vụ
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={addLaborLine}>
+                          <Plus className="mr-1 h-3.5 w-3.5" /> Thêm vai trò
+                        </Button>
+                      </div>
+                    </div>
+                    {laborLines.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Chưa có dòng nhân sự. Bấm “Lấy theo dịch vụ” để nạp từ yêu cầu nhân sự của dịch vụ, hoặc “Thêm vai trò” rồi chọn từ Bảng đơn giá (KTV có/chưa CC, Master, Bác sĩ, Sales CV/NV) — có thể ghi đè phí/thưởng/tips/hoa hồng.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="hidden gap-2 text-[11px] text-muted-foreground sm:flex">
+                          <span className="flex-1">Vai trò (bảng đơn giá)</span>
+                          <span className="w-14 text-center">SL</span>
+                          <span className="w-24 text-right">Phí</span>
+                          <span className="w-20 text-right">Thưởng</span>
+                          <span className="w-20 text-right">Tips</span>
+                          <span className="w-24 text-right">Hoa hồng</span>
+                          <span className="w-8" />
+                        </div>
+                        {laborLines.map((l, i) => (
+                          <div key={i} className="flex flex-wrap items-center gap-2">
+                            <div className="flex flex-1 items-center gap-1">
+                              <Select className="min-w-[9rem] flex-1" value={l.roleCode || ""} onChange={(e) => pickRate(i, e.target.value)}>
+                                <option value="">— Chọn / tự nhập —</option>
+                                {rateCatalog.map((r) => <option key={r.code} value={r.code}>{r.roleName}{r.certified ? " (có CC)" : ""}</option>)}
+                              </Select>
+                              {!l.roleCode && (
+                                <Input className="w-28" placeholder="Tên vai trò" value={l.roleName} onChange={(e) => setLaborLines((ls) => ls.map((x, j) => j === i ? { ...x, roleName: e.target.value } : x))} />
+                              )}
+                            </div>
+                            <Input className="w-14" type="number" value={l.quantity} onChange={(e) => setLaborLines((ls) => ls.map((x, j) => j === i ? { ...x, quantity: e.target.value } : x))} />
+                            <Input className="w-24" type="number" placeholder="Phí" value={l.baseFee} onChange={(e) => setLaborLines((ls) => ls.map((x, j) => j === i ? { ...x, baseFee: e.target.value, source: "OVERRIDE" } : x))} />
+                            <Input className="w-20" type="number" placeholder="Thưởng" value={l.bonus} onChange={(e) => setLaborLines((ls) => ls.map((x, j) => j === i ? { ...x, bonus: e.target.value, source: "OVERRIDE" } : x))} />
+                            <Input className="w-20" type="number" placeholder="Tips" value={l.tips} onChange={(e) => setLaborLines((ls) => ls.map((x, j) => j === i ? { ...x, tips: e.target.value, source: "OVERRIDE" } : x))} />
+                            <Input className="w-24" type="number" placeholder="Hoa hồng" value={l.commission} onChange={(e) => setLaborLines((ls) => ls.map((x, j) => j === i ? { ...x, commission: e.target.value, source: "OVERRIDE" } : x))} />
+                            <Button type="button" size="sm" variant="ghost" onClick={() => setLaborLines((ls) => ls.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                          </div>
+                        ))}
+                        <div className="flex justify-end pt-1 text-sm"><span className="text-muted-foreground">Tổng chi phí nhân sự:&nbsp;</span><b>{formatCurrency(laborTotal)}</b></div>
+                        <p className="text-[11px] text-muted-foreground">Nếu để trống danh sách này, nhân sự sẽ tự tính từ yêu cầu nhân sự của dịch vụ × phí vai trò (như cũ).</p>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Chi phí khác / phát sinh — thêm bằng nút "+" */}
                   <div className="rounded-md border border-dashed p-3">
                     <div className="mb-2 flex items-center justify-between">
@@ -215,6 +292,9 @@ export default function ServiceCostingPage() {
                       {sel.materialOverride != null && <BR letter="" label="↳ Ghi đè vật tư" value={money(sel.materialOverride)} note={sel.materialOverrideReason} />}
                       <BR letter="" label="Vật tư chốt" value={money(sel.finalMaterialCost)} bold />
                       <BR letter="B" label="Nhân sự (phí vai trò × số lượng)" value={money(sel.laborCost)} />
+                      {Array.isArray(sel.laborCostLines) && sel.laborCostLines.map((l: any, i: number) => (
+                        <BR key={i} letter="" label={`↳ ${l.roleName}${l.certified ? " (có CC)" : ""} ×${l.quantity ?? 1}`} value={money((Number(l.quantity) || 1) * ((Number(l.baseFee) || 0) + (Number(l.bonus) || 0) + (Number(l.tips) || 0) + (Number(l.commission) || 0)))} note={[l.bonus ? `thưởng ${money(l.bonus)}` : "", l.tips ? `tips ${money(l.tips)}` : "", l.commission ? `hh ${money(l.commission)}` : ""].filter(Boolean).join(" · ") || undefined} />
+                      ))}
                       <BR letter="C" label="Thiết bị (nhập tay)" value={money(sel.equipmentCost)} />
                       <BR letter="D" label="Phòng / cơ sở (nhập tay)" value={money(sel.facilityCost)} />
                       <BR letter="" label="Chi phí trực tiếp" value={money(sel.directCost)} bold />

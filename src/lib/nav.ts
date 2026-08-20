@@ -88,6 +88,8 @@ export const NAV_GROUPS: NavGroup[] = [
       // IA-PH2 — workspace giá toàn cục (tổng hợp read-only; server đã mask theo finance.read).
       { href: "/service-costings", label: "Giá vốn & biên", icon: Calculator, perm: ["pricefloor.read", "finance.read"] },
       { href: "/recommended-prices", label: "Giá bán đề xuất", icon: TrendingUp, perm: ["pricefloor.read", "finance.read"] },
+      // ② Bảng đơn giá nhân sự theo vai trò (dùng cho chi phí nhân sự trong Giá vốn).
+      { href: "/staff-role-rates", label: "Đơn giá nhân sự", icon: Users, perm: ["pricefloor.read", "finance.read"] },
     ],
   },
   {

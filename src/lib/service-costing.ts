@@ -14,6 +14,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { serviceStepsInclude, expectedMaterialCost } from "./service-sop";
+import { normalizeLaborLines, type LaborCostLine } from "./staff-role-rate";
 
 function num(v: unknown): number {
   if (v === null || v === undefined) return 0;
@@ -198,6 +199,7 @@ export interface CostingComputeInput {
   serviceVersion?: number | null;
   durationMinutes?: number | null;
   materialOverride?: number | null;
+  laborCostLines?: LaborCostLine[] | null; // ② dòng nhân sự theo vai trò (nếu có → thay auto)
   equipmentCost?: number | null;
   facilityCost?: number | null;
   otherCost?: number | null;
@@ -219,6 +221,7 @@ export interface CostingComputed {
   materialOverride: number | null;
   finalMaterialCost: number;
   laborCost: number;
+  laborCostLines: LaborCostLine[];
   equipmentCost: number;
   facilityCost: number;
   otherCost: number;
@@ -242,6 +245,11 @@ export async function computeCosting(serviceId: string, input: CostingComputeInp
   const materialOverride = input.materialOverride ?? null;
   const finalMaterialCost = materialOverride != null ? num(materialOverride) : src.computedMaterialCost;
 
+  // Nhân sự (②): nếu có dòng theo vai trò → laborCost = Σ dòng; nếu rỗng dùng auto
+  // (staffRequirements × EmployeeRoleFee) để tương thích ngược.
+  const labor = normalizeLaborLines(input.laborCostLines);
+  const laborCost = labor.lines.length > 0 ? labor.total : src.laborCost;
+
   const equipmentCost = num(input.equipmentCost);
   const facilityCost = num(input.facilityCost);
   // Chi phí khác (F) = tổng các dòng chi phí phát sinh (nút "+"); nếu không có dòng, dùng số nhập tay.
@@ -252,7 +260,7 @@ export async function computeCosting(serviceId: string, input: CostingComputeInp
   const overheadCost = computeOverhead({ method: overheadMethod, value: overheadValue, minutes: durationMinutes });
 
   const { directCost, totalEstimatedCost } = computeTotals({
-    finalMaterialCost, laborCost: src.laborCost, equipmentCost, facilityCost, overheadCost, otherCost,
+    finalMaterialCost, laborCost, equipmentCost, facilityCost, overheadCost, otherCost,
   });
 
   return {
@@ -261,7 +269,8 @@ export async function computeCosting(serviceId: string, input: CostingComputeInp
     computedMaterialCost: src.computedMaterialCost,
     materialOverride,
     finalMaterialCost,
-    laborCost: src.laborCost,
+    laborCost,
+    laborCostLines: labor.lines,
     equipmentCost, facilityCost, otherCost,
     extraCostLines: extra.lines,
     overheadMethod, overheadValue, overheadCost,
@@ -278,6 +287,7 @@ export function buildSourceSnapshot(c: CostingComputed) {
       durationMinutes: c.durationMinutes,
       materialInputs: c.materialInputs,
       laborInputs: c.laborInputs,
+      laborCostLines: c.laborCostLines,
       equipmentInput: c.equipmentCost,
       facilityInput: c.facilityCost,
       overheadInput: { method: c.overheadMethod, value: c.overheadValue, minutes: c.durationMinutes, amount: c.overheadCost },
@@ -298,6 +308,7 @@ export function computedToData(c: CostingComputed): Prisma.ServiceCostingVersion
     computedMaterialCost: c.computedMaterialCost,
     finalMaterialCost: c.finalMaterialCost,
     laborCost: c.laborCost,
+    laborCostLines: (c.laborCostLines && c.laborCostLines.length ? c.laborCostLines : null) as any,
     equipmentCost: c.equipmentCost,
     facilityCost: c.facilityCost,
     otherCost: c.otherCost,
@@ -314,7 +325,7 @@ export function computedToData(c: CostingComputed): Prisma.ServiceCostingVersion
 // Finance mask — mọi field cost nhạy cảm (PH1 §14, BLOCKER)
 // -----------------------------------------------------------------------------
 export const COSTING_SENSITIVE_FIELDS = [
-  "computedMaterialCost", "materialOverride", "finalMaterialCost", "laborCost",
+  "computedMaterialCost", "materialOverride", "finalMaterialCost", "laborCost", "laborCostLines",
   "equipmentCost", "facilityCost", "otherCost", "extraCostLines", "overheadValue", "overheadCost",
   "directCost", "totalEstimatedCost", "sourceSnapshot",
 ] as const;
@@ -336,6 +347,7 @@ export async function createCostingVersion(input: {
   serviceId: string;
   materialOverride?: number | null;
   materialOverrideReason?: string | null;
+  laborCostLines?: LaborCostLine[] | null;
   equipmentCost?: number | null;
   facilityCost?: number | null;
   otherCost?: number | null;
@@ -374,6 +386,7 @@ export async function createCostingVersion(input: {
 export async function updateCostingVersion(versionId: string, patch: {
   materialOverride?: number | null;
   materialOverrideReason?: string | null;
+  laborCostLines?: LaborCostLine[] | null;
   equipmentCost?: number | null;
   facilityCost?: number | null;
   otherCost?: number | null;
@@ -389,6 +402,7 @@ export async function updateCostingVersion(versionId: string, patch: {
 
   const merged = {
     materialOverride: patch.materialOverride !== undefined ? patch.materialOverride : (v.materialOverride == null ? null : num(v.materialOverride)),
+    laborCostLines: patch.laborCostLines !== undefined ? patch.laborCostLines : ((v.laborCostLines as any) ?? null),
     equipmentCost: patch.equipmentCost !== undefined ? patch.equipmentCost : num(v.equipmentCost),
     facilityCost: patch.facilityCost !== undefined ? patch.facilityCost : num(v.facilityCost),
     otherCost: patch.otherCost !== undefined ? patch.otherCost : num(v.otherCost),
@@ -425,6 +439,7 @@ export async function recalculateCostingVersion(versionId: string) {
   if (v.status !== "DRAFT") throw new CostingError("Chỉ tính lại được version Bản nháp", 409);
   const c = await computeCosting(v.serviceId, {
     materialOverride: v.materialOverride == null ? null : num(v.materialOverride),
+    laborCostLines: (v.laborCostLines as any) ?? null,
     equipmentCost: num(v.equipmentCost),
     facilityCost: num(v.facilityCost),
     otherCost: num(v.otherCost),
@@ -446,6 +461,7 @@ export async function publishCostingVersion(versionId: string, actor?: string | 
   // Chụp lại từ LIVE ngay lúc publish → snapshot bất biến khớp số hiển thị.
   const c = await computeCosting(v.serviceId, {
     materialOverride: v.materialOverride == null ? null : num(v.materialOverride),
+    laborCostLines: (v.laborCostLines as any) ?? null,
     equipmentCost: num(v.equipmentCost),
     facilityCost: num(v.facilityCost),
     otherCost: num(v.otherCost),

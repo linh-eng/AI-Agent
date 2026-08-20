@@ -959,9 +959,23 @@ export const costingExtraLineSchema = z.object({
   amount: z.coerce.number().min(0),
 });
 
+// Dòng chi phí NHÂN SỰ theo vai trò (② bảng đơn giá + ghi đè tại dịch vụ).
+export const costingLaborLineSchema = z.object({
+  roleCode: z.string().trim().optional().nullable(),
+  roleName: z.string().trim().min(1, "Tên vai trò"),
+  certified: z.boolean().optional().nullable(),
+  quantity: z.coerce.number().min(0).optional(),
+  baseFee: z.coerce.number().min(0).optional(),
+  bonus: z.coerce.number().min(0).optional(),
+  tips: z.coerce.number().min(0).optional(),
+  commission: z.coerce.number().min(0).optional(),
+  source: z.enum(["CATALOG", "OVERRIDE"]).optional().nullable(),
+});
+
 const costingBase = z.object({
   materialOverride: z.coerce.number().min(0).optional().nullable(),
   materialOverrideReason: z.string().trim().min(1).optional().nullable(),
+  laborCostLines: z.array(costingLaborLineSchema).max(30).optional().nullable(),
   equipmentCost: z.coerce.number().min(0).optional(),
   facilityCost: z.coerce.number().min(0).optional(),
   otherCost: z.coerce.number().min(0).optional(),
@@ -985,6 +999,21 @@ export const costingUpdateSchema = costingBase
   .refine(requireOverrideReason, { message: "Ghi đè giá vốn vật tư cần lý do", path: ["materialOverrideReason"] });
 
 export const costingPublishSchema = z.object({ note: z.string().optional().nullable() });
+
+// Bảng ĐƠN GIÁ NHÂN SỰ theo vai trò (② catalog dùng chung cho Giá vốn dịch vụ).
+export const staffRoleRateCreateSchema = z.object({
+  code: z.string().trim().optional().nullable(),
+  roleName: z.string().trim().min(1, "Tên vai trò"),
+  certified: z.boolean().optional(),
+  baseFee: z.coerce.number().min(0).optional(),
+  bonus: z.coerce.number().min(0).optional(),
+  tips: z.coerce.number().min(0).optional(),
+  commission: z.coerce.number().min(0).optional(),
+  commissionPercent: z.coerce.number().min(0).max(100).optional().nullable(),
+  note: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+export const staffRoleRateUpdateSchema = staffRoleRateCreateSchema.partial();
 
 // =============================================================================
 // PRICING / COSTING — PH3: Recommended Price (giá đề xuất theo biên mục tiêu).

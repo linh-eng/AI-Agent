@@ -3356,6 +3356,10 @@ model ServiceCostingVersion {
 
   // --- LABOR (nhân sự) — computed từ staffRequirements × EmployeeRoleFee ---
   laborCost Decimal @default(0) @db.Decimal(18, 2)
+  // Dòng chi phí nhân sự theo VAI TRÒ (bảng đơn giá + ghi đè tại dịch vụ): nếu có dòng
+  // thì laborCost = Σ dòng (quantity × (baseFee+bonus+tips+commission)); nếu rỗng dùng
+  // laborCost auto từ staffRequirements × EmployeeRoleFee (tương thích ngược).
+  laborCostLines Json? // [{roleCode?, roleName, certified?, quantity, baseFee, bonus, tips, commission, source?}]
 
   // --- Manual components ---
   equipmentCost Decimal @default(0) @db.Decimal(18, 2) // thiết bị (nhập tay PH1)
@@ -3389,6 +3393,30 @@ model ServiceCostingVersion {
   @@unique([serviceId, version])
   @@index([serviceId, status])
   @@map("service_costing_versions")
+}
+
+/// Bảng ĐƠN GIÁ NHÂN SỰ theo VAI TRÒ (catalog dùng chung cho Giá vốn dịch vụ).
+/// Ví dụ: KTV có chứng chỉ / KTV chưa chứng chỉ / Master / Bác sĩ / Sales CV / Sales NV.
+/// Mỗi vai trò có: phí cơ bản + thưởng + tips + hoa hồng (tiền) + hoa hồng % (tham khảo).
+/// Costing dịch vụ tự lấy đơn giá từ đây làm mặc định, cho ghi đè/thêm tại từng dịch vụ.
+/// Dữ liệu tài chính — mask theo finance.read khi trả API.
+model StaffRoleRate {
+  id                String   @id @default(cuid())
+  code              String   @unique // VR-xxxxxx
+  roleName          String // tên vai trò hiển thị (Kỹ thuật viên, Master, Bác sĩ, Sales CV...)
+  certified         Boolean  @default(false) // có chứng chỉ hay không (KTV có/chưa CC)
+  baseFee           Decimal  @default(0) @db.Decimal(18, 2) // phí cơ bản / buổi
+  bonus             Decimal  @default(0) @db.Decimal(18, 2) // thưởng
+  tips              Decimal  @default(0) @db.Decimal(18, 2) // tips
+  commission        Decimal  @default(0) @db.Decimal(18, 2) // hoa hồng (tiền)
+  commissionPercent Decimal? @db.Decimal(6, 2) // hoa hồng % (tham khảo, không tự tính vào cost)
+  note              String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("staff_role_rates")
 }
 
 // =============================================================================
