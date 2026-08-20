@@ -75,7 +75,12 @@ export default function ServicesPage() {
       <PageHeader
         title="Dịch vụ"
         description="Dữ liệu nền cho Lịch hẹn / Phác đồ: thời lượng, công nghệ, protocol, nhân sự, vật tư định mức, giá & giá sàn."
-        action={canWrite && <Button onClick={() => setEditing("new")}><Plus className="h-4 w-4" /> Thêm dịch vụ</Button>}
+        action={canWrite && (
+          <div className="flex items-center gap-2">
+            <Link href="/data-io"><Button variant="outline"><ExternalLink className="h-4 w-4" /> Nhập/Xuất CSV (dịch vụ · quy trình)</Button></Link>
+            <Button onClick={() => setEditing("new")}><Plus className="h-4 w-4" /> Thêm dịch vụ</Button>
+          </div>
+        )}
       />
 
       <div className="mb-3 flex flex-wrap items-center gap-2">

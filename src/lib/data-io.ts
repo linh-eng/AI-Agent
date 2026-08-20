@@ -171,6 +171,20 @@ export const DATASETS: Record<string, Dataset> = {
       { key: "purpose", header: "Mục đích" }, { key: "durationMinutes", header: "Thời lượng (phút)", type: "number" },
     ],
   },
+  "service-steps": {
+    // Quy trình (protocol bên trong dịch vụ) theo BƯỚC — mỗi DÒNG = 1 bước, gom theo Mã dịch vụ.
+    // NHẬP = thay TOÀN BỘ bước của dịch vụ (bump version). Dịch vụ phải TỒN TẠI trước (tạo ở màn Dịch vụ / dataset services).
+    // Sản phẩm/công nghệ/phương án của từng bước quản lý ở màn Dịch vụ (không qua CSV này).
+    key: "service-steps", label: "Dịch vụ — Quy trình (theo bước)", group: "Thư viện chuyên môn", model: "service", naturalKey: "code",
+    readPerm: "service.read", writePerm: "service.write", nested: true,
+    columns: [
+      { key: "serviceCode", header: "Mã dịch vụ", required: true }, { key: "serviceName", header: "Tên dịch vụ" },
+      { key: "stepOrder", header: "Bước", type: "number" }, { key: "stepName", header: "Tên bước", required: true },
+      { key: "description", header: "Mục đích", note: "Mục tiêu/mô tả của bước" }, { key: "technique", header: "Kỹ thuật/thao tác" },
+      { key: "durationMinutes", header: "Thời lượng (phút)", type: "number" }, { key: "isRequired", header: "Bắt buộc", type: "boolean" },
+      { key: "warnings", header: "Cảnh báo/chống chỉ định" }, { key: "conditionText", header: "Điều kiện áp dụng" },
+    ],
+  },
   "booking-resources": {
     key: "booking-resources", label: "Tài nguyên (phòng/giường/máy)", group: "Khách hàng & Hành trình", model: "bookingResource", naturalKey: "code",
     readPerm: "booking.read", writePerm: "booking.write",
@@ -335,11 +349,94 @@ async function commitProtocolSteps(header: string[], dataRows: string[][]) {
   return { total: parsed.length, created, updated, skippedError, errors };
 }
 
+// ---------------------------------------------------------------------------
+// NESTED — Dịch vụ theo BƯỚC (protocol bên trong dịch vụ): mỗi DÒNG = 1 bước SOP,
+// gom theo "Mã dịch vụ". NHẬP = thay toàn bộ ServiceStep của dịch vụ + bump version.
+// Sản phẩm/công nghệ/phương án của bước KHÔNG qua CSV (quản lý ở màn Dịch vụ).
+// ---------------------------------------------------------------------------
+async function exportServiceSteps(): Promise<string> {
+  const ds = DATASETS["service-steps"];
+  const header = ds.columns.map((c) => c.header);
+  const services = await m("service").findMany({
+    orderBy: { code: "asc" },
+    select: { code: true, name: true, steps: { orderBy: { sortOrder: "asc" }, select: { sortOrder: true, name: true, description: true, technique: true, durationMinutes: true, isRequired: true, warnings: true, conditionText: true } } },
+  });
+  const out: (string | number | null)[][] = [];
+  for (const s of services) {
+    if (!s.steps.length) continue; // chỉ xuất dịch vụ CÓ quy trình (SOP theo bước)
+    for (const st of s.steps) out.push([s.code, s.name, st.sortOrder + 1, st.name, st.description ?? "", st.technique ?? "", st.durationMinutes ?? "", st.isRequired ? "true" : "false", st.warnings ?? "", st.conditionText ?? ""]);
+  }
+  return toCsv(header, out);
+}
+
+async function previewServiceSteps(header: string[], dataRows: string[][]) {
+  const ds = DATASETS["service-steps"];
+  const parsed = mapNestedRows(ds, header, dataRows);
+  const codes = Array.from(new Set(parsed.filter((p) => !p.errors.length && p.row.serviceCode).map((p) => String(p.row.serviceCode))));
+  const existing = codes.length ? await m("service").findMany({ where: { code: { in: codes } }, select: { code: true } }) : [];
+  const existSet = new Set(existing.map((e: any) => String(e.code)));
+  const results: RowResult[] = parsed.map((p, i) => {
+    if (p.errors.length) return { index: i, status: "ERROR", errors: p.errors };
+    if (!existSet.has(String(p.row.serviceCode))) return { index: i, status: "ERROR", errors: [`Dịch vụ "${p.row.serviceCode}" chưa tồn tại — tạo dịch vụ trước`] };
+    return { index: i, status: "UPDATE", errors: [], key: p.row.serviceCode };
+  });
+  return { results, counts: { willCreate: 0, willUpdate: new Set(results.filter((r) => r.status === "UPDATE").map((r) => r.key)).size, willError: results.filter((r) => r.status === "ERROR").length } };
+}
+
+async function commitServiceSteps(header: string[], dataRows: string[][]) {
+  const parsed = mapNestedRows(DATASETS["service-steps"], header, dataRows);
+  const errors: { index: number; reason: string }[] = [];
+  let skippedError = 0;
+  // Gom dòng HỢP LỆ theo Mã dịch vụ (giữ index gốc để báo lỗi khi dịch vụ không tồn tại).
+  const groups = new Map<string, { rows: { i: number; step: any; order: number | null }[] }>();
+  parsed.forEach((p, i) => {
+    if (p.errors.length) { skippedError++; errors.push({ index: i, reason: p.errors.join("; ") }); return; }
+    const code = String(p.row.serviceCode);
+    const g = groups.get(code) ?? { rows: [] };
+    g.rows.push({
+      i,
+      order: p.row.stepOrder != null ? Number(p.row.stepOrder) : null,
+      step: {
+        name: String(p.row.stepName),
+        description: p.row.description ?? null,
+        technique: p.row.technique ?? null,
+        durationMinutes: p.row.durationMinutes != null ? p.row.durationMinutes : null,
+        isRequired: p.row.isRequired != null ? p.row.isRequired : true,
+        warnings: p.row.warnings ?? null,
+        conditionText: p.row.conditionText ?? null,
+      },
+    });
+    groups.set(code, g);
+  });
+  let updated = 0;
+  for (const [code, g] of groups) {
+    const svc = await m("service").findUnique({ where: { code }, select: { id: true } });
+    if (!svc) { // cả nhóm lỗi: dịch vụ chưa tồn tại
+      for (const r of g.rows) { skippedError++; errors.push({ index: r.i, reason: `Dịch vụ "${code}" chưa tồn tại` }); }
+      continue;
+    }
+    // Sắp theo cột "Bước" nếu có, else theo thứ tự xuất hiện. sortOrder = index.
+    const ordered = g.rows.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    await prisma.$transaction(async (tx: any) => {
+      await tx.serviceStep.deleteMany({ where: { serviceId: svc.id } });
+      await tx.service.update({
+        where: { id: svc.id },
+        data: {
+          version: { increment: 1 },
+          steps: { create: ordered.map((r, idx) => ({ sortOrder: idx, ...r.step })) },
+        },
+      });
+    });
+    updated++;
+  }
+  return { total: parsed.length, created: 0, updated, skippedError, errors };
+}
+
 /** XUẤT toàn bộ bản ghi của 1 dataset → CSV (FK hiển thị bằng mã). */
 export async function exportDataset(key: string): Promise<string> {
   const ds = DATASETS[key];
   if (!ds) throw new Error("Dataset không tồn tại");
-  if (ds.nested) return exportProtocolSteps();
+  if (ds.nested) return ds.key === "service-steps" ? exportServiceSteps() : exportProtocolSteps();
   const rows = await m(ds.model).findMany({ orderBy: { [ds.naturalKey]: "asc" } });
   // prefetch id→code cho các cột ref
   const refMaps = new Map<string, Map<string, string>>();
@@ -418,7 +515,7 @@ async function buildRows(ds: Dataset, header: string[], dataRows: string[][]) {
 export async function previewImport(key: string, header: string[], dataRows: string[][]): Promise<{ results: RowResult[]; counts: { willCreate: number; willUpdate: number; willError: number } }> {
   const ds = DATASETS[key];
   if (!ds) throw new Error("Dataset không tồn tại");
-  if (ds.nested) return previewProtocolSteps(header, dataRows);
+  if (ds.nested) return ds.key === "service-steps" ? previewServiceSteps(header, dataRows) : previewProtocolSteps(header, dataRows);
   const built = await buildRows(ds, header, dataRows);
   const keys = built.map((b) => b.naturalVal).filter(Boolean);
   const existing = keys.length ? await m(ds.model).findMany({ where: { [ds.naturalKey]: { in: keys } }, select: { [ds.naturalKey]: true } }) : [];
@@ -434,7 +531,7 @@ export async function previewImport(key: string, header: string[], dataRows: str
 export async function commitImport(key: string, header: string[], dataRows: string[][]): Promise<{ total: number; created: number; updated: number; skippedError: number; errors: { index: number; reason: string }[] }> {
   const ds = DATASETS[key];
   if (!ds) throw new Error("Dataset không tồn tại");
-  if (ds.nested) return commitProtocolSteps(header, dataRows);
+  if (ds.nested) return ds.key === "service-steps" ? commitServiceSteps(header, dataRows) : commitProtocolSteps(header, dataRows);
   const built = await buildRows(ds, header, dataRows);
   let created = 0, updated = 0, skippedError = 0;
   const errors: { index: number; reason: string }[] = [];

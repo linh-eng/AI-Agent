@@ -271,4 +271,45 @@ describe("DATA-IO · Tiêu đề TIẾNG VIỆT + mục nhập liệu bổ sung 
     expect(items.items).toHaveLength(1);
     expect(items.items[0].name).toBe("Quick Peel");
   });
+
+  it("S: Dịch vụ theo BƯỚC (nested service-steps) — nhập nhiều bước/1 dịch vụ → ServiceStep + bump version", async () => {
+    const u = await makeUser(SVC); await login(u.email);
+    const keys = (await D(await listDs())).map((r: any) => r.key);
+    expect(keys).toContain("service-steps");
+    const svc = await prisma.service.create({ data: { code: "DV-SOPCSV", name: "DV SOP CSV", standardPrice: 500000 as any } });
+    expect(svc.version).toBe(1);
+    const csv = [
+      "Mã dịch vụ,Tên dịch vụ,Bước,Tên bước,Mục đích,Kỹ thuật/thao tác,Thời lượng (phút),Bắt buộc,Cảnh báo/chống chỉ định",
+      "DV-SOPCSV,DV SOP CSV,1,Làm sạch,Loại bỏ dầu thừa,Massage nhẹ,10,true,",
+      "DV-SOPCSV,DV SOP CSV,2,Enzyme,Tái tạo bề mặt,Đắp enzyme,20,true,Tránh da đang viêm",
+      "DV-SOPCSV,DV SOP CSV,3,Phục hồi,Làm dịu da,Đắp mặt nạ,15,false,",
+    ].join("\n");
+    const r = await D(await doImport("service-steps", csv));
+    expect(r.updated).toBe(1); expect(r.created).toBe(0); expect(r.skippedError).toBe(0);
+    const steps = await prisma.serviceStep.findMany({ where: { serviceId: svc.id }, orderBy: { sortOrder: "asc" } });
+    expect(steps).toHaveLength(3);
+    expect(steps[0]).toMatchObject({ sortOrder: 0, name: "Làm sạch", description: "Loại bỏ dầu thừa", technique: "Massage nhẹ", durationMinutes: 10, isRequired: true });
+    expect(steps[1].warnings).toBe("Tránh da đang viêm");
+    expect(steps[2].isRequired).toBe(false);
+    expect((await prisma.service.findUnique({ where: { code: "DV-SOPCSV" } }))!.version).toBe(2); // bump
+  });
+
+  it("T: service-steps — dịch vụ chưa tồn tại → ERROR (không tạo) + round-trip XUẤT/nhập thay toàn bộ bước", async () => {
+    const u = await makeUser(SVC); await login(u.email);
+    // Dịch vụ chưa tồn tại → lỗi, không tạo bừa
+    const bad = await D(await doImport("service-steps", "Mã dịch vụ,Bước,Tên bước\nDV-KHONGCO,1,Bước 1"));
+    expect(bad.updated).toBe(0); expect(bad.skippedError).toBe(1);
+    expect(await prisma.service.findUnique({ where: { code: "DV-KHONGCO" } })).toBeNull();
+    // Round-trip: seed 2 bước → xuất → nhập lại 1 bước (thay toàn bộ)
+    const svc = await prisma.service.create({ data: { code: "DV-RT", name: "DV RT", standardPrice: 300000 as any, steps: { create: [{ sortOrder: 0, name: "B1", description: "mục đích 1" }, { sortOrder: 1, name: "B2", description: "mục đích 2" }] } } });
+    const text = (await (await exportCsv("service-steps")).text()).replace(/^﻿/, "");
+    expect(text.split("\n")[0]).toContain("Mã dịch vụ"); // tiêu đề tiếng Việt
+    expect(text).toContain("DV-RT"); expect(text).toContain("B2");
+    const r = await D(await doImport("service-steps", "Mã dịch vụ,Bước,Tên bước,Mục đích\nDV-RT,1,B-Moi,mục đích mới"));
+    expect(r.updated).toBe(1);
+    const steps = await prisma.serviceStep.findMany({ where: { serviceId: svc.id } });
+    expect(steps).toHaveLength(1);
+    expect(steps[0].name).toBe("B-Moi");
+    expect((await prisma.service.findUnique({ where: { code: "DV-RT" } }))!.version).toBe(2);
+  });
 });

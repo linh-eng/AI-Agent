@@ -3302,3 +3302,22 @@ Migration **`Zk_staff_role_rates`** (1 cột JSON nullable `ServiceCostingVersio
   chưa CC 150k / Master 500k / Bác sĩ 800k / Sales CV 100k+hh 200k / Sales NV 80k+hh 120k).
 - **RBAC**: tái dùng `pricefloor.read/write` + `finance.read` — KHÔNG thêm permission. `staff_role_rates` là
   DỮ LIỆU GIÁ VỐN (finance-private), độc lập với payroll/`EmployeeRoleFee` (costing rate) — không trộn.
+
+### CSV Nhập/Xuất QUY TRÌNH dịch vụ (protocol bên trong dịch vụ) — service-steps (v0.38.7)
+Theo yêu cầu "phần dịch vụ có các protocol bên trong thể hiện các bước & mục đích, cần nhập/xuất CSV". SOP
+(ServiceStep: bước · mục đích[`description`] · kỹ thuật · thời lượng · bắt buộc · cảnh báo · điều kiện) **đã có
+sẵn** ở màn Dịch vụ (thêm/sửa/kéo thứ tự ↑↓ + sản phẩm/công nghệ/phương án mỗi bước). Bổ sung **DATA-IO dataset
+LỒNG `service-steps`** "Dịch vụ — Quy trình (theo bước)": mỗi DÒNG CSV = 1 bước, gom theo **Mã dịch vụ**. Cột
+(tiêu đề tiếng Việt): Mã dịch vụ · Tên dịch vụ · Bước · Tên bước · Mục đích · Kỹ thuật/thao tác · Thời lượng
+(phút) · Bắt buộc · Cảnh báo/chống chỉ định · Điều kiện áp dụng. **Code-only additive** (KHÔNG migration; tổng
+vẫn **47 migration**).
+- **NHẬP = thay TOÀN BỘ bước của dịch vụ** (xóa ServiceStep cũ → tạo mới theo cột "Bước") + **bump
+  `Service.version`** (buổi đã ghi nhận giữ snapshot bất biến). Dịch vụ **phải TỒN TẠI trước** (tạo ở màn Dịch
+  vụ hoặc dataset `services`) — mã chưa có → **ERROR**, KHÔNG tạo bừa. Sản phẩm/công nghệ/phương án của từng
+  bước quản lý ở màn Dịch vụ (không qua CSV này — CSV phủ phần "bước + mục đích" theo bảng đào tạo).
+- **XUẤT** ra dòng/bước (chỉ dịch vụ CÓ SOP) → round-trip. Nhận CẢ tiêu đề tiếng Việt LẪN tên field tiếng Anh
+  (alias). RBAC: `service.read` (đọc/xuất) · `service.write` (nhập). Discoverability: nút **"Nhập/Xuất CSV
+  (dịch vụ · quy trình)"** ở header màn `/services` → `/data-io`.
+- **Test** `test/data-io.test.ts` S+T (nhập nhiều bước/1 dịch vụ → ServiceStep + bump version · dịch vụ chưa
+  tồn tại → ERROR · round-trip xuất/nhập thay toàn bộ bước). Nested dispatch tổng quát theo `ds.key`
+  (`service-steps` vs `protocol-steps`). tsc sạch · **19 test data-io PASS**.

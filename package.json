@@ -1,6 +1,6 @@
 {
   "name": "thng-warehouse",
-  "version": "0.38.6",
+  "version": "0.38.7",
   "private": true,
   "description": "Webapp quản lý kho THNG — Nhập/Xuất/Lắp ráp/Tháo dỡ/Truy vết Serial",
   "scripts": {
