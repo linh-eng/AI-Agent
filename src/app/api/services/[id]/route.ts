@@ -48,6 +48,8 @@ export const PATCH = handle(async (req, { params }) => {
   if (!before) return fail(404, "Không tìm thấy dịch vụ");
   const { data, materials } = splitServiceInput(parsed);
   const { steps } = parsed as any;
+  // Chống tự-lồng: một bước KHÔNG được trỏ dịch vụ lồng = chính dịch vụ cha (tránh đệ quy vô hạn).
+  if (Array.isArray(steps)) for (const s of steps) if (s?.linkedServiceId === params.id) s.linkedServiceId = null;
   // Sửa SOP (steps) → TĂNG version (bất biến: buổi cũ đã snapshot không đổi — mục 9/P4).
   if (steps !== undefined) (data as any).version = { increment: 1 };
 

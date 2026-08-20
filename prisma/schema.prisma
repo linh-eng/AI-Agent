@@ -1159,6 +1159,7 @@ model Service {
   protocolServices         ProtocolService[] // Redesign P2 — Service được compose vào các Protocol
   bookingItems             BookingItem[] // Redesign P3 — Service là 1 hạng mục trong Booking nhiều dịch vụ
   executionItems           SessionExecutionItem[] // Redesign P4 — Service được thực hiện thực tế trong buổi
+  composedInSteps          ServiceStep[]                    @relation("ServiceStepLinkedService") // dịch vụ này được lồng vào bước của dịch vụ khác
 
   @@map("services")
 }
@@ -1205,13 +1206,15 @@ model ServiceStep {
   warnings        String? // Cảnh báo/chống chỉ định riêng của bước (mục 8B)
   isRequired      Boolean  @default(true)
   conditionText   String? // Điều kiện áp dụng bước (nếu có)
+  linkedServiceId String? // Bước LÀ một dịch vụ khác (lồng dịch vụ vào protocol) — soft compose; null = bước thường
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  service      Service                 @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  products     ServiceStepProduct[]
-  technologies ServiceStepTechnology[]
-  options      ServiceStepOption[]
+  service       Service                 @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  linkedService Service?                @relation("ServiceStepLinkedService", fields: [linkedServiceId], references: [id], onDelete: SetNull)
+  products      ServiceStepProduct[]
+  technologies  ServiceStepTechnology[]
+  options       ServiceStepOption[]
 
   @@index([serviceId, sortOrder])
   @@map("service_steps")

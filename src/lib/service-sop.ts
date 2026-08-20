@@ -10,6 +10,7 @@ export const stepInclude = {
   products: { orderBy: { sortOrder: "asc" } },
   technologies: { include: { technology: { select: { id: true, name: true, code: true } } } },
   options: { orderBy: { sortOrder: "asc" } },
+  linkedService: { select: { id: true, code: true, name: true, durationMinutes: true, version: true } },
 } satisfies Prisma.ServiceStepInclude;
 
 export const serviceStepsInclude = {
@@ -25,6 +26,7 @@ type StepInput = {
   warnings?: string | null;
   isRequired?: boolean;
   conditionText?: string | null;
+  linkedServiceId?: string | null;
   products?: any[];
   technologies?: any[];
   options?: any[];
@@ -43,6 +45,7 @@ export function buildStepsCreate(steps: StepInput[] | undefined): Prisma.Service
     warnings: s.warnings ?? null,
     isRequired: s.isRequired ?? true,
     conditionText: s.conditionText ?? null,
+    linkedServiceId: s.linkedServiceId ?? null,
     products: {
       create: (s.products ?? []).map((p, j) => ({
         spaProductId: p.spaProductId ?? null,
@@ -106,6 +109,9 @@ export function sopSnapshot(service: any) {
         warnings: s.warnings,
         isRequired: s.isRequired,
         conditionText: s.conditionText,
+        linkedServiceId: s.linkedServiceId ?? null,
+        linkedServiceCode: s.linkedService?.code ?? null,
+        linkedServiceName: s.linkedService?.name ?? null,
         products: (s.products ?? []).map((p: any) => ({
           spaProductId: p.spaProductId, name: p.name, quantity: Number(p.quantity), unit: p.unit, isRequired: p.isRequired,
         })),

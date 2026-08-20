@@ -171,6 +171,7 @@ export const serviceStepSchema = z.object({
   warnings: z.string().optional().nullable(),
   isRequired: z.boolean().default(true),
   conditionText: z.string().optional().nullable(),
+  linkedServiceId: z.string().optional().nullable(), // bước lồng một dịch vụ khác vào protocol
   products: z.array(stepProductSchema).default([]),
   technologies: z.array(stepTechnologySchema).default([]),
   options: z.array(stepOptionSchema).default([]),

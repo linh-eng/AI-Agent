@@ -220,6 +220,8 @@ function ServiceFormModal({ service, cats, techs, protos, resources, products, o
     materials: [], steps: [],
   });
   const [floorSummary, setFloorSummary] = useState<any | null>(null);
+  const [allServices, setAllServices] = useState<{ id: string; code: string; name: string }[]>([]);
+  useEffect(() => { apiFetch<any[]>("/api/services").then((r) => setAllServices(r.map((x) => ({ id: x.id, code: x.code, name: x.name })))).catch(() => {}); }, []);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [catQuick, setCatQuick] = useState(false);
@@ -243,6 +245,7 @@ function ServiceFormModal({ service, cats, techs, protos, resources, products, o
         steps: (d.steps ?? []).map((s: any) => ({
           name: s.name ?? "", description: s.description ?? "", durationMinutes: s.durationMinutes ?? "", technique: s.technique ?? "",
           notes: s.notes ?? "", warnings: s.warnings ?? "", isRequired: s.isRequired ?? true, conditionText: s.conditionText ?? "",
+          linkedServiceId: s.linkedServiceId ?? "", linkedServiceName: s.linkedService?.name ?? "",
           products: (s.products ?? []).map((p: any) => ({ spaProductId: p.spaProductId ?? "", name: p.name ?? "", quantity: Number(p.quantity ?? 1), unit: p.unit ?? "", isRequired: p.isRequired ?? true, notes: p.notes ?? "" })),
           technologies: (s.technologies ?? []).map((t: any) => ({ technologyId: t.technologyId, notes: t.notes ?? "" })),
           options: (s.options ?? []).map((o: any) => ({ name: o.name ?? "", selectMode: o.selectMode ?? "SINGLE_SELECT", isDefault: o.isDefault ?? false, spaProductId: o.spaProductId ?? "", quantity: o.quantity != null ? Number(o.quantity) : "", unit: o.unit ?? "", technique: o.technique ?? "", durationMinutes: o.durationMinutes ?? "", notes: o.notes ?? "", conditionText: o.conditionText ?? "" })),
@@ -289,6 +292,7 @@ function ServiceFormModal({ service, cats, techs, protos, resources, products, o
       warnings: s.warnings || null,
       isRequired: !!s.isRequired,
       conditionText: s.conditionText || null,
+      linkedServiceId: s.linkedServiceId || null,
       products: (s.products ?? []).filter((p: any) => p.name?.trim() && p.unit?.trim()).map((p: any) => ({
         spaProductId: p.spaProductId || null, name: p.name.trim(), quantity: Number(p.quantity) || 1, unit: p.unit.trim(), isRequired: !!p.isRequired, notes: p.notes || null,
       })),
@@ -374,8 +378,9 @@ function ServiceFormModal({ service, cats, techs, protos, resources, products, o
         </Block>
 
         {/* D. Quy trình thực hiện (SOP chuẩn hóa — Redesign P1) */}
-        <Block letter="D" title="Quy trình thực hiện (các bước)">
-          <StepEditor value={f.steps} onChange={(v) => setF({ ...f, steps: v })} products={products} techs={techs} />
+        <Block letter="D" title="Quy trình thực hiện (các bước = protocol)">
+          <StepEditor value={f.steps} onChange={(v) => setF({ ...f, steps: v })} products={products} techs={techs}
+            services={allServices.filter((s) => !service || s.id !== service.id)} />
         </Block>
 
         {/* E. Vật tư định mức */}
@@ -457,9 +462,9 @@ function MaterialEditor({ value, onChange, products }: { value: any[]; onChange:
 }
 
 /* ============================ SOP StepEditor (Redesign P1 · §20) ============================ */
-function StepEditor({ value, onChange, products, techs }: { value: any[]; onChange: (v: any[]) => void; products: any[]; techs: Tech[] }) {
+function StepEditor({ value, onChange, products, techs, services = [] }: { value: any[]; onChange: (v: any[]) => void; products: any[]; techs: Tech[]; services?: { id: string; code: string; name: string }[] }) {
   const totalDuration = value.reduce((s, x) => s + (Number(x.durationMinutes) || 0), 0);
-  const addStep = () => onChange([...value, { name: "", description: "", durationMinutes: "", technique: "", notes: "", warnings: "", isRequired: true, conditionText: "", products: [], technologies: [], options: [] }]);
+  const addStep = () => onChange([...value, { name: "", description: "", durationMinutes: "", technique: "", notes: "", warnings: "", isRequired: true, conditionText: "", linkedServiceId: "", products: [], technologies: [], options: [] }]);
   const updStep = (i: number, patch: any) => onChange(value.map((s, j) => (j === i ? { ...s, ...patch } : s)));
   const delStep = (i: number) => onChange(value.filter((_, j) => j !== i));
   const move = (i: number, dir: -1 | 1) => {
@@ -489,8 +494,18 @@ function StepEditor({ value, onChange, products, techs }: { value: any[]; onChan
                 <Input value={s.technique} onChange={(e) => updStep(i, { technique: e.target.value })} placeholder="Kỹ thuật/thao tác" />
                 <Input value={s.conditionText} onChange={(e) => updStep(i, { conditionText: e.target.value })} placeholder="Điều kiện áp dụng (nếu có)" />
               </div>
-              <Input value={s.description} onChange={(e) => updStep(i, { description: e.target.value })} placeholder="Mô tả" />
+              <Input value={s.description} onChange={(e) => updStep(i, { description: e.target.value })} placeholder="Mục đích / mô tả bước" />
               <Input value={s.warnings} onChange={(e) => updStep(i, { warnings: e.target.value })} placeholder="⚠ Cảnh báo / chống chỉ định (nếu có)" />
+              <div className="rounded border border-dashed border-primary/30 bg-primary/5 p-2 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 text-xs font-medium text-primary">Chèn dịch vụ khác vào bước này</span>
+                  <Select className="flex-1" value={s.linkedServiceId || ""} onChange={(e) => { const svc = services.find((x) => x.id === e.target.value); updStep(i, { linkedServiceId: e.target.value, name: (!s.name?.trim() && svc) ? svc.name : s.name }); }}>
+                    <option value="">— Không (bước thường) —</option>
+                    {services.map((x) => <option key={x.id} value={x.id}>{x.name} ({x.code})</option>)}
+                  </Select>
+                </div>
+                {s.linkedServiceId && <p className="text-[11px] text-muted-foreground">↳ Bước này chạy toàn bộ quy trình của dịch vụ đã chọn (lồng protocol). Sản phẩm/công nghệ của bước lấy theo dịch vụ đó.</p>}
+              </div>
               <StepProducts value={s.products} onChange={(v) => updStep(i, { products: v })} products={products} />
               <StepTechs value={s.technologies} onChange={(v) => updStep(i, { technologies: v })} techs={techs} />
               <StepOptions value={s.options} onChange={(v) => updStep(i, { options: v })} products={products} />
@@ -605,6 +620,8 @@ function ServiceDetailModal({ id, canFinance, canWrite, onClose, onEdit }: { id:
               {d.steps.map((s: any, i: number) => (
                 <li key={s.id} className="rounded border bg-muted/20 p-2">
                   <div className="font-medium">{i + 1}. {s.name}{s.durationMinutes ? ` — ${s.durationMinutes}′` : ""}{!s.isRequired ? " (tùy chọn)" : ""}</div>
+                  {s.linkedService && <div className="text-xs text-primary">↳ Dịch vụ lồng: <b>{s.linkedService.name}</b> ({s.linkedService.code}){s.linkedService.durationMinutes ? ` · ${s.linkedService.durationMinutes}′` : ""}</div>}
+                  {s.description && <div className="text-xs text-muted-foreground">Mục đích: {s.description}</div>}
                   {s.technique && <div className="text-xs text-muted-foreground">Thao tác: {s.technique}</div>}
                   {s.warnings && <div className="text-xs text-amber-600">⚠ {s.warnings}</div>}
                   {(s.products ?? []).length > 0 && <div className="text-xs">Sản phẩm: {s.products.map((p: any) => `${p.name} ${Number(p.quantity)}${p.unit}`).join(", ")}</div>}

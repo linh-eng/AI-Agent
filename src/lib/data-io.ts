@@ -183,6 +183,7 @@ export const DATASETS: Record<string, Dataset> = {
       { key: "description", header: "Mục đích", note: "Mục tiêu/mô tả của bước" }, { key: "technique", header: "Kỹ thuật/thao tác" },
       { key: "durationMinutes", header: "Thời lượng (phút)", type: "number" }, { key: "isRequired", header: "Bắt buộc", type: "boolean" },
       { key: "warnings", header: "Cảnh báo/chống chỉ định" }, { key: "conditionText", header: "Điều kiện áp dụng" },
+      { key: "linkedServiceCode", header: "Mã dịch vụ lồng", note: "Bước = chèn dịch vụ khác (theo mã dịch vụ)" },
     ],
   },
   "booking-resources": {
@@ -359,12 +360,12 @@ async function exportServiceSteps(): Promise<string> {
   const header = ds.columns.map((c) => c.header);
   const services = await m("service").findMany({
     orderBy: { code: "asc" },
-    select: { code: true, name: true, steps: { orderBy: { sortOrder: "asc" }, select: { sortOrder: true, name: true, description: true, technique: true, durationMinutes: true, isRequired: true, warnings: true, conditionText: true } } },
+    select: { code: true, name: true, steps: { orderBy: { sortOrder: "asc" }, select: { sortOrder: true, name: true, description: true, technique: true, durationMinutes: true, isRequired: true, warnings: true, conditionText: true, linkedService: { select: { code: true } } } } },
   });
   const out: (string | number | null)[][] = [];
   for (const s of services) {
     if (!s.steps.length) continue; // chỉ xuất dịch vụ CÓ quy trình (SOP theo bước)
-    for (const st of s.steps) out.push([s.code, s.name, st.sortOrder + 1, st.name, st.description ?? "", st.technique ?? "", st.durationMinutes ?? "", st.isRequired ? "true" : "false", st.warnings ?? "", st.conditionText ?? ""]);
+    for (const st of s.steps) out.push([s.code, s.name, st.sortOrder + 1, st.name, st.description ?? "", st.technique ?? "", st.durationMinutes ?? "", st.isRequired ? "true" : "false", st.warnings ?? "", st.conditionText ?? "", (st as any).linkedService?.code ?? ""]);
   }
   return toCsv(header, out);
 }
@@ -387,15 +388,23 @@ async function commitServiceSteps(header: string[], dataRows: string[][]) {
   const parsed = mapNestedRows(DATASETS["service-steps"], header, dataRows);
   const errors: { index: number; reason: string }[] = [];
   let skippedError = 0;
+  // Prefetch mã dịch vụ → id (cho cả serviceCode và linkedServiceCode).
+  const codeToId = new Map<string, string>(
+    (await m("service").findMany({ select: { id: true, code: true } })).map((s: any) => [String(s.code), s.id as string]),
+  );
   // Gom dòng HỢP LỆ theo Mã dịch vụ (giữ index gốc để báo lỗi khi dịch vụ không tồn tại).
-  const groups = new Map<string, { rows: { i: number; step: any; order: number | null }[] }>();
+  const groups = new Map<string, { rows: { i: number; step: any; order: number | null; linkedCode?: string }[] }>();
   parsed.forEach((p, i) => {
     if (p.errors.length) { skippedError++; errors.push({ index: i, reason: p.errors.join("; ") }); return; }
     const code = String(p.row.serviceCode);
+    const linkedCode = p.row.linkedServiceCode ? String(p.row.linkedServiceCode) : undefined;
+    // Mã dịch vụ lồng sai → lỗi dòng (không tạo bừa liên kết).
+    if (linkedCode && !codeToId.has(linkedCode)) { skippedError++; errors.push({ index: i, reason: `Mã dịch vụ lồng "${linkedCode}" không tồn tại` }); return; }
     const g = groups.get(code) ?? { rows: [] };
     g.rows.push({
       i,
       order: p.row.stepOrder != null ? Number(p.row.stepOrder) : null,
+      linkedCode,
       step: {
         name: String(p.row.stepName),
         description: p.row.description ?? null,
@@ -410,20 +419,21 @@ async function commitServiceSteps(header: string[], dataRows: string[][]) {
   });
   let updated = 0;
   for (const [code, g] of groups) {
-    const svc = await m("service").findUnique({ where: { code }, select: { id: true } });
-    if (!svc) { // cả nhóm lỗi: dịch vụ chưa tồn tại
+    const svcId = codeToId.get(code);
+    if (!svcId) { // cả nhóm lỗi: dịch vụ chưa tồn tại
       for (const r of g.rows) { skippedError++; errors.push({ index: r.i, reason: `Dịch vụ "${code}" chưa tồn tại` }); }
       continue;
     }
     // Sắp theo cột "Bước" nếu có, else theo thứ tự xuất hiện. sortOrder = index.
     const ordered = g.rows.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     await prisma.$transaction(async (tx: any) => {
-      await tx.serviceStep.deleteMany({ where: { serviceId: svc.id } });
+      await tx.serviceStep.deleteMany({ where: { serviceId: svcId } });
       await tx.service.update({
-        where: { id: svc.id },
+        where: { id: svcId },
         data: {
           version: { increment: 1 },
-          steps: { create: ordered.map((r, idx) => ({ sortOrder: idx, ...r.step })) },
+          // Chống tự-lồng: linkedServiceId = chính dịch vụ cha → null.
+          steps: { create: ordered.map((r, idx) => ({ sortOrder: idx, ...r.step, linkedServiceId: r.linkedCode && codeToId.get(r.linkedCode) !== svcId ? codeToId.get(r.linkedCode) : null })) },
         },
       });
     });

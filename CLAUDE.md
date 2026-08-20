@@ -3321,3 +3321,22 @@ vẫn **47 migration**).
 - **Test** `test/data-io.test.ts` S+T (nhập nhiều bước/1 dịch vụ → ServiceStep + bump version · dịch vụ chưa
   tồn tại → ERROR · round-trip xuất/nhập thay toàn bộ bước). Nested dispatch tổng quát theo `ds.key`
   (`service-steps` vs `protocol-steps`). tsc sạch · **19 test data-io PASS**.
+
+### Dịch vụ LỒNG dịch vụ trong protocol — ServiceStep.linkedServiceId (v0.38.8)
+Theo yêu cầu "dịch vụ phải có các bước = protocol, và dịch vụ có thể ADD thêm các dịch vụ khác vào các bước".
+Một **bước SOP có thể LÀ một dịch vụ khác** (compose dịch vụ nhỏ vào protocol của dịch vụ lớn). Migration
+**`Zl_service_step_link`** (1 cột nullable `ServiceStep.linkedServiceId` + FK onDelete SetNull; additive 0 DROP;
+tổng **48 migration**).
+- **Schema:** `ServiceStep.linkedServiceId String?` → `Service` (relation `ServiceStepLinkedService`, back-rel
+  `Service.composedInSteps`). null = bước thường; có giá trị = bước chạy toàn bộ quy trình của dịch vụ đó.
+- **Backend:** `stepInclude` trả `linkedService {id,code,name,durationMinutes,version}`; `buildStepsCreate`
+  mang `linkedServiceId`; `sopSnapshot` chụp `linkedServiceId/Code/Name` (bất biến). Validation
+  `serviceStepSchema.linkedServiceId` optional. **Chống tự-lồng:** PATCH `/api/services/[id]` strip
+  linkedServiceId === chính dịch vụ cha → null (tránh đệ quy).
+- **UI `/services` khối D:** mỗi bước có ô **"Chèn dịch vụ khác vào bước này"** (dropdown dịch vụ active, loại
+  chính nó) → tự điền tên bước theo dịch vụ, hiện gợi ý "chạy toàn bộ quy trình dịch vụ đã chọn". Modal chi tiết
+  hiện "↳ Dịch vụ lồng: <tên> (mã)" dưới từng bước.
+- **CSV:** dataset `service-steps` thêm cột **"Mã dịch vụ lồng"** (FK theo mã dịch vụ) — nhập/xuất round-trip;
+  mã lồng sai → lỗi dòng; tự-lồng → null.
+- **Test** `test/data-io.test.ts` U (lồng dịch vụ con đúng + chống tự-lồng + mã lồng sai → lỗi + xuất có cột).
+  Full regression **633/62 PASS**; tsc sạch.

@@ -312,4 +312,30 @@ describe("DATA-IO · Tiêu đề TIẾNG VIỆT + mục nhập liệu bổ sung 
     expect(steps[0].name).toBe("B-Moi");
     expect((await prisma.service.findUnique({ where: { code: "DV-RT" } }))!.version).toBe(2);
   });
+
+  it("U: service-steps — LỒNG dịch vụ khác vào bước (Mã dịch vụ lồng) + chống tự-lồng + mã lồng sai → lỗi", async () => {
+    const u = await makeUser(SVC); await login(u.email);
+    const parent = await prisma.service.create({ data: { code: "DV-PARENT", name: "Dịch vụ cha", standardPrice: 900000 as any } });
+    const child = await prisma.service.create({ data: { code: "DV-CHILD", name: "Dịch vụ con", standardPrice: 400000 as any } });
+    const csv = [
+      "Mã dịch vụ,Bước,Tên bước,Mục đích,Mã dịch vụ lồng",
+      "DV-PARENT,1,Chuẩn bị,Làm sạch,",           // bước thường
+      "DV-PARENT,2,Chạy dịch vụ con,Lồng protocol,DV-CHILD", // lồng dịch vụ khác
+      "DV-PARENT,3,Tự lồng,Không hợp lệ,DV-PARENT",         // tự-lồng → null
+    ].join("\n");
+    const r = await D(await doImport("service-steps", csv));
+    expect(r.updated).toBe(1); expect(r.skippedError).toBe(0);
+    const steps = await prisma.serviceStep.findMany({ where: { serviceId: parent.id }, orderBy: { sortOrder: "asc" } });
+    expect(steps).toHaveLength(3);
+    expect(steps[0].linkedServiceId).toBeNull();
+    expect(steps[1].linkedServiceId).toBe(child.id); // lồng đúng dịch vụ con
+    expect(steps[2].linkedServiceId).toBeNull();      // tự-lồng bị chặn
+    // Mã dịch vụ lồng sai → lỗi dòng (không tạo bừa liên kết)
+    const bad = await D(await doImport("service-steps", "Mã dịch vụ,Bước,Tên bước,Mã dịch vụ lồng\nDV-PARENT,1,X,DV-KHONGCO"));
+    expect(bad.skippedError).toBe(1); expect(bad.updated).toBe(0);
+    // XUẤT có cột "Mã dịch vụ lồng" (round-trip)
+    const text = (await (await exportCsv("service-steps")).text()).replace(/^﻿/, "");
+    expect(text.split("\n")[0]).toContain("Mã dịch vụ lồng");
+    expect(text).toContain("DV-CHILD");
+  });
 });
