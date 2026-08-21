@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CheckCheck, Trash2, Pencil } from "lucide-react";
+import Link from "next/link";
+import { CheckCheck, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -15,6 +16,7 @@ import { PERMISSIONS } from "@/lib/rbac";
 interface Item {
   id: string;
   product: { id: string; sku: string; name: string; uom: string; category?: { name: string } | null };
+  service?: { id: string; code: string; name: string } | null;
   openedDate: string;
   expiryDate?: string | null;
   initialQty: number;
@@ -88,16 +90,10 @@ export default function ServiceStockPage() {
     await apiFetch(`/api/service-stock/${it.id}`, { method: "PATCH", body: JSON.stringify({ remainingQty: num }) });
     load();
   }
-  async function remove(it: Item) {
-    if (!window.confirm(`Xóa hộp "${it.product.name}" (mở ngày ${formatDate(it.openedDate)}) khỏi Kho Dịch Vụ?`)) return;
-    await apiFetch(`/api/service-stock/${it.id}`, { method: "DELETE" });
-    load();
-  }
-
   const filtered = items.filter(
     (i) => i.product.name.toLowerCase().includes(q.toLowerCase()) || i.product.sku.toLowerCase().includes(q.toLowerCase())
   );
-  const cols = canWrite ? 9 : 8;
+  const cols = canWrite ? 10 : 9;
 
   return (
     <div>
@@ -115,6 +111,7 @@ export default function ServiceStockPage() {
               <TR>
                 <TH>SKU</TH>
                 <TH>Hàng hóa</TH>
+                <TH>Mã liệu trình</TH>
                 <TH>Ngày mở nắp</TH>
                 <TH>Người mở / cập nhật</TH>
                 <TH className="text-right">Còn lại</TH>
@@ -148,6 +145,15 @@ export default function ServiceStockPage() {
                           <div className="text-xs text-muted-foreground">{it.product.category.name}</div>
                         )}
                       </TD>
+                      <TD>
+                        {it.service ? (
+                          <Link href={`/services?focus=${encodeURIComponent(it.service.code)}`} className="font-mono text-primary hover:underline" title={it.service.name}>
+                            {it.service.code}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TD>
                       <TD>{formatDate(it.openedDate)}</TD>
                       <TD className="text-muted-foreground">
                         <div>{it.openedBy?.name ?? "—"}</div>
@@ -157,9 +163,9 @@ export default function ServiceStockPage() {
                       </TD>
                       <TD className="text-right">
                         <span className={it.remainingQty <= 0 ? "text-muted-foreground" : "font-medium"}>
-                          {formatNumber(it.remainingQty)}
+                          {formatNumber(it.remainingQty)} {it.product.uom}
                         </span>
-                        <span className="text-xs text-muted-foreground"> / {formatNumber(it.initialQty)} {it.product.uom}</span>
+                        <div className="text-xs text-muted-foreground">đã dùng {formatNumber(Math.max(0, it.initialQty - it.remainingQty))}</div>
                       </TD>
                       <TD>
                         {it.expiryDate ? (
@@ -200,9 +206,6 @@ export default function ServiceStockPage() {
                                 <CheckCheck className="h-4 w-4" />
                               </Button>
                             )}
-                            <Button variant="ghost" size="icon" className="text-destructive" title="Xóa" onClick={() => remove(it)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
                           </div>
                         </TD>
                       )}

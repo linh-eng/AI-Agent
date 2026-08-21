@@ -547,6 +547,10 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
         const paid = data.payments.reduce((s, p) => s + p.amount, 0);
         const owed = (data.contractValue ?? 0) - paid;
         const payPct = data.contractValue && data.contractValue > 0 ? Math.min(100, Math.round((paid / data.contractValue) * 100)) : 0;
+        // Lũy kế đã trả sau mỗi đợt (nhật ký thanh toán — payments đã sắp theo ngày tăng dần).
+        let running = 0;
+        const cumById = new Map<string, number>();
+        for (const p of data.payments) { running += p.amount; cumById.set(p.id, running); }
         return (
           <>
             <div className="mb-2 flex items-center justify-between">
@@ -607,6 +611,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                       <TR>
                         <TH>Ngày</TH>
                         <TH className="text-right">Số tiền</TH>
+                        <TH className="text-right">Lũy kế đã trả</TH>
                         <TH>Phương thức</TH>
                         <TH>Ngân hàng</TH>
                         <TH>Hình thức chi trả</TH>
@@ -618,7 +623,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                     <TBody>
                       {data.payments.length === 0 ? (
                         <TR>
-                          <TD colSpan={canManage ? 8 : 7} className="py-6 text-center text-muted-foreground">Chưa có đợt thanh toán</TD>
+                          <TD colSpan={canManage ? 9 : 8} className="py-6 text-center text-muted-foreground">Chưa có đợt thanh toán</TD>
                         </TR>
                       ) : (
                         data.payments.map((p) => (
@@ -628,6 +633,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                               {formatNumber(p.amount)} đ
                               {p.note && <div className="text-xs font-normal text-muted-foreground">{p.note}</div>}
                             </TD>
+                            <TD className="text-right tabular-nums text-emerald-600">{formatNumber(cumById.get(p.id) ?? 0)} đ</TD>
                             <TD>{METHOD_LABEL[p.method] ?? p.method}</TD>
                             <TD className="text-muted-foreground">{p.bankInfo ?? "—"}</TD>
                             <TD>{PAYER_LABEL[p.payerType] ?? p.payerType}</TD>

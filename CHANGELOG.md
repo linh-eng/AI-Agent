@@ -3,6 +3,19 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.14.0 — 2026-08-21
+- **Kho Dịch Vụ:**
+  - Thêm cột **Mã liệu trình** (bấm vào → mở trang Liệu trình và tô sáng đúng liệu trình đã mở hộp).
+  - **HSD sau mở nắp** nay **tính động** theo PAO hiện tại của nhóm hàng (đặt “Hạn dùng sau mở nắp” ở
+    Nhóm hàng là hiện ngay, kể cả hộp đã mở trước đó).
+  - **Bỏ nút Xóa** (tránh lệch dữ liệu — hàng vào đây là do Ghi nhận dịch vụ tự xuất). Vẫn giữ Sửa còn lại / Đánh dấu đã hết.
+  - Cột **Còn lại** rõ hơn: hiện “còn X {đơn vị}” + “đã dùng …”.
+- **Công nợ tài sản:** nhật ký thanh toán thêm cột **Lũy kế đã trả** (cộng dồn qua từng đợt) — đọc lịch sử rõ ràng.
+  (Thêm/sửa đợt, ngày, tự tính còn nợ đã có từ 1.12.0.)
+- **Windows:** thêm `scripts/windows/KHOI-DONG-LAI.bat` — **chuột phải → Run as administrator** để **tự tắt server cũ
+  rồi chạy bản mới** (khỏi bị lỗi cổng 9000 đang bận khi cập nhật).
+- ⚠️ Có thêm cột mới (liệu trình của hộp) → cần chạy **`npm run prisma:push`** khi cập nhật.
+
 ## 1.13.0 — 2026-08-20
 - **Kho Dịch Vụ — liên kết theo MÃ HÀNG HÓA (bỏ điều kiện HSD):** khi Ghi nhận dịch vụ, **mọi** vật tư/hàng hóa
   được tiêu hao đều **tự ghi nhận sang Kho Dịch Vụ** theo mã hàng — không còn phụ thuộc việc có/không có HSD.

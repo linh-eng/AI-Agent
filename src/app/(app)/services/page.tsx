@@ -40,6 +40,20 @@ export default function ServicesPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: "", name: "", price: "", note: "", isActive: true });
   const [items, setItems] = useState<FormItem[]>([{ productId: "", quantity: "" }]);
+  const [focusCode, setFocusCode] = useState<string | null>(null);
+
+  // Cuộn tới + tô sáng liệu trình khi mở từ Kho Dịch Vụ (?focus=<mã>).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const code = new URLSearchParams(window.location.search).get("focus");
+    if (!code) return;
+    setFocusCode(code);
+    const t = setTimeout(() => {
+      document.getElementById(`svc-${code}`)?.scrollIntoView({ block: "center" });
+    }, 400);
+    const t2 = setTimeout(() => setFocusCode(null), 3000);
+    return () => { clearTimeout(t); clearTimeout(t2); };
+  }, [loading]);
 
   async function load() {
     setLoading(true);
@@ -144,7 +158,7 @@ export default function ServicesPage() {
                 </TR>
               ) : (
                 rows.map((s) => (
-                  <TR key={s.id}>
+                  <TR key={s.id} id={`svc-${s.code}`} className={focusCode === s.code ? "bg-primary/10" : undefined}>
                     <TD className="font-mono font-medium">{s.code}</TD>
                     <TD>{s.name}</TD>
                     <TD className="text-right">{s.price != null ? `${formatNumber(s.price)} đ` : "—"}</TD>

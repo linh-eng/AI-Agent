@@ -29,7 +29,8 @@ export interface ConsumedItem {
 export async function applyServiceStock(
   consumed: ConsumedItem[],
   warehouseId: string | null,
-  userId: string
+  userId: string,
+  serviceId: string | null = null
 ): Promise<void> {
   const ids = Array.from(new Set(consumed.map((c) => c.productId)));
   if (ids.length === 0) return;
@@ -75,6 +76,7 @@ export async function applyServiceStock(
       await prisma.serviceStockItem.create({
         data: {
           productId: p.id,
+          serviceId: serviceId ?? null,
           warehouseId: warehouseId ?? null,
           openedDate: now,
           expiryDate: pao ? addMonths(now, pao) : null,

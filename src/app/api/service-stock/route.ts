@@ -9,15 +9,31 @@ import { PERMISSIONS } from "@/lib/rbac";
 export const GET = handle(async () => {
   await requirePermission(PERMISSIONS.SERVICE_READ);
 
-  const items = await prisma.serviceStockItem.findMany({
+  const raw = await prisma.serviceStockItem.findMany({
     include: {
       product: {
-        select: { id: true, sku: true, name: true, uom: true, category: { select: { name: true } } },
+        select: {
+          id: true, sku: true, name: true, uom: true,
+          category: { select: { name: true, openMaxMonths: true } },
+        },
       },
+      service: { select: { id: true, code: true, name: true } },
       openedBy: { select: { name: true } },
       updatedBy: { select: { name: true } },
     },
     orderBy: [{ status: "asc" }, { openedDate: "asc" }],
+  });
+
+  // HSD sau mở = HSD đã lưu, hoặc tính động = ngày mở + PAO hiện tại của nhóm hàng.
+  const items = raw.map((it) => {
+    let expiryDate = it.expiryDate;
+    const pao = it.product.category?.openMaxMonths ?? null;
+    if (!expiryDate && pao) {
+      const d = new Date(it.openedDate);
+      d.setMonth(d.getMonth() + pao);
+      expiryDate = d;
+    }
+    return { ...it, expiryDate };
   });
 
   // Định mức tiêu hao theo từng dịch vụ cho các sản phẩm đang có trong kho dịch vụ.

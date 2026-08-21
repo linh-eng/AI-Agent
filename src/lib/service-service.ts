@@ -90,7 +90,8 @@ export async function recordServiceUsage(input: ServiceUsageInput, userId: strin
     await applyServiceStock(
       issueItems.map((i) => ({ productId: i.productId, qty: i.quantity })),
       input.warehouseId,
-      userId
+      userId,
+      service.id
     );
   } catch (e: any) {
     serviceStockWarning = e?.message ?? "Không cập nhật được Kho Dịch Vụ";
