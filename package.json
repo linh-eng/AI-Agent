@@ -24,7 +24,8 @@
     "seed:dmk": "tsx prisma/seed-dmk.ts",
     "seed:klapp": "tsx prisma/seed-klapp.ts",
     "seed:dermalogica": "tsx prisma/seed-dermalogica.ts",
-    "seed:dermalogica:products": "tsx prisma/seed-dermalogica-products.ts"
+    "seed:dermalogica:products": "tsx prisma/seed-dermalogica-products.ts",
+    "d2:dryrun": "tsx scripts/d2-dryrun.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
