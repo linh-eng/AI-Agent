@@ -31,6 +31,7 @@ export interface DepYearRow {
 export interface DepResult {
   method: DepMethod;
   monthly: number; // khấu hao/tháng (PP theo thời gian)
+  perDay?: number; // khấu hao/ngày (đường thẳng — tính theo ngày)
   yearlyStraight: number; // khấu hao/năm (đường thẳng tham chiếu)
   accumulated: number; // đã khấu hao lũy kế tới asOf
   remaining: number; // giá trị còn lại tới asOf
@@ -95,9 +96,55 @@ export function computeDepreciation(input: DepInput, asOf = new Date()): DepResu
   // --- Khấu hao theo thời gian (đường thẳng / số dư giảm dần) ---
   if (!months || months <= 0 || !start || isNaN(start.getTime())) return null;
 
-  // Đường thẳng: theo yêu cầu = Nguyên giá / Số tháng (KHÔNG trừ giá trị thu hồi),
-  // giá trị còn lại giảm dần về 0. Số dư giảm dần vẫn dừng ở giá trị thu hồi.
-  const sSal = method === "STRAIGHT_LINE" ? 0 : salvage;
+  const DAY = 86400000;
+  const dayDiff = (a: Date, b: Date) => Math.floor((a.getTime() - b.getTime()) / DAY);
+
+  // --- Đường thẳng TÍNH THEO NGÀY ---
+  // Khấu hao/ngày = Nguyên giá / tổng số ngày (từ ngày bắt đầu đến khi khấu hao xong).
+  // Lũy kế = khấu hao/ngày × số ngày THỰC TẾ đã trôi qua; còn lại = Nguyên giá − lũy kế.
+  if (method === "STRAIGHT_LINE") {
+    const end = addMonths(start, months);
+    const totalDays = Math.max(1, dayDiff(end, start));
+    const perDay = cost / totalDays;
+    const elapsed = Math.min(totalDays, Math.max(0, dayDiff(asOf, start)));
+    const accumulated = Math.min(r0(perDay * elapsed), r0(cost));
+
+    // Bảng theo năm: khấu hao mỗi năm = perDay × số ngày của năm đó nằm trong kỳ khấu hao.
+    const yearly: DepYearRow[] = [];
+    let acc = 0;
+    for (let y = start.getFullYear(); y <= end.getFullYear(); y++) {
+      const ys = new Date(Math.max(start.getTime(), new Date(y, 0, 1).getTime()));
+      const ye = new Date(Math.min(end.getTime(), new Date(y + 1, 0, 1).getTime()));
+      const days = dayDiff(ye, ys);
+      if (days <= 0) continue;
+      const dep = perDay * days;
+      acc += dep;
+      yearly.push({ year: y, depreciation: r0(dep), accumulated: r0(acc), remaining: r0(cost - acc) });
+    }
+    // Chốt năm cuối về đúng 0 (khử sai số làm tròn theo ngày).
+    if (yearly.length) {
+      const last = yearly[yearly.length - 1];
+      const prevAcc = last.accumulated - last.depreciation;
+      last.accumulated = r0(cost);
+      last.depreciation = r0(cost - prevAcc);
+      last.remaining = 0;
+    }
+
+    return {
+      method,
+      monthly: r0(cost / months), // tham chiếu = Nguyên giá / số tháng
+      perDay: r0(perDay),
+      yearlyStraight: r0(perDay * 365),
+      accumulated,
+      remaining: r0(cost - accumulated),
+      percent: cost > 0 ? Math.min(100, Math.round((accumulated / cost) * 100)) : 0,
+      endDate: end,
+      yearly,
+    };
+  }
+
+  // Số dư giảm dần vẫn dừng ở giá trị thu hồi (tính theo tháng).
+  const sSal = salvage;
   const sl = (cost - sSal) / months; // đường thẳng / tháng
   let book = cost;
   let accToAsOf = 0;

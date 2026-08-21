@@ -403,7 +403,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                     <>
                       <Info label="Bắt đầu khấu hao" value={formatDate(startBasis!)} />
                       <Info label="Thời gian" value={`${months} tháng (≈ ${Math.floor(months / 12)} năm ${months % 12} tháng)`} />
-                      <Info label="Khấu hao / tháng" value={`${formatNumber(dep.monthly)} đ`} />
+                      <Info label="Khấu hao / ngày" value={dep.perDay != null ? `${formatNumber(dep.perDay)} đ` : `${formatNumber(dep.monthly)} đ/tháng`} />
                     </>
                   )}
                   <Info label="Đã khấu hao (lũy kế)" value={`${formatNumber(dep.accumulated)} đ`} />

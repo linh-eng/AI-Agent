@@ -3,6 +3,17 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.13.0 — 2026-08-20
+- **Kho Dịch Vụ — liên kết theo MÃ HÀNG HÓA (bỏ điều kiện HSD):** khi Ghi nhận dịch vụ, **mọi** vật tư/hàng hóa
+  được tiêu hao đều **tự ghi nhận sang Kho Dịch Vụ** theo mã hàng — không còn phụ thuộc việc có/không có HSD.
+  Hàng có HSD sau mở (PAO nhóm) thì tính hạn, hàng không HSD vẫn lưu đầy đủ dữ liệu tiêu hao (không bị mất).
+- **Khấu hao TÍNH THEO NGÀY:** khấu hao/ngày = Nguyên giá ÷ tổng số ngày; **lũy kế phản ánh đúng số ngày thực tế**
+  đã trôi qua kể từ ngày bắt đầu (mặc định = **Ngày mua / ngày ghi trên chứng từ**). Bảng theo năm chốt đúng về 0.
+  Trang chi tiết hiển thị thêm **Khấu hao / ngày**.
+- **Thanh toán & Công nợ (đã có từ 1.12.0, nhắc lại):** mỗi lần trả là **1 dòng trong nhật ký** (không gộp tổng);
+  **sửa số tiền & ngày** từng đợt; **còn phải trả tự cập nhật** theo các đợt đã ghi.
+- Không đổi cấu trúc database so với 1.12.0 (chỉ cần `prisma:push` nếu cập nhật từ bản trước 1.12.0).
+
 ## 1.12.0 — 2026-08-20
 - **Khấu hao tài sản:**
   - **Chỉnh sửa khấu hao ngay tại trang Khấu hao** (nút ✏️ mỗi tài sản — nguyên giá, phương pháp, số tháng,

@@ -33,7 +33,7 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
 - **Dịch vụ/liệu trình (Phase 2):** khai báo định mức tiêu hao (`Service` + `ServiceItem`); ghi nhận thực hiện
   N lượt (`ServiceUsage`) → tự lập phiếu xuất `INTERNAL_USE` (FEFO) trừ kho theo định mức × số lượt.
 - **Kho Dịch Vụ (hàng đã mở nắp):** `ServiceStockItem` — sổ theo dõi hàng mở nắp/dùng dở cho dịch vụ.
-  Ghi nhận dịch vụ tiêu hao hàng `requiresExpiry` → tự trừ "hộp đang mở" (cũ trước), hết thì mở hộp mới
+  Ghi nhận dịch vụ tiêu hao **mọi hàng hóa (liên kết theo mã hàng, không phụ thuộc HSD)** → tự trừ "hộp đang mở" (cũ trước), hết thì mở hộp mới
   (1 đơn vị), HSD sau mở = ngày mở + PAO nhóm (`Category.openMaxMonths`). Trạng thái Đang dùng/Đã hết/
   Sắp-Hết HSD; cho điều chỉnh còn lại/đánh dấu hết/xóa. Là sổ theo dõi overlay, không đổi sổ tồn kho chính.
 - **Tài sản/thiết bị (Phase 2):** `Asset` theo serial, trạng thái (IN_STOCK/IN_USE/MAINTENANCE/RETIRED),
@@ -58,8 +58,8 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
 - **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng theo `expiryAlertDays`, mặc định 60 ngày), sản phẩm dưới định mức
   (`onHand <= minStock`), **hàng tồn lâu chưa mở nắp** (theo `Category.storeWarnMonths`), **thiết bị
   sắp/đã hết bảo hành**, **bảo trì định kỳ đến hạn**, và **công nợ tài sản sắp/đến hạn** (theo `Asset.paymentDueDate`,
-  `getDebtDueAlerts`). Khấu hao đường thẳng = Nguyên giá ÷ số tháng (không trừ giá trị thu hồi), tự trích từ
-  `depreciationStart ?? purchaseDate`; sửa khấu hao ngay ở trang `/asset-depreciation`. **HSD sau mở nắp (PAO):** cấu hình `Category.openMaxMonths` theo nhóm (vd Serum 6
+  `getDebtDueAlerts`). Khấu hao đường thẳng **tính theo ngày** = Nguyên giá ÷ tổng số ngày (không trừ giá trị thu hồi), tự trích từ
+  `depreciationStart ?? purchaseDate` (ngày mua/chứng từ); lũy kế theo số ngày thực tế; sửa khấu hao ngay ở trang `/asset-depreciation`. **HSD sau mở nắp (PAO):** cấu hình `Category.openMaxMonths` theo nhóm (vd Serum 6
   tháng, Kem/Mặt nạ 12 tháng); sau khi mở nắp HSD thực tế = ngày mở nắp + PAO (chưa mở thì dùng HSD bao bì).
 - **Báo cáo N-X-T (Phase 2):** tồn đầu – nhập – xuất – tồn cuối theo kỳ + kho, tính từ `StockMovement`;
   xuất **CSV** (UTF-8 BOM) phía client.

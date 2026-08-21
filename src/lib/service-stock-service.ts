@@ -42,7 +42,9 @@ export async function applyServiceStock(
 
   for (const c of consumed) {
     const p = byId.get(c.productId);
-    if (!p || !p.requiresExpiry || c.qty <= EPS) continue; // chỉ theo dõi hàng mở nắp
+    // Liên kết theo MÃ HÀNG HÓA (mọi sản phẩm được tiêu hao đều ghi nhận sang Kho Dịch Vụ),
+    // KHÔNG phụ thuộc việc có/không có HSD. Có HSD (PAO nhóm) thì tính hạn sau mở, không thì để trống.
+    if (!p || c.qty <= EPS) continue;
 
     let need = c.qty;
 
