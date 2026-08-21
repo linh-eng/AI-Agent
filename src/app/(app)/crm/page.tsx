@@ -100,7 +100,7 @@ export default function CrmDashboardPage() {
               finance.read. Backend đã redact (revenue=null) nên UI không có giá trị thật để lộ. */}
           {d.canSeeFinance && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <Stat icon={Wallet} label="Doanh thu (tháng)" value={formatNumber(d.revenue ?? 0) + " ₫"} tone="success" />
+              <Stat icon={Wallet} label="Tiền thực thu (tháng)" value={formatNumber(d.revenue ?? 0) + " ₫"} tone="success" />
               <Stat icon={TrendingUp} label="Chi phí (tháng)" value={formatNumber(d.cost ?? 0) + " ₫"} tone="warning" />
               <Stat
                 icon={TrendingUp}
@@ -115,7 +115,7 @@ export default function CrmDashboardPage() {
           <Card>
             <CardContent className="p-5">
               <h3 className="mb-4 text-sm font-semibold text-muted-foreground">
-                Doanh thu 6 tháng gần nhất
+                Tiền thực thu 6 tháng gần nhất
               </h3>
               <div className="flex h-48 items-end gap-3">
                 {d.revenueSeries.map((s) => (

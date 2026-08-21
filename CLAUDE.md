@@ -3458,3 +3458,37 @@ theo `sku`. **Code-only additive** — KHÔNG migration/schema.
   **Nợ:** `productType` mặc định HOME_CARE (doc là "kê toa/chăm sóc tại nhà" — phân loại chuyên nghiệp/home
   chi tiết cần rà thêm); một vài SP trong doc chưa tách được sạch (fragment) — 28/34 SP lấy đủ 3 trường.
   Xác thực DB dev: 28 SpaProduct DERMA-* ở màn Sản phẩm (ảnh). tsc sạch.
+
+## AUDIT FIX — BATCH 1 (Owner-approved, minimal-fix, 0 migration) (v0.40.0)
+
+Vòng sửa lỗi kết nối sau Full Flow Audit — **chỉ minimal fix, KHÔNG redesign, KHÔNG schema/migration,
+KHÔNG đổi cấu trúc module**. Owner đã duyệt Batch 1 (D1/D3/D4-cash/D5/D7 + FLOW-016). **Regression:
+baseline 644/64 → 650/65 PASS** (thêm `test/batch1-flow.test.ts` 6 test). tsc sạch · lint 0 lỗi · build OK.
+
+- **FLOW-005 (D4 cash)** — `/api/clinic/dashboard` doanh thu = **tiền thực thu** = `Payment(voidedAt=null)
+  + Deposit(ALLOCATED)`, khớp `/bao-cao` (trước đây tính cả phiếu ĐÃ HỦY + bỏ cọc). Nhãn CRM đổi "Doanh thu"
+  → **"Tiền thực thu"** (không gọi cash là recognized revenue — D4). `clinic/dashboard/route.ts`,
+  `crm/page.tsx`.
+- **FLOW-004 (D3)** — `employeeAvailability` (`hr.ts`): **chỉ APPROVED hard-block**; **PENDING = cảnh báo**
+  (`pendingLeave`, không chặn); REJECTED/CANCELLED → available. Booking POST trả `staffPendingLeave` (không
+  chặn) → form hiện alert cảnh báo. `hr.ts`, `bookings/route.ts`, `bookings/page.tsx`.
+- **FLOW-002 (D5)** — chấm công tay: (a) `manualRecord` **bắt P2002** → 409 dễ hiểu ("đang có bản chấm công
+  MỞ…"); (b) form UI thêm nhãn *Nhân sự \* / Giờ vào \** + **hint khi nút Tạo mờ** + **tự lọc danh sách theo
+  nhân sự vừa chấm** (hết "tạo xong không thấy"). **RBAC D5:** thêm `attendance.write` cho **BOD**; **CASHIER
+  KHÔNG** (giữ nguyên — báo cáo: CASHIER vốn đã không có, đúng ý Owner). `attendance-service.ts`,
+  `attendance/page.tsx`, `rbac.ts`.
+- **FLOW-001 (D1)** — Walk-in: nút **"Ghi nhận lần thực hiện"** cho booking KHÔNG phác đồ (POST
+  `/api/treatment-sessions {bookingId,customerId}` → `/sessions/[id]`); nếu đã có session → **"Xem lần thực
+  hiện"**. GIỮ NGUYÊN đường plan-based (2 workflow song song). `bookings/page.tsx` (API sẵn có).
+- **FLOW-010 (D7)** — trang **`/attendance/me`** self check-in/out cho nhân viên (gate `customer.read` = nhân
+  sự spa; KHÔNG cần `attendance.write`); API self ủy quyền theo FK userId. Nav item "Chấm công của tôi".
+- **FLOW-016** — `SpaMaterialConsume` gửi `idempotencyKey` + **disable nút khi submit** (chống double-deduct).
+
+**Bằng chứng:** `test/batch1-flow.test.ts` — P2002→409; RBAC BOD/CASHIER; availability APPROVED/PENDING/
+REJECTED/CANCELLED; dashboard doanh thu loại phiếu hủy + cộng cọc + mask non-finance; walk-in session
+planId null + bookingId + GET booking trả session. Ảnh: form chấm công (hint), booking walk-in (nút session),
+self check-in.
+
+**CHƯA làm (Batch 2 — chờ Owner duyệt kế hoạch riêng):** D2 (employeeId FK + migration + backfill), D6 (auto
+material usage — cần design/spec), D4-accrual (recognized revenue — REPORT GAP, chờ Owner chọn nguồn). FLOW-003
+(name→id) phụ thuộc D2 nên chưa đụng ở Batch 1.

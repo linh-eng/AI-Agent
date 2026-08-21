@@ -60,7 +60,8 @@ export function isWithinSchedule(
 export interface AvailabilityResult {
   active: boolean; // status ACTIVE (còn làm việc)
   working: boolean; // có ca làm phủ khoảng
-  onLeave: boolean; // đang nghỉ trong khoảng
+  onLeave: boolean; // đang nghỉ ĐÃ DUYỆT (APPROVED) trong khoảng — hard-block (D3)
+  pendingLeave: boolean; // có đơn nghỉ CHỜ DUYỆT (PENDING) — chỉ CẢNH BÁO, không chặn (D3)
   bookingConflict: boolean; // bận với booking khác
   available: boolean; // tổng hợp: đủ điều kiện để phân công
   reasons: string[];
@@ -77,7 +78,7 @@ export async function employeeAvailability(
     where: { id: employeeId },
     include: { schedules: true },
   });
-  if (!emp) return { active: false, working: false, onLeave: false, bookingConflict: false, available: false, reasons: ["Không tìm thấy nhân sự"] };
+  if (!emp) return { active: false, working: false, onLeave: false, pendingLeave: false, bookingConflict: false, available: false, reasons: ["Không tìm thấy nhân sự"] };
 
   const reasons: string[] = [];
   const active = emp.status === "ACTIVE";
@@ -86,12 +87,16 @@ export async function employeeAvailability(
   const working = emp.schedules.length === 0 ? true : isWithinSchedule(emp.schedules as any, from, to);
   if (!working) reasons.push("Ngoài lịch làm việc");
 
-  // Nghỉ phép giao khoảng
-  const leave = await prisma.employeeLeave.findFirst({
-    where: { employeeId, fromAt: { lt: to }, toAt: { gt: from } },
+  // Nghỉ phép giao khoảng (D3): chỉ đơn ĐÃ DUYỆT (APPROVED) mới hard-block; đơn CHỜ
+  // DUYỆT (PENDING) chỉ CẢNH BÁO; REJECTED/CANCELLED bỏ qua (available).
+  const leaves = await prisma.employeeLeave.findMany({
+    where: { employeeId, status: { in: ["APPROVED", "PENDING"] }, fromAt: { lt: to }, toAt: { gt: from } },
+    select: { status: true },
   });
-  const onLeave = !!leave;
-  if (onLeave) reasons.push("Đang nghỉ phép/không khả dụng");
+  const onLeave = leaves.some((l) => l.status === "APPROVED");
+  const pendingLeave = leaves.some((l) => l.status === "PENDING");
+  if (onLeave) reasons.push("Đang nghỉ phép (đã duyệt)");
+  if (pendingLeave) reasons.push("Có đơn nghỉ đang chờ duyệt");
 
   // Booking khác chiếm thời gian (so theo tên ở các trường technician/master/performer)
   const name = emp.fullName;
@@ -111,7 +116,7 @@ export async function employeeAvailability(
   if (bookingConflict) reasons.push("Đã có lịch hẹn khác trùng giờ");
 
   const available = active && working && !onLeave && !bookingConflict;
-  return { active, working, onLeave, bookingConflict, available, reasons };
+  return { active, working, onLeave, pendingLeave, bookingConflict, available, reasons };
 }
 
 /** Nhân sự có năng lực thực hiện dịch vụ/công nghệ không (nếu có yêu cầu). */

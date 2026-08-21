@@ -62,7 +62,7 @@ export default function AttendancePage() {
       )}
 
       {tab === "shifts" && <ShiftsTab canWrite={canWrite} employees={employees} qs={qs} empId={empId} from={from} to={to} wrap={wrap} />}
-      {tab === "attendance" && <AttendanceTab canWrite={canWrite} employees={employees} qs={qs} wrap={wrap} />}
+      {tab === "attendance" && <AttendanceTab canWrite={canWrite} employees={employees} qs={qs} wrap={wrap} setFilterEmp={setEmpId} />}
       {tab === "leave" && <LeaveTab canWrite={canWrite} employees={employees} empId={empId} wrap={wrap} />}
     </div>
   );
@@ -175,21 +175,31 @@ function ShiftsTab({ canWrite, employees, qs, empId, from, to, wrap }: any) {
   );
 }
 
-function AttendanceTab({ canWrite, employees, qs, wrap }: any) {
+function AttendanceTab({ canWrite, employees, qs, wrap, setFilterEmp }: any) {
   const [rows, setRows] = useState<any[]>([]);
   const [mEmp, setMEmp] = useState(""); const [mIn, setMIn] = useState(""); const [mOut, setMOut] = useState("");
   const load = useCallback(() => { apiFetch<any[]>(`/api/attendance?x=1${qs()}`).then(setRows).catch(() => setRows([])); }, [qs]);
   useEffect(() => { load(); }, [qs]); // eslint-disable-line
   const onVoid = async (id: string) => { const reason = prompt("Lý do hủy bản chấm công?"); if (!reason) return; await wrap(apiFetch(`/api/attendance/${id}/void`, { method: "POST", body: JSON.stringify({ reason }) })); load(); };
+  // FLOW-002 — nút Tạo mờ khi thiếu Nhân sự/Giờ vào (ô "Nhân sự" của form KHÁC ô lọc phía trên).
+  const canCreate = !!mEmp && !!mIn;
   return (
     <div className="space-y-4">
       {canWrite && (
         <Card><CardContent className="flex flex-wrap items-end gap-3 p-4">
           <div className="text-sm font-semibold">Chấm công thủ công</div>
-          <Select value={mEmp} onChange={(e) => setMEmp(e.target.value)}><option value="">— Nhân sự —</option>{employees.map((e: any) => <option key={e.id} value={e.id}>{e.fullName}</option>)}</Select>
-          <div className="space-y-1"><Label>Giờ vào</Label><Input type="datetime-local" value={mIn} onChange={(e) => setMIn(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Nhân sự *</Label>
+            <Select value={mEmp} onChange={(e) => setMEmp(e.target.value)}><option value="">— Chọn nhân sự —</option>{employees.map((e: any) => <option key={e.id} value={e.id}>{e.fullName}</option>)}</Select>
+          </div>
+          <div className="space-y-1"><Label>Giờ vào *</Label><Input type="datetime-local" value={mIn} onChange={(e) => setMIn(e.target.value)} /></div>
           <div className="space-y-1"><Label>Giờ ra</Label><Input type="datetime-local" value={mOut} onChange={(e) => setMOut(e.target.value)} /></div>
-          <Button size="sm" disabled={!mEmp || !mIn} onClick={async () => { await wrap(apiFetch("/api/attendance/manual", { method: "POST", body: JSON.stringify({ employeeId: mEmp, checkInAt: mIn, checkOutAt: mOut || null }) })); setMIn(""); setMOut(""); load(); }}>Tạo</Button>
+          <Button size="sm" disabled={!canCreate} onClick={async () => {
+            await wrap(apiFetch("/api/attendance/manual", { method: "POST", body: JSON.stringify({ employeeId: mEmp, checkInAt: mIn, checkOutAt: mOut || null }) }));
+            setMIn(""); setMOut("");
+            // Tự lọc danh sách theo nhân sự vừa chấm để record chắc chắn hiển thị (tránh "tạo xong không thấy").
+            if (setFilterEmp) setFilterEmp(mEmp); else load();
+          }}>Tạo</Button>
+          {!canCreate && <span className="text-xs text-muted-foreground">Chọn <b>Nhân sự</b> và nhập <b>Giờ vào</b> để tạo.</span>}
         </CardContent></Card>
       )}
       <Card><CardContent className="p-0"><RecTable rows={rows} canWrite={canWrite} onVoid={onVoid} /></CardContent></Card>

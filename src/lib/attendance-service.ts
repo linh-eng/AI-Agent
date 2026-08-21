@@ -129,15 +129,24 @@ export async function manualRecord(session: Session, input: ManualInput) {
   let shift: any = null;
   if (input.workShiftId) shift = await prisma.workShift.findUnique({ where: { id: input.workShiftId } });
   const calc = computeAttendance({ checkInAt, checkOutAt, breakMinutesActual: input.breakMinutesActual ?? 0, scheduledStartAt: shift?.scheduledStartAt, scheduledEndAt: shift?.scheduledEndAt, scheduledBreakMinutes: shift?.breakMinutes });
-  const rec = await prisma.attendanceRecord.create({
-    data: {
-      employeeId: input.employeeId, workShiftId: input.workShiftId ?? null, branchId: input.branchId ?? shift?.branchId ?? emp.branchId ?? null,
-      workDate: localWorkDate(checkInAt), checkInAt, checkOutAt, breakMinutesActual: input.breakMinutesActual ?? 0,
-      source: "MANUAL", status: checkOutAt ? "COMPLETED" : "OPEN", note: input.note ?? null,
-      workedMinutes: calc.workedMinutes, scheduledMinutes: calc.scheduledMinutes, overtimeMinutes: calc.overtimeMinutes,
-      lateMinutes: calc.lateMinutes, earlyLeaveMinutes: calc.earlyLeaveMinutes, createdBy: session.name ?? session.email ?? null,
-    },
-  });
+  let rec;
+  try {
+    rec = await prisma.attendanceRecord.create({
+      data: {
+        employeeId: input.employeeId, workShiftId: input.workShiftId ?? null, branchId: input.branchId ?? shift?.branchId ?? emp.branchId ?? null,
+        workDate: localWorkDate(checkInAt), checkInAt, checkOutAt, breakMinutesActual: input.breakMinutesActual ?? 0,
+        source: "MANUAL", status: checkOutAt ? "COMPLETED" : "OPEN", note: input.note ?? null,
+        workedMinutes: calc.workedMinutes, scheduledMinutes: calc.scheduledMinutes, overtimeMinutes: calc.overtimeMinutes,
+        lateMinutes: calc.lateMinutes, earlyLeaveMinutes: calc.earlyLeaveMinutes, createdBy: session.name ?? session.email ?? null,
+      },
+    });
+  } catch (e) {
+    // FLOW-002 — bỏ trống Giờ ra → bản OPEN; nếu nhân sự đã có 1 bản OPEN thì unique
+    // index chặn (P2002). Trả thông báo DỄ HIỂU thay vì lỗi trùng chung chung.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")
+      throw new AttendanceError("Nhân sự đang có bản chấm công MỞ (chưa check-out). Hãy nhập cả Giờ ra, hoặc check-out bản đang mở trước.", 409);
+    throw e;
+  }
   await auditLog({ userId: session.userId, action: "ATTENDANCE_CHECKED_IN", entityType: "AttendanceRecord", entityId: rec.id, changes: { manual: true, employeeId: input.employeeId } });
   return rec;
 }

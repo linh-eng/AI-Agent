@@ -94,6 +94,7 @@ export const POST = handle(async (req) => {
 
   // Kiểm tra khả dụng NHÂN SỰ đã chọn (mục 8.10–11): nghỉ việc → chặn cứng; nghỉ
   // phép/ngoài ca → cảnh báo, cần allowConflict để lưu đè. So theo tên với danh mục NS.
+  const staffPendingLeave: string[] = []; // D3 — nhân sự có đơn nghỉ CHỜ DUYỆT (chỉ cảnh báo)
   {
     const start = new Date(parsed.scheduledAt);
     const end = new Date(start.getTime() + (durationMinutes ?? 60) * 60_000);
@@ -103,6 +104,8 @@ export const POST = handle(async (req) => {
       const emp = await prisma.employee.findFirst({ where: { fullName: nm }, select: { id: true, status: true } });
       if (!emp) continue; // tên tự do không khớp danh mục → bỏ qua
       const av = await employeeAvailability(emp.id, start, end);
+      // D3 — nghỉ CHỜ DUYỆT (PENDING) chỉ CẢNH BÁO (không chặn); chỉ APPROVED mới hard-block.
+      if (av.pendingLeave) staffPendingLeave.push(nm);
       if (!av.available) staffIssues.push({ name: nm, reasons: av.reasons, resigned: emp.status === "RESIGNED" });
     }
     if (staffIssues.length > 0) {
@@ -230,5 +233,6 @@ export const POST = handle(async (req) => {
     });
   }
 
-  return created(booking);
+  // D3 — trả kèm cảnh báo (không chặn) nếu nhân sự có đơn nghỉ đang chờ duyệt.
+  return created(staffPendingLeave.length ? { ...booking, staffPendingLeave } : booking);
 });

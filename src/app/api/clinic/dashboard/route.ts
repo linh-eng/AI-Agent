@@ -28,6 +28,8 @@ export const GET = handle(async () => {
     payments6m,
     monthCostAgg,
     monthPayAgg,
+    monthDepAgg,
+    deposits6m,
   ] = await Promise.all([
     prisma.booking.count({ where: { scheduledAt: { gte: todayStart, lt: todayEnd } } }),
     prisma.booking.count({
@@ -44,18 +46,22 @@ export const GET = handle(async () => {
     prisma.task.count({
       where: { status: { in: ["OPEN", "IN_PROGRESS"] }, dueDate: { lt: now } },
     }),
+    // FLOW-005 — TIỀN THỰC THU (cash collected) = Payment CHƯA HỦY + Deposit ĐÃ PHÂN BỔ.
+    // Đồng bộ với /bao-cao (spa-reports.ts). KHÔNG đếm phiếu thu đã hủy, cộng cọc allocated.
     prisma.payment.findMany({
-      where: { paidAt: { gte: sixMonthsAgo } },
+      where: { voidedAt: null, paidAt: { gte: sixMonthsAgo } },
       select: { amount: true, paidAt: true },
     }),
     prisma.treatmentSession.aggregate({
       _sum: { actualCost: true },
       where: { performedAt: { gte: monthStart } },
     }),
-    prisma.payment.aggregate({ _sum: { amount: true }, where: { paidAt: { gte: monthStart } } }),
+    prisma.payment.aggregate({ _sum: { amount: true }, where: { voidedAt: null, paidAt: { gte: monthStart } } }),
+    prisma.deposit.aggregate({ _sum: { amount: true }, where: { status: "ALLOCATED", allocatedAt: { gte: monthStart } } }),
+    prisma.deposit.findMany({ where: { status: "ALLOCATED", allocatedAt: { gte: sixMonthsAgo } }, select: { amount: true, allocatedAt: true } }),
   ]);
 
-  // Chuỗi doanh thu 6 tháng gần nhất (bucket theo tháng)
+  // Chuỗi TIỀN THỰC THU 6 tháng gần nhất (bucket theo tháng) = payment (chưa hủy) + deposit (đã phân bổ)
   const buckets = new Map<string, number>();
   for (let i = 0; i < 6; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
@@ -65,9 +71,15 @@ export const GET = handle(async () => {
     const key = `${p.paidAt.getFullYear()}-${String(p.paidAt.getMonth() + 1).padStart(2, "0")}`;
     if (buckets.has(key)) buckets.set(key, buckets.get(key)! + Number(p.amount));
   }
+  for (const d of deposits6m) {
+    if (!d.allocatedAt) continue;
+    const key = `${d.allocatedAt.getFullYear()}-${String(d.allocatedAt.getMonth() + 1).padStart(2, "0")}`;
+    if (buckets.has(key)) buckets.set(key, buckets.get(key)! + Number(d.amount));
+  }
   const revenueSeries = Array.from(buckets.entries()).map(([month, value]) => ({ month, value }));
 
-  const revenue = Number(monthPayAgg._sum.amount ?? 0);
+  // revenue = tiền thực thu (cash collected) = payment chưa hủy + cọc đã phân bổ (tháng).
+  const revenue = Number(monthPayAgg._sum.amount ?? 0) + Number(monthDepAgg._sum.amount ?? 0);
   const cost = Number(monthCostAgg._sum.actualCost ?? 0);
 
   return ok({

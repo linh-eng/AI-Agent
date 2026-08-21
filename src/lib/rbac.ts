@@ -251,8 +251,11 @@ const HR_MANAGER: PermissionCode[] = [
   PERMISSIONS.COMPENSATION_POLICY_WRITE,
   PERMISSIONS.COMMISSION_READ,
 ];
+// BOD (Ban điều hành): D5 — được QUẢN LÝ/ĐIỀU CHỈNH chấm công (attendance.read+write);
+// lương/hoa hồng/chính sách vẫn CHỈ ĐỌC. CASHIER KHÔNG có attendance.write (không đổi).
 const HR_BOD_READONLY: PermissionCode[] = [
   PERMISSIONS.ATTENDANCE_READ,
+  PERMISSIONS.ATTENDANCE_WRITE,
   PERMISSIONS.PAYROLL_READ,
   PERMISSIONS.COMPENSATION_POLICY_READ,
   PERMISSIONS.COMMISSION_READ,

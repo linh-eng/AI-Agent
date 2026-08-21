@@ -21,6 +21,7 @@ export function SpaMaterialConsume({ sessionId, customerId, canWrite }: { sessio
   const [refId, setRefId] = useState("");
   const [qty, setQty] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false); // FLOW-016 — chống double-submit trừ tồn 2 lần
 
   const loadUsages = useCallback(async () => {
     setUsages(await apiFetch<any[]>(`/api/material-usages?sessionId=${sessionId}`).catch(() => []));
@@ -41,8 +42,12 @@ export function SpaMaterialConsume({ sessionId, customerId, canWrite }: { sessio
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setError(null);
+    if (busy) return; // chống double-click
+    setBusy(true);
     try {
-      const body: any = { source, sessionId, quantity: Number(qty) };
+      // idempotencyKey: retry/double-submit cùng thao tác KHÔNG trừ tồn 2 lần (P4 server-side).
+      const key = (globalThis.crypto?.randomUUID?.() ?? `${sessionId}-${Date.now()}-${Math.round(Number(qty) * 1000)}`);
+      const body: any = { source, sessionId, quantity: Number(qty), idempotencyKey: key };
       if (source === "SHARED_STOCK") body.containerId = refId; else body.customerMaterialId = refId;
       await apiFetch("/api/material-usages", { method: "POST", body: JSON.stringify(body) });
       setQty(""); setRefId("");
@@ -51,6 +56,7 @@ export function SpaMaterialConsume({ sessionId, customerId, canWrite }: { sessio
       apiFetch<any[]>("/api/usage-materials").then((mats) => setContainers(mats.flatMap((m) => m.containers.filter((c: any) => c.status !== "DISPOSED" && c.status !== "EMPTY").map((c: any) => ({ ...c, materialName: m.name }))))).catch(() => {});
       if (customerId) apiFetch<any[]>(`/api/customer-materials?customerId=${customerId}`).then((r) => setCustMats(r.filter((m) => m.status !== "CANCELLED"))).catch(() => {});
     } catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); }
+    finally { setBusy(false); }
   }
 
   return (
@@ -78,7 +84,7 @@ export function SpaMaterialConsume({ sessionId, customerId, canWrite }: { sessio
           {selected && <p className="text-xs text-muted-foreground">Còn lại: <strong>{remaining} {unit}</strong></p>}
           <div className="flex items-end gap-2">
             <div className="flex-1 space-y-1"><Label className="text-xs">Số lượng sử dụng{unit ? ` (${unit})` : ""}</Label><Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} className="h-8" /></div>
-            <Button type="submit" size="sm" disabled={!refId || !qty}>Ghi nhận</Button>
+            <Button type="submit" size="sm" disabled={!refId || !qty || busy}>{busy ? "Đang ghi…" : "Ghi nhận"}</Button>
           </div>
           {source === "CUSTOMER_OWNED" && custMats.length === 0 && <p className="text-xs text-muted-foreground">Khách chưa có vật tư riêng. Cấp ở menu &quot;Vật tư khách hàng&quot;.</p>}
           {error && <p className="text-xs text-destructive">{error}</p>}

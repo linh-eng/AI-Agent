@@ -115,6 +115,11 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/employees", label: "Nhân sự", icon: Users, perm: "staff.read" },
       // HR-PH2 — workspace chấm công (Ca/Chấm công/Nghỉ phép). Gate theo attendance.read.
       { href: "/attendance", label: "Chấm công", icon: CalendarDays, perm: "attendance.read" },
+      // FLOW-010 (D7) — self check-in cho nhân viên (KHÔNG cần quyền quản trị attendance.write).
+      // Gate `customer.read` = "nhân sự spa thực thụ" (mọi vai trò spa có qua CLINIC_READ) → hiện
+      // cho nhân viên chưa có attendance.read, nhưng KHÔNG hiện cho vai trò 0-quyền (giữ bất biến
+      // "0 quyền → 0 menu"). Trang tự xử lý "chưa liên kết hồ sơ nhân sự".
+      { href: "/attendance/me", label: "Chấm công của tôi", icon: CalendarDays, perm: "customer.read" },
       // HR-PH4 — workspace hiệu suất KPI (kỳ + snapshot). Gate theo attendance.read.
       { href: "/performance", label: "Hiệu suất (KPI)", icon: BarChart3, perm: "attendance.read" },
       // HR-PH5 — workspace lương thưởng (chính sách/attribution/sự kiện thu nhập). Gate compensationPolicy.read.

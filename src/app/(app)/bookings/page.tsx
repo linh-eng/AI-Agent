@@ -639,6 +639,9 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
       if (res.status === 409 && json?.details?.conflicts) { setConflicts(json.details.conflicts); setSuggestions(json.details.suggestions ?? []); setFloor(null); setStaffIssues(null); setSaving(false); return; }
       if (res.status === 409 && json?.details?.priceFloor) { setFloor(json.details.priceFloor); setConflicts(null); setStaffIssues(null); setSaving(false); return; }
       if (!res.ok) throw new Error(json?.error ?? "Lỗi");
+      // D3 — cảnh báo (không chặn) nếu nhân sự phân công có đơn nghỉ đang chờ duyệt.
+      const pend = json?.data?.staffPendingLeave ?? json?.staffPendingLeave;
+      if (Array.isArray(pend) && pend.length) alert(`Lưu ý: ${pend.join(", ")} đang có đơn nghỉ CHỜ DUYỆT trong khung giờ này (đã tạo lịch — cần theo dõi).`);
       onSaved();
     } catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); }
     finally { setSaving(false); }
@@ -815,6 +818,22 @@ function BookingDetailModal({ id, onClose, canWrite, canOverride, employees, res
     finally { setBusy(false); }
   }
 
+  // FLOW-001 (D1) — Walk-in: tạo TreatmentSession gắn bookingId rồi sang màn ghi nhận buổi.
+  // Chỉ dùng cho booking KHÔNG thuộc phác đồ (khách theo phác đồ vẫn ghi ở trang Phác đồ).
+  async function recordWalkinSession() {
+    setBusy(true); setErr(null);
+    try {
+      const svcId = b.serviceId ?? b.service?.id ?? b.items?.[0]?.serviceId ?? b.items?.[0]?.service?.id ?? null;
+      const s = await apiFetch<any>("/api/treatment-sessions", {
+        method: "POST",
+        body: JSON.stringify({ bookingId: id, customerId: b.customer?.id ?? b.customerId, serviceId: svcId, status: "IN_PROGRESS", scheduledAt: b.scheduledAt }),
+      });
+      const sid = s?.id ?? s?.data?.id;
+      if (sid) window.location.href = `/sessions/${sid}`;
+      else { setErr("Không tạo được buổi thực hiện"); setBusy(false); }
+    } catch (e) { setErr(e instanceof Error ? e.message : "Lỗi"); setBusy(false); }
+  }
+
   if (!b) return <Modal open onClose={onClose} title="Chi tiết lịch hẹn"><p className="text-muted-foreground">Đang tải...</p></Modal>;
 
   const dur = b.durationMinutes ?? 60;
@@ -901,7 +920,15 @@ function BookingDetailModal({ id, onClose, canWrite, canOverride, employees, res
             {["NEW", "PENDING", "CONFIRMED", "ARRIVED"].includes(st) && <Button size="sm" variant="outline" disabled={busy} onClick={() => setSub("reschedule")}>Đổi lịch</Button>}
             {["CONFIRMED", "ARRIVED"].includes(st) && <Button size="sm" variant="outline" disabled={busy} onClick={() => setSub("noshow")}>Không đến</Button>}
             {!["COMPLETED", "CANCELLED", "NO_SHOW"].includes(st) && <Button size="sm" variant="destructive" disabled={busy} onClick={() => setSub("cancel")}>Hủy</Button>}
-            {(st === "IN_PROGRESS" || st === "COMPLETED") && b.planId && <Link href={`/treatment-plans/${b.planId}`}><Button size="sm" variant="outline">Ghi nhận lần thực hiện</Button></Link>}
+            {(st === "IN_PROGRESS" || st === "COMPLETED") && (
+              b.session ? (
+                <Link href={`/sessions/${b.session.id}`}><Button size="sm" variant="outline">Xem lần thực hiện</Button></Link>
+              ) : b.planId ? (
+                <Link href={`/treatment-plans/${b.planId}`}><Button size="sm" variant="outline">Ghi nhận lần thực hiện</Button></Link>
+              ) : (
+                <Button size="sm" variant="outline" disabled={busy} onClick={recordWalkinSession}>Ghi nhận lần thực hiện</Button>
+              )
+            )}
             <Link href={`/customers/${b.customer?.id ?? b.customerId}`}><Button size="sm" variant="ghost">Mở hồ sơ khách</Button></Link>
           </div>
         )}
