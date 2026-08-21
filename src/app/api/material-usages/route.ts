@@ -41,6 +41,7 @@ const consumeSchema = z.object({
   quantity: z.coerce.number().positive(),
   note: z.string().optional().nullable(),
   idempotencyKey: z.string().optional().nullable(), // Redesign P4 — chống double-deduct
+  origin: z.enum(["SOP", "MANUAL"]).optional(), // D6 — nguồn gợi ý (SOP) vs nhập tay; chỉ để TRACE qua audit, KHÔNG cột DB
 });
 
 // Ghi nhận 1 lần tiêu hao (điều hướng theo nguồn). Idempotent theo idempotencyKey (P4).
@@ -58,6 +59,6 @@ export const POST = handle(async (req) => {
   }
   // Idempotent: nếu là bản đã tồn tại (POST trùng key) thì không audit lần nữa.
   const isNew = usage.createdAt && Date.now() - new Date(usage.createdAt).getTime() < 5000;
-  if (isNew) await auditLog({ userId: session.userId, action: "MATERIAL_USAGE_POSTED", entityType: "MaterialUsage", entityId: usage.id, changes: { sessionId: d.sessionId, quantity: d.quantity, source: d.source } });
+  if (isNew) await auditLog({ userId: session.userId, action: "MATERIAL_USAGE_POSTED", entityType: "MaterialUsage", entityId: usage.id, changes: { sessionId: d.sessionId, quantity: d.quantity, source: d.source, origin: d.origin ?? "MANUAL" } });
   return created(usage);
 });

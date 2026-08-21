@@ -3492,3 +3492,51 @@ self check-in.
 **CHƯA làm (Batch 2 — chờ Owner duyệt kế hoạch riêng):** D2 (employeeId FK + migration + backfill), D6 (auto
 material usage — cần design/spec), D4-accrual (recognized revenue — REPORT GAP, chờ Owner chọn nguồn). FLOW-003
 (name→id) phụ thuộc D2 nên chưa đụng ở Batch 1.
+
+## AUDIT FIX — BATCH 2 · D6 (SOP suggested material usage) + STEP 2/4 reports (v0.41.0)
+
+Tiếp theo Batch 1, theo phê duyệt Owner (STEP 2 D2 dry-run · STEP 3 D6 implement · STEP 4 D4 audit).
+**Additive, KHÔNG schema migration** (D6-C không thêm cột). **656/66 test PASS** (650 + `test/d6-material.test.ts`
+6). tsc sạch · lint 0 lỗi (chỉ warning cũ) · build OK.
+
+### STEP 2 — D2 dry-run tool (READ-ONLY, đã ship — chưa migration)
+`scripts/d2-dryrun.ts` + npm `d2:dryrun`: đo khả năng backfill `Booking.{technician,master,assistants}` → 
+`employeeId`. **CHỈ SELECT** — 0 write/DDL/migration. Che credentials + che mẫu tên. Phân loại
+TOTAL/UNIQUE MATCH/UNMATCHED/AMBIGUOUS/EMPTY-NULL + anomalies. Cloud session KHÔNG có DB production → tool để
+Owner chạy trên máy prod (`git pull` → `npm run d2:dryrun`). Bước backup → additive migration → backfill là
+RIÊNG, chờ Owner duyệt sau khi có số production.
+
+### STEP 3 — D6 tự động GỢI Ý tiêu hao vật tư theo SOP (implement)
+**Reuse engine hiện có** (`consumeFromContainer`/`consumeFromCustomerMaterial`/`reverseUsage` — điểm trừ tồn
+DUY NHẤT, FOR UPDATE + idempotencyKey) — **KHÔNG parallel inventory engine**. Quyết định Owner đã chốt:
+- **D6-A** `AUTO_MATERIAL_ON_COMPLETE = OFF` (không tồn tại auto-post): SOP chỉ **prefill Suggested/Planned**;
+  hoàn thành buổi KHÔNG tự trừ kho. **Planned ≠ Actual** — trừ kho CHỈ khi Confirmed Actual Usage.
+- **D6-B** Bỏ qua vật tư SOP → **LÝ DO BẮT BUỘC** (no silent skip); ghi audit `SOP_MATERIAL_SKIPPED`.
+- **D6-C** KHÔNG thêm cột `MaterialUsage.auto`; trace nguồn qua **audit** (`MATERIAL_USAGE_POSTED.changes.origin`
+  = SOP|MANUAL).
+- **API (additive):** `GET /api/session-suggested-materials?sessionId=` (gom SP từ `ServiceStep.products` của
+  dịch vụ — READ-ONLY, KHÔNG trừ kho; kèm danh sách đã bỏ qua từ audit) · `POST /api/session-material-skip`
+  (reason ≥3 ký tự → 422 nếu thiếu; MATERIAL_WRITE) · `POST /api/material-usages` thêm `origin` optional →
+  audit. RBAC reuse `customer.read` (đọc gợi ý) / `material.write` (ghi/bỏ qua).
+- **UI** `components/spa-material-consume.tsx` (khối E màn `/sessions/[id]`): khối **"Vật tư dự kiến theo SOP"**
+  — mỗi dòng tên + số dự kiến + badge (Bắt buộc/Đã dùng/Đã bỏ qua) + **Dùng** (prefill số, preselect lọ trùng
+  tên, origin=SOP — nhân viên sửa thành thực tế rồi Ghi nhận) / **Bỏ qua** (ô lý do bắt buộc). Trừ tồn vẫn qua
+  nút Ghi nhận sẵn có (engine cũ, chống double-submit FLOW-016).
+- **Test** `test/d6-material.test.ts` (6, A–F+G): A gợi ý từ SOP không trừ kho · B không serviceId → rỗng ·
+  C+G Ghi nhận origin=SOP TRỪ KHO qua engine hiện có (100→96) + audit origin · D bỏ qua thiếu lý do→422/có
+  lý do→audit+hiện skipped · E hoàn thành KHÔNG auto-post · F RBAC 403/401.
+
+### STEP 4 — D4 accrual: audit nguồn giá lịch sử → **RECOGNIZED REVENUE SOURCE GAP** (chưa migration)
+Owner chọn hướng (a): historical Session/Execution price snapshot làm nguồn recognized revenue (KHÔNG dùng
+`Service.standardPrice` hiện hành; KHÔNG dùng cash collected). Audit hiện trạng:
+- `TreatmentSession.price` = trường nhập tay TÙY CHỌN (POST lấy nguyên client gửi; PATCH/hoàn thành KHÔNG tự
+  suy) → không đủ tin cậy/bắt buộc.
+- `Booking.price` chỉ có khi booking gắn dịch vụ + resolve segment (thiếu ở walk-in/nhiều buổi).
+- `BookingItem.priceSnapshot` chỉ booking nhiều dịch vụ. `Invoice` link proposal/plan, KHÔNG link session 1:1.
+→ **GAP:** chưa có price-snapshot 1:1 đáng tin, BẮT BUỘC gắn buổi hoàn thành. **KHÔNG bịa công thức tạm,
+KHÔNG migration.** Đề xuất minimal additive (chờ Owner duyệt): chốt `session.price` = snapshot giá dịch
+vụ/booking tại thời điểm COMPLETED (nullable, giữ field cũ, backfill có kiểm chứng) làm nguồn recognized
+revenue; Invoice/Payment tiếp tục phục vụ Cash Collected/Outstanding/Deposit (tách bạch).
+
+**CHƯA làm (chờ Owner):** D2 migration/backfill production; D4 migration recognized-revenue; FLOW-003
+(name→employeeId) phụ thuộc D2.
