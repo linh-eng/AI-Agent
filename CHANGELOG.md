@@ -3,6 +3,13 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.14.1 — 2026-08-21
+- **Sửa lỗi thiếu quyền (nút Thêm/Sửa thanh toán không hiện):** quyền đăng nhập nay lấy theo **mã nguồn
+  (`rbac.ts`)** hợp với DB — khi có quyền mới (vd `asset.manage`), **chỉ cần ĐĂNG NHẬP LẠI** là có ngay,
+  **không cần chạy `db:sync-rbac`** nữa. Quản trị có đủ mọi quyền. → Sau khi cập nhật, **đăng xuất rồi đăng nhập lại**
+  là mục Thanh toán & Công nợ hiện nút **Thêm đợt / Sửa** đầy đủ.
+- Không đổi database (không cần `prisma:push`).
+
 ## 1.14.0 — 2026-08-21
 - **Kho Dịch Vụ:**
   - Thêm cột **Mã liệu trình** (bấm vào → mở trang Liệu trình và tô sáng đúng liệu trình đã mở hộp).
