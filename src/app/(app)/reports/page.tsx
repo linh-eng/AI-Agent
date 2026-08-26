@@ -36,6 +36,7 @@ export default function ReportsPage() {
   const [tab, setTab] = useState<"nxt" | "service">("nxt");
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [warehouseId, setWarehouseId] = useState("");
+  const [catFilter, setCatFilter] = useState("");
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(today());
   const [nxt, setNxt] = useState<NxtRow[]>([]);
@@ -73,7 +74,7 @@ export default function ReportsPage() {
   function exportNxt() {
     const whName = warehouses.find((w) => w.id === warehouseId)?.name ?? "Tất cả kho";
     const headers = ["SKU", "Sản phẩm", "Nhóm", "ĐVT", "Tồn đầu", "Nhập", "Xuất", "Tồn cuối"];
-    const data = nxt.map((r) => [r.sku, r.name, r.category ?? "", r.uom, r.opening, r.inQty, r.outQty, r.closing]);
+    const data = nxtView.map((r) => [r.sku, r.name, r.category ?? "", r.uom, r.opening, r.inQty, r.outQty, r.closing]);
     const csv = `Báo cáo Nhập - Xuất - Tồn\nKho:,${whName}\nTừ:,${from},Đến:,${to}\n\n` + toCsv(headers, data);
     downloadCsv(`NXT_${from}_${to}.csv`, csv);
   }
@@ -85,13 +86,16 @@ export default function ReportsPage() {
     downloadCsv(`DoanhThuDV_${from}_${to}.csv`, csv);
   }
 
+  const cats = Array.from(new Set(nxt.map((r) => r.category).filter((c): c is string => !!c))).sort();
+  const nxtView = catFilter ? nxt.filter((r) => r.category === catFilter) : nxt;
+
   return (
     <div>
       <PageHeader
         title="Báo cáo"
         description="Nhập–Xuất–Tồn theo kỳ và doanh thu dịch vụ."
         action={
-          <Button variant="outline" onClick={tab === "nxt" ? exportNxt : exportSvc} disabled={tab === "nxt" ? nxt.length === 0 : !svc?.rows.length}>
+          <Button variant="outline" onClick={tab === "nxt" ? exportNxt : exportSvc} disabled={tab === "nxt" ? nxtView.length === 0 : !svc?.rows.length}>
             <Download className="h-4 w-4" /> Xuất CSV
           </Button>
         }
@@ -126,15 +130,26 @@ export default function ReportsPage() {
             <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
           {tab === "nxt" && (
-            <div className="space-y-1.5">
-              <Label>Kho</Label>
-              <Select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className="sm:w-52">
-                <option value="">Tất cả kho</option>
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>{w.name}</option>
-                ))}
-              </Select>
-            </div>
+            <>
+              <div className="space-y-1.5">
+                <Label>Kho</Label>
+                <Select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className="sm:w-52">
+                  <option value="">Tất cả kho</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Nhóm hàng</Label>
+                <Select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="sm:w-52">
+                  <option value="">Tất cả nhóm</option>
+                  {cats.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </Select>
+              </div>
+            </>
           )}
           <Button onClick={run} disabled={loading}>
             <Search className="h-4 w-4" /> {loading ? "Đang tính…" : "Xem báo cáo"}
@@ -158,10 +173,10 @@ export default function ReportsPage() {
               <TBody>
                 {loading ? (
                   <TR><TD colSpan={7} className="py-8 text-center text-muted-foreground">Đang tải…</TD></TR>
-                ) : nxt.length === 0 ? (
+                ) : nxtView.length === 0 ? (
                   <TR><TD colSpan={7} className="py-8 text-center text-muted-foreground">Không có biến động trong kỳ</TD></TR>
                 ) : (
-                  nxt.map((r) => (
+                  nxtView.map((r) => (
                     <TR key={r.productId}>
                       <TD className="font-mono text-xs">{r.sku}</TD>
                       <TD className="font-medium">{r.name}</TD>

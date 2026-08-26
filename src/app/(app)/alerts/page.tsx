@@ -3,11 +3,13 @@ import { useEffect, useState } from "react";
 import { CalendarClock, TrendingDown, ShieldCheck, Zap, Archive, Wrench, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/client";
 import { formatNumber, formatDate } from "@/lib/utils";
+import { normalizeSearch } from "@/lib/utils";
 
 interface ExpiryAlert {
   batchId: string;
@@ -87,6 +89,7 @@ export default function AlertsPage() {
   const [maintenance, setMaintenance] = useState<MaintenanceDue[]>([]);
   const [debts, setDebts] = useState<DebtDue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
 
   useEffect(() => {
     apiFetch<{
@@ -110,12 +113,19 @@ export default function AlertsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const nq = normalizeSearch(q);
+  const ff = <T,>(arr: T[]) => arr.filter((a) => normalizeSearch(Object.values(a as any).filter((v) => typeof v === "string").join(" ")).includes(nq));
+  const fExpiry = ff(expiry), fLowStock = ff(lowStock), fUnopened = ff(unopened), fWarranty = ff(warranty), fMaintenance = ff(maintenance), fDebts = ff(debts), fShots = ff(shots);
+
   return (
     <div>
       <PageHeader
         title="Cảnh báo"
         description="Lô sắp/đã hết hạn, sản phẩm dưới định mức tồn, hàng tồn lâu chưa mở nắp, thiết bị sắp hết bảo hành / đến hạn bảo trì và tay cầm sắp hết shot."
       />
+      <div className="mb-4">
+        <Input placeholder="Lọc theo tên / mã / SKU… (áp dụng cho tất cả mục)" value={q} onChange={(e) => setQ(e.target.value)} className="sm:max-w-md" />
+      </div>
 
       {/* HSD */}
       <Card className="mb-6">
@@ -123,7 +133,7 @@ export default function AlertsPage() {
           <div className="mb-3 flex items-center gap-2">
             <CalendarClock className="h-5 w-5 text-amber-600" />
             <h3 className="font-semibold">Hạn sử dụng</h3>
-            <Badge tone={expiry.length ? "warning" : "success"}>{expiry.length} lô</Badge>
+            <Badge tone={fExpiry.length ? "warning" : "success"}>{fExpiry.length} lô</Badge>
           </div>
           <Table>
             <THead>
@@ -144,14 +154,14 @@ export default function AlertsPage() {
                     Đang tải…
                   </TD>
                 </TR>
-              ) : expiry.length === 0 ? (
+              ) : fExpiry.length === 0 ? (
                 <TR>
                   <TD colSpan={7} className="py-6 text-center text-muted-foreground">
                     Không có lô nào cần chú ý 🎉
                   </TD>
                 </TR>
               ) : (
-                expiry.map((a) => (
+                fExpiry.map((a) => (
                   <TR key={a.batchId}>
                     <TD className="font-mono text-xs">{a.sku}</TD>
                     <TD className="font-medium">{a.productName}</TD>
@@ -182,7 +192,7 @@ export default function AlertsPage() {
           <div className="mb-3 flex items-center gap-2">
             <TrendingDown className="h-5 w-5 text-amber-600" />
             <h3 className="font-semibold">Dưới định mức tồn</h3>
-            <Badge tone={lowStock.length ? "warning" : "success"}>{lowStock.length} sản phẩm</Badge>
+            <Badge tone={fLowStock.length ? "warning" : "success"}>{fLowStock.length} sản phẩm</Badge>
           </div>
           <Table>
             <THead>
@@ -201,14 +211,14 @@ export default function AlertsPage() {
                     Đang tải…
                   </TD>
                 </TR>
-              ) : lowStock.length === 0 ? (
+              ) : fLowStock.length === 0 ? (
                 <TR>
                   <TD colSpan={5} className="py-6 text-center text-muted-foreground">
                     Tất cả sản phẩm đều trên định mức 🎉
                   </TD>
                 </TR>
               ) : (
-                lowStock.map((a) => (
+                fLowStock.map((a) => (
                   <TR key={a.productId}>
                     <TD className="font-mono text-xs">{a.sku}</TD>
                     <TD className="font-medium">{a.name}</TD>
@@ -235,7 +245,7 @@ export default function AlertsPage() {
           <div className="mb-3 flex items-center gap-2">
             <Archive className="h-5 w-5 text-amber-600" />
             <h3 className="font-semibold">Tồn lâu chưa mở nắp</h3>
-            <Badge tone={unopened.length ? "warning" : "success"}>{unopened.length} sản phẩm</Badge>
+            <Badge tone={fUnopened.length ? "warning" : "success"}>{fUnopened.length} sản phẩm</Badge>
           </div>
           <Table>
             <THead>
@@ -254,14 +264,14 @@ export default function AlertsPage() {
                     Đang tải…
                   </TD>
                 </TR>
-              ) : unopened.length === 0 ? (
+              ) : fUnopened.length === 0 ? (
                 <TR>
                   <TD colSpan={5} className="py-6 text-center text-muted-foreground">
                     Không có hàng tồn lâu chưa mở 🎉
                   </TD>
                 </TR>
               ) : (
-                unopened.map((u) => (
+                fUnopened.map((u) => (
                   <TR key={u.productId}>
                     <TD className="font-mono text-xs">{u.sku}</TD>
                     <TD className="font-medium">{u.name}</TD>
@@ -286,7 +296,7 @@ export default function AlertsPage() {
           <div className="mb-3 flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-amber-600" />
             <h3 className="font-semibold">Bảo hành thiết bị</h3>
-            <Badge tone={warranty.length ? "warning" : "success"}>{warranty.length} thiết bị</Badge>
+            <Badge tone={fWarranty.length ? "warning" : "success"}>{fWarranty.length} thiết bị</Badge>
           </div>
           <Table>
             <THead>
@@ -305,14 +315,14 @@ export default function AlertsPage() {
                     Đang tải…
                   </TD>
                 </TR>
-              ) : warranty.length === 0 ? (
+              ) : fWarranty.length === 0 ? (
                 <TR>
                   <TD colSpan={5} className="py-6 text-center text-muted-foreground">
                     Không có thiết bị sắp hết bảo hành 🎉
                   </TD>
                 </TR>
               ) : (
-                warranty.map((w) => (
+                fWarranty.map((w) => (
                   <TR key={w.assetId}>
                     <TD className="font-mono text-xs">{w.code}</TD>
                     <TD className="font-medium">{w.productName}</TD>
@@ -339,7 +349,7 @@ export default function AlertsPage() {
           <div className="mb-3 flex items-center gap-2">
             <Wrench className="h-5 w-5 text-amber-600" />
             <h3 className="font-semibold">Bảo trì định kỳ đến hạn</h3>
-            <Badge tone={maintenance.length ? "warning" : "success"}>{maintenance.length} thiết bị</Badge>
+            <Badge tone={fMaintenance.length ? "warning" : "success"}>{fMaintenance.length} thiết bị</Badge>
           </div>
           <Table>
             <THead>
@@ -357,12 +367,12 @@ export default function AlertsPage() {
                 <TR>
                   <TD colSpan={6} className="py-6 text-center text-muted-foreground">Đang tải…</TD>
                 </TR>
-              ) : maintenance.length === 0 ? (
+              ) : fMaintenance.length === 0 ? (
                 <TR>
                   <TD colSpan={6} className="py-6 text-center text-muted-foreground">Không có thiết bị đến hạn bảo trì 🎉</TD>
                 </TR>
               ) : (
-                maintenance.map((m) => (
+                fMaintenance.map((m) => (
                   <TR key={m.assetId}>
                     <TD className="font-mono text-xs">
                       <Link href={`/assets/${m.assetId}`} className="text-primary hover:underline">{m.code}</Link>
@@ -392,7 +402,7 @@ export default function AlertsPage() {
           <div className="mb-3 flex items-center gap-2">
             <CreditCard className="h-5 w-5 text-amber-600" />
             <h3 className="font-semibold">Công nợ tài sản sắp/đến hạn</h3>
-            <Badge tone={debts.length ? "warning" : "success"}>{debts.length} tài sản</Badge>
+            <Badge tone={fDebts.length ? "warning" : "success"}>{fDebts.length} tài sản</Badge>
           </div>
           <Table>
             <THead>
@@ -409,12 +419,12 @@ export default function AlertsPage() {
                 <TR>
                   <TD colSpan={5} className="py-6 text-center text-muted-foreground">Đang tải…</TD>
                 </TR>
-              ) : debts.length === 0 ? (
+              ) : fDebts.length === 0 ? (
                 <TR>
                   <TD colSpan={5} className="py-6 text-center text-muted-foreground">Không có công nợ đến hạn 🎉</TD>
                 </TR>
               ) : (
-                debts.map((d) => (
+                fDebts.map((d) => (
                   <TR key={d.assetId}>
                     <TD className="font-mono text-xs">
                       <Link href={`/assets/${d.assetId}`} className="text-primary hover:underline">{d.code}</Link>
@@ -443,7 +453,7 @@ export default function AlertsPage() {
           <div className="mb-3 flex items-center gap-2">
             <Zap className="h-5 w-5 text-amber-600" />
             <h3 className="font-semibold">Tay cầm sắp hết shot</h3>
-            <Badge tone={shots.length ? "warning" : "success"}>{shots.length} tay cầm</Badge>
+            <Badge tone={fShots.length ? "warning" : "success"}>{fShots.length} tay cầm</Badge>
           </div>
           <Table>
             <THead>
@@ -463,14 +473,14 @@ export default function AlertsPage() {
                     Đang tải…
                   </TD>
                 </TR>
-              ) : shots.length === 0 ? (
+              ) : fShots.length === 0 ? (
                 <TR>
                   <TD colSpan={6} className="py-6 text-center text-muted-foreground">
                     Tất cả tay cầm đều còn đủ shot 🎉
                   </TD>
                 </TR>
               ) : (
-                shots.map((s) => (
+                fShots.map((s) => (
                   <TR key={s.handpieceId}>
                     <TD className="font-mono text-xs">{s.code}</TD>
                     <TD className="font-medium">{s.name}</TD>

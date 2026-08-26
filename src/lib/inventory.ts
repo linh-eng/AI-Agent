@@ -150,7 +150,9 @@ export async function getLowStockAlerts(
       uom: r.uom,
       onHand: r.onHand,
       minStock: r.minStock as number,
-    }));
+    }))
+    // Ưu tiên: thiếu hụt nhiều nhất (minStock - onHand lớn) lên trên.
+    .sort((a, b) => (b.minStock - b.onHand) - (a.minStock - a.onHand));
 }
 
 export interface WarrantyAlert {

@@ -25,6 +25,8 @@ interface Maint {
   vendor?: string | null;
   performedBy?: string | null;
   performedAt: string;
+  expectedReturnDate?: string | null;
+  deviceLocation?: string | null;
   note?: string | null;
   createdBy: { name: string };
 }
@@ -127,7 +129,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ type: "MAINTENANCE", description: "", cost: "", vendor: "", performedBy: "", performedAt: "", note: "" });
+  const [form, setForm] = useState({ type: "MAINTENANCE", description: "", cost: "", vendor: "", performedBy: "", performedAt: "", expectedReturnDate: "", deviceLocation: "", note: "" });
   const [editingLog, setEditingLog] = useState<any | null>(null);
 
   // Thanh toán & công nợ
@@ -286,7 +288,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     load();
   }
 
-  const EMPTY_LOG = { type: "MAINTENANCE", description: "", cost: "", vendor: "", performedBy: "", performedAt: "", note: "" };
+  const EMPTY_LOG = { type: "MAINTENANCE", description: "", cost: "", vendor: "", performedBy: "", performedAt: "", expectedReturnDate: "", deviceLocation: "", note: "" };
   function openLogCreate() {
     setEditingLog(null);
     setForm(EMPTY_LOG);
@@ -302,6 +304,8 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
       vendor: m.vendor ?? "",
       performedBy: m.performedBy ?? "",
       performedAt: (m.performedAt ?? "").slice(0, 10),
+      expectedReturnDate: (m.expectedReturnDate ?? "").slice(0, 10),
+      deviceLocation: m.deviceLocation ?? "",
       note: m.note ?? "",
     });
     setError(null);
@@ -319,6 +323,8 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
         vendor: form.vendor || null,
         performedBy: form.performedBy || null,
         performedAt: form.performedAt,
+        expectedReturnDate: form.expectedReturnDate || null,
+        deviceLocation: form.deviceLocation || null,
         note: form.note || null,
       });
       if (editingLog) {
@@ -774,6 +780,8 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                 <TH>Nội dung</TH>
                 <TH>Đơn vị / hãng</TH>
                 <TH>Người thực hiện</TH>
+                <TH>Vị trí thiết bị</TH>
+                <TH>Dự kiến về kho</TH>
                 <TH className="text-right">Chi phí</TH>
                 <TH>Người ghi</TH>
                 {canManage && <TH className="text-right">Thao tác</TH>}
@@ -782,7 +790,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
             <TBody>
               {data.maintenance.length === 0 ? (
                 <TR>
-                  <TD colSpan={canManage ? 8 : 7} className="py-8 text-center text-muted-foreground">Chưa có bản ghi bảo trì</TD>
+                  <TD colSpan={canManage ? 10 : 9} className="py-8 text-center text-muted-foreground">Chưa có bản ghi bảo trì</TD>
                 </TR>
               ) : (
                 data.maintenance.map((m) => (
@@ -799,6 +807,16 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                     </TD>
                     <TD className="text-muted-foreground">{m.vendor ?? "—"}</TD>
                     <TD className="text-muted-foreground">{m.performedBy ?? "—"}</TD>
+                    <TD>
+                      {m.deviceLocation === "AT_VENDOR" ? (
+                        <Badge tone="warning">Đang ở chỗ bảo trì</Badge>
+                      ) : m.deviceLocation === "AT_COMPANY" ? (
+                        <Badge tone="success">Ở kho công ty</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TD>
+                    <TD className="text-muted-foreground">{m.expectedReturnDate ? formatDate(m.expectedReturnDate) : "—"}</TD>
                     <TD className="text-right">{m.cost != null ? `${formatNumber(m.cost)} đ` : "—"}</TD>
                     <TD className="text-muted-foreground">{m.createdBy.name}</TD>
                     {canManage && (
@@ -851,6 +869,20 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
             <div className="space-y-1.5">
               <Label>Chi phí (đ)</Label>
               <Input type="number" min="0" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Vị trí thiết bị</Label>
+              <Select value={form.deviceLocation} onChange={(e) => setForm({ ...form, deviceLocation: e.target.value })}>
+                <option value="">— Chọn —</option>
+                <option value="AT_COMPANY">Ở kho công ty</option>
+                <option value="AT_VENDOR">Đang ở chỗ bảo trì</option>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Ngày dự kiến về kho</Label>
+              <Input type="date" value={form.expectedReturnDate} onChange={(e) => setForm({ ...form, expectedReturnDate: e.target.value })} />
             </div>
           </div>
           <div className="space-y-1.5">

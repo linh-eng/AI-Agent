@@ -11,7 +11,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { focusNextOnEnter } from "@/lib/form";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, normalizeSearch } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 
@@ -31,6 +31,7 @@ interface FormItem { productId: string; quantity: string }
 
 export default function ServicesPage() {
   const canWrite = useCan(PERMISSIONS.SERVICE_WRITE);
+  const [q, setQ] = useState("");
   const [rows, setRows] = useState<Service[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [inventory, setInventory] = useState<InvRow[]>([]);
@@ -117,6 +118,8 @@ export default function ServicesPage() {
     }
   }
 
+  const filtered = rows.filter((s: any) => normalizeSearch(`${s.code} ${s.name}`).includes(normalizeSearch(q)));
+
   return (
     <div>
       <PageHeader
@@ -130,6 +133,9 @@ export default function ServicesPage() {
           )
         }
       />
+      <div className="mb-4">
+        <Input placeholder="Tìm kiếm…" value={q} onChange={(e) => setQ(e.target.value)} className="sm:max-w-sm" />
+      </div>
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -150,14 +156,14 @@ export default function ServicesPage() {
                     Đang tải…
                   </TD>
                 </TR>
-              ) : rows.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <TR>
                   <TD colSpan={canWrite ? 6 : 5} className="py-8 text-center text-muted-foreground">
                     Chưa có liệu trình
                   </TD>
                 </TR>
               ) : (
-                rows.map((s) => (
+                filtered.map((s) => (
                   <TR key={s.id} id={`svc-${s.code}`} className={focusCode === s.code ? "bg-primary/10" : undefined}>
                     <TD className="font-mono font-medium">{s.code}</TD>
                     <TD>{s.name}</TD>

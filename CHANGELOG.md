@@ -3,6 +3,19 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.16.0 — 2026-08-26
+- **Cảnh báo:** thêm **ô lọc** (áp dụng cho tất cả mục) + **sắp xếp theo mức ưu tiên** — cái sắp/đã đến hạn
+  hiện lên trên (HSD gần nhất, công nợ đến hạn trước, bảo trì đến hạn trước, sản phẩm thiếu hụt nhiều nhất…).
+- **Báo cáo:** thêm **lọc theo nhóm hàng** (áp dụng cho bảng N-X-T + CSV).
+- **Thêm ô tìm kiếm/lọc** cho: Liệu trình dịch vụ, Ghi nhận dịch vụ, Tài sản/Thiết bị, Khấu hao, Lịch bảo trì,
+  Công nợ, Tay cầm/Shot.
+- **Kho Dịch Vụ — HSD sau mở có GIỚI HẠN TỐI ĐA:** HSD sau mở = **min(HSD bao bì, ngày mở + PAO nhóm)**.
+  Đặt PAO ở Nhóm hàng (vd Serum 6 tháng; Kem/Mặt nạ 12 tháng; Tinh dầu 12 tháng) → HSD sau mở không vượt quá giới hạn đó.
+- **Công nợ:** thêm cột **Trạng thái** (Đã thanh toán / Còn nợ) — tự chuyển “Đã thanh toán” khi trả hết.
+- **Lịch bảo trì / sửa chữa:** thêm **Vị trí thiết bị** (Ở kho công ty / Đang ở chỗ bảo trì) và **Ngày dự kiến về kho**
+  cho mỗi lần bảo trì (nhập ở form Ghi bảo trì, hiển thị trong lịch sử).
+- ⚠️ Có thêm cột mới cho bảo trì → cần chạy **`npm run prisma:push`** khi cập nhật.
+
 ## 1.15.0 — 2026-08-26
 - **Kho Dịch Vụ (sửa lỗi & làm đúng ý):**
   - **“Còn lại” = TỒN THỰC TẾ của sản phẩm** (tính động từ kho), không còn luôn hiện 0 / “đã hết”.

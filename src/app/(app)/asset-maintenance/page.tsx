@@ -8,7 +8,8 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/client";
-import { formatDate, formatNumber } from "@/lib/utils";
+import { formatDate, formatNumber, normalizeSearch } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 import { MAINT_STATUS_LABEL, MAINT_STATUS_TONE } from "@/lib/labels";
 import { toCsv, downloadCsv } from "@/lib/csv";
 
@@ -49,6 +50,7 @@ function dueText(days: number | null): string {
 
 export default function AssetMaintenancePage() {
   const [data, setData] = useState<Report | null>(null);
+  const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function AssetMaintenancePage() {
   function exportCsv() {
     if (!data) return;
     const headers = ["Mã", "Sản phẩm", "SKU", "Chu kỳ (tháng)", "Bảo trì gần nhất", "Bảo trì kế tiếp", "Tình trạng", "Trạng thái", "Đơn vị/hãng"];
-    const rows = data.rows.map((r) => [
+    const rows = rowsView.map((r) => [
       r.code, r.name, r.sku, r.cycleMonths,
       r.lastDate ? formatDate(r.lastDate) : "",
       r.nextDate ? formatDate(r.nextDate) : "",
@@ -69,6 +71,8 @@ export default function AssetMaintenancePage() {
     ]);
     downloadCsv("lich-bao-tri.csv", toCsv(headers, rows));
   }
+
+  const rowsView = (data?.rows ?? []).filter((r) => normalizeSearch(`${r.code} ${r.name} ${r.sku}`).includes(normalizeSearch(q)));
 
   return (
     <div>
@@ -81,6 +85,9 @@ export default function AssetMaintenancePage() {
           </Button>
         }
       />
+      <div className="mb-4">
+        <Input placeholder="Tìm theo mã / tên / SKU…" value={q} onChange={(e) => setQ(e.target.value)} className="sm:max-w-sm" />
+      </div>
 
       {loading ? (
         <div className="py-10 text-center text-muted-foreground">Đang tải…</div>
@@ -113,7 +120,7 @@ export default function AssetMaintenancePage() {
                   </TR>
                 </THead>
                 <TBody>
-                  {data.rows.map((r) => (
+                  {rowsView.map((r) => (
                     <TR key={r.id}>
                       <TD className="font-medium">
                         <Link href={`/assets/${r.id}`} className="text-primary hover:underline">{r.code}</Link>

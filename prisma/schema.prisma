@@ -599,6 +599,8 @@ model MaintenanceLog {
   vendor      String? // đơn vị/hãng thực hiện
   performedBy String?         @map("performed_by") // người thực hiện (kỹ thuật viên)
   performedAt DateTime        @map("performed_at")
+  expectedReturnDate DateTime? @map("expected_return_date") // ngày dự kiến thiết bị về kho (sau sửa chữa)
+  deviceLocation     String?   @map("device_location")      // AT_COMPANY (ở kho) | AT_VENDOR (đang bảo trì)
   note        String?
   createdById String          @map("created_by_id")
   createdBy   User            @relation("MaintenanceCreatedBy", fields: [createdById], references: [id])

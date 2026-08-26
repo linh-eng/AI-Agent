@@ -36,15 +36,19 @@ export const GET = handle(async () => {
     : [];
   const onHandByProduct = new Map(sums.map((s) => [s.productId, s._sum.quantity ?? 0]));
 
-  // HSD sau mở = HSD đã lưu ở sổ, hoặc HSD của SẢN PHẨM, hoặc ngày mở + PAO nhóm.
+  // HSD sau mở nắp = MIN( HSD bao bì (sản phẩm), ngày mở + PAO nhóm ) — PAO là GIỚI HẠN TỐI ĐA.
   const items = uniq.map((it) => {
-    let expiryDate = it.expiryDate ?? it.product.expiryDate ?? null;
     const pao = it.product.category?.openMaxMonths ?? null;
-    if (!expiryDate && pao) {
+    let paoDate: Date | null = null;
+    if (pao) {
       const d = new Date(it.openedDate);
       d.setMonth(d.getMonth() + pao);
-      expiryDate = d;
+      paoDate = d;
     }
+    const packaging = it.expiryDate ?? it.product.expiryDate ?? null;
+    let expiryDate: Date | null;
+    if (paoDate && packaging) expiryDate = paoDate < packaging ? paoDate : packaging;
+    else expiryDate = paoDate ?? packaging;
     const onHand = onHandByProduct.get(it.productId) ?? 0;
     return { ...it, expiryDate, remainingQty: onHand, status: onHand <= 0 ? "EMPTY" : "IN_USE" };
   });

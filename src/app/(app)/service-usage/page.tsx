@@ -12,7 +12,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { focusNextOnEnter } from "@/lib/form";
-import { formatDate, formatNumber } from "@/lib/utils";
+import { formatDate, formatNumber, normalizeSearch } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 
@@ -42,6 +42,7 @@ interface Usage {
 export default function ServiceUsagePage() {
   const canUse = useCan(PERMISSIONS.SERVICE_USE);
   const canManage = useCan(PERMISSIONS.SERVICE_WRITE);
+  const [q, setQ] = useState("");
   const [rows, setRows] = useState<Usage[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -135,6 +136,8 @@ export default function ServiceUsagePage() {
     }
   }
 
+  const filtered = rows.filter((u: any) => normalizeSearch(`${u.code} ${u.service?.code ?? ""} ${u.service?.name ?? ""} ${u.customerName ?? ""}`).includes(normalizeSearch(q)));
+
   return (
     <div>
       <PageHeader
@@ -148,6 +151,9 @@ export default function ServiceUsagePage() {
           )
         }
       />
+      <div className="mb-4">
+        <Input placeholder="Tìm kiếm…" value={q} onChange={(e) => setQ(e.target.value)} className="sm:max-w-sm" />
+      </div>
       {notice && (
         <div
           className={`mb-4 flex items-start justify-between gap-3 rounded-md border p-3 text-sm ${
@@ -181,12 +187,12 @@ export default function ServiceUsagePage() {
                 <TR>
                   <TD colSpan={canManage ? 9 : 8} className="py-8 text-center text-muted-foreground">Đang tải…</TD>
                 </TR>
-              ) : rows.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <TR>
                   <TD colSpan={canManage ? 9 : 8} className="py-8 text-center text-muted-foreground">Chưa có ghi nhận</TD>
                 </TR>
               ) : (
-                rows.map((u) => (
+                filtered.map((u) => (
                   <TR key={u.id}>
                     <TD className="font-mono text-xs font-medium">{u.code}</TD>
                     <TD>{u.service.name}</TD>

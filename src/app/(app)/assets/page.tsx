@@ -12,7 +12,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { focusNextOnEnter } from "@/lib/form";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
-import { formatDate, formatNumber } from "@/lib/utils";
+import { formatDate, formatNumber, normalizeSearch } from "@/lib/utils";
 import { computeDepreciation } from "@/lib/depreciation";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
@@ -84,6 +84,7 @@ const EMPTY_FORM = {
 export default function AssetsPage() {
   const canWrite = useCan(PERMISSIONS.ASSET_WRITE);
   const canManage = useCan(PERMISSIONS.ASSET_MANAGE);
+  const [q, setQ] = useState("");
   const [rows, setRows] = useState<Asset[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -204,6 +205,8 @@ export default function AssetsPage() {
     }
   }
 
+  const filtered = rows.filter((a: any) => normalizeSearch(`${a.code} ${a.serialNumber ?? ""} ${a.product?.sku ?? ""} ${a.product?.name ?? ""} ${a.location ?? ""}`).includes(normalizeSearch(q)));
+
   return (
     <div>
       <PageHeader
@@ -224,6 +227,9 @@ export default function AssetsPage() {
           )
         }
       />
+      <div className="mb-4">
+        <Input placeholder="Tìm kiếm…" value={q} onChange={(e) => setQ(e.target.value)} className="sm:max-w-sm" />
+      </div>
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -244,12 +250,12 @@ export default function AssetsPage() {
                 <TR>
                   <TD colSpan={canManage ? 8 : 7} className="py-8 text-center text-muted-foreground">Đang tải…</TD>
                 </TR>
-              ) : rows.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <TR>
                   <TD colSpan={canManage ? 8 : 7} className="py-8 text-center text-muted-foreground">Chưa có tài sản</TD>
                 </TR>
               ) : (
-                rows.map((a) => {
+                filtered.map((a) => {
                   // Hạn BH hiệu lực = ngày nhập trực tiếp, hoặc ngày mua + thời gian BH.
                   let warrantyEnd = a.warrantyUntil ?? null;
                   if (!warrantyEnd && a.purchaseDate && a.warrantyMonths) {

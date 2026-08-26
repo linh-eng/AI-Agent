@@ -208,6 +208,8 @@ export const maintenanceCreateSchema = z.object({
   vendor: optionalString,
   performedBy: optionalString,
   performedAt: z.string().min(1, "Chọn ngày thực hiện"),
+  expectedReturnDate: optionalString,
+  deviceLocation: z.enum(["AT_COMPANY", "AT_VENDOR"]).nullable().optional(),
   note: optionalString,
 });
 

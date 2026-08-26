@@ -8,7 +8,8 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/client";
-import { formatDate, formatNumber } from "@/lib/utils";
+import { formatDate, formatNumber, normalizeSearch } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 import { ASSET_MANAGE_LABEL } from "@/lib/labels";
 import { toCsv, downloadCsv } from "@/lib/csv";
 
@@ -44,6 +45,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
 export default function AssetDebtsPage() {
   const [data, setData] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
 
   useEffect(() => {
     apiFetch<Report>("/api/assets/reports/debts")
@@ -54,14 +56,16 @@ export default function AssetDebtsPage() {
 
   function exportCsv() {
     if (!data) return;
-    const headers = ["Mã", "Sản phẩm", "SKU", "Hình thức", "Tổng hợp đồng", "Đã thanh toán", "Còn công nợ", "Tiến độ", "Số đợt", "Lần trả cuối"];
-    const rows = data.rows.map((r) => [
+    const headers = ["Mã", "Sản phẩm", "SKU", "Hình thức", "Tổng hợp đồng", "Đã thanh toán", "Còn công nợ", "Tiến độ", "Trạng thái", "Số đợt", "Lần trả cuối"];
+    const rows = rowsView.map((r) => [
       r.code, r.name, r.sku, r.managementType ? ASSET_MANAGE_LABEL[r.managementType] ?? r.managementType : "",
-      r.contract, r.paid, r.remaining, `${r.percent}%`, r.count,
+      r.contract, r.paid, r.remaining, `${r.percent}%`, r.remaining <= 0 ? "Đã thanh toán" : "Còn nợ", r.count,
       r.lastPaid ? formatDate(r.lastPaid) : "",
     ]);
     downloadCsv("cong-no-tai-san.csv", toCsv(headers, rows));
   }
+
+  const rowsView = (data?.rows ?? []).filter((r) => normalizeSearch(`${r.code} ${r.name} ${r.sku}`).includes(normalizeSearch(q)));
 
   return (
     <div>
@@ -74,6 +78,9 @@ export default function AssetDebtsPage() {
           </Button>
         }
       />
+      <div className="mb-4">
+        <Input placeholder="Tìm theo mã / tên / SKU…" value={q} onChange={(e) => setQ(e.target.value)} className="sm:max-w-sm" />
+      </div>
 
       {loading ? (
         <div className="py-10 text-center text-muted-foreground">Đang tải…</div>
@@ -102,11 +109,12 @@ export default function AssetDebtsPage() {
                     <TH className="text-right">Đã thanh toán</TH>
                     <TH className="text-right">Còn công nợ</TH>
                     <TH className="text-right">Tiến độ</TH>
+                    <TH className="text-center">Trạng thái</TH>
                     <TH>Lần trả cuối</TH>
                   </TR>
                 </THead>
                 <TBody>
-                  {data.rows.map((r) => (
+                  {rowsView.map((r) => (
                     <TR key={r.id}>
                       <TD className="font-medium">
                         <Link href={`/assets/${r.id}`} className="text-primary hover:underline">{r.code}</Link>
@@ -125,6 +133,9 @@ export default function AssetDebtsPage() {
                           <div className="h-full bg-emerald-500" style={{ width: `${r.percent}%` }} />
                         </div>
                       </TD>
+                      <TD className="text-center">
+                        {r.remaining <= 0 ? <Badge tone="success">Đã thanh toán</Badge> : <Badge tone="warning">Còn nợ</Badge>}
+                      </TD>
                       <TD>{r.lastPaid ? formatDate(r.lastPaid) : "—"}</TD>
                     </TR>
                   ))}
@@ -135,7 +146,7 @@ export default function AssetDebtsPage() {
                     <TD className="text-right tabular-nums">{formatNumber(data.totals.contract)} đ</TD>
                     <TD className="text-right tabular-nums text-emerald-600">{formatNumber(data.totals.paid)} đ</TD>
                     <TD className="text-right tabular-nums text-red-600">{formatNumber(data.totals.remaining)} đ</TD>
-                    <TD colSpan={2}></TD>
+                    <TD colSpan={3}></TD>
                   </TR>
                 </tfoot>
               </Table>

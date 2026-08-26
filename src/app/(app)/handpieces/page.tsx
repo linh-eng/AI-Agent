@@ -11,7 +11,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { focusNextOnEnter } from "@/lib/form";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, normalizeSearch } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 
@@ -41,6 +41,7 @@ function machineLabel(r: Row): string {
 
 export default function HandpiecesPage() {
   const canWrite = useCan(PERMISSIONS.ASSET_WRITE);
+  const [q, setQ] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
   const [assets, setAssets] = useState<AssetOpt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,6 +121,8 @@ export default function HandpiecesPage() {
     load();
   }
 
+  const filtered = rows.filter((r: any) => normalizeSearch(`${r.code} ${r.name} ${r.machine ?? ""}`).includes(normalizeSearch(q)));
+
   return (
     <div>
       <PageHeader
@@ -133,6 +136,9 @@ export default function HandpiecesPage() {
           )
         }
       />
+      <div className="mb-4">
+        <Input placeholder="Tìm kiếm…" value={q} onChange={(e) => setQ(e.target.value)} className="sm:max-w-sm" />
+      </div>
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -154,14 +160,14 @@ export default function HandpiecesPage() {
                     Đang tải…
                   </TD>
                 </TR>
-              ) : rows.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <TR>
                   <TD colSpan={canWrite ? 7 : 6} className="py-8 text-center text-muted-foreground">
                     Chưa có tay cầm
                   </TD>
                 </TR>
               ) : (
-                rows.map((r) => {
+                filtered.map((r) => {
                   const remaining = r.maxShots - r.usedShots;
                   const pct = Math.min(100, Math.round((r.usedShots / Math.max(1, r.maxShots)) * 100));
                   const depleted = remaining <= 0;

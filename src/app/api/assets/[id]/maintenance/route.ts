@@ -28,6 +28,8 @@ export const POST = handle(async (req, ctx) => {
       vendor: input.vendor,
       performedBy: input.performedBy,
       performedAt: new Date(input.performedAt),
+      expectedReturnDate: input.expectedReturnDate ? new Date(input.expectedReturnDate) : null,
+      deviceLocation: input.deviceLocation ?? null,
       note: input.note,
       createdById: session.userId,
     },

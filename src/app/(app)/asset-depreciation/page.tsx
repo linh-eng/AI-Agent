@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
-import { formatDate, formatNumber } from "@/lib/utils";
+import { formatDate, formatNumber, normalizeSearch } from "@/lib/utils";
 import { DEP_METHOD_LABEL } from "@/lib/labels";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { useCan } from "@/components/session-provider";
@@ -64,6 +64,7 @@ export default function AssetDepreciationPage() {
   const canManage = useCan(PERMISSIONS.ASSET_MANAGE);
   const [asOf, setAsOf] = useState(todayStr());
   const [data, setData] = useState<Report | null>(null);
+  const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Row | null>(null);
   const [form, setForm] = useState(EDIT_EMPTY);
@@ -121,13 +122,15 @@ export default function AssetDepreciationPage() {
   function exportCsv() {
     if (!data) return;
     const headers = ["Mã", "Sản phẩm", "SKU", "Phương pháp", "Nguyên giá", "Đã khấu hao", "Còn lại", "% khấu hao", "Khấu hao/tháng", "Khấu hao xong"];
-    const rows = data.rows.map((r) => [
+    const rows = rowsView.map((r) => [
       r.code, r.name, r.sku, DEP_METHOD_LABEL[r.method] ?? r.method,
       r.cost, r.accumulated, r.remaining, `${r.percent}%`, r.monthly || "",
       r.endDate ? formatDate(r.endDate) : "",
     ]);
     downloadCsv(`khau-hao-${asOf}.csv`, toCsv(headers, rows));
   }
+
+  const rowsView = (data?.rows ?? []).filter((r) => normalizeSearch(`${r.code} ${r.name} ${r.sku}`).includes(normalizeSearch(q)));
 
   return (
     <div>
@@ -147,6 +150,10 @@ export default function AssetDepreciationPage() {
           <Input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} className="w-44" />
         </div>
         <Button onClick={() => load(asOf)}>Xem</Button>
+        <div className="min-w-[200px] flex-1">
+          <Label>Tìm kiếm</Label>
+          <Input placeholder="Mã / tên / SKU…" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
       </div>
 
       {loading ? (
@@ -182,7 +189,7 @@ export default function AssetDepreciationPage() {
                   </TR>
                 </THead>
                 <TBody>
-                  {data.rows.map((r) => (
+                  {rowsView.map((r) => (
                     <TR key={r.id}>
                       <TD className="font-medium">
                         <Link href={`/assets/${r.id}`} className="text-primary hover:underline">{r.code}</Link>
