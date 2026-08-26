@@ -3,6 +3,18 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.15.0 — 2026-08-26
+- **Kho Dịch Vụ (sửa lỗi & làm đúng ý):**
+  - **“Còn lại” = TỒN THỰC TẾ của sản phẩm** (tính động từ kho), không còn luôn hiện 0 / “đã hết”.
+  - Mỗi sản phẩm chỉ **1 dòng** (gộp, không tách nhiều hộp phân số).
+  - **HSD sau mở** ưu tiên **HSD nhập ở sản phẩm**, nếu không có thì ngày mở + PAO nhóm hàng → hiện đúng khi
+    đã nhập ngày mua / mở nắp / HSD cho sản phẩm.
+  - Trạng thái đúng theo tồn (còn hàng = Đang sử dụng).
+- **Bảo trì / sửa chữa:** thêm **Sửa** và **Xóa** từng bản ghi trong “Lịch sử bảo trì / sửa chữa”.
+- **Nhập liệu bằng Enter:** form **Thêm/Sửa đợt thanh toán**, **Ghi bảo trì**, **Ghi sản lượng** nay bấm
+  **Enter để nhảy sang ô kế tiếp** (kể cả ô không bắt buộc), thay vì lưu sớm.
+- Không đổi cấu trúc database so với 1.14.0 (chỉ cần `prisma:push` nếu cập nhật từ bản trước 1.14.0).
+
 ## 1.14.1 — 2026-08-21
 - **Sửa lỗi thiếu quyền (nút Thêm/Sửa thanh toán không hiện):** quyền đăng nhập nay lấy theo **mã nguồn
   (`rbac.ts`)** hợp với DB — khi có quyền mới (vd `asset.manage`), **chỉ cần ĐĂNG NHẬP LẠI** là có ngay,

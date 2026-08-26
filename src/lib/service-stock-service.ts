@@ -43,51 +43,38 @@ export async function applyServiceStock(
 
   for (const c of consumed) {
     const p = byId.get(c.productId);
-    // Liên kết theo MÃ HÀNG HÓA (mọi sản phẩm được tiêu hao đều ghi nhận sang Kho Dịch Vụ),
-    // KHÔNG phụ thuộc việc có/không có HSD. Có HSD (PAO nhóm) thì tính hạn sau mở, không thì để trống.
+    // Liên kết theo MÃ HÀNG HÓA: mỗi sản phẩm được tiêu hao cho dịch vụ = 1 bản ghi "đang mở".
+    // "Còn lại" hiển thị = TỒN THỰC TẾ của sản phẩm (tính động ở API), không phụ thuộc HSD.
     if (!p || c.qty <= EPS) continue;
 
-    let need = c.qty;
-
-    // 1) Trừ vào các hộp đang mở (cũ nhất trước).
-    const active = await prisma.serviceStockItem.findMany({
-      where: { productId: p.id, status: "IN_USE", remainingQty: { gt: 0 } },
-      orderBy: { openedDate: "asc" },
+    const existing = await prisma.serviceStockItem.findFirst({
+      where: { productId: p.id, warehouseId: warehouseId ?? null, status: "IN_USE" },
     });
-    for (const it of active) {
-      if (need <= EPS) break;
-      const take = Math.min(it.remainingQty, need);
-      const rem = round4(it.remainingQty - take);
+    if (existing) {
+      // Đã mở rồi -> cập nhật người dùng cuối + liệu trình gần nhất (giữ ngày mở đầu tiên).
       await prisma.serviceStockItem.update({
-        where: { id: it.id },
-        data: { remainingQty: rem, status: rem <= EPS ? "EMPTY" : "IN_USE", updatedById: userId },
+        where: { id: existing.id },
+        data: { updatedById: userId, serviceId: serviceId ?? existing.serviceId },
       });
-      need = round4(need - take);
-    }
-
-    // 2) Còn thiếu -> mở hộp mới (mỗi hộp = 1 đơn vị), tính HSD sau mở theo PAO.
-    const pao = p.category?.openMaxMonths ?? null;
-    let guard = 0;
-    while (need > EPS && guard < 1000) {
-      guard++;
-      const cap = 1;
-      const take = Math.min(cap, need);
-      const rem = round4(cap - take);
+    } else {
+      // Mở mới: dùng ngày mở nắp / HSD của SẢN PHẨM nếu đã nhập, nếu không thì tính theo PAO nhóm.
+      const pao = p.category?.openMaxMonths ?? null;
+      const opened = p.openedDate ?? now;
+      const exp = p.expiryDate ?? (pao ? addMonths(opened, pao) : null);
       await prisma.serviceStockItem.create({
         data: {
           productId: p.id,
           serviceId: serviceId ?? null,
           warehouseId: warehouseId ?? null,
-          openedDate: now,
-          expiryDate: pao ? addMonths(now, pao) : null,
-          initialQty: cap,
-          remainingQty: rem,
-          status: rem <= EPS ? "EMPTY" : "IN_USE",
+          openedDate: opened,
+          expiryDate: exp,
+          initialQty: 1,
+          remainingQty: 1,
+          status: "IN_USE",
           openedById: userId,
           updatedById: userId,
         },
       });
-      need = round4(need - take);
     }
   }
 }

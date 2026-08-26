@@ -13,7 +13,7 @@ export const GET = handle(async () => {
     include: {
       product: {
         select: {
-          id: true, sku: true, name: true, uom: true,
+          id: true, sku: true, name: true, uom: true, expiryDate: true, openedDate: true,
           category: { select: { name: true, openMaxMonths: true } },
         },
       },
@@ -21,23 +21,33 @@ export const GET = handle(async () => {
       openedBy: { select: { name: true } },
       updatedBy: { select: { name: true } },
     },
-    orderBy: [{ status: "asc" }, { openedDate: "asc" }],
+    orderBy: [{ openedDate: "asc" }],
   });
 
-  // HSD sau mở = HSD đã lưu, hoặc tính động = ngày mở + PAO hiện tại của nhóm hàng.
-  const items = raw.map((it) => {
-    let expiryDate = it.expiryDate;
+  // Gộp 1 dòng cho mỗi sản phẩm (giữ dòng mở sớm nhất) — tránh nhân bản do dữ liệu cũ.
+  const byProduct = new Map<string, (typeof raw)[number]>();
+  for (const it of raw) if (!byProduct.has(it.productId)) byProduct.set(it.productId, it);
+  const uniq = Array.from(byProduct.values());
+  const productIds = uniq.map((i) => i.productId);
+
+  // TỒN THỰC TẾ của sản phẩm (còn lại) — tính động từ StockBatch.
+  const sums = productIds.length
+    ? await prisma.stockBatch.groupBy({ by: ["productId"], where: { productId: { in: productIds } }, _sum: { quantity: true } })
+    : [];
+  const onHandByProduct = new Map(sums.map((s) => [s.productId, s._sum.quantity ?? 0]));
+
+  // HSD sau mở = HSD đã lưu ở sổ, hoặc HSD của SẢN PHẨM, hoặc ngày mở + PAO nhóm.
+  const items = uniq.map((it) => {
+    let expiryDate = it.expiryDate ?? it.product.expiryDate ?? null;
     const pao = it.product.category?.openMaxMonths ?? null;
     if (!expiryDate && pao) {
       const d = new Date(it.openedDate);
       d.setMonth(d.getMonth() + pao);
       expiryDate = d;
     }
-    return { ...it, expiryDate };
+    const onHand = onHandByProduct.get(it.productId) ?? 0;
+    return { ...it, expiryDate, remainingQty: onHand, status: onHand <= 0 ? "EMPTY" : "IN_USE" };
   });
-
-  // Định mức tiêu hao theo từng dịch vụ cho các sản phẩm đang có trong kho dịch vụ.
-  const productIds = Array.from(new Set(items.map((i) => i.productId)));
   const norms = productIds.length
     ? await prisma.serviceItem.findMany({
         where: { productId: { in: productIds } },

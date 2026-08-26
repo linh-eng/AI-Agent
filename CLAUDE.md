@@ -33,9 +33,9 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
 - **Dịch vụ/liệu trình (Phase 2):** khai báo định mức tiêu hao (`Service` + `ServiceItem`); ghi nhận thực hiện
   N lượt (`ServiceUsage`) → tự lập phiếu xuất `INTERNAL_USE` (FEFO) trừ kho theo định mức × số lượt.
 - **Kho Dịch Vụ (hàng đã mở nắp):** `ServiceStockItem` — sổ theo dõi hàng mở nắp/dùng dở cho dịch vụ.
-  Ghi nhận dịch vụ tiêu hao **mọi hàng hóa (liên kết theo mã hàng, không phụ thuộc HSD)** → tự trừ "hộp đang mở" (cũ trước), hết thì mở hộp mới
-  (1 đơn vị), HSD sau mở = ngày mở + PAO nhóm (`Category.openMaxMonths`). Trạng thái Đang dùng/Đã hết/
-  Sắp-Hết HSD; cho điều chỉnh còn lại/đánh dấu hết/xóa. Là sổ theo dõi overlay, không đổi sổ tồn kho chính.
+  Ghi nhận dịch vụ tiêu hao **mọi hàng hóa (liên kết theo mã hàng)** → mỗi sản phẩm 1 dòng "đang mở". Cột
+  **"Còn lại" = tồn thực tế của sản phẩm** (tính động từ `StockBatch`); **HSD sau mở** = HSD nhập ở sản phẩm,
+  hoặc ngày mở + PAO nhóm (`Category.openMaxMonths`). Lưu `serviceId` (liệu trình đã mở). Sổ theo dõi overlay, không đổi sổ tồn chính.
 - **Tài sản/thiết bị (Phase 2):** `Asset` theo serial, trạng thái (IN_STOCK/IN_USE/MAINTENANCE/RETIRED),
   ngày mua & hạn bảo hành — quản lý riêng, không nằm trong tồn theo lô.
 - **Báo cáo tài sản (nhóm "Quản lý tài sản"):** 3 trang tổng hợp theo nhiều tài sản + theo thời gian

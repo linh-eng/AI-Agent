@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
+import { focusNextOnEnter } from "@/lib/form";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { computeDepreciation } from "@/lib/depreciation";
 import { useCan } from "@/components/session-provider";
@@ -127,6 +128,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ type: "MAINTENANCE", description: "", cost: "", vendor: "", performedBy: "", performedAt: "", note: "" });
+  const [editingLog, setEditingLog] = useState<any | null>(null);
 
   // Thanh toán & công nợ
   const [payOpen, setPayOpen] = useState(false);
@@ -284,24 +286,59 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     load();
   }
 
+  const EMPTY_LOG = { type: "MAINTENANCE", description: "", cost: "", vendor: "", performedBy: "", performedAt: "", note: "" };
+  function openLogCreate() {
+    setEditingLog(null);
+    setForm(EMPTY_LOG);
+    setError(null);
+    setOpen(true);
+  }
+  function openLogEdit(m: any) {
+    setEditingLog(m);
+    setForm({
+      type: m.type ?? "MAINTENANCE",
+      description: m.description ?? "",
+      cost: m.cost != null ? String(m.cost) : "",
+      vendor: m.vendor ?? "",
+      performedBy: m.performedBy ?? "",
+      performedAt: (m.performedAt ?? "").slice(0, 10),
+      note: m.note ?? "",
+    });
+    setError(null);
+    setOpen(true);
+  }
+
   async function addLog(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     try {
-      await apiFetch(`/api/assets/${params.id}/maintenance`, {
-        method: "POST",
-        body: JSON.stringify({
-          type: form.type,
-          description: form.description,
-          cost: form.cost ? Number(form.cost) : null,
-          vendor: form.vendor || null,
-          performedBy: form.performedBy || null,
-          performedAt: form.performedAt,
-          note: form.note || null,
-        }),
+      const body = JSON.stringify({
+        type: form.type,
+        description: form.description,
+        cost: form.cost ? Number(form.cost) : null,
+        vendor: form.vendor || null,
+        performedBy: form.performedBy || null,
+        performedAt: form.performedAt,
+        note: form.note || null,
       });
+      if (editingLog) {
+        await apiFetch(`/api/assets/${params.id}/maintenance/${editingLog.id}`, { method: "PATCH", body });
+      } else {
+        await apiFetch(`/api/assets/${params.id}/maintenance`, { method: "POST", body });
+      }
       setOpen(false);
-      setForm({ type: "MAINTENANCE", description: "", cost: "", vendor: "", performedBy: "", performedAt: "", note: "" });
+      setEditingLog(null);
+      setForm(EMPTY_LOG);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lỗi");
+    }
+  }
+
+  async function delLog(id: string) {
+    if (!window.confirm("Xóa bản ghi bảo trì này?")) return;
+    try {
+      await apiFetch(`/api/assets/${params.id}/maintenance/${id}`, { method: "DELETE" });
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi");
@@ -319,7 +356,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
         action={
           <div className="flex gap-2">
             {canWrite && (
-              <Button onClick={() => setOpen(true)}>
+              <Button onClick={openLogCreate}>
                 <Plus className="h-4 w-4" /> Ghi bảo trì
               </Button>
             )}
@@ -739,12 +776,13 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                 <TH>Người thực hiện</TH>
                 <TH className="text-right">Chi phí</TH>
                 <TH>Người ghi</TH>
+                {canManage && <TH className="text-right">Thao tác</TH>}
               </TR>
             </THead>
             <TBody>
               {data.maintenance.length === 0 ? (
                 <TR>
-                  <TD colSpan={7} className="py-8 text-center text-muted-foreground">Chưa có bản ghi bảo trì</TD>
+                  <TD colSpan={canManage ? 8 : 7} className="py-8 text-center text-muted-foreground">Chưa có bản ghi bảo trì</TD>
                 </TR>
               ) : (
                 data.maintenance.map((m) => (
@@ -763,6 +801,16 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                     <TD className="text-muted-foreground">{m.performedBy ?? "—"}</TD>
                     <TD className="text-right">{m.cost != null ? `${formatNumber(m.cost)} đ` : "—"}</TD>
                     <TD className="text-muted-foreground">{m.createdBy.name}</TD>
+                    {canManage && (
+                      <TD className="text-right whitespace-nowrap">
+                        <Button variant="ghost" size="icon" onClick={() => openLogEdit(m)} title="Sửa">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => delLog(m.id)} title="Xóa">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TD>
+                    )}
                   </TR>
                 ))
               )}
@@ -771,8 +819,8 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
         </CardContent>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Ghi nhận bảo trì / sửa chữa">
-        <form onSubmit={addLog} className="space-y-4">
+      <Modal open={open} onClose={() => setOpen(false)} title={editingLog ? "Sửa bản ghi bảo trì" : "Ghi nhận bảo trì / sửa chữa"}>
+        <form onSubmit={addLog} onKeyDown={focusNextOnEnter} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Loại *</Label>
@@ -819,7 +867,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
 
       {/* Thêm đợt thanh toán */}
       <Modal open={payOpen} onClose={() => setPayOpen(false)} title={editingPay ? "Sửa đợt thanh toán" : "Thêm đợt thanh toán"}>
-        <form onSubmit={savePayment} className="space-y-4">
+        <form onSubmit={savePayment} onKeyDown={focusNextOnEnter} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Số tiền (đ) *</Label>
@@ -870,7 +918,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
 
       {/* Ghi nhận sản lượng (khấu hao theo sản lượng) */}
       <Modal open={useOpen} onClose={() => setUseOpen(false)} title="Ghi nhận sản lượng">
-        <form onSubmit={addUsage} className="space-y-4">
+        <form onSubmit={addUsage} onKeyDown={focusNextOnEnter} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Ngày *</Label>

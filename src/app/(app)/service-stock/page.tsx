@@ -1,17 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCheck, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/client";
 import { formatDate, formatNumber } from "@/lib/utils";
-import { useCan } from "@/components/session-provider";
-import { PERMISSIONS } from "@/lib/rbac";
 
 interface Item {
   id: string;
@@ -51,7 +47,6 @@ function statusBadge(it: Item) {
 }
 
 export default function ServiceStockPage() {
-  const canWrite = useCan(PERMISSIONS.SERVICE_WRITE);
   const [items, setItems] = useState<Item[]>([]);
   const [norms, setNorms] = useState<Norm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,28 +73,16 @@ export default function ServiceStockPage() {
     normsByProduct.set(n.productId, arr);
   }
 
-  async function markEmpty(it: Item) {
-    await apiFetch(`/api/service-stock/${it.id}`, { method: "PATCH", body: JSON.stringify({ status: "EMPTY" }) });
-    load();
-  }
-  async function adjust(it: Item) {
-    const v = window.prompt(`Số lượng/dung tích còn lại của "${it.product.name}" (${it.product.uom}):`, String(it.remainingQty));
-    if (v == null) return;
-    const num = Number(v);
-    if (isNaN(num) || num < 0) return alert("Giá trị không hợp lệ.");
-    await apiFetch(`/api/service-stock/${it.id}`, { method: "PATCH", body: JSON.stringify({ remainingQty: num }) });
-    load();
-  }
   const filtered = items.filter(
     (i) => i.product.name.toLowerCase().includes(q.toLowerCase()) || i.product.sku.toLowerCase().includes(q.toLowerCase())
   );
-  const cols = canWrite ? 10 : 9;
+  const cols = 9;
 
   return (
     <div>
       <PageHeader
         title="Kho Dịch Vụ"
-        description="Theo dõi hàng đã mở nắp / dùng dở cho dịch vụ — còn lại bao nhiêu, HSD sau khi mở, trạng thái. Tự cập nhật khi ghi nhận dịch vụ."
+        description="Theo dõi hàng đã mở nắp dùng cho dịch vụ (liên kết theo mã hàng). Cột “Còn lại” = tồn thực tế của sản phẩm; HSD sau mở lấy theo sản phẩm/nhóm hàng. Tự cập nhật khi ghi nhận dịch vụ."
       />
       <div className="mb-4">
         <Input placeholder="Tìm theo tên / SKU…" value={q} onChange={(e) => setQ(e.target.value)} className="sm:max-w-xs" />
@@ -118,7 +101,6 @@ export default function ServiceStockPage() {
                 <TH>HSD sau mở</TH>
                 <TH>Định mức theo dịch vụ</TH>
                 <TH>Trạng thái</TH>
-                {canWrite && <TH className="text-right">Thao tác</TH>}
               </TR>
             </THead>
             <TBody>
@@ -165,7 +147,6 @@ export default function ServiceStockPage() {
                         <span className={it.remainingQty <= 0 ? "text-muted-foreground" : "font-medium"}>
                           {formatNumber(it.remainingQty)} {it.product.uom}
                         </span>
-                        <div className="text-xs text-muted-foreground">đã dùng {formatNumber(Math.max(0, it.initialQty - it.remainingQty))}</div>
                       </TD>
                       <TD>
                         {it.expiryDate ? (
@@ -195,20 +176,6 @@ export default function ServiceStockPage() {
                         )}
                       </TD>
                       <TD>{statusBadge(it)}</TD>
-                      {canWrite && (
-                        <TD className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" title="Sửa số lượng còn lại" onClick={() => adjust(it)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            {it.status === "IN_USE" && (
-                              <Button variant="ghost" size="icon" title="Đánh dấu đã hết" onClick={() => markEmpty(it)}>
-                                <CheckCheck className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TD>
-                      )}
                     </TR>
                   );
                 })
