@@ -3,6 +3,18 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.16.2 — 2026-08-27
+- **Cảnh báo “Hạn sử dụng” nay hiện cả HSD ở cấp SẢN PHẨM:** trước đây mục này chỉ đọc HSD **theo lô**
+  (`StockBatch`), nên hàng chị nhập HSD ở **trang Sản phẩm** (ngày mua / mở nắp / HSD) mà không theo dõi
+  theo lô sẽ **không hiện lên** → mục trông như trống. Nay hệ thống bổ sung cảnh báo **theo mốc HSD của
+  sản phẩm**: HSD hiệu lực = **min(HSD bao bì, ngày mở nắp + PAO nhóm)**, chỉ tính hàng **còn tồn > 0**,
+  và **bỏ qua sản phẩm đã có lô cảnh báo** để không trùng. Cột “Lô” đổi tên thành **“Lô / cơ sở HSD”**
+  (dòng theo sản phẩm ghi rõ “HSD bao bì” hoặc “Sau mở nắp”).
+- **Sửa lỗi tính HSD khi cộng tháng (ảnh hưởng mọi nhóm, gồm nhóm “combo”):** phép **cộng tháng** nay
+  **kẹp về cuối tháng** thay vì nhảy lố sang tháng sau (vd 31/01 + 1 tháng = **28/02**, không còn thành 03/03).
+  Áp dụng đồng bộ cho HSD ở trang **Sản phẩm**, **Kho Dịch Vụ** và **cảnh báo**.
+- Không đổi cấu trúc database (không cần `prisma:push` nếu đã ở 1.16.x).
+
 ## 1.16.1 — 2026-08-27
 - **Cảnh báo “Tồn lâu chưa mở nắp” đã hiển thị:** trước đây chỉ chạy khi nhóm hàng đã khai
   `storeWarnMonths`, nên nếu chưa khai thì mục này luôn trống. Nay có **ngưỡng mặc định 12 tháng**

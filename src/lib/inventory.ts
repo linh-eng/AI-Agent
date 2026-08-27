@@ -23,6 +23,37 @@ export function daysUntil(date: Date | string, from = new Date()): number {
   return Math.round((a - b) / MS_PER_DAY);
 }
 
+/**
+ * Cộng thêm n tháng, KẸP về cuối tháng nếu ngày gốc vượt số ngày của tháng đích
+ * (vd 31/01 + 1 tháng = 28/02, không nhảy sang 03/03 như Date mặc định).
+ */
+export function addMonths(d: Date, n: number): Date {
+  const day = d.getDate();
+  const r = new Date(d);
+  r.setDate(1);
+  r.setMonth(r.getMonth() + n);
+  const lastDay = new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate();
+  r.setDate(Math.min(day, lastDay));
+  return r;
+}
+
+/**
+ * HSD hiệu lực cấp SẢN PHẨM = min( HSD trên bao bì, ngày mở nắp + PAO nhóm ).
+ * Luôn theo ngày mua/mở nắp người dùng nhập, không dùng ngày tạo bản ghi.
+ */
+export function productEffectiveExpiry(p: {
+  expiryDate: Date | null;
+  openedDate: Date | null;
+  category: { openMaxMonths: number | null } | null;
+}): { date: Date | null; byOpen: boolean } {
+  const pkg = p.expiryDate ?? null;
+  const pao = p.category?.openMaxMonths ?? null;
+  const postOpen = p.openedDate && pao ? addMonths(p.openedDate, pao) : null;
+  if (pkg && postOpen) return postOpen < pkg ? { date: postOpen, byOpen: true } : { date: pkg, byOpen: false };
+  if (postOpen) return { date: postOpen, byOpen: true };
+  return { date: pkg, byOpen: false };
+}
+
 export interface InventoryRow {
   productId: string;
   sku: string;
@@ -128,6 +159,54 @@ export async function getExpiryAlerts(
       daysLeft: left,
       quantity: b.quantity,
       uom: b.product.uom,
+      status: left < 0 ? "EXPIRED" : "NEAR",
+    });
+  }
+  return alerts;
+}
+
+/**
+ * Cảnh báo HSD theo cấp SẢN PHẨM (mốc ngày mua/mở nắp/HSD nhập ở trang Sản phẩm),
+ * dùng cho hàng KHÔNG theo dõi HSD theo lô — nếu không sẽ không xuất hiện ở cảnh báo.
+ * HSD hiệu lực = min(HSD bao bì, ngày mở nắp + PAO nhóm). "Còn lại" = tồn thực tế.
+ * Chỉ tính sản phẩm còn tồn ( > 0 ) và bỏ qua sản phẩm đã có lô cảnh báo (tránh trùng).
+ */
+export async function getProductExpiryAlerts(
+  warehouseId?: string | null,
+  skipProductIds: Set<string> = new Set()
+): Promise<ExpiryAlert[]> {
+  const products = await prisma.product.findMany({
+    where: {
+      isActive: true,
+      OR: [{ expiryDate: { not: null } }, { openedDate: { not: null } }],
+    },
+    include: {
+      category: { select: { openMaxMonths: true } },
+      batches: { where: warehouseId ? { warehouseId } : undefined, select: { quantity: true } },
+    },
+  });
+
+  const alerts: ExpiryAlert[] = [];
+  for (const p of products) {
+    if (skipProductIds.has(p.id)) continue;
+    const { date, byOpen } = productEffectiveExpiry(p);
+    if (!date) continue;
+    const threshold = p.expiryAlertDays ?? DEFAULT_EXPIRY_ALERT_DAYS;
+    const left = daysUntil(date);
+    if (left > threshold) continue;
+    const onHand = p.batches.reduce((s, b) => s + b.quantity, 0);
+    if (onHand <= 0) continue; // hết tồn thì không cảnh báo
+    alerts.push({
+      batchId: `prod:${p.id}`,
+      productId: p.id,
+      sku: p.sku,
+      productName: p.name,
+      warehouse: "—",
+      batchCode: byOpen ? "Sau mở nắp" : "HSD bao bì",
+      expiryDate: date.toISOString(),
+      daysLeft: left,
+      quantity: onHand,
+      uom: p.uom,
       status: left < 0 ? "EXPIRED" : "NEAR",
     });
   }

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, handle } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
+import { addMonths } from "@/lib/inventory";
 
 // Danh sách Kho Dịch Vụ (hàng đã mở nắp dùng dở) + định mức tiêu hao theo dịch vụ.
 export const GET = handle(async () => {
@@ -41,12 +42,7 @@ export const GET = handle(async () => {
   const items = uniq.map((it) => {
     const openedDate = it.product.openedDate ?? it.openedDate; // ngày mở nắp thực tế
     const pao = it.product.category?.openMaxMonths ?? null;
-    let paoDate: Date | null = null;
-    if (pao) {
-      const d = new Date(openedDate);
-      d.setMonth(d.getMonth() + pao);
-      paoDate = d;
-    }
+    const paoDate: Date | null = pao ? addMonths(new Date(openedDate), pao) : null;
     const packaging = it.expiryDate ?? it.product.expiryDate ?? null;
     let expiryDate: Date | null;
     if (paoDate && packaging) expiryDate = paoDate < packaging ? paoDate : packaging;

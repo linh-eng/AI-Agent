@@ -141,7 +141,7 @@ export default function AlertsPage() {
                 <TH>SKU</TH>
                 <TH>Sản phẩm</TH>
                 <TH>Kho</TH>
-                <TH>Lô</TH>
+                <TH>Lô / cơ sở HSD</TH>
                 <TH>HSD</TH>
                 <TH className="text-right">Còn lại</TH>
                 <TH className="text-right">SL tồn</TH>

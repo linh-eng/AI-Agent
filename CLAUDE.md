@@ -57,7 +57,9 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
 - **Doanh thu dịch vụ (Phase 3):** `Service.price` (đơn giá/lượt); mỗi `ServiceUsage` chốt `revenue` (giá×lượt)
   và `cost` (giá vốn vật tư tiêu hao theo lô đã xuất); báo cáo doanh thu–giá vốn–lợi nhuận theo kỳ.
 - **Tồn kho realtime:** tồn theo sản phẩm (gộp lô), lọc theo kho, HSD gần nhất, giá trị tồn theo giá vốn.
-- **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng theo `expiryAlertDays`, mặc định 60 ngày), sản phẩm dưới định mức
+- **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng theo `expiryAlertDays`, mặc định 60 ngày) **+ HSD cấp sản phẩm**
+  (`getProductExpiryAlerts`: mốc ngày mua/mở nắp/HSD ở trang Sản phẩm, HSD hiệu lực = min(HSD bao bì, ngày mở
+  + PAO nhóm), chỉ hàng còn tồn, bỏ qua SP đã có lô cảnh báo — để hàng không theo lô vẫn hiện), sản phẩm dưới định mức
   (`onHand <= minStock`), **hàng tồn lâu chưa mở nắp** (theo `Category.storeWarnMonths`, mặc định
   `DEFAULT_STORE_WARN_MONTHS=12` tháng nếu nhóm chưa khai — cảnh báo vẫn chạy), **thiết bị
   sắp/đã hết bảo hành**, **bảo trì định kỳ đến hạn**, và **công nợ tài sản sắp/đến hạn** (theo `Asset.paymentDueDate`,

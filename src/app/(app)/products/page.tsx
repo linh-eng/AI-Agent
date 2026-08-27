@@ -51,9 +51,14 @@ function parseISO(iso?: string | null): Date | null {
   const d = new Date(iso);
   return isNaN(d.getTime()) ? null : d;
 }
+// Cộng n tháng, KẸP về cuối tháng nếu tràn (31/01 + 1 = 28/02, không nhảy 03/03).
 function addMonths(d: Date, n: number): Date {
+  const day = d.getDate();
   const r = new Date(d);
+  r.setDate(1);
   r.setMonth(r.getMonth() + n);
+  const lastDay = new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate();
+  r.setDate(Math.min(day, lastDay));
   return r;
 }
 function daysBetween(target: Date): number {
