@@ -3,6 +3,23 @@
 Số phiên bản hiển thị ở góc dưới sidebar và trang đăng nhập. Quy ước: MAJOR.MINOR.PATCH.
 Mỗi bản zip cập nhật đặt tên theo version, ví dụ `sophia-wellness-v1.0.0.zip`.
 
+## 1.16.1 — 2026-08-27
+- **Cảnh báo “Tồn lâu chưa mở nắp” đã hiển thị:** trước đây chỉ chạy khi nhóm hàng đã khai
+  `storeWarnMonths`, nên nếu chưa khai thì mục này luôn trống. Nay có **ngưỡng mặc định 12 tháng**
+  khi nhóm chưa cấu hình → sản phẩm **có ngày mua, chưa mở nắp** để quá lâu sẽ tự cảnh báo
+  (vẫn ưu tiên ngưỡng riêng của nhóm nếu đã khai). Áp dụng đồng bộ cho badge “Tồn ~N tháng chưa mở”
+  ở trang **Sản phẩm**.
+- **Cảnh báo nợ quá hạn:** mục **Công nợ tài sản** đã tách rõ **“Quá hạn N ngày”** (đỏ) cho tài sản còn
+  công nợ mà đã qua `paymentDueDate`. Điều kiện hiện: có **ngày đến hạn** + **giá trị hợp đồng** và
+  **còn phải trả > 0** (đã trả đủ thì không cảnh báo).
+- **HSD ở trang Sản phẩm tính đúng theo NGÀY MỞ NẮP + giới hạn bao bì:** HSD hiển thị =
+  **min(HSD trên bao bì, ngày mở nắp + PAO nhóm)** — luôn dựa trên **ngày mua / ngày mở nắp** người dùng
+  nhập, **không** dùng ngày tạo bản ghi trên hệ thống. (Trước đó khi đã mở nắp, hạn sau mở có thể vượt quá
+  HSD bao bì.)
+- **Kho Dịch Vụ — HSD lấy theo NGÀY MỞ NẮP của sản phẩm:** ưu tiên `openedDate` đã nhập ở sản phẩm để tính
+  hạn sau mở (min với HSD bao bì), thay vì ngày ghi nhận dịch vụ lên hệ thống.
+- Không đổi cấu trúc database (không cần `prisma:push` nếu đã ở 1.16.0).
+
 ## 1.16.0 — 2026-08-26
 - **Cảnh báo:** thêm **ô lọc** (áp dụng cho tất cả mục) + **sắp xếp theo mức ưu tiên** — cái sắp/đã đến hạn
   hiện lên trên (HSD gần nhất, công nợ đến hạn trước, bảo trì đến hạn trước, sản phẩm thiếu hụt nhiều nhất…).

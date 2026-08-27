@@ -36,12 +36,14 @@ export const GET = handle(async () => {
     : [];
   const onHandByProduct = new Map(sums.map((s) => [s.productId, s._sum.quantity ?? 0]));
 
+  // NGÀY MỞ NẮP ưu tiên lấy theo SẢN PHẨM (nếu đã nhập), không dùng ngày ghi nhận lên hệ thống.
   // HSD sau mở nắp = MIN( HSD bao bì (sản phẩm), ngày mở + PAO nhóm ) — PAO là GIỚI HẠN TỐI ĐA.
   const items = uniq.map((it) => {
+    const openedDate = it.product.openedDate ?? it.openedDate; // ngày mở nắp thực tế
     const pao = it.product.category?.openMaxMonths ?? null;
     let paoDate: Date | null = null;
     if (pao) {
-      const d = new Date(it.openedDate);
+      const d = new Date(openedDate);
       d.setMonth(d.getMonth() + pao);
       paoDate = d;
     }
@@ -50,7 +52,7 @@ export const GET = handle(async () => {
     if (paoDate && packaging) expiryDate = paoDate < packaging ? paoDate : packaging;
     else expiryDate = paoDate ?? packaging;
     const onHand = onHandByProduct.get(it.productId) ?? 0;
-    return { ...it, expiryDate, remainingQty: onHand, status: onHand <= 0 ? "EMPTY" : "IN_USE" };
+    return { ...it, openedDate, expiryDate, remainingQty: onHand, status: onHand <= 0 ? "EMPTY" : "IN_USE" };
   });
   const norms = productIds.length
     ? await prisma.serviceItem.findMany({

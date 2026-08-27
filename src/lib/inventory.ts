@@ -7,6 +7,13 @@ import { prisma } from "./prisma";
 /** Số ngày mặc định trước HSD bắt đầu cảnh báo (nếu sản phẩm không cấu hình riêng). */
 export const DEFAULT_EXPIRY_ALERT_DAYS = 60;
 
+/**
+ * Số tháng mặc định để cảnh báo "hàng tồn lâu chưa mở nắp" khi NHÓM HÀNG chưa cấu hình
+ * riêng (`Category.storeWarnMonths`). Nhờ vậy cảnh báo vẫn chạy dù chưa khai báo ngưỡng
+ * cho từng nhóm. Có thể chỉnh theo từng nhóm để chặt/lỏng hơn.
+ */
+export const DEFAULT_STORE_WARN_MONTHS = 12;
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export function daysUntil(date: Date | string, from = new Date()): number {
@@ -326,7 +333,8 @@ export async function getUnopenedStaleAlerts(): Promise<UnopenedAlert[]> {
   const now = new Date();
   const out: UnopenedAlert[] = [];
   for (const p of products) {
-    const warn = p.category?.storeWarnMonths;
+    // Ngưỡng theo nhóm; nếu nhóm chưa cấu hình thì dùng mặc định để cảnh báo vẫn hoạt động.
+    const warn = p.category?.storeWarnMonths ?? DEFAULT_STORE_WARN_MONTHS;
     if (!warn || !p.purchaseDate) continue;
     const limit = new Date(p.purchaseDate);
     limit.setMonth(limit.getMonth() + warn);

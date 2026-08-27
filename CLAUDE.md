@@ -34,8 +34,10 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
   N lượt (`ServiceUsage`) → tự lập phiếu xuất `INTERNAL_USE` (FEFO) trừ kho theo định mức × số lượt.
 - **Kho Dịch Vụ (hàng đã mở nắp):** `ServiceStockItem` — sổ theo dõi hàng mở nắp/dùng dở cho dịch vụ.
   Ghi nhận dịch vụ tiêu hao **mọi hàng hóa (liên kết theo mã hàng)** → mỗi sản phẩm 1 dòng "đang mở". Cột
-  **"Còn lại" = tồn thực tế của sản phẩm** (tính động từ `StockBatch`); **HSD sau mở** = HSD nhập ở sản phẩm,
-  hoặc ngày mở + PAO nhóm (`Category.openMaxMonths`). Lưu `serviceId` (liệu trình đã mở). Sổ theo dõi overlay, không đổi sổ tồn chính.
+  **"Còn lại" = tồn thực tế của sản phẩm** (tính động từ `StockBatch`); **HSD sau mở** = **min(HSD bao bì,
+  ngày mở nắp + PAO nhóm `Category.openMaxMonths`)**, trong đó **ngày mở nắp ưu tiên `Product.openedDate`**
+  (nếu đã nhập) chứ không dùng ngày ghi nhận dịch vụ lên hệ thống. Lưu `serviceId` (liệu trình đã mở).
+  Sổ theo dõi overlay, không đổi sổ tồn chính.
 - **Tài sản/thiết bị (Phase 2):** `Asset` theo serial, trạng thái (IN_STOCK/IN_USE/MAINTENANCE/RETIRED),
   ngày mua & hạn bảo hành — quản lý riêng, không nằm trong tồn theo lô.
 - **Báo cáo tài sản (nhóm "Quản lý tài sản"):** 3 trang tổng hợp theo nhiều tài sản + theo thời gian
@@ -56,7 +58,8 @@ trước xuất trước); cảnh báo hàng sắp/đã hết hạn và dưới 
   và `cost` (giá vốn vật tư tiêu hao theo lô đã xuất); báo cáo doanh thu–giá vốn–lợi nhuận theo kỳ.
 - **Tồn kho realtime:** tồn theo sản phẩm (gộp lô), lọc theo kho, HSD gần nhất, giá trị tồn theo giá vốn.
 - **Cảnh báo:** lô đã/sắp hết hạn (ngưỡng theo `expiryAlertDays`, mặc định 60 ngày), sản phẩm dưới định mức
-  (`onHand <= minStock`), **hàng tồn lâu chưa mở nắp** (theo `Category.storeWarnMonths`), **thiết bị
+  (`onHand <= minStock`), **hàng tồn lâu chưa mở nắp** (theo `Category.storeWarnMonths`, mặc định
+  `DEFAULT_STORE_WARN_MONTHS=12` tháng nếu nhóm chưa khai — cảnh báo vẫn chạy), **thiết bị
   sắp/đã hết bảo hành**, **bảo trì định kỳ đến hạn**, và **công nợ tài sản sắp/đến hạn** (theo `Asset.paymentDueDate`,
   `getDebtDueAlerts`). Khấu hao đường thẳng **tính theo ngày** = Nguyên giá ÷ tổng số ngày (không trừ giá trị thu hồi), tự trích từ
   `depreciationStart ?? purchaseDate` (ngày mua/chứng từ); lũy kế theo số ngày thực tế; sửa khấu hao ngay ở trang `/asset-depreciation`. **HSD sau mở nắp (PAO):** cấu hình `Category.openMaxMonths` theo nhóm (vd Serum 6

@@ -62,21 +62,28 @@ function daysBetween(target: Date): number {
   return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
 
+// Ngưỡng mặc định "tồn lâu chưa mở" khi nhóm chưa cấu hình (đồng bộ với src/lib/inventory.ts).
+const DEFAULT_STORE_WARN_MONTHS = 12;
+
 /**
- * HSD thực tế của sản phẩm:
- *  - Đã mở nắp + nhóm có cấu hình hạn sau mở (PAO): HSD = ngày mở nắp + hạn sau mở.
+ * HSD thực tế của sản phẩm = MIN( HSD trên bao bì, ngày mở nắp + hạn sau mở (PAO nhóm) ).
+ *  - Đã mở nắp + nhóm có cấu hình PAO: hạn sau mở là GIỚI HẠN TỐI ĐA (không vượt HSD bao bì).
  *  - Chưa mở nắp (hoặc nhóm chưa cấu hình PAO): dùng HSD trên bao bì.
+ * Luôn tính theo NGÀY MỞ NẮP thực tế người dùng nhập, không dùng ngày tạo bản ghi.
  */
 function effectiveExpiry(r: Row): { date: Date | null; byOpen: boolean } {
+  const pkg = parseISO(r.expiryDate);
   const opened = parseISO(r.openedDate);
   const pao = r.category?.openMaxMonths ?? null;
-  if (opened && pao) return { date: addMonths(opened, pao), byOpen: true };
-  return { date: parseISO(r.expiryDate), byOpen: false };
+  const postOpen = opened && pao ? addMonths(opened, pao) : null;
+  if (pkg && postOpen) return postOpen < pkg ? { date: postOpen, byOpen: true } : { date: pkg, byOpen: false };
+  if (postOpen) return { date: postOpen, byOpen: true };
+  return { date: pkg, byOpen: false };
 }
 
 // Đã mua quá lâu mà chưa mở nắp (theo ngưỡng của nhóm)? Trả số tháng nếu có cảnh báo.
 function storedTooLong(r: Row): number | null {
-  const warn = r.category?.storeWarnMonths ?? null;
+  const warn = r.category?.storeWarnMonths ?? DEFAULT_STORE_WARN_MONTHS;
   const purchase = parseISO(r.purchaseDate);
   if (!warn || !purchase || r.openedDate) return null;
   const limit = addMonths(purchase, warn);
