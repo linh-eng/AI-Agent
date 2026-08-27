@@ -1,121 +1,262 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Download, Printer, Wrench, ShieldCheck, Hammer } from "lucide-react";
+import { Download, Search } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Input, Label, Select } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/client";
-import { downloadCsv } from "@/lib/csv";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, formatDate } from "@/lib/utils";
+import { toCsv, downloadCsv } from "@/lib/csv";
+import { BarList } from "@/components/charts";
+
+interface Warehouse { id: string; name: string }
+interface NxtRow {
+  productId: string; sku: string; name: string; uom: string; category: string | null;
+  opening: number; inQty: number; outQty: number; closing: number;
+}
+interface SvcRow {
+  serviceId: string; code: string; name: string;
+  usageCount: number; sessions: number; revenue: number; cost: number; profit: number;
+}
+interface SvcTotal { usageCount: number; sessions: number; revenue: number; cost: number; profit: number }
+
+function firstOfMonth(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+function today(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export default function ReportsPage() {
-  const [d, setD] = useState<any>(null);
+  const [tab, setTab] = useState<"nxt" | "service">("nxt");
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [warehouseId, setWarehouseId] = useState("");
+  const [catFilter, setCatFilter] = useState("");
+  const [from, setFrom] = useState(firstOfMonth());
+  const [to, setTo] = useState(today());
+  const [nxt, setNxt] = useState<NxtRow[]>([]);
+  const [svc, setSvc] = useState<{ rows: SvcRow[]; total: SvcTotal } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch("/api/reports/summary").then(setD).catch(() => {});
+    apiFetch<Warehouse[]>("/api/warehouses").then(setWarehouses).catch(() => {});
   }, []);
 
-  if (!d) return <p className="text-muted-foreground">Đang tải...</p>;
+  async function run() {
+    setLoading(true);
+    setError(null);
+    try {
+      if (tab === "nxt") {
+        const params = new URLSearchParams({ from, to });
+        if (warehouseId) params.set("warehouseId", warehouseId);
+        setNxt(await apiFetch<NxtRow[]>(`/api/reports/nxt?${params.toString()}`));
+      } else {
+        const params = new URLSearchParams({ from, to });
+        setSvc(await apiFetch<{ rows: SvcRow[]; total: SvcTotal }>(`/api/reports/service-revenue?${params.toString()}`));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lỗi");
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  function exportNxt() {
+    const whName = warehouses.find((w) => w.id === warehouseId)?.name ?? "Tất cả kho";
+    const headers = ["SKU", "Sản phẩm", "Nhóm", "ĐVT", "Tồn đầu", "Nhập", "Xuất", "Tồn cuối"];
+    const data = nxtView.map((r) => [r.sku, r.name, r.category ?? "", r.uom, r.opening, r.inQty, r.outQty, r.closing]);
+    const csv = `Báo cáo Nhập - Xuất - Tồn\nKho:,${whName}\nTừ:,${from},Đến:,${to}\n\n` + toCsv(headers, data);
+    downloadCsv(`NXT_${from}_${to}.csv`, csv);
+  }
+  function exportSvc() {
+    if (!svc) return;
+    const headers = ["Mã DV", "Dịch vụ", "Số lần", "Số lượt", "Doanh thu", "Giá vốn VT", "Lợi nhuận"];
+    const data = svc.rows.map((r) => [r.code, r.name, r.usageCount, r.sessions, r.revenue, r.cost, r.profit]);
+    const csv = `Báo cáo doanh thu dịch vụ\nTừ:,${from},Đến:,${to}\n\n` + toCsv(headers, data);
+    downloadCsv(`DoanhThuDV_${from}_${to}.csv`, csv);
+  }
+
+  const cats = Array.from(new Set(nxt.map((r) => r.category).filter((c): c is string => !!c))).sort();
+  const nxtView = catFilter ? nxt.filter((r) => r.category === catFilter) : nxt;
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between no-print">
-        <div />
-        <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4" /> In báo cáo</Button>
+      <PageHeader
+        title="Báo cáo"
+        description="Nhập–Xuất–Tồn theo kỳ và doanh thu dịch vụ."
+        action={
+          <Button variant="outline" onClick={tab === "nxt" ? exportNxt : exportSvc} disabled={tab === "nxt" ? nxtView.length === 0 : !svc?.rows.length}>
+            <Download className="h-4 w-4" /> Xuất CSV
+          </Button>
+        }
+      />
+
+      <div className="mb-4 flex gap-1 border-b">
+        {[
+          { k: "nxt", label: "Nhập – Xuất – Tồn" },
+          { k: "service", label: "Doanh thu dịch vụ" },
+        ].map((t) => (
+          <button
+            key={t.k}
+            onClick={() => setTab(t.k as any)}
+            className={cn(
+              "px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors",
+              tab === t.k ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
-      <div className="print-area">
-        <PageHeader title="Báo cáo tổng hợp" description="Nhập–Xuất–Tồn, theo NCC, tồn đọng quá hạn, lắp ráp, bảo hành, rã máy." />
 
-        {/* KPI cards */}
-        <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <Card><CardContent className="flex items-center gap-3 p-4"><Wrench className="h-5 w-5 text-primary" /><div><div className="text-xl font-bold">{d.assembly.doneWo}/{d.assembly.totalWo}</div><div className="text-xs text-muted-foreground">WO hoàn thành</div></div></CardContent></Card>
-          <Card><CardContent className="flex items-center gap-3 p-4"><div><div className="text-xl font-bold">{d.assembly.qcFailRate}%</div><div className="text-xs text-muted-foreground">Tỷ lệ QC fail</div></div></CardContent></Card>
-          <Card><CardContent className="flex items-center gap-3 p-4"><ShieldCheck className="h-5 w-5 text-amber-600" /><div><div className="text-xl font-bold">{d.warranty.openRma}</div><div className="text-xs text-muted-foreground">RMA đang mở</div></div></CardContent></Card>
-          <Card><CardContent className="flex items-center gap-3 p-4"><Hammer className="h-5 w-5 text-primary" /><div><div className="text-xl font-bold">{d.disassembly.recovered}</div><div className="text-xs text-muted-foreground">Linh kiện thu hồi (rã máy)</div></div></CardContent></Card>
-        </div>
+      <Card className="mb-4">
+        <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-end">
+          <div className="space-y-1.5">
+            <Label>Từ ngày</Label>
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Đến ngày</Label>
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+          {tab === "nxt" && (
+            <>
+              <div className="space-y-1.5">
+                <Label>Kho</Label>
+                <Select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className="sm:w-52">
+                  <option value="">Tất cả kho</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Nhóm hàng</Label>
+                <Select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="sm:w-52">
+                  <option value="">Tất cả nhóm</option>
+                  {cats.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </Select>
+              </div>
+            </>
+          )}
+          <Button onClick={run} disabled={loading}>
+            <Search className="h-4 w-4" /> {loading ? "Đang tính…" : "Xem báo cáo"}
+          </Button>
+        </CardContent>
+      </Card>
 
-        {/* NXT theo kho */}
-        <Card className="mb-4">
-          <CardHeader className="flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base">Nhập – Xuất – Tồn theo kho</CardTitle>
-            <Button size="sm" variant="ghost" className="no-print" onClick={() => downloadCsv("nhap-xuat-ton", ["Mã kho", "Tên kho", "Nhập", "Xuất", "Tồn thực tế", "Tính KD"], d.nxt.map((r: any) => [r.code, r.name, r.inbound, r.outbound, r.onHand, r.countsAsAvailable ? "Có" : "Không"]))}><Download className="h-4 w-4" /> CSV</Button>
-          </CardHeader>
+      {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
+
+      {tab === "nxt" ? (
+        <Card>
           <CardContent className="p-0">
             <Table>
-              <THead><TR><TH>Kho</TH><TH className="text-right">Nhập</TH><TH className="text-right">Xuất</TH><TH className="text-right">Tồn thực tế</TH><TH>Tính KD</TH></TR></THead>
+              <THead>
+                <TR>
+                  <TH>SKU</TH><TH>Sản phẩm</TH><TH>Nhóm</TH>
+                  <TH className="text-right">Tồn đầu</TH><TH className="text-right">Nhập</TH>
+                  <TH className="text-right">Xuất</TH><TH className="text-right">Tồn cuối</TH>
+                </TR>
+              </THead>
               <TBody>
-                {d.nxt.map((r: any) => (
-                  <TR key={r.code}>
-                    <TD><span className="font-mono font-medium">{r.code}</span> <span className="text-muted-foreground">{r.name}</span></TD>
-                    <TD className="text-right text-emerald-700">{formatNumber(r.inbound)}</TD>
-                    <TD className="text-right text-red-700">{formatNumber(r.outbound)}</TD>
-                    <TD className="text-right font-medium">{formatNumber(r.onHand)}</TD>
-                    <TD>{r.countsAsAvailable ? <Badge tone="success">Có</Badge> : <Badge tone="danger">Không</Badge>}</TD>
-                  </TR>
-                ))}
+                {loading ? (
+                  <TR><TD colSpan={7} className="py-8 text-center text-muted-foreground">Đang tải…</TD></TR>
+                ) : nxtView.length === 0 ? (
+                  <TR><TD colSpan={7} className="py-8 text-center text-muted-foreground">Không có biến động trong kỳ</TD></TR>
+                ) : (
+                  nxtView.map((r) => (
+                    <TR key={r.productId}>
+                      <TD className="font-mono text-xs">{r.sku}</TD>
+                      <TD className="font-medium">{r.name}</TD>
+                      <TD className="text-muted-foreground">{r.category ?? "—"}</TD>
+                      <TD className="text-right">{formatNumber(r.opening)}</TD>
+                      <TD className="text-right text-emerald-600">+{formatNumber(r.inQty)}</TD>
+                      <TD className="text-right text-red-600">−{formatNumber(r.outQty)}</TD>
+                      <TD className="text-right font-semibold">
+                        {formatNumber(r.closing)} <span className="text-xs font-normal text-muted-foreground">{r.uom}</span>
+                      </TD>
+                    </TR>
+                  ))
+                )}
               </TBody>
             </Table>
           </CardContent>
         </Card>
-
-        {/* Theo NCC */}
-        <Card className="mb-4">
-          <CardHeader className="flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base">Báo cáo theo NCC (tỷ lệ lỗi)</CardTitle>
-            <Button size="sm" variant="ghost" className="no-print" onClick={() => downloadCsv("theo-ncc", ["Mã", "Tên NCC", "Serial cung cấp", "Lỗi", "Tỷ lệ lỗi %", "Số vụ RMA"], d.bySupplier.map((r: any) => [r.code, r.name, r.supplied, r.defects, r.defectRate, r.rmaCount]))}><Download className="h-4 w-4" /> CSV</Button>
-          </CardHeader>
+      ) : (
+        <>
+          {svc?.rows.length ? (
+            <Card className="mb-4">
+              <CardContent className="p-5">
+                <h3 className="mb-4 font-semibold">Doanh thu theo dịch vụ</h3>
+                <BarList
+                  items={svc.rows.map((r) => ({
+                    label: r.name,
+                    value: r.revenue,
+                    hint: `Lợi nhuận ${formatNumber(r.profit)} đ · ${r.sessions} lượt`,
+                  }))}
+                  unit="đ"
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+          <Card>
           <CardContent className="p-0">
             <Table>
-              <THead><TR><TH>NCC</TH><TH className="text-right">Cung cấp</TH><TH className="text-right">Lỗi</TH><TH className="text-right">Tỷ lệ lỗi</TH><TH className="text-right">RMA</TH></TR></THead>
+              <THead>
+                <TR>
+                  <TH>Mã</TH><TH>Dịch vụ</TH>
+                  <TH className="text-center">Số lần</TH><TH className="text-center">Số lượt</TH>
+                  <TH className="text-right">Doanh thu</TH><TH className="text-right">Giá vốn VT</TH>
+                  <TH className="text-right">Lợi nhuận</TH>
+                </TR>
+              </THead>
               <TBody>
-                {d.bySupplier.map((r: any) => (
-                  <TR key={r.code}>
-                    <TD><span className="font-mono">{r.code}</span> {r.name}</TD>
-                    <TD className="text-right">{formatNumber(r.supplied)}</TD>
-                    <TD className="text-right">{formatNumber(r.defects)}</TD>
-                    <TD className="text-right">{r.defectRate > 0 ? <span className="text-red-700">{r.defectRate}%</span> : "0%"}</TD>
-                    <TD className="text-right">{r.rmaCount}</TD>
-                  </TR>
-                ))}
+                {loading ? (
+                  <TR><TD colSpan={7} className="py-8 text-center text-muted-foreground">Đang tải…</TD></TR>
+                ) : !svc?.rows.length ? (
+                  <TR><TD colSpan={7} className="py-8 text-center text-muted-foreground">Chưa có ghi nhận dịch vụ trong kỳ</TD></TR>
+                ) : (
+                  <>
+                    {svc.rows.map((r) => (
+                      <TR key={r.serviceId}>
+                        <TD className="font-mono text-xs">{r.code}</TD>
+                        <TD className="font-medium">{r.name}</TD>
+                        <TD className="text-center">{r.usageCount}</TD>
+                        <TD className="text-center">{r.sessions}</TD>
+                        <TD className="text-right">{formatNumber(r.revenue)} đ</TD>
+                        <TD className="text-right text-muted-foreground">{formatNumber(r.cost)} đ</TD>
+                        <TD className="text-right font-semibold text-emerald-600">{formatNumber(r.profit)} đ</TD>
+                      </TR>
+                    ))}
+                    <TR className="bg-muted/40">
+                      <TD colSpan={2} className="font-semibold">Tổng cộng</TD>
+                      <TD className="text-center font-semibold">{svc.total.usageCount}</TD>
+                      <TD className="text-center font-semibold">{svc.total.sessions}</TD>
+                      <TD className="text-right font-semibold">{formatNumber(svc.total.revenue)} đ</TD>
+                      <TD className="text-right font-semibold">{formatNumber(svc.total.cost)} đ</TD>
+                      <TD className="text-right font-semibold text-emerald-600">{formatNumber(svc.total.profit)} đ</TD>
+                    </TR>
+                  </>
+                )}
               </TBody>
             </Table>
           </CardContent>
-        </Card>
-
-        {/* Tồn đọng quá hạn */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base">Tồn đọng K-HH quá hạn ({d.overdue.khh.length})</CardTitle></CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <THead><TR><TH>Serial</TH><TH>Hàng</TH><TH className="text-right">Quá hạn</TH></TR></THead>
-                <TBody>
-                  {d.overdue.khh.length === 0 ? <TR><TD colSpan={3} className="py-6 text-center text-muted-foreground">Không có</TD></TR> :
-                    d.overdue.khh.map((r: any, i: number) => (
-                      <TR key={i}><TD className="font-mono">{r.serialNumber}</TD><TD>{r.product}</TD><TD className="text-right text-destructive">{r.days} ngày</TD></TR>
-                    ))}
-                </TBody>
-              </Table>
-            </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base">K-BH-NCC quá SLA ({d.overdue.kbhncc.length})</CardTitle></CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <THead><TR><TH>Số RMA</TH><TH>Serial</TH><TH className="text-right">Quá hạn</TH></TR></THead>
-                <TBody>
-                  {d.overdue.kbhncc.length === 0 ? <TR><TD colSpan={3} className="py-6 text-center text-muted-foreground">Không có</TD></TR> :
-                    d.overdue.kbhncc.map((r: any, i: number) => (
-                      <TR key={i}><TD className="font-mono">{r.number}</TD><TD className="font-mono">{r.serialNumber}</TD><TD className="text-right text-destructive">{r.days} ngày</TD></TR>
-                    ))}
-                </TBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        </>
+      )}
+      <p className="mt-2 text-xs text-muted-foreground">Kỳ báo cáo: {formatDate(from)} – {formatDate(to)}</p>
     </div>
   );
 }

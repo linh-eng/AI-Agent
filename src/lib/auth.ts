@@ -6,7 +6,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 
-export const SESSION_COOKIE = "thng_session";
+export const SESSION_COOKIE = "sophia_session";
 
 const SECRET = new TextEncoder().encode(
   process.env.AUTH_SECRET ?? "dev-secret-change-me"
@@ -59,7 +59,9 @@ export function sessionCookieOptions(maxAge = MAX_AGE) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    // Chỉ bật "secure" khi chạy sau HTTPS (đặt COOKIE_SECURE=true). Mặc định tắt để
+    // đăng nhập được khi truy cập qua HTTP nội bộ / LAN (không có chứng chỉ SSL).
+    secure: process.env.COOKIE_SECURE === "true",
     path: "/",
     maxAge,
   };

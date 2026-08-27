@@ -3,10 +3,12 @@ export const dynamic = "force-dynamic";
 import { ok, handle } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
-import { getInventory } from "@/lib/inventory";
+import { getInventoryRows } from "@/lib/inventory";
 
-export const GET = handle(async () => {
-  await requirePermission(PERMISSIONS.PRODUCT_READ);
-  const data = await getInventory();
-  return ok(data);
+export const GET = handle(async (req) => {
+  await requirePermission(PERMISSIONS.INVENTORY_READ);
+  const url = new URL(req.url);
+  const warehouseId = url.searchParams.get("warehouseId");
+  const rows = await getInventoryRows(warehouseId);
+  return ok(rows);
 });

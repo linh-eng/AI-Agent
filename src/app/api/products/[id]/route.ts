@@ -4,18 +4,23 @@ import { prisma } from "@/lib/prisma";
 import { ok, handle } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
-import { productUpdateSchema } from "@/lib/validation";
+import { productCreateSchema } from "@/lib/validation";
+import { ensureUnique } from "@/lib/unique";
 
-export const GET = handle(async (_req, { params }: { params: { id: string } }) => {
+export const GET = handle(async (_req, ctx) => {
   await requirePermission(PERMISSIONS.PRODUCT_READ);
-  const product = await prisma.product.findUniqueOrThrow({ where: { id: params.id } });
-  return ok(product);
+  const row = await prisma.product.findUniqueOrThrow({
+    where: { id: ctx.params.id },
+    include: { category: true, batches: { orderBy: { expiryDate: "asc" } } },
+  });
+  return ok(row);
 });
 
-export const PATCH = handle(async (req, { params }: { params: { id: string } }) => {
-  await requirePermission(PERMISSIONS.PRODUCT_WRITE);
-  const parsed = productUpdateSchema.parse(await req.json());
-  const data = "barcode" in parsed ? { ...parsed, barcode: parsed.barcode ? parsed.barcode : null } : parsed;
-  const product = await prisma.product.update({ where: { id: params.id }, data });
-  return ok(product);
+export const PATCH = handle(async (req, ctx) => {
+  await requirePermission(PERMISSIONS.PRODUCT_MANAGE);
+  const data = productCreateSchema.partial().parse(await req.json());
+  await ensureUnique("product", "sku", data.sku, "Mã SKU", ctx.params.id);
+  await ensureUnique("product", "barcode", data.barcode, "Mã vạch", ctx.params.id);
+  const row = await prisma.product.update({ where: { id: ctx.params.id }, data });
+  return ok(row);
 });

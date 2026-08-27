@@ -5,14 +5,18 @@ import { ok, handle } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS } from "@/lib/rbac";
 
-export const GET = handle(async (_req, { params }: { params: { id: string } }) => {
-  await requirePermission(PERMISSIONS.PRODUCT_READ);
-  const count = await prisma.stockCount.findUniqueOrThrow({
-    where: { id: params.id },
-    include: { lines: { orderBy: { serialNumber: "asc" } } },
+export const GET = handle(async (_req, ctx) => {
+  await requirePermission(PERMISSIONS.INVENTORY_READ);
+  const row = await prisma.stockCount.findUniqueOrThrow({
+    where: { id: ctx.params.id },
+    include: {
+      warehouse: true,
+      createdBy: { select: { name: true } },
+      items: {
+        include: { product: true, batch: true },
+        orderBy: { id: "asc" },
+      },
+    },
   });
-  const warehouse = count.warehouseId
-    ? await prisma.warehouse.findUnique({ where: { id: count.warehouseId }, select: { code: true, name: true } })
-    : null;
-  return ok({ ...count, warehouse });
+  return ok(row);
 });

@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 
 // Các đường dẫn công khai (không cần đăng nhập).
-const PUBLIC_PATHS = ["/login", "/api/auth/login"];
+// /api/settings: GET công khai để trang đăng nhập lấy logo/tên; PATCH vẫn được
+// bảo vệ bằng requirePermission trong route handler.
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/settings"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -30,6 +32,8 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Bỏ qua static assets & ảnh; áp dụng cho phần còn lại.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // Bỏ qua static assets, ảnh & phông chữ; áp dụng cho phần còn lại.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|fonts/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?|ttf|otf|eot)$).*)",
+  ],
 };

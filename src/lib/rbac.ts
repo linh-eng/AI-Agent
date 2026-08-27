@@ -1,60 +1,55 @@
 // =============================================================================
-// RBAC — danh mục vai trò & quyền (mục 4 bản mô tả yêu cầu)
-// Nguồn sự thật cho seed và cho việc kiểm quyền phía server.
+// RBAC — vai trò & quyền cho Sophia Wellness. Nguồn sự thật dùng chung cho
+// seed và kiểm quyền phía server.
 // =============================================================================
 
-/** Mã vai trò. */
 export const ROLES = {
   ADMIN: "ADMIN",
-  BOD: "BOD", // Ban Giám đốc
-  PURCHASING: "PURCHASING", // Mua hàng
-  WH_ACCOUNTANT: "WH_ACCOUNTANT", // Kế toán kho
-  WAREHOUSE_KEEPER: "WAREHOUSE_KEEPER", // Thủ kho
-  TECH: "TECH", // Kỹ thuật/Lắp ráp
-  QC: "QC", // QC
-  SALES: "SALES", // Kinh doanh
-  WARRANTY: "WARRANTY", // Bảo hành/Dịch vụ
+  MANAGER: "MANAGER", // Quản lý — xem tất cả, sửa danh mục, duyệt
+  WAREHOUSE: "WAREHOUSE", // Thủ kho — nhập/xuất kho
+  STAFF: "STAFF", // Nhân viên — xem tồn, tạo phiếu xuất dùng nội bộ
 } as const;
 
 export type RoleCode = (typeof ROLES)[keyof typeof ROLES];
 
 export const ROLE_LABELS: Record<RoleCode, string> = {
-  ADMIN: "Admin",
-  BOD: "Ban Giám đốc",
-  PURCHASING: "Mua hàng",
-  WH_ACCOUNTANT: "Kế toán kho",
-  WAREHOUSE_KEEPER: "Thủ kho",
-  TECH: "Kỹ thuật/Lắp ráp",
-  QC: "QC",
-  SALES: "Kinh doanh",
-  WARRANTY: "Bảo hành/Dịch vụ",
+  ADMIN: "Quản trị",
+  MANAGER: "Quản lý",
+  WAREHOUSE: "Thủ kho",
+  STAFF: "Nhân viên",
 };
 
-// -----------------------------------------------------------------------------
-// Quyền: dạng "<resource>.<action>". action: read | write | approve
-// -----------------------------------------------------------------------------
+// Quyền dạng "<resource>.<action>".
 export const PERMISSIONS = {
-  // Danh mục (Phase 1)
-  WAREHOUSE_READ: "warehouse.read",
-  WAREHOUSE_WRITE: "warehouse.write",
-  PROJECT_READ: "project.read",
-  PROJECT_WRITE: "project.write",
-  PARTNER_READ: "partner.read",
-  PARTNER_WRITE: "partner.write",
+  CATEGORY_READ: "category.read",
+  CATEGORY_WRITE: "category.write",
+  SUPPLIER_READ: "supplier.read",
+  SUPPLIER_WRITE: "supplier.write",
   PRODUCT_READ: "product.read",
   PRODUCT_WRITE: "product.write",
-  BIN_READ: "bin.read",
-  BIN_WRITE: "bin.write",
+  PRODUCT_MANAGE: "product.manage", // sửa thông tin sản phẩm (giới hạn: ADMIN/MANAGER)
+  WAREHOUSE_READ: "warehouse.read",
+  WAREHOUSE_WRITE: "warehouse.write",
 
-  // Nghiệp vụ (Phase sau — đã khai báo để RBAC đầy đủ)
+  INVENTORY_READ: "inventory.read",
   INBOUND_WRITE: "inbound.write",
+  INBOUND_MANAGE: "inbound.manage", // sửa/hủy phiếu nhập đã ghi sổ (ADMIN/MANAGER)
   OUTBOUND_WRITE: "outbound.write",
-  OUTBOUND_APPROVE: "outbound.approve",
-  WORKORDER_WRITE: "workorder.write",
-  QC_WRITE: "qc.write",
-  WARRANTY_WRITE: "warranty.write",
-  DISASSEMBLY_APPROVE: "disassembly.approve",
-  STOCKCOUNT_APPROVE: "stockcount.approve",
+  OUTBOUND_MANAGE: "outbound.manage", // sửa/hủy phiếu xuất đã ghi sổ (ADMIN/MANAGER)
+  TRANSFER_WRITE: "transfer.write",
+  STOCKCOUNT_WRITE: "stockcount.write",
+
+  SERVICE_READ: "service.read",
+  SERVICE_WRITE: "service.write", // quản lý liệu trình + định mức
+  SERVICE_USE: "service.use", // ghi nhận thực hiện dịch vụ (trừ kho)
+
+  ASSET_READ: "asset.read",
+  ASSET_WRITE: "asset.write",
+  ASSET_MANAGE: "asset.manage", // sửa thông tin tài sản/thiết bị (giới hạn: ADMIN/MANAGER)
+
+  REPORT_READ: "report.read",
+
+  SETTING_MANAGE: "setting.manage",
   USER_MANAGE: "user.manage",
 } as const;
 
@@ -62,71 +57,88 @@ export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 export const ALL_PERMISSIONS: PermissionCode[] = Object.values(PERMISSIONS);
 
-/** Quyền đọc danh mục — hầu hết vai trò đều cần để thao tác. */
-const CATALOG_READ: PermissionCode[] = [
-  PERMISSIONS.WAREHOUSE_READ,
-  PERMISSIONS.PROJECT_READ,
-  PERMISSIONS.PARTNER_READ,
+export const PERMISSION_LABELS: Record<PermissionCode, string> = {
+  "category.read": "Xem nhóm hàng",
+  "category.write": "Sửa nhóm hàng",
+  "supplier.read": "Xem nhà cung cấp",
+  "supplier.write": "Sửa nhà cung cấp",
+  "product.read": "Xem sản phẩm",
+  "product.write": "Thêm sản phẩm",
+  "product.manage": "Chỉnh sửa sản phẩm",
+  "warehouse.read": "Xem kho",
+  "warehouse.write": "Sửa kho",
+  "inventory.read": "Xem tồn kho",
+  "inbound.write": "Nhập kho",
+  "inbound.manage": "Sửa/hủy phiếu nhập",
+  "outbound.write": "Xuất kho",
+  "outbound.manage": "Sửa/hủy phiếu xuất",
+  "transfer.write": "Chuyển kho",
+  "stockcount.write": "Kiểm kê kho",
+  "service.read": "Xem liệu trình dịch vụ",
+  "service.write": "Quản lý liệu trình dịch vụ",
+  "service.use": "Ghi nhận thực hiện dịch vụ",
+  "asset.read": "Xem tài sản/thiết bị",
+  "asset.write": "Thêm tài sản/thiết bị",
+  "asset.manage": "Chỉnh sửa tài sản/thiết bị",
+  "report.read": "Xem báo cáo",
+  "setting.manage": "Cài đặt công ty",
+  "user.manage": "Quản trị người dùng",
+};
+
+const READ_ALL: PermissionCode[] = [
+  PERMISSIONS.CATEGORY_READ,
+  PERMISSIONS.SUPPLIER_READ,
   PERMISSIONS.PRODUCT_READ,
-  PERMISSIONS.BIN_READ,
+  PERMISSIONS.WAREHOUSE_READ,
+  PERMISSIONS.INVENTORY_READ,
+  PERMISSIONS.SERVICE_READ,
+  PERMISSIONS.ASSET_READ,
+  PERMISSIONS.REPORT_READ,
 ];
 
-/**
- * Ma trận vai trò → quyền (mục 4).
- * ADMIN nhận toàn bộ; các vai trò khác nhận đúng phạm vi nghiệp vụ.
- */
 export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
   ADMIN: ALL_PERMISSIONS,
 
-  // BGĐ: xem tất cả + các quyền duyệt
-  BOD: [
-    ...CATALOG_READ,
-    PERMISSIONS.INBOUND_WRITE,
-    PERMISSIONS.OUTBOUND_APPROVE,
-    PERMISSIONS.DISASSEMBLY_APPROVE,
-    PERMISSIONS.STOCKCOUNT_APPROVE,
-  ],
-
-  // Mua hàng: tạo PO/đề nghị nhập
-  PURCHASING: [...CATALOG_READ, PERMISSIONS.PARTNER_WRITE, PERMISSIONS.INBOUND_WRITE],
-
-  // Kế toán kho: nhập hệ thống, gán SKU/barcode, duyệt xuất
-  WH_ACCOUNTANT: [
-    ...CATALOG_READ,
+  MANAGER: [
+    ...READ_ALL,
+    PERMISSIONS.CATEGORY_WRITE,
+    PERMISSIONS.SUPPLIER_WRITE,
     PERMISSIONS.PRODUCT_WRITE,
-    PERMISSIONS.PROJECT_WRITE,
-    PERMISSIONS.PARTNER_WRITE,
+    PERMISSIONS.PRODUCT_MANAGE,
+    PERMISSIONS.WAREHOUSE_WRITE,
     PERMISSIONS.INBOUND_WRITE,
-    PERMISSIONS.OUTBOUND_APPROVE,
+    PERMISSIONS.INBOUND_MANAGE,
+    PERMISSIONS.OUTBOUND_WRITE,
+    PERMISSIONS.OUTBOUND_MANAGE,
+    PERMISSIONS.TRANSFER_WRITE,
+    PERMISSIONS.STOCKCOUNT_WRITE,
+    PERMISSIONS.SERVICE_WRITE,
+    PERMISSIONS.SERVICE_USE,
+    PERMISSIONS.ASSET_WRITE,
+    PERMISSIONS.ASSET_MANAGE,
+    PERMISSIONS.SETTING_MANAGE,
   ],
 
-  // Thủ kho: nhận hàng, quét serial, scan-to-bin
-  WAREHOUSE_KEEPER: [
-    ...CATALOG_READ,
-    PERMISSIONS.WAREHOUSE_WRITE,
-    PERMISSIONS.BIN_WRITE,
+  WAREHOUSE: [
+    ...READ_ALL,
+    PERMISSIONS.PRODUCT_WRITE,
+    PERMISSIONS.SUPPLIER_WRITE,
     PERMISSIONS.INBOUND_WRITE,
     PERMISSIONS.OUTBOUND_WRITE,
+    PERMISSIONS.TRANSFER_WRITE,
+    PERMISSIONS.STOCKCOUNT_WRITE,
+    PERMISSIONS.SERVICE_USE,
+    PERMISSIONS.ASSET_WRITE,
   ],
 
-  // Kỹ thuật/Lắp ráp
-  TECH: [...CATALOG_READ, PERMISSIONS.WORKORDER_WRITE, PERMISSIONS.QC_WRITE],
-
-  // QC
-  QC: [...CATALOG_READ, PERMISSIONS.QC_WRITE],
-
-  // Kinh doanh: tạo SO, lệnh lắp ráp
-  SALES: [...CATALOG_READ, PERMISSIONS.OUTBOUND_WRITE, PERMISSIONS.WORKORDER_WRITE],
-
-  // Bảo hành/Dịch vụ
-  WARRANTY: [...CATALOG_READ, PERMISSIONS.WARRANTY_WRITE],
+  STAFF: [...READ_ALL, PERMISSIONS.OUTBOUND_WRITE, PERMISSIONS.SERVICE_USE],
 };
 
-/** Kiểm tra tập quyền có chứa quyền yêu cầu. */
 export function can(
   userPermissions: Iterable<string>,
   required: PermissionCode
 ): boolean {
-  const set = userPermissions instanceof Set ? userPermissions : new Set(userPermissions);
+  const set =
+    userPermissions instanceof Set ? userPermissions : new Set(userPermissions);
   return set.has(required);
 }

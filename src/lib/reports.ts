@@ -1,158 +1,139 @@
 // =============================================================================
-// Báo cáo (mục 7). Các chỉ tiêu dựa trên số lượng/serial (schema chưa có giá
-// vốn nên "giá trị" thể hiện bằng số lượng; có thể bổ sung khi thêm trường giá).
+// Báo cáo Nhập – Xuất – Tồn (N-X-T) theo khoảng thời gian, tùy chọn theo kho.
+// Tính từ sổ cái StockMovement:
+//   tồn đầu  = tổng biến động trước "từ ngày"
+//   nhập     = tổng biến động dương trong kỳ
+//   xuất     = tổng |biến động âm| trong kỳ
+//   tồn cuối = tồn đầu + nhập − xuất
 // =============================================================================
 import { prisma } from "./prisma";
-import { getInventory } from "./inventory";
-import { SLA_DAYS, addDays, overdueDays } from "./sla";
 
-/** Nhập – Xuất – Tồn theo từng kho trong kỳ. */
-export async function reportNXT(from?: Date, to?: Date) {
-  const inv = await getInventory();
-  const period = {
-    ...(from ? { gte: from } : {}),
-    ...(to ? { lte: to } : {}),
-  };
-  const hasPeriod = from || to;
-
-  const inbound = await prisma.stockMovement.groupBy({
-    by: ["toWarehouseId"],
-    where: { type: "INBOUND", ...(hasPeriod ? { createdAt: period } : {}) },
-    _sum: { quantity: true },
-  });
-  const outbound = await prisma.stockMovement.groupBy({
-    by: ["fromWarehouseId"],
-    where: { type: "OUTBOUND", ...(hasPeriod ? { createdAt: period } : {}) },
-    _sum: { quantity: true },
-  });
-  const inMap = new Map(inbound.map((r) => [r.toWarehouseId, r._sum.quantity ?? 0]));
-  const outMap = new Map(outbound.map((r) => [r.fromWarehouseId, r._sum.quantity ?? 0]));
-
-  return inv.warehouses.map((w) => ({
-    code: w.code,
-    name: w.name,
-    inbound: inMap.get(w.id) ?? 0,
-    outbound: outMap.get(w.id) ?? 0,
-    onHand: w.onHand,
-    countsAsAvailable: w.countsAsAvailable,
-  }));
+export interface NxtRow {
+  productId: string;
+  sku: string;
+  name: string;
+  uom: string;
+  category: string | null;
+  opening: number;
+  inQty: number;
+  outQty: number;
+  closing: number;
 }
 
-/** Báo cáo theo NCC: số serial cung cấp, số lỗi, tỷ lệ lỗi, số vụ RMA. */
-export async function reportBySupplier() {
-  const suppliers = await prisma.partner.findMany({
-    where: { OR: [{ type: "SUPPLIER" }, { type: "BOTH" }] },
-    orderBy: { code: "asc" },
+export async function getNxtReport(
+  from: Date,
+  to: Date,
+  warehouseId?: string | null
+): Promise<NxtRow[]> {
+  const toEnd = new Date(to);
+  toEnd.setHours(23, 59, 59, 999);
+
+  const movements = await prisma.stockMovement.findMany({
+    where: {
+      createdAt: { lte: toEnd },
+      ...(warehouseId ? { warehouseId } : {}),
+    },
+    select: { productId: true, quantity: true, createdAt: true },
   });
 
-  const supplied = await prisma.serial.groupBy({ by: ["supplierId"], _count: { _all: true } });
-  const defects = await prisma.serial.groupBy({
-    by: ["supplierId"],
-    where: { status: { in: ["DAMAGED", "REPLACED"] } },
-    _count: { _all: true },
+  interface Acc {
+    opening: number;
+    inQty: number;
+    outQty: number;
+  }
+  const acc = new Map<string, Acc>();
+  for (const m of movements) {
+    const a = acc.get(m.productId) ?? { opening: 0, inQty: 0, outQty: 0 };
+    if (m.createdAt < from) {
+      a.opening += m.quantity;
+    } else {
+      if (m.quantity >= 0) a.inQty += m.quantity;
+      else a.outQty += -m.quantity;
+    }
+    acc.set(m.productId, a);
+  }
+
+  if (acc.size === 0) return [];
+
+  const products = await prisma.product.findMany({
+    where: { id: { in: Array.from(acc.keys()) } },
+    include: { category: true },
   });
-  const rma = await prisma.vendorRma.groupBy({ by: ["vendorId"], _count: { _all: true } });
 
-  const suppliedM = new Map(supplied.map((r) => [r.supplierId, r._count._all]));
-  const defectsM = new Map(defects.map((r) => [r.supplierId, r._count._all]));
-  const rmaM = new Map(rma.map((r) => [r.vendorId, r._count._all]));
-
-  return suppliers.map((s) => {
-    const total = suppliedM.get(s.id) ?? 0;
-    const defect = defectsM.get(s.id) ?? 0;
-    return {
-      code: s.code,
-      name: s.name,
-      supplied: total,
-      defects: defect,
-      defectRate: total > 0 ? Math.round((defect / total) * 1000) / 10 : 0,
-      rmaCount: rmaM.get(s.id) ?? 0,
-    };
-  });
-}
-
-/** Tồn đọng quá hạn: K-HH (15 ngày) và K-BH-NCC (SLA hãng). */
-export async function reportOverdue() {
-  const now = new Date();
-  const damaged = await prisma.damagedItem.findMany({
-    where: { resolution: "PENDING" },
-  });
-  const dmgSerialIds = damaged.map((d) => d.serialId).filter(Boolean) as string[];
-  const rmas = await prisma.vendorRma.findMany({ where: { status: "SENT" } });
-  const rmaSerialIds = rmas.map((r) => r.serialId).filter(Boolean) as string[];
-  const serials = await prisma.serial.findMany({
-    where: { id: { in: [...dmgSerialIds, ...rmaSerialIds] } },
-    select: { id: true, serialNumber: true, product: { select: { name: true } } },
-  });
-  const sMap = new Map(serials.map((s) => [s.id, s]));
-
-  const khh = damaged
-    .map((d) => ({ serialNumber: d.serialId ? sMap.get(d.serialId)?.serialNumber : "—", product: d.serialId ? sMap.get(d.serialId)?.product.name : "", days: overdueDays(d.dueDate, now) }))
-    .filter((x) => x.days > 0)
-    .sort((a, b) => b.days - a.days);
-
-  const kbhncc = rmas
-    .map((r) => {
-      const due = r.sentDate ? addDays(r.sentDate, r.slaDays ?? SLA_DAYS.VENDOR_RMA) : null;
-      return { number: r.number, serialNumber: r.serialId ? sMap.get(r.serialId)?.serialNumber : "—", days: due ? overdueDays(due, now) : 0 };
+  return products
+    .map((p) => {
+      const a = acc.get(p.id)!;
+      return {
+        productId: p.id,
+        sku: p.sku,
+        name: p.name,
+        uom: p.uom,
+        category: p.category?.name ?? null,
+        opening: a.opening,
+        inQty: a.inQty,
+        outQty: a.outQty,
+        closing: a.opening + a.inQty - a.outQty,
+      };
     })
-    .filter((x) => x.days > 0)
-    .sort((a, b) => b.days - a.days);
-
-  return { khh, kbhncc };
+    .sort((a, b) => a.sku.localeCompare(b.sku));
 }
 
-/** Hiệu quả lắp ráp: số WO hoàn thành, tỷ lệ QC fail. */
-export async function reportAssembly() {
-  const [totalWo, doneWo, qcPass, qcFail] = await Promise.all([
-    prisma.workOrder.count(),
-    prisma.workOrder.count({ where: { status: "DONE" } }),
-    prisma.qcReport.count({ where: { type: "OUTPUT", result: "PASS" } }),
-    prisma.qcReport.count({ where: { type: "OUTPUT", result: "FAIL" } }),
-  ]);
-  const totalQc = qcPass + qcFail;
-  return {
-    totalWo,
-    doneWo,
-    qcPass,
-    qcFail,
-    qcFailRate: totalQc > 0 ? Math.round((qcFail / totalQc) * 1000) / 10 : 0,
-  };
+export interface ServiceRevenueRow {
+  serviceId: string;
+  code: string;
+  name: string;
+  usageCount: number; // số lần ghi nhận
+  sessions: number; // tổng số lượt
+  revenue: number;
+  cost: number;
+  profit: number;
 }
 
-/** Bảo hành tổng quan + đòi BH ngược NCC chưa thu hồi. */
-export async function reportWarranty() {
-  const now = new Date();
-  const soon = addDays(now, 60);
-  const [openIntakes, openRma, openClaims, expiringSoon] = await Promise.all([
-    prisma.warrantyIntake.count({ where: { status: "OPEN" } }),
-    prisma.vendorRma.count({ where: { status: "SENT" } }),
-    prisma.rmaTicket.count({ where: { isVendorClaim: true, status: "OPEN" } }),
-    prisma.warranty.count({ where: { provider: "THNG", endDate: { gte: now, lte: soon } } }),
-  ]);
-  return { openIntakes, openRma, openClaims, expiringSoon };
-}
+/** Báo cáo doanh thu dịch vụ theo kỳ: doanh thu – giá vốn vật tư – lợi nhuận. */
+export async function getServiceRevenueReport(
+  from: Date,
+  to: Date
+): Promise<{ rows: ServiceRevenueRow[]; total: Omit<ServiceRevenueRow, "serviceId" | "code" | "name"> }> {
+  const toEnd = new Date(to);
+  toEnd.setHours(23, 59, 59, 999);
 
-/** Kết quả rã máy: số lệnh đã rã, linh kiện thu hồi (K-TMAY) vs bỏ đi (K-TL). */
-export async function reportDisassembly() {
-  const executed = await prisma.disassemblyOrder.count({ where: { executedAt: { not: null } } });
-  const recovered = await prisma.stockMovement.count({
-    where: { type: "DISASSEMBLY", note: { contains: "thu hồi" } },
+  const usages = await prisma.serviceUsage.findMany({
+    where: { performedAt: { gte: from, lte: toEnd } },
+    include: { service: { select: { code: true, name: true } } },
   });
-  const scrapped = await prisma.stockMovement.count({
-    where: { type: "DISASSEMBLY", note: { contains: "hỏng" } },
-  });
-  return { executed, recovered, scrapped };
-}
 
-export async function reportSummary() {
-  const [nxt, bySupplier, overdue, assembly, warranty, disassembly] = await Promise.all([
-    reportNXT(),
-    reportBySupplier(),
-    reportOverdue(),
-    reportAssembly(),
-    reportWarranty(),
-    reportDisassembly(),
-  ]);
-  return { nxt, bySupplier, overdue, assembly, warranty, disassembly };
+  const map = new Map<string, ServiceRevenueRow>();
+  for (const u of usages) {
+    const r =
+      map.get(u.serviceId) ??
+      {
+        serviceId: u.serviceId,
+        code: u.service.code,
+        name: u.service.name,
+        usageCount: 0,
+        sessions: 0,
+        revenue: 0,
+        cost: 0,
+        profit: 0,
+      };
+    r.usageCount += 1;
+    r.sessions += u.sessions;
+    r.revenue += u.revenue ?? 0;
+    r.cost += u.cost ?? 0;
+    r.profit = r.revenue - r.cost;
+    map.set(u.serviceId, r);
+  }
+
+  const rows = Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
+  const total = rows.reduce(
+    (t, r) => ({
+      usageCount: t.usageCount + r.usageCount,
+      sessions: t.sessions + r.sessions,
+      revenue: t.revenue + r.revenue,
+      cost: t.cost + r.cost,
+      profit: t.profit + r.profit,
+    }),
+    { usageCount: 0, sessions: 0, revenue: 0, cost: 0, profit: 0 }
+  );
+  return { rows, total };
 }

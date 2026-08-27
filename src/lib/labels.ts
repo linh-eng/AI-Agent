@@ -1,87 +1,112 @@
+// =============================================================================
 // Nhãn tiếng Việt + tone màu cho các enum hiển thị trên UI.
+// Nguồn sự thật dùng chung cho mọi trang (tránh khai báo lặp trong từng page).
+// =============================================================================
 type Tone = "default" | "success" | "warning" | "danger" | "muted";
 
-export const SERIAL_STATUS_LABEL: Record<string, string> = {
-  IN_STOCK: "Trong kho",
-  WIP: "Đang lắp ráp",
-  RESERVED: "Đã giữ",
-  SOLD: "Đã bán",
-  RENTED: "Cho thuê",
-  IN_WARRANTY_INTAKE: "Tiếp nhận BH",
-  AT_VENDOR: "Đang ở NCC",
-  IN_REPAIR: "Đang sửa",
-  DAMAGED: "Hư hỏng",
-  REPLACED: "Đã thay thế",
-  DISASSEMBLED: "Đã tháo/rã",
-  SCRAPPED: "Đã hủy",
-};
-
-export const SERIAL_STATUS_TONE: Record<string, Tone> = {
-  IN_STOCK: "success",
-  WIP: "warning",
-  RESERVED: "default",
-  SOLD: "muted",
-  RENTED: "default",
-  IN_WARRANTY_INTAKE: "warning",
-  AT_VENDOR: "warning",
-  IN_REPAIR: "warning",
-  DAMAGED: "danger",
-  REPLACED: "muted",
-  DISASSEMBLED: "muted",
-  SCRAPPED: "danger",
-};
-
+// ----- Trạng thái chứng từ (phiếu nhập/xuất/chuyển/kiểm kê) -----
 export const DOC_STATUS_LABEL: Record<string, string> = {
   DRAFT: "Nháp",
-  PENDING_APPROVAL: "Chờ duyệt",
-  APPROVED: "Đã duyệt",
-  REJECTED: "Từ chối",
+  POSTED: "Đã ghi sổ",
   CANCELLED: "Đã hủy",
 };
 
 export const DOC_STATUS_TONE: Record<string, Tone> = {
-  DRAFT: "muted",
-  PENDING_APPROVAL: "warning",
-  APPROVED: "success",
-  REJECTED: "danger",
+  DRAFT: "warning",
+  POSTED: "success",
   CANCELLED: "muted",
 };
 
-export const WO_STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Nháp",
-  ALLOCATING: "Đang cấp phát",
-  ASSEMBLING: "Đang lắp ráp",
-  QC: "Chờ/đạt QC",
-  DONE: "Hoàn thành",
-  CANCELLED: "Đã hủy",
-};
-
-export const WO_STATUS_TONE: Record<string, Tone> = {
-  DRAFT: "muted",
-  ALLOCATING: "warning",
-  ASSEMBLING: "warning",
-  QC: "default",
-  DONE: "success",
-  CANCELLED: "muted",
-};
-
-export const WO_MODE_LABEL: Record<string, string> = {
-  TO_ORDER: "Lắp theo đơn",
-  TO_STOCK: "Lắp để tồn kho",
-};
-
+// Kiểm kê: DRAFT hiển thị là "Đang kiểm" cho sát nghiệp vụ.
 export const COUNT_STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Nháp",
-  COUNTING: "Đang kiểm",
-  PENDING_APPROVAL: "Chờ duyệt",
-  APPROVED: "Đã duyệt",
+  DRAFT: "Đang kiểm",
+  POSTED: "Đã duyệt",
   CANCELLED: "Đã hủy",
 };
 
 export const COUNT_STATUS_TONE: Record<string, Tone> = {
-  DRAFT: "muted",
-  COUNTING: "warning",
-  PENDING_APPROVAL: "warning",
-  APPROVED: "success",
+  DRAFT: "warning",
+  POSTED: "success",
   CANCELLED: "muted",
+};
+
+// ----- Loại phiếu xuất -----
+export const ISSUE_TYPE_LABEL: Record<string, string> = {
+  SALE: "Bán hàng",
+  INTERNAL_USE: "Dùng nội bộ",
+  DISPOSAL: "Hủy",
+  ADJUSTMENT: "Điều chỉnh",
+};
+
+export const ISSUE_TYPE_TONE: Record<string, Tone> = {
+  SALE: "success",
+  INTERNAL_USE: "default",
+  DISPOSAL: "danger",
+  ADJUSTMENT: "muted",
+};
+
+// ----- Chế độ quản lý sản phẩm -----
+export const TRACKING_MODE_LABEL: Record<string, string> = {
+  LOT: "Theo lô",
+  QUANTITY: "Số lượng",
+};
+
+export const TRACKING_MODE_TONE: Record<string, Tone> = {
+  LOT: "default",
+  QUANTITY: "muted",
+};
+
+// ----- Trạng thái tài sản/thiết bị -----
+export const ASSET_STATUS_LABEL: Record<string, string> = {
+  IN_STOCK: "Trong kho",
+  IN_USE: "Đang dùng",
+  MAINTENANCE: "Bảo trì",
+  RETIRED: "Thanh lý",
+};
+
+export const ASSET_STATUS_TONE: Record<string, Tone> = {
+  IN_STOCK: "success",
+  IN_USE: "default",
+  MAINTENANCE: "warning",
+  RETIRED: "muted",
+};
+
+// ----- Loại bảo trì thiết bị -----
+export const MAINTENANCE_TYPE_LABEL: Record<string, string> = {
+  MAINTENANCE: "Bảo trì",
+  REPAIR: "Sửa chữa",
+  INSPECTION: "Kiểm tra",
+};
+
+export const MAINTENANCE_TYPE_TONE: Record<string, Tone> = {
+  MAINTENANCE: "default",
+  REPAIR: "danger",
+  INSPECTION: "muted",
+};
+
+// ----- Phương pháp khấu hao -----
+export const DEP_METHOD_LABEL: Record<string, string> = {
+  STRAIGHT_LINE: "Đường thẳng",
+  DECLINING: "Số dư giảm dần",
+  UNITS: "Theo sản lượng",
+};
+
+// ----- Hình thức quản lý công nợ tài sản -----
+export const ASSET_MANAGE_LABEL: Record<string, string> = {
+  DEBT: "Theo công nợ",
+  INVOICE: "Theo hóa đơn",
+  CONTRACT: "Theo hợp đồng",
+};
+
+// ----- Trạng thái lịch bảo trì -----
+export const MAINT_STATUS_LABEL: Record<string, string> = {
+  overdue: "Quá hạn",
+  due: "Đến hạn",
+  ok: "Bình thường",
+};
+
+export const MAINT_STATUS_TONE: Record<string, Tone> = {
+  overdue: "danger",
+  due: "warning",
+  ok: "success",
 };

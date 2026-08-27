@@ -1,0 +1,503 @@
+<!-- huong-dan-cap-nhat.html — Hướng dẫn cập nhật Sophia Wellness (bản in / tra cứu) -->
+<meta charset="utf-8" />
+<title>Hướng Dẫn Cập Nhật</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Roboto+Mono:wght@500&display=swap"
+  rel="stylesheet"
+/>
+
+<style>
+  :root {
+    /* Cool near-white ground + sky/blue primary khớp gradient đăng nhập của app */
+    --ground: #f5f8fc;
+    --card: #ffffff;
+    --ink: #0f2740;
+    --ink-soft: #47617c;
+    --ink-faint: #7189a3;
+    --line: #dce6f2;
+    --line-soft: #ebf1f8;
+    --primary: #1f7fe0;
+    --primary-deep: #0f5fb8;
+    --primary-wash: #eaf3fd;
+    /* Semantic — nền cho 3 loại lệnh sau khi giải nén */
+    --ok: #128a5a;
+    --ok-wash: #e6f6ee;
+    --ok-line: #b7e6ce;
+    --warn: #b7791f;
+    --warn-wash: #fbf1dd;
+    --warn-line: #f0d9a8;
+    --info: #1f6fd0;
+    --info-wash: #e8f1fc;
+    --info-line: #bcdaf6;
+    --danger: #c0392b;
+    --shadow: 0 1px 2px rgba(15, 39, 64, 0.04), 0 6px 20px rgba(15, 39, 64, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 40px 24px 72px;
+  }
+
+  /* ---------- Header ---------- */
+  .head {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding-bottom: 22px;
+    border-bottom: 2px solid var(--line);
+  }
+  .badge {
+    flex: none;
+    width: 52px;
+    height: 52px;
+    border-radius: 15px;
+    background: linear-gradient(135deg, var(--primary) 0%, #38a0f2 100%);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 6px 16px rgba(31, 127, 224, 0.32);
+  }
+  .badge svg { width: 27px; height: 27px; }
+  .head-txt { flex: 1; min-width: 0; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--primary-deep);
+    margin: 2px 0 4px;
+  }
+  h1 {
+    font-size: 27px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  .sub { color: var(--ink-soft); font-size: 15px; margin: 0; }
+  .ver-chip {
+    flex: none;
+    text-align: center;
+    background: var(--primary-wash);
+    border: 1px solid var(--info-line);
+    border-radius: 12px;
+    padding: 8px 14px;
+    line-height: 1.25;
+  }
+  .ver-chip .k { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary-deep); }
+  .ver-chip .v { font-size: 19px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .ver-chip .d { font-size: 11px; color: var(--ink-faint); }
+
+  /* ---------- Section titles ---------- */
+  .sec-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 40px 0 16px;
+  }
+  .sec-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  /* ---------- Steps ---------- */
+  .steps { display: flex; flex-direction: column; gap: 14px; }
+  .step {
+    display: flex;
+    gap: 16px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .step-n {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    display: grid;
+    place-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .step-b { flex: 1; min-width: 0; }
+  .step-b h3 { margin: 3px 0 5px; font-size: 16.5px; font-weight: 700; }
+  .step-b p { margin: 0; color: var(--ink-soft); font-size: 14.5px; }
+  .step-b p + p { margin-top: 6px; }
+
+  code, .kbd {
+    font-family: "Roboto Mono", ui-monospace, monospace;
+    font-size: 0.9em;
+    background: var(--line-soft);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 1px 6px;
+    color: var(--primary-deep);
+    white-space: nowrap;
+  }
+  .kbd { color: var(--ink); background: #fff; box-shadow: 0 1px 0 var(--line); }
+
+  .cmd {
+    display: block;
+    font-family: "Roboto Mono", ui-monospace, monospace;
+    font-size: 13.5px;
+    background: #0f2740;
+    color: #d6ecff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 10px 0 2px;
+    white-space: nowrap;
+    overflow-x: auto;
+  }
+  .cmd::before { content: "› "; color: #5fa8e6; }
+
+  /* ---------- Decision table ---------- */
+  .table-scroll { overflow-x: auto; border-radius: 14px; box-shadow: var(--shadow); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card);
+    font-size: 14px;
+    min-width: 560px;
+  }
+  thead th {
+    background: #eef4fb;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    padding: 12px 16px;
+    border-bottom: 2px solid var(--line);
+  }
+  tbody td { padding: 14px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td .lead { font-weight: 600; color: var(--ink); }
+  td .note { color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .pill.ok   { background: var(--ok-wash);   color: var(--ok);   border: 1px solid var(--ok-line); }
+  .pill.warn { background: var(--warn-wash); color: var(--warn); border: 1px solid var(--warn-line); }
+  .pill.info { background: var(--info-wash); color: var(--info); border: 1px solid var(--info-line); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+  /* ---------- Callouts ---------- */
+  .callout {
+    display: flex;
+    gap: 13px;
+    border-radius: 13px;
+    padding: 15px 18px;
+    font-size: 14.5px;
+    margin: 14px 0;
+  }
+  .callout svg { flex: none; width: 20px; height: 20px; margin-top: 1px; }
+  .callout .c-b { flex: 1; }
+  .callout .c-b strong { display: block; margin-bottom: 2px; }
+  .callout.tip    { background: var(--ok-wash);   color: #0b5c3c; border: 1px solid var(--ok-line); }
+  .callout.tip svg    { color: var(--ok); }
+  .callout.warn   { background: var(--warn-wash); color: #7a5210; border: 1px solid var(--warn-line); }
+  .callout.warn svg   { color: var(--warn); }
+  .callout.danger { background: #fdece9;         color: #8f281c; border: 1px solid #f3c6bf; }
+  .callout.danger svg { color: var(--danger); }
+  .callout .c-b p { margin: 4px 0 0; }
+
+  /* ---------- Verify card ---------- */
+  .verify {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: linear-gradient(135deg, #eaf3fd 0%, #f2f8ff 100%);
+    border: 1px solid var(--info-line);
+    border-radius: 14px;
+    padding: 20px 22px;
+  }
+  .verify .mock {
+    flex: none;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 9px 16px;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+  .verify .mock .lbl { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+  .verify .mock .val { font-size: 18px; font-weight: 800; color: var(--primary-deep); font-variant-numeric: tabular-nums; }
+  .verify .v-txt { font-size: 14.5px; color: var(--ink-soft); }
+  .verify .v-txt strong { color: var(--ink); }
+
+  /* ---------- Footer ---------- */
+  .foot {
+    margin-top: 44px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 560px) {
+    .head { flex-wrap: wrap; }
+    .ver-chip { order: 3; }
+    h1 { font-size: 23px; }
+  }
+
+  /* ---------- Print ---------- */
+  @media print {
+    body { background: #fff; }
+    .wrap { max-width: none; padding: 0 12px; }
+    .step, .table-scroll, .verify, .callout { box-shadow: none; }
+    .cmd { background: #eef4fb; color: #0f2740; border: 1px solid var(--line); }
+    .cmd::before { color: var(--primary-deep); }
+    .step, .verify, .callout, table { break-inside: avoid; }
+    .sec-title { break-after: avoid; }
+  }
+
+  /* ---------- Dark ---------- */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0c1622;
+      --card: #12202f;
+      --ink: #e8f1fb;
+      --ink-soft: #9fb6cd;
+      --ink-faint: #6f889f;
+      --line: #23384c;
+      --line-soft: #1a2c3d;
+      --primary: #4aa3f0;
+      --primary-deep: #8cc6f7;
+      --primary-wash: #14283c;
+      --ok: #4ecb8f; --ok-wash: #10261d; --ok-line: #1f4a37;
+      --warn: #e2b155; --warn-wash: #2a2113; --warn-line: #4d3d1c;
+      --info: #6bb5f2; --info-wash: #12283e; --info-line: #234a6b;
+      --danger: #ef7264;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.35);
+    }
+    :root:not([data-theme="light"]) thead th { background: #16293b; }
+    :root:not([data-theme="light"]) .kbd { background: #16293b; }
+    :root:not([data-theme="light"]) .callout.tip    { color: #b9ecd0; }
+    :root:not([data-theme="light"]) .callout.warn   { color: #edd29a; }
+    :root:not([data-theme="light"]) .callout.danger { background: #2a1512; border-color: #4d241d; color: #f2b4aa; }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0c1622;
+    --card: #12202f;
+    --ink: #e8f1fb;
+    --ink-soft: #9fb6cd;
+    --ink-faint: #6f889f;
+    --line: #23384c;
+    --line-soft: #1a2c3d;
+    --primary: #4aa3f0;
+    --primary-deep: #8cc6f7;
+    --primary-wash: #14283c;
+    --ok: #4ecb8f; --ok-wash: #10261d; --ok-line: #1f4a37;
+    --warn: #e2b155; --warn-wash: #2a2113; --warn-line: #4d3d1c;
+    --info: #6bb5f2; --info-wash: #12283e; --info-line: #234a6b;
+    --danger: #ef7264;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.35);
+  }
+  :root[data-theme="dark"] thead th { background: #16293b; }
+  :root[data-theme="dark"] .kbd { background: #16293b; }
+  :root[data-theme="dark"] .callout.danger { background: #2a1512; border-color: #4d241d; color: #f2b4aa; }
+</style>
+
+<div class="wrap">
+  <!-- HEADER -->
+  <header class="head">
+    <div class="badge" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" />
+      </svg>
+    </div>
+    <div class="head-txt">
+      <p class="eyebrow">Sophia Wellness · Quản lý kho</p>
+      <h1>Hướng dẫn cập nhật hệ thống</h1>
+      <p class="sub">Giải nén bản zip mới đè lên thư mục cũ — không mất dữ liệu. Giữ tờ này để tra cứu mỗi lần cập nhật.</p>
+    </div>
+    <div class="ver-chip">
+      <div class="k">Bản mới nhất</div>
+      <div class="v">1.8.2</div>
+      <div class="d">18/08/2026</div>
+    </div>
+  </header>
+
+  <!-- BƯỚC 0: SAO LƯU -->
+  <div class="sec-title">Trước tiên — Sao lưu</div>
+  <div class="callout tip">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+    <div class="c-b">
+      <strong>Luôn sao lưu trước khi cập nhật.</strong>
+      <p>Vào menu <strong>Hệ thống → Sao lưu &amp; Phục hồi → Tải bản sao lưu</strong> để lấy tệp <code>.json</code> chứa toàn bộ dữ liệu. Giữ tệp này ở nơi an toàn. Cập nhật bằng cách giải nén đè <b>không xóa</b> cơ sở dữ liệu, nhưng có bản sao lưu thì luôn yên tâm.</p>
+    </div>
+  </div>
+
+  <!-- CÁC BƯỚC CHÍNH -->
+  <div class="sec-title">Các bước cập nhật</div>
+  <div class="steps">
+
+    <div class="step">
+      <div class="step-n">1</div>
+      <div class="step-b">
+        <h3>Tắt web đang chạy</h3>
+        <p>Bấm <span class="kbd">Ctrl</span> + <span class="kbd">C</span> ở cửa sổ đang chạy web (hoặc chạy <code>stop-server.bat</code> nếu dùng bộ tự khởi động Windows).</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-n">2</div>
+      <div class="step-b">
+        <h3>Giải nén bản mới đè lên thư mục cũ</h3>
+        <p>Mở tệp <code>sophia-wellness-v1.8.2.zip</code>, chép toàn bộ vào đúng thư mục dự án hiện tại và chọn <strong>Thay thế / Replace</strong> khi được hỏi. Dữ liệu nằm trong cơ sở dữ liệu PostgreSQL nên <b>không bị đè</b> — chỉ mã nguồn được thay mới.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-n">3</div>
+      <div class="step-b">
+        <h3>Cài gói &amp; chạy lệnh cần thiết (nếu có)</h3>
+        <p>Mở cửa sổ lệnh trong thư mục dự án, chạy <code>npm install</code>, rồi xem <b>ghi chú bản phát hành</b> để biết có cần chạy thêm lệnh database không (bảng bên dưới).</p>
+        <span class="cmd">npm install</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-n">4</div>
+      <div class="step-b">
+        <h3>Khởi động lại web</h3>
+        <p>Chạy <code>npm run dev</code> (hoặc <code>start-server.bat</code> / bật lại máy nếu dùng tự khởi động). Mở lại trình duyệt tại địa chỉ quen thuộc.</p>
+        <span class="cmd">npm run dev</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- BẢNG QUYẾT ĐỊNH -->
+  <div class="sec-title">Ở bước 3 — chạy lệnh nào?</div>
+  <p style="margin:0 0 14px;color:var(--ink-soft);font-size:14.5px">
+    Mỗi bản phát hành trong <code>CHANGELOG.md</code> đều ghi rõ thuộc loại nào. Chọn đúng dòng bên dưới:
+  </p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:34%">Ghi chú bản phát hành nói…</th>
+          <th style="width:34%">Chạy lệnh</th>
+          <th>Sau đó</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <span class="pill ok"><span class="dot"></span>Chỉ sửa giao diện</span>
+            <div class="note">Không nhắc gì tới database/quyền.</div>
+          </td>
+          <td><span class="lead">Không cần lệnh nào</span><div class="note">Chỉ khởi động lại web.</div></td>
+          <td>Xong ngay.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="pill warn"><span class="dot"></span>“cần <code>prisma:push</code>”</span>
+            <div class="note">Có thêm bảng / cột mới trong database.</div>
+          </td>
+          <td><span class="cmd" style="white-space:nowrap">npm run prisma:push</span></td>
+          <td>Rồi khởi động lại web.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="pill info"><span class="dot"></span>“cần <code>db:sync-rbac</code>”</span>
+            <div class="note">Có thêm quyền / phân quyền mới.</div>
+          </td>
+          <td><span class="cmd" style="white-space:nowrap">npm run db:sync-rbac</span></td>
+          <td><strong>Đăng xuất rồi đăng nhập lại</strong> để nạp quyền mới.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout warn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+    </svg>
+    <div class="c-b">
+      <strong>Bỏ qua <code>prisma:push</code> khi bản cập nhật cần nó?</strong>
+      <p>Trang liên quan có thể báo lỗi hoặc để trống (ví dụ trước đây trang <b>Nhóm hàng</b> trắng vì thiếu cột mới). Cứ chạy lệnh trên rồi tải lại — không mất dữ liệu.</p>
+    </div>
+  </div>
+
+  <!-- KIỂM TRA -->
+  <div class="sec-title">Kiểm tra đã cập nhật thành công</div>
+  <div class="verify">
+    <div class="mock">
+      <div class="lbl">Góc dưới sidebar</div>
+      <div class="val">Phiên bản 1.8.2</div>
+    </div>
+    <div class="v-txt">
+      Nhìn <strong>góc dưới cùng thanh menu bên trái</strong> (và trang đăng nhập). Nếu số phiên bản đúng bằng bản vừa tải về là đã cập nhật xong.
+      Nếu vẫn thấy số cũ: xóa cache trình duyệt (<span class="kbd">Ctrl</span> + <span class="kbd">F5</span>) hoặc kiểm tra đã giải nén đè đúng thư mục chưa.
+    </div>
+  </div>
+
+  <!-- LƯU Ý -->
+  <div class="sec-title">Lưu ý thêm</div>
+  <div class="callout danger">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" />
+    </svg>
+    <div class="c-b">
+      <strong>Không chạy <code>npm run db:seed</code> hay <code>db:clear-demo</code> khi cập nhật.</strong>
+      <p>Hai lệnh này dùng để nạp/xóa dữ liệu demo — sẽ ảnh hưởng dữ liệu thật. Cập nhật bình thường chỉ cần các lệnh trong bảng trên.</p>
+    </div>
+  </div>
+  <div class="callout tip">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2v4" /><path d="m16.2 7.8 2.9-2.9" /><path d="M18 12h4" /><path d="m16.2 16.2 2.9 2.9" /><path d="M12 18v4" /><path d="m4.9 19.1 2.9-2.9" /><path d="M2 12h4" /><path d="m4.9 4.9 2.9 2.9" />
+    </svg>
+    <div class="c-b">
+      <strong>Đang dùng bộ tự khởi động Windows?</strong>
+      <p>Các tệp trong <code>scripts/windows/</code> vẫn giữ nguyên sau khi giải nén — không cần cài lại. Chỉ chạy <code>install-autostart.bat</code> lại nếu bạn đổi thư mục dự án.</p>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>Sophia Wellness — Hệ thống quản lý kho</span>
+    <span>Cập nhật cho bản v1.8.2 · 18/08/2026</span>
+  </footer>
+</div>

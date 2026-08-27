@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword, signSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
+import { ROLE_PERMISSIONS, type RoleCode } from "@/lib/rbac";
 import { ok, fail, handle } from "@/lib/api";
 
 const loginSchema = z.object({
@@ -28,11 +29,11 @@ export const POST = handle(async (req) => {
   if (!valid) return fail(401, "Email hoặc mật khẩu không đúng");
 
   const roles = user.roles.map((ur) => ur.role.code);
-  const permissions = Array.from(
-    new Set(
-      user.roles.flatMap((ur) => ur.role.permissions.map((rp) => rp.permission.code))
-    )
-  );
+  // Quyền lấy theo NGUỒN SỰ THẬT ở rbac.ts (ROLE_PERMISSIONS) hợp với quyền trong DB.
+  // Nhờ vậy khi thêm quyền mới trong mã, chỉ cần ĐĂNG NHẬP LẠI là có, không cần db:sync-rbac.
+  const fromCode = roles.flatMap((r) => ROLE_PERMISSIONS[r as RoleCode] ?? []);
+  const fromDb = user.roles.flatMap((ur) => ur.role.permissions.map((rp) => rp.permission.code));
+  const permissions = Array.from(new Set([...fromCode, ...fromDb]));
 
   const token = await signSession({
     userId: user.id,

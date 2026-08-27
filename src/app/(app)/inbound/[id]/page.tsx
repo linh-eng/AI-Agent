@@ -1,279 +1,218 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, PackageCheck } from "lucide-react";
+import { ArrowLeft, Printer, Tag, Pencil, Ban } from "lucide-react";
+import { printReceipt, printBatchLabels } from "@/lib/print";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input, Label, Select, Checkbox } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
+import { Label } from "@/components/ui/input";
 import { apiFetch } from "@/lib/client";
+import { formatDate, formatNumber } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
-import { INBOUND_TYPES, type InboundTypeCode } from "@/lib/inbound";
 import { DOC_STATUS_LABEL, DOC_STATUS_TONE } from "@/lib/labels";
 
-interface Line {
+interface Item {
   id: string;
+  product: { sku: string; name: string; uom: string };
+  batchCode?: string | null;
+  expiryDate?: string | null;
+  mfgDate?: string | null;
   quantity: number;
-  isCommercialStock: boolean;
-  product: { id: string; sku: string; name: string; trackingMode: string };
-  project?: { code: string; name: string } | null;
+  unitCost?: number | null;
 }
-interface Order {
+interface Receipt {
   id: string;
-  number: string;
-  type: string;
+  code: string;
   status: string;
-  poNumber?: string | null;
-  invoiceNumber?: string | null;
+  supplier: { name: string; code: string };
+  warehouse: { name: string };
+  createdBy: { name: string };
   note?: string | null;
-  supplier?: { code: string; name: string } | null;
-  lines: Line[];
+  receivedAt?: string | null;
+  cancelReason?: string | null;
+  cancelledAt?: string | null;
+  items: Item[];
 }
-interface BinOpt { id: string; label: string }
 
-// State nhận hàng cho mỗi dòng
-interface RecvState {
-  isDefective: boolean;
-  binId: string;
-  serialText: string; // mỗi serial 1 dòng
-  originCountry: string;
-  coNumber: string;
-  cqNumber: string;
-  customsDeclarationNo: string;
-  vendorStart: string;
-  vendorEnd: string;
-  thngStart: string;
-  thngEnd: string;
-  // LOT
-  lotNumber: string;
-  lotQty: string;
-  mfgDate: string;
-  expDate: string;
-  // QUANTITY
-  qty: string;
-}
-const emptyRecv: RecvState = {
-  isDefective: false, binId: "", serialText: "", originCountry: "", coNumber: "", cqNumber: "",
-  customsDeclarationNo: "", vendorStart: "", vendorEnd: "", thngStart: "", thngEnd: "",
-  lotNumber: "", lotQty: "", mfgDate: "", expDate: "", qty: "",
-};
-
-export default function InboundDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const router = useRouter();
-  const canWrite = useCan(PERMISSIONS.INBOUND_WRITE);
-  const [order, setOrder] = useState<Order | null>(null);
-  const [bins, setBins] = useState<BinOpt[]>([]);
-  const [recv, setRecv] = useState<Record<string, RecvState>>({});
+export default function ReceiptDetailPage({ params }: { params: { id: string } }) {
+  const canManage = useCan(PERMISSIONS.INBOUND_MANAGE);
+  const [data, setData] = useState<Receipt | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  async function load() {
-    const o = await apiFetch<Order>(`/api/inbound/${id}`);
-    setOrder(o);
-    setRecv(Object.fromEntries(o.lines.map((l) => [l.id, { ...emptyRecv }])));
-    const zones = await apiFetch<any[]>("/api/zones").catch(() => []);
-    setBins(
-      zones.flatMap((z) =>
-        (z.bins ?? []).map((b: any) => ({ id: b.id, label: `${z.warehouse?.code ?? ""} · ${z.code}-${b.code}` }))
-      )
-    );
+  function load() {
+    apiFetch<Receipt>(`/api/receipts/${params.id}`)
+      .then(setData)
+      .finally(() => setLoading(false));
   }
-  useEffect(() => {
-    load();
-  }, [id]);
+  useEffect(load, [params.id]);
 
-  function upd(lineId: string, patch: Partial<RecvState>) {
-    setRecv((prev) => ({ ...prev, [lineId]: { ...prev[lineId], ...patch } }));
-  }
-
-  async function receive() {
-    if (!order) return;
+  async function cancel() {
     setError(null);
-    setMsg(null);
-    setSaving(true);
+    setBusy(true);
     try {
-      const payloadLines = order.lines.map((line) => {
-        const r = recv[line.id];
-        const mode = line.product.trackingMode;
-        const base: any = { lineId: line.id, isDefective: r.isDefective };
-        const origin = {
-          countryOfOrigin: r.originCountry || null,
-          coNumber: r.coNumber || null,
-          cqNumber: r.cqNumber || null,
-          customsDeclarationNo: r.customsDeclarationNo || null,
-        };
-        const vendorWarranty = r.vendorStart || r.vendorEnd ? { startDate: r.vendorStart || null, endDate: r.vendorEnd || null } : null;
-        const thngWarranty = r.thngStart || r.thngEnd ? { startDate: r.thngStart || null, endDate: r.thngEnd || null } : null;
-
-        if (mode === "SERIAL") {
-          const serials = r.serialText.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-          base.serials = serials.map((sn) => ({
-            serialNumber: sn,
-            binId: r.binId || null,
-            originCountry: r.originCountry || null,
-            origin,
-            vendorWarranty,
-            thngWarranty,
-          }));
-        } else if (mode === "LOT") {
-          base.lot = {
-            lotNumber: r.lotNumber,
-            quantity: Number(r.lotQty || line.quantity),
-            manufactureDate: r.mfgDate || null,
-            expiryDate: r.expDate || null,
-            origin,
-            vendorWarranty,
-          };
-        } else {
-          base.quantity = Number(r.qty || line.quantity);
-        }
-        return base;
+      await apiFetch(`/api/receipts/${params.id}`, {
+        method: "DELETE",
+        body: JSON.stringify({ reason }),
       });
-
-      const res = await apiFetch<{ createdSerials: string[]; createdLots: string[] }>(
-        `/api/inbound/${id}/receive`,
-        { method: "POST", body: JSON.stringify({ lines: payloadLines }) }
-      );
-      setMsg(`Đã nhận: ${res.createdSerials.length} serial, ${res.createdLots.length} lô.`);
-      await load();
-      router.refresh();
+      setCancelOpen(false);
+      setReason("");
+      setLoading(true);
+      load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi");
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   }
 
-  if (!order) return <p className="text-muted-foreground">Đang tải...</p>;
+  if (loading) return <p className="text-muted-foreground">Đang tải…</p>;
+  if (!data) return <p className="text-destructive">Không tìm thấy phiếu nhập.</p>;
 
-  const cfg = INBOUND_TYPES[order.type as InboundTypeCode];
-  const received = order.status === "APPROVED";
+  const total = data.items.reduce((s, it) => s + it.quantity * (it.unitCost ?? 0), 0);
+  const isPosted = data.status === "POSTED";
 
   return (
     <div>
-      <div className="mb-4">
-        <Link href="/inbound" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Danh sách phiếu nhập
-        </Link>
-      </div>
       <PageHeader
-        title={`Phiếu nhập ${order.number}`}
-        description={`${order.type} — ${cfg?.label ?? ""}`}
-        action={<Badge tone={DOC_STATUS_TONE[order.status]}>{DOC_STATUS_LABEL[order.status]}</Badge>}
+        title={
+          <span className="flex items-center gap-2">
+            Phiếu nhập {data.code}
+            <Badge tone={DOC_STATUS_TONE[data.status]}>{DOC_STATUS_LABEL[data.status]}</Badge>
+          </span>
+        }
+        description={`NCC: ${data.supplier.name} · Kho: ${data.warehouse.name}`}
+        action={
+          <>
+            {canManage && isPosted && (
+              <>
+                <Link href={`/inbound/${data.id}/edit`}>
+                  <Button variant="outline">
+                    <Pencil className="h-4 w-4" /> Sửa
+                  </Button>
+                </Link>
+                <Button variant="destructive" onClick={() => setCancelOpen(true)}>
+                  <Ban className="h-4 w-4" /> Hủy phiếu
+                </Button>
+              </>
+            )}
+            <Button variant="outline" onClick={() => printBatchLabels(data)}>
+              <Tag className="h-4 w-4" /> In tem lô
+            </Button>
+            <Button variant="outline" onClick={() => printReceipt(data)}>
+              <Printer className="h-4 w-4" /> In phiếu
+            </Button>
+            <Link href="/inbound">
+              <Button variant="outline">
+                <ArrowLeft className="h-4 w-4" /> Danh sách
+              </Button>
+            </Link>
+          </>
+        }
       />
 
+      {data.status === "CANCELLED" && (
+        <Card className="mb-4 border-destructive/40 bg-destructive/5">
+          <CardContent className="p-4 text-sm">
+            <span className="font-semibold text-destructive">Phiếu đã hủy</span>
+            {data.cancelledAt ? ` · ${formatDate(data.cancelledAt)}` : ""} — Lý do:{" "}
+            {data.cancelReason ?? "—"}
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="mb-4">
-        <CardContent className="grid grid-cols-2 gap-3 p-5 text-sm sm:grid-cols-4">
-          <div><div className="text-muted-foreground">NCC</div><div className="font-medium">{order.supplier?.name ?? "—"}</div></div>
-          <div><div className="text-muted-foreground">PO</div><div className="font-medium">{order.poNumber ?? "—"}</div></div>
-          <div><div className="text-muted-foreground">Hóa đơn</div><div className="font-medium">{order.invoiceNumber ?? "—"}</div></div>
-          <div><div className="text-muted-foreground">Kho đích</div><div className="font-medium font-mono">{cfg?.destinationWarehouseCode ?? "—"}</div></div>
+        <CardContent className="grid gap-4 p-5 text-sm sm:grid-cols-4">
+          <Info label="Nhà cung cấp" value={data.supplier.name} />
+          <Info label="Kho nhập" value={data.warehouse.name} />
+          <Info label="Người nhập" value={data.createdBy.name} />
+          <Info label="Ngày nhập" value={formatDate(data.receivedAt)} />
+          {data.note && <Info label="Ghi chú" value={data.note} />}
         </CardContent>
       </Card>
 
-      {received && (
-        <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-          Phiếu đã nhận hàng — tồn đã được đặt vào kho. Xem{" "}
-          <Link href="/serials" className="font-medium underline">danh sách serial</Link>.
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <THead>
+              <TR>
+                <TH>SKU</TH>
+                <TH>Sản phẩm</TH>
+                <TH>Mã lô</TH>
+                <TH>HSD</TH>
+                <TH className="text-right">SL</TH>
+                <TH className="text-right">Giá vốn</TH>
+                <TH className="text-right">Thành tiền</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {data.items.map((it) => (
+                <TR key={it.id}>
+                  <TD className="font-mono text-xs">{it.product.sku}</TD>
+                  <TD className="font-medium">{it.product.name}</TD>
+                  <TD className="font-mono text-xs">{it.batchCode ?? "—"}</TD>
+                  <TD>{it.expiryDate ? formatDate(it.expiryDate) : "—"}</TD>
+                  <TD className="text-right">
+                    {formatNumber(it.quantity)} {it.product.uom}
+                  </TD>
+                  <TD className="text-right">{it.unitCost != null ? formatNumber(it.unitCost) : "—"}</TD>
+                  <TD className="text-right">{formatNumber(it.quantity * (it.unitCost ?? 0))}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+          <div className="flex justify-end border-t p-4 text-sm">
+            Tổng giá trị:{" "}
+            <span className="ml-2 font-semibold">{formatNumber(total)} đ</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Modal open={cancelOpen} onClose={() => setCancelOpen(false)} title={`Hủy phiếu nhập ${data.code}`}>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Hệ thống sẽ hoàn lại tồn kho đã cộng từ phiếu này và đánh dấu phiếu là “Đã hủy”. Thao tác
+            cần lý do và không thể tự hoàn tác.
+          </p>
+          <div className="space-y-1.5">
+            <Label>Lý do hủy *</Label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+              maxLength={300}
+              placeholder="Ví dụ: nhập nhầm số lượng, sai nhà cung cấp…"
+              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setCancelOpen(false)} disabled={busy}>
+              Đóng
+            </Button>
+            <Button variant="destructive" onClick={cancel} disabled={busy || reason.trim().length < 3}>
+              {busy ? "Đang hủy…" : "Xác nhận hủy"}
+            </Button>
+          </div>
         </div>
-      )}
-      {msg && <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{msg}</div>}
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      </Modal>
+    </div>
+  );
+}
 
-      <div className="space-y-4">
-        {order.lines.map((line) => {
-          const r = recv[line.id];
-          if (!r) return null;
-          const mode = line.product.trackingMode;
-          return (
-            <Card key={line.id}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">
-                  {line.product.sku} — {line.product.name}{" "}
-                  <Badge tone="muted">{mode}</Badge>
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  SL kế hoạch: <span className="font-medium">{line.quantity}</span>
-                  {line.project && <> · Dự án: <span className="font-mono">{line.project.code}</span></>}
-                  {line.isCommercialStock && <> · Hàng thương mại</>}
-                </p>
-              </CardHeader>
-              {!received && canWrite && (
-                <CardContent className="space-y-3">
-                  <label className="flex items-center gap-2 text-sm">
-                    <Checkbox checked={r.isDefective} onChange={(e) => upd(line.id, { isDefective: e.target.checked })} />
-                    Hàng lỗi → chuyển thẳng K-HH
-                  </label>
-
-                  {mode === "SERIAL" && (
-                    <>
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <div className="sm:col-span-2 space-y-1.5">
-                          <Label className="text-xs">Serial (mỗi dòng 1 serial — quét liên tục)</Label>
-                          <textarea
-                            className="flex min-h-[90px] w-full rounded-md border border-input bg-card px-3 py-2 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            value={r.serialText}
-                            onChange={(e) => upd(line.id, { serialText: e.target.value })}
-                            placeholder={"SN00001\nSN00002"}
-                            autoFocus
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">Vị trí kệ (Scan-to-Bin)</Label>
-                          <Select value={r.binId} onChange={(e) => upd(line.id, { binId: e.target.value })}>
-                            <option value="">— Chọn bin —</option>
-                            {bins.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-4">
-                        <div className="space-y-1.5"><Label className="text-xs">Xuất xứ</Label><Input value={r.originCountry} onChange={(e) => upd(line.id, { originCountry: e.target.value })} /></div>
-                        <div className="space-y-1.5"><Label className="text-xs">CO</Label><Input value={r.coNumber} onChange={(e) => upd(line.id, { coNumber: e.target.value })} /></div>
-                        <div className="space-y-1.5"><Label className="text-xs">CQ</Label><Input value={r.cqNumber} onChange={(e) => upd(line.id, { cqNumber: e.target.value })} /></div>
-                        <div className="space-y-1.5"><Label className="text-xs">Tờ khai HQ</Label><Input value={r.customsDeclarationNo} onChange={(e) => upd(line.id, { customsDeclarationNo: e.target.value })} /></div>
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-4">
-                        <div className="space-y-1.5"><Label className="text-xs">BH hãng từ</Label><Input type="date" value={r.vendorStart} onChange={(e) => upd(line.id, { vendorStart: e.target.value })} /></div>
-                        <div className="space-y-1.5"><Label className="text-xs">BH hãng đến</Label><Input type="date" value={r.vendorEnd} onChange={(e) => upd(line.id, { vendorEnd: e.target.value })} /></div>
-                        <div className="space-y-1.5"><Label className="text-xs">BH THNG từ</Label><Input type="date" value={r.thngStart} onChange={(e) => upd(line.id, { thngStart: e.target.value })} /></div>
-                        <div className="space-y-1.5"><Label className="text-xs">BH THNG đến</Label><Input type="date" value={r.thngEnd} onChange={(e) => upd(line.id, { thngEnd: e.target.value })} /></div>
-                      </div>
-                    </>
-                  )}
-
-                  {mode === "LOT" && (
-                    <div className="grid gap-3 sm:grid-cols-4">
-                      <div className="space-y-1.5"><Label className="text-xs">Số lô *</Label><Input value={r.lotNumber} onChange={(e) => upd(line.id, { lotNumber: e.target.value })} /></div>
-                      <div className="space-y-1.5"><Label className="text-xs">Số lượng</Label><Input type="number" value={r.lotQty} placeholder={String(line.quantity)} onChange={(e) => upd(line.id, { lotQty: e.target.value })} /></div>
-                      <div className="space-y-1.5"><Label className="text-xs">Ngày SX</Label><Input type="date" value={r.mfgDate} onChange={(e) => upd(line.id, { mfgDate: e.target.value })} /></div>
-                      <div className="space-y-1.5"><Label className="text-xs">Hạn dùng</Label><Input type="date" value={r.expDate} onChange={(e) => upd(line.id, { expDate: e.target.value })} /></div>
-                    </div>
-                  )}
-
-                  {(mode === "QUANTITY" || mode === "LICENSE") && (
-                    <div className="grid gap-3 sm:grid-cols-4">
-                      <div className="space-y-1.5"><Label className="text-xs">Số lượng nhận</Label><Input type="number" value={r.qty} placeholder={String(line.quantity)} onChange={(e) => upd(line.id, { qty: e.target.value })} /></div>
-                    </div>
-                  )}
-                </CardContent>
-              )}
-            </Card>
-          );
-        })}
-      </div>
-
-      {!received && canWrite && (
-        <div className="mt-4 flex justify-end">
-          <Button onClick={receive} disabled={saving}>
-            <PackageCheck className="h-4 w-4" /> {saving ? "Đang nhận..." : "Xác nhận nhận hàng"}
-          </Button>
-        </div>
-      )}
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="font-medium">{value}</div>
     </div>
   );
 }

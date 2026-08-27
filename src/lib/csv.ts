@@ -1,19 +1,27 @@
-// Xuất CSV phía client (mở được bằng Excel). Có BOM UTF-8 cho tiếng Việt.
-export function downloadCsv(
-  filename: string,
-  headers: string[],
-  rows: (string | number | null | undefined)[][]
-) {
-  const esc = (v: string | number | null | undefined) => {
-    const s = v === null || v === undefined ? "" : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const lines = [headers.map(esc).join(","), ...rows.map((r) => r.map(esc).join(","))];
-  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+// Tiện ích xuất CSV phía client (hỗ trợ tiếng Việt qua BOM UTF-8).
+
+function escapeCell(v: unknown): string {
+  const s = v == null ? "" : String(v);
+  if (/[",\n;]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+/** Tạo chuỗi CSV từ header + hàng dữ liệu. */
+export function toCsv(headers: string[], rows: (string | number | null)[][]): string {
+  const lines = [headers.map(escapeCell).join(",")];
+  for (const r of rows) lines.push(r.map(escapeCell).join(","));
+  return lines.join("\n");
+}
+
+/** Kích hoạt tải file CSV trong trình duyệt. */
+export function downloadCsv(filename: string, csv: string): void {
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+  a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }

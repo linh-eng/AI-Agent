@@ -22,3 +22,12 @@ export function formatDate(value: Date | string | null | undefined): string {
     year: "numeric",
   }).format(d);
 }
+
+// Chuẩn hóa chuỗi để tìm kiếm: bỏ hoa/thường + bỏ dấu tiếng Việt (đ -> d).
+export function normalizeSearch(s: string): string {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d");
+}

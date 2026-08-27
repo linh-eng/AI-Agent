@@ -37,8 +37,17 @@ export function handle(
       }
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === "P2002") {
-          const target = (err.meta?.target as string[])?.join(", ") ?? "trường";
-          return fail(409, `Giá trị đã tồn tại (trùng ${target})`);
+          const fields = (err.meta?.target as string[]) ?? [];
+          const labels: Record<string, string> = {
+            sku: "Mã SKU",
+            barcode: "Mã vạch",
+            code: "Mã",
+            name: "Tên",
+            email: "Email",
+            serialNumber: "Số serial",
+          };
+          const label = fields.map((f) => labels[f] ?? f).join(", ") || "Giá trị";
+          return fail(409, `${label} đã tồn tại — vui lòng dùng giá trị khác.`);
         }
         if (err.code === "P2025") return fail(404, "Không tìm thấy bản ghi");
       }

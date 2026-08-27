@@ -4,24 +4,27 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    /* Bảng màu xanh dương sapphire cao cấp + nền lạnh trắng ngà + mực navy */
+    --background: 214 38% 98%;
+    --foreground: 220 44% 16%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 221 83% 45%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 94%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 92%;
-    --accent-foreground: 222 47% 11%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214 32% 88%;
-    --input: 214 32% 88%;
-    --ring: 221 83% 45%;
-    --radius: 0.5rem;
+    --card-foreground: 220 44% 16%;
+    --primary: 216 80% 47%;
+    --primary-foreground: 210 45% 99%;
+    --secondary: 214 44% 93%;
+    --secondary-foreground: 220 42% 22%;
+    --muted: 214 34% 96%;
+    --muted-foreground: 218 16% 45%;
+    --accent: 213 50% 92%;
+    --accent-foreground: 220 42% 22%;
+    --destructive: 2 72% 50%;
+    --destructive-foreground: 0 0% 99%;
+    --border: 214 30% 88%;
+    --input: 214 30% 88%;
+    --ring: 216 80% 47%;
+    /* Nhấn hổ phách (amber) làm màu tương phản cho biểu đồ & điểm nhấn nhỏ */
+    --gold: 38 92% 52%;
+    --radius: 0.625rem;
   }
 }
 
@@ -32,6 +35,14 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  /* Kiểu chữ tiêu đề: Be Vietnam Pro đậm — dấu tiếng Việt hiển thị chuẩn, cảm giác hiện đại & rõ ràng */
+  .font-display {
+    font-family: "Be Vietnam Pro", system-ui, "Segoe UI", sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -51,4 +62,3 @@
     background: #fff;
   }
 }
-

@@ -1,18 +1,20 @@
 {
-  "name": "thng-warehouse",
-  "version": "0.1.0",
+  "name": "sophia-wellness-warehouse",
+  "version": "1.16.2",
   "private": true,
-  "description": "Webapp quản lý kho THNG — Nhập/Xuất/Lắp ráp/Tháo dỡ/Truy vết Serial",
+  "description": "Webapp quản lý kho Sophia Wellness — Nhập/Xuất kho, tồn theo lô & hạn sử dụng, cảnh báo",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 9000",
     "build": "prisma generate && next build",
-    "start": "next start",
+    "start": "next start -p 9000",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:sync-rbac": "tsx prisma/sync-rbac.ts",
+    "db:clear-demo": "tsx prisma/clear-demo.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
@@ -28,6 +30,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.5.4",
+    "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

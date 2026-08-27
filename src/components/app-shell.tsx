@@ -1,50 +1,99 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Warehouse,
+  Sparkles,
   LayoutDashboard,
-  FolderKanban,
-  Users,
+  Gauge,
+  PackagePlus,
+  PackageMinus,
+  ArrowLeftRight,
+  ClipboardCheck,
+  Bell,
   Package,
-  MapPin,
+  Tags,
+  Award,
+  Truck,
+  Warehouse,
+  HeartPulse,
+  ClipboardList,
+  FlaskConical,
+  Cpu,
+  Zap,
+  TrendingDown,
+  Wrench,
+  CreditCard,
+  FileSpreadsheet,
+  BarChart3,
+  Users,
+  Settings,
+  DatabaseBackup,
   LogOut,
   Menu,
-  PackagePlus,
-  ScanBarcode,
-  Boxes,
-  Wrench,
-  Gauge,
-  ClipboardList,
-  PackageMinus,
-  ShieldCheck,
-  Hammer,
-  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version";
 import { apiFetch } from "@/lib/client";
 import type { SessionPayload } from "@/lib/auth";
-import { ROLE_LABELS, type RoleCode } from "@/lib/rbac";
+import { ROLE_LABELS, PERMISSIONS, type RoleCode } from "@/lib/rbac";
 import { SessionProvider } from "@/components/session-provider";
+import { ChangePassword } from "@/components/change-password";
 
 const NAV = [
-  { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
-  { href: "/inventory", label: "Tồn kho", icon: Gauge },
-  { href: "/inbound", label: "Nhập kho", icon: PackagePlus },
-  { href: "/outbound", label: "Xuất kho", icon: PackageMinus },
-  { href: "/work-orders", label: "Lắp ráp", icon: Wrench },
-  { href: "/warranty", label: "Bảo hành / RMA", icon: ShieldCheck },
-  { href: "/disassembly", label: "Rã máy", icon: Hammer },
-  { href: "/stock-counts", label: "Kiểm kê", icon: ClipboardList },
-  { href: "/serials", label: "Serial", icon: ScanBarcode },
-  { href: "/lots", label: "Lô hàng", icon: Boxes },
-  { href: "/reports", label: "Báo cáo", icon: BarChart3 },
-  { href: "/warehouses", label: "Danh mục kho", icon: Warehouse },
-  { href: "/bins", label: "Vị trí kệ", icon: MapPin },
-  { href: "/projects", label: "Dự án", icon: FolderKanban },
-  { href: "/partners", label: "NCC / Khách hàng", icon: Users },
-  { href: "/products", label: "Sản phẩm", icon: Package },
+  {
+    section: "Tổng quan",
+    items: [{ href: "/dashboard", label: "Bảng điều khiển", icon: LayoutDashboard }],
+  },
+  {
+    section: "Kho vận",
+    items: [
+      { href: "/inventory", label: "Tồn kho", icon: Gauge },
+      { href: "/inbound", label: "Nhập kho", icon: PackagePlus },
+      { href: "/outbound", label: "Xuất kho", icon: PackageMinus },
+      { href: "/transfers", label: "Chuyển kho", icon: ArrowLeftRight },
+      { href: "/stock-counts", label: "Kiểm kê", icon: ClipboardCheck },
+      { href: "/alerts", label: "Cảnh báo", icon: Bell },
+      { href: "/reports", label: "Báo cáo", icon: BarChart3 },
+    ],
+  },
+  {
+    section: "Dịch vụ",
+    items: [
+      { href: "/services", label: "Liệu trình dịch vụ", icon: HeartPulse },
+      { href: "/service-usage", label: "Ghi nhận dịch vụ", icon: ClipboardList },
+      { href: "/service-stock", label: "Kho Dịch Vụ", icon: FlaskConical },
+    ],
+  },
+  {
+    section: "Quản lý tài sản",
+    items: [
+      { href: "/assets", label: "Tài sản / Thiết bị", icon: Cpu },
+      { href: "/asset-depreciation", label: "Khấu hao", icon: TrendingDown },
+      { href: "/asset-maintenance", label: "Lịch bảo trì", icon: Wrench },
+      { href: "/asset-debts", label: "Công nợ", icon: CreditCard },
+      { href: "/handpieces", label: "Tay cầm / Shot", icon: Zap },
+    ],
+  },
+  {
+    section: "Danh mục",
+    items: [
+      { href: "/products", label: "Sản phẩm", icon: Package },
+      { href: "/categories", label: "Nhóm hàng", icon: Tags },
+      { href: "/brands", label: "Thương hiệu", icon: Award },
+      { href: "/suppliers", label: "Nhà cung cấp", icon: Truck },
+      { href: "/warehouses", label: "Kho", icon: Warehouse },
+    ],
+  },
+  {
+    section: "Hệ thống",
+    items: [
+      { href: "/import", label: "Nhập liệu Excel", icon: FileSpreadsheet },
+      { href: "/users", label: "Người dùng", icon: Users, perm: PERMISSIONS.USER_MANAGE },
+      { href: "/settings", label: "Cài đặt công ty", icon: Settings, perm: PERMISSIONS.SETTING_MANAGE },
+      { href: "/backup", label: "Sao lưu & Phục hồi", icon: DatabaseBackup, perm: PERMISSIONS.USER_MANAGE },
+    ],
+  },
 ];
 
 export function AppShell({
@@ -57,6 +106,31 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [company, setCompany] = useState<{ name: string; logo: string | null }>({
+    name: "Sophia Wellness",
+    logo: null,
+  });
+  const [alertCount, setAlertCount] = useState(0);
+
+  useEffect(() => {
+    apiFetch<any>("/api/settings")
+      .then((s) => {
+        setCompany({ name: s.name || "Sophia Wellness", logo: s.logo ?? null });
+        // Lưu để phiếu in dùng lại (đọc đồng bộ khi mở cửa sổ in).
+        try {
+          localStorage.setItem("sophia_company", JSON.stringify(s));
+        } catch {}
+      })
+      .catch(() => {});
+    // Đếm cảnh báo cho badge ở menu (thông báo tự động). Làm mới mỗi 5 phút.
+    const loadCount = () =>
+      apiFetch<{ total: number }>("/api/alerts/count")
+        .then((d) => setAlertCount(d.total ?? 0))
+        .catch(() => {});
+    loadCount();
+    const t = setInterval(loadCount, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
 
   async function logout() {
     await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => {});
@@ -68,43 +142,80 @@ export function AppShell({
     .map((r) => ROLE_LABELS[r as RoleCode] ?? r)
     .join(", ");
 
+  const canSee = (perm?: string) => !perm || session.permissions.includes(perm);
+
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 transform border-r bg-card transition-transform lg:static lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-64 transform flex-col border-r bg-card transition-transform lg:static lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="flex h-14 items-center gap-2 border-b px-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Warehouse className="h-4 w-4" />
+          {company.logo ? (
+            <div className="flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-xl border bg-card">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={company.logo} alt="logo" className="h-full w-full object-contain" />
+            </div>
+          ) : (
+            <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-primary to-[hsl(204_90%_58%)] text-primary-foreground shadow-sm">
+              <Sparkles className="h-5 w-5" />
+            </div>
+          )}
+          <div className="leading-tight">
+            <div className="font-display text-[15px] font-semibold">{company.name}</div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Quản lý kho</div>
           </div>
-          <span className="font-semibold">THNG Kho</span>
         </div>
-        <nav className="space-y-1 p-3">
-          {NAV.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
-            const Icon = item.icon;
+        <nav className="flex-1 space-y-4 overflow-y-auto p-3">
+          {NAV.map((group) => {
+            const items = group.items.filter((it: any) => canSee(it.perm));
+            if (items.length === 0) return null;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Link>
+            <div key={group.section}>
+              <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {group.section}
+              </div>
+              <div className="space-y-1">
+                {items.map((item) => {
+                  const active =
+                    pathname === item.href || pathname.startsWith(item.href + "/");
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="flex-1">{item.label}</span>
+                      {item.href === "/alerts" && alertCount > 0 && (
+                        <span className={cn(
+                          "ml-auto min-w-5 rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold",
+                          active ? "bg-primary-foreground text-primary" : "bg-red-500 text-white"
+                        )}>
+                          {alertCount > 99 ? "99+" : alertCount}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
             );
           })}
         </nav>
+        <div className="border-t px-4 py-2 text-[11px] text-muted-foreground">
+          Phiên bản {APP_VERSION}
+        </div>
       </aside>
 
       {open && (
@@ -129,12 +240,13 @@ export function AppShell({
               <div className="text-sm font-medium leading-tight">{session.name}</div>
               <div className="text-xs text-muted-foreground">{roleLabels}</div>
             </div>
+            <ChangePassword />
             <button
               onClick={logout}
               className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
             >
               <LogOut className="h-4 w-4" />
-              Đăng xuất
+              <span className="hidden sm:inline">Đăng xuất</span>
             </button>
           </div>
         </header>
