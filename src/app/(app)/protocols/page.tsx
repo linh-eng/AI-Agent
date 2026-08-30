@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +33,7 @@ interface Protocol {
 interface Brand { id: string; name: string }
 
 export default function ProtocolsPage() {
+  const router = useRouter();
   const canWrite = useCan(PERMISSIONS.PROTOCOL_WRITE);
   const [rows, setRows] = useState<Protocol[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -40,7 +42,7 @@ export default function ProtocolsPage() {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
-    name: "", kind: "BRAND", brandId: "", purpose: "", suitableFor: "",
+    name: "", kind: "BRAND", compositionMode: "LEGACY_STEPS", brandId: "", purpose: "", suitableFor: "",
     contraindications: "", recommendedFreq: "", recommendedCount: "",
   });
 
@@ -62,10 +64,12 @@ export default function ProtocolsPage() {
       if (!body.brandId) delete body.brandId;
       if (body.recommendedCount) body.recommendedCount = Number(body.recommendedCount); else delete body.recommendedCount;
       Object.keys(body).forEach((k) => { if (body[k] === "") delete body[k]; });
-      await apiFetch("/api/brand-protocols", { method: "POST", body: JSON.stringify(body) });
+      const created = await apiFetch<{ id: string }>("/api/brand-protocols", { method: "POST", body: JSON.stringify(body) });
       setOpen(false);
-      setForm({ name: "", kind: "BRAND", brandId: "", purpose: "", suitableFor: "", contraindications: "", recommendedFreq: "", recommendedCount: "" });
-      load();
+      setForm({ name: "", kind: "BRAND", compositionMode: "LEGACY_STEPS", brandId: "", purpose: "", suitableFor: "", contraindications: "", recommendedFreq: "", recommendedCount: "" });
+      // Mở ngay trang soạn nội dung (chọn bước / chọn dịch vụ / công nghệ / sản phẩm).
+      if (created?.id) router.push(`/protocols/${created.id}`);
+      else load();
     } catch (err) { setError(err instanceof Error ? err.message : "Lỗi"); }
   }
 
@@ -126,12 +130,24 @@ export default function ProtocolsPage() {
               </Select>
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>Brand</Label>
-            <Select value={form.brandId} onChange={(e) => setForm({ ...form, brandId: e.target.value })}>
-              <option value="">— (protocol nội bộ có thể không thuộc brand) —</option>
-              {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Cách tổ chức nội dung</Label>
+              <Select value={form.compositionMode} onChange={(e) => setForm({ ...form, compositionMode: e.target.value })}>
+                <option value="LEGACY_STEPS">Theo bước (tự soạn từng bước)</option>
+                <option value="SERVICES">Ghép nhiều Dịch vụ (compose)</option>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {form.compositionMode === "SERVICES" ? "Chọn các Dịch vụ để ghép ở bước tiếp theo." : "Thêm từng bước thực hiện ở bước tiếp theo."}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Brand</Label>
+              <Select value={form.brandId} onChange={(e) => setForm({ ...form, brandId: e.target.value })}>
+                <option value="">— (nội bộ có thể không thuộc brand) —</option>
+                {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </Select>
+            </div>
           </div>
           <div className="space-y-1.5"><Label>Mục tiêu</Label><Input value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} /></div>
           <div className="grid grid-cols-2 gap-3">
