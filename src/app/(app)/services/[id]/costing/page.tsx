@@ -9,6 +9,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plus, Save, RefreshCw, CheckCircle2, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { QuickCreateLink } from "@/components/quick-create";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -203,6 +204,7 @@ export default function ServiceCostingPage() {
                         <Button type="button" size="sm" variant="outline" onClick={addLaborLine}>
                           <Plus className="mr-1 h-3.5 w-3.5" /> Thêm vai trò
                         </Button>
+                        <QuickCreateLink href="/staff-role-rates?new=1" title="Tạo đơn giá nhân sự mới" />
                       </div>
                     </div>
                     {laborLines.length === 0 ? (

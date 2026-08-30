@@ -9,6 +9,7 @@ import { Input, Label, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { useCan } from "@/components/session-provider";
+import { useOpenNew } from "@/lib/use-open-new";
 import { PERMISSIONS } from "@/lib/rbac";
 
 interface Tech {
@@ -40,6 +41,7 @@ export default function TechnologiesPage() {
     try { setRows(await apiFetch<Tech[]>("/api/technologies")); } finally { setLoading(false); }
   }
   useEffect(() => { load(); apiFetch<Brand[]>("/api/brands").then(setBrands).catch(() => {}); }, []);
+  useOpenNew(() => setOpen(true), canWrite); // ?new=1 → tự mở form Tạo mới (deep-link nút "+")
 
   async function create(e: React.FormEvent) {
     e.preventDefault();

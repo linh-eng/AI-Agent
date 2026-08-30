@@ -11,6 +11,7 @@ import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { formatNumber } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
+import { useOpenNew } from "@/lib/use-open-new";
 import { PERMISSIONS } from "@/lib/rbac";
 import { PRODUCT_TYPE_LABEL } from "@/lib/clinic-labels";
 
@@ -44,6 +45,7 @@ export default function CatalogPage() {
     try { setRows(await apiFetch<Product[]>("/api/spa-products")); } finally { setLoading(false); }
   }
   useEffect(() => { load(); apiFetch<Brand[]>("/api/brands").then(setBrands).catch(() => {}); }, []);
+  useOpenNew(() => setOpen(true), canWrite); // ?new=1 → tự mở form Tạo mới
 
   async function create(e: React.FormEvent) {
     e.preventDefault();

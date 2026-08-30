@@ -11,6 +11,7 @@ import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { formatNumber, formatDate } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
+import { useOpenNew } from "@/lib/use-open-new";
 import { PERMISSIONS } from "@/lib/rbac";
 import { PRICE_TYPE_LABEL, PRICE_TARGET_LABEL } from "@/lib/clinic-labels";
 
@@ -58,6 +59,7 @@ export default function PricingPage() {
     }
     setOpen(true);
   }
+  useOpenNew(() => openCreate(), canWrite); // ?new=1 → tự mở form Thêm giá
 
   async function create(e: React.FormEvent) {
     e.preventDefault();

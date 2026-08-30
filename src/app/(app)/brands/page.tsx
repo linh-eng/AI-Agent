@@ -10,6 +10,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { useCan } from "@/components/session-provider";
+import { useOpenNew } from "@/lib/use-open-new";
 import { PERMISSIONS } from "@/lib/rbac";
 
 interface Brand {
@@ -33,6 +34,7 @@ export default function BrandsPage() {
     try { setRows(await apiFetch<Brand[]>("/api/brands")); } finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+  useOpenNew(() => setOpen(true), canWrite); // ?new=1 → tự mở form Tạo mới
 
   async function create(e: React.FormEvent) {
     e.preventDefault();

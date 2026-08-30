@@ -14,6 +14,7 @@ import { Input, Label } from "@/components/ui/input";
 import { apiFetch } from "@/lib/client";
 import { formatCurrency } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
+import { useOpenNew } from "@/lib/use-open-new";
 import { PERMISSIONS } from "@/lib/rbac";
 
 const money = (v: any) => (v == null ? "—" : formatCurrency(Number(v)));
@@ -41,6 +42,7 @@ export default function StaffRoleRatesPage() {
   useEffect(() => { load(); }, [load]);
 
   function openNew() { setEditId(null); setForm(emptyForm); setShowForm(true); }
+  useOpenNew(openNew, canWrite); // ?new=1 → tự mở form Tạo mới (deep-link nút "+")
   function openEdit(r: any) {
     setEditId(r.id);
     setForm({ code: r.code, roleName: r.roleName, certified: r.certified, baseFee: r.baseFee ?? 0, bonus: r.bonus ?? 0, tips: r.tips ?? 0, commission: r.commission ?? 0, commissionPercent: r.commissionPercent ?? "", note: r.note ?? "", isActive: r.isActive });

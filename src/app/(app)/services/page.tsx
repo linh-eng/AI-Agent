@@ -14,6 +14,7 @@ import { formatNumber, formatCurrency } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import { EMPLOYEE_ROLE_OPTIONS } from "@/lib/clinic-labels";
+import { QuickCreateButton } from "@/components/quick-create";
 
 /* ---------- types ---------- */
 interface Service {
@@ -146,6 +147,9 @@ export default function ServicesPage() {
         <ServiceFormModal
           service={editing === "new" ? null : editing}
           cats={cats} techs={techs} protos={protos} resources={resources} products={products}
+          onTechCreated={(r: any) => setTechs((p) => [...p, r])}
+          onProtoCreated={(r: any) => setProtos((p) => [...p, r])}
+          onProductCreated={(r: any) => setProducts((p) => [...p, r])}
           onClose={() => setEditing(null)} onCatCreated={loadCats}
           onSaved={() => { setEditing(null); load(); }}
         />
@@ -206,9 +210,10 @@ function Block({ letter, title, children }: { letter: string; title: string; chi
   );
 }
 
-function ServiceFormModal({ service, cats, techs, protos, resources, products, onClose, onSaved, onCatCreated }: {
+function ServiceFormModal({ service, cats, techs, protos, resources, products, onClose, onSaved, onCatCreated, onTechCreated, onProtoCreated, onProductCreated }: {
   service: Service | null; cats: Cat[]; techs: Tech[]; protos: Proto[]; resources: Resource[]; products: any[];
   onClose: () => void; onSaved: () => void; onCatCreated: () => void;
+  onTechCreated: (r: any) => void; onProtoCreated: (r: any) => void; onProductCreated: (r: any) => void;
 }) {
   const editing = !!service;
   const [f, setF] = useState<any>({
@@ -367,11 +372,11 @@ function ServiceFormModal({ service, cats, techs, protos, resources, products, o
         {/* C. Chuyên môn */}
         <Block letter="C" title="Chuyên môn (công nghệ · protocol · nhân sự)">
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5"><Label>Công nghệ liên quan</Label><MultiPick options={techOpts} values={f.technologyIds} onChange={(v) => setF({ ...f, technologyIds: v, defaultTechnologyId: v.includes(f.defaultTechnologyId) ? f.defaultTechnologyId : "" })} placeholder="Chọn công nghệ" /></div>
+            <div className="space-y-1.5"><div className="flex items-center justify-between"><Label>Công nghệ liên quan</Label><QuickCreateButton label="Công nghệ" endpoint="/api/technologies" fields={[{ key: "name", label: "Tên công nghệ", required: true }]} onCreated={(r) => { onTechCreated(r); setF((prev: any) => ({ ...prev, technologyIds: [...prev.technologyIds, r.id] })); }} /></div><MultiPick options={techOpts} values={f.technologyIds} onChange={(v) => setF({ ...f, technologyIds: v, defaultTechnologyId: v.includes(f.defaultTechnologyId) ? f.defaultTechnologyId : "" })} placeholder="Chọn công nghệ" /></div>
             <div className="space-y-1.5"><Label>Công nghệ mặc định</Label><Select value={f.defaultTechnologyId} onChange={(e) => setF({ ...f, defaultTechnologyId: e.target.value })} disabled={!f.technologyIds.length}><option value="">— Không —</option>{f.technologyIds.map((id: string) => <option key={id} value={id}>{techs.find((t) => t.id === id)?.name ?? id}</option>)}</Select></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5"><Label>Protocol liên quan</Label><MultiPick options={protoOpts} values={f.protocolIds} onChange={(v) => setF({ ...f, protocolIds: v, defaultProtocolId: v.includes(f.defaultProtocolId) ? f.defaultProtocolId : "" })} placeholder="Chọn protocol" /></div>
+            <div className="space-y-1.5"><div className="flex items-center justify-between"><Label>Protocol liên quan</Label><QuickCreateButton label="Protocol" endpoint="/api/brand-protocols" fields={[{ key: "name", label: "Tên protocol", required: true }]} onCreated={(r) => { onProtoCreated(r); setF((prev: any) => ({ ...prev, protocolIds: [...prev.protocolIds, r.id] })); }} /></div><MultiPick options={protoOpts} values={f.protocolIds} onChange={(v) => setF({ ...f, protocolIds: v, defaultProtocolId: v.includes(f.defaultProtocolId) ? f.defaultProtocolId : "" })} placeholder="Chọn protocol" /></div>
             <div className="space-y-1.5"><Label>Protocol mặc định</Label><Select value={f.defaultProtocolId} onChange={(e) => setF({ ...f, defaultProtocolId: e.target.value })} disabled={!f.protocolIds.length}><option value="">— Không —</option>{f.protocolIds.map((id: string) => <option key={id} value={id}>{protos.find((p) => p.id === id)?.name ?? id}</option>)}</Select></div>
           </div>
           <StaffReqEditor value={f.staffRequirements} onChange={(v) => setF({ ...f, staffRequirements: v })} />
@@ -380,12 +385,13 @@ function ServiceFormModal({ service, cats, techs, protos, resources, products, o
         {/* D. Quy trình thực hiện (SOP chuẩn hóa — Redesign P1) */}
         <Block letter="D" title="Quy trình thực hiện (các bước = protocol)">
           <StepEditor value={f.steps} onChange={(v) => setF({ ...f, steps: v })} products={products} techs={techs}
+            onProductCreated={onProductCreated}
             services={allServices.filter((s) => !service || s.id !== service.id)} />
         </Block>
 
         {/* E. Vật tư định mức */}
         <Block letter="E" title="Vật tư định mức">
-          <MaterialEditor value={f.materials} onChange={(v) => setF({ ...f, materials: v })} products={products} />
+          <MaterialEditor value={f.materials} onChange={(v) => setF({ ...f, materials: v })} products={products} onProductCreated={onProductCreated} />
         </Block>
 
         {/* F. Giá & chi phí */}
@@ -437,13 +443,13 @@ function StaffReqEditor({ value, onChange }: { value: any[]; onChange: (v: any[]
   );
 }
 
-function MaterialEditor({ value, onChange, products }: { value: any[]; onChange: (v: any[]) => void; products: any[] }) {
+function MaterialEditor({ value, onChange, products, onProductCreated }: { value: any[]; onChange: (v: any[]) => void; products: any[]; onProductCreated?: (r: any) => void }) {
   const add = () => onChange([...value, { name: "", quantity: 1, unit: "", note: "", required: false, spaProductId: "" }]);
   const upd = (i: number, patch: any) => onChange(value.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const del = (i: number) => onChange(value.filter((_, j) => j !== i));
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between"><span className="text-xs text-muted-foreground">Vật tư/sản phẩm chuyên môn dùng định mức mỗi buổi (làm &quot;vật tư dự kiến&quot; khi ghi buổi).</span><Button type="button" size="sm" variant="outline" onClick={add}><Plus className="h-3.5 w-3.5" /> Thêm vật tư</Button></div>
+      <div className="flex items-center justify-between gap-2"><span className="text-xs text-muted-foreground">Vật tư/sản phẩm chuyên môn dùng định mức mỗi buổi (làm &quot;vật tư dự kiến&quot; khi ghi buổi).</span><div className="flex items-center gap-3">{onProductCreated && <QuickCreateButton label="Sản phẩm" endpoint="/api/spa-products" fields={[{ key: "name", label: "Tên sản phẩm", required: true }]} onCreated={onProductCreated} />}<Button type="button" size="sm" variant="outline" onClick={add}><Plus className="h-3.5 w-3.5" /> Thêm vật tư</Button></div></div>
       {value.length === 0 ? <p className="text-xs text-muted-foreground">Chưa có vật tư định mức.</p> : value.map((m, i) => (
         <div key={i} className="grid grid-cols-[1.4fr_.6fr_.6fr_1fr_auto_auto] items-center gap-2">
           <div>
@@ -462,7 +468,7 @@ function MaterialEditor({ value, onChange, products }: { value: any[]; onChange:
 }
 
 /* ============================ SOP StepEditor (Redesign P1 · §20) ============================ */
-function StepEditor({ value, onChange, products, techs, services = [] }: { value: any[]; onChange: (v: any[]) => void; products: any[]; techs: Tech[]; services?: { id: string; code: string; name: string }[] }) {
+function StepEditor({ value, onChange, products, techs, services = [], onProductCreated }: { value: any[]; onChange: (v: any[]) => void; products: any[]; techs: Tech[]; services?: { id: string; code: string; name: string }[]; onProductCreated?: (r: any) => void }) {
   const totalDuration = value.reduce((s, x) => s + (Number(x.durationMinutes) || 0), 0);
   const addStep = () => onChange([...value, { name: "", description: "", durationMinutes: "", technique: "", notes: "", warnings: "", isRequired: true, conditionText: "", linkedServiceId: "", products: [], technologies: [], options: [] }]);
   const updStep = (i: number, patch: any) => onChange(value.map((s, j) => (j === i ? { ...s, ...patch } : s)));
@@ -506,7 +512,7 @@ function StepEditor({ value, onChange, products, techs, services = [] }: { value
                 </div>
                 {s.linkedServiceId && <p className="text-[11px] text-muted-foreground">↳ Bước này chạy toàn bộ quy trình của dịch vụ đã chọn (lồng protocol). Sản phẩm/công nghệ của bước lấy theo dịch vụ đó.</p>}
               </div>
-              <StepProducts value={s.products} onChange={(v) => updStep(i, { products: v })} products={products} />
+              <StepProducts value={s.products} onChange={(v) => updStep(i, { products: v })} products={products} onProductCreated={onProductCreated} />
               <StepTechs value={s.technologies} onChange={(v) => updStep(i, { technologies: v })} techs={techs} />
               <StepOptions value={s.options} onChange={(v) => updStep(i, { options: v })} products={products} />
             </div>
@@ -518,13 +524,13 @@ function StepEditor({ value, onChange, products, techs, services = [] }: { value
   );
 }
 
-function StepProducts({ value, onChange, products }: { value: any[]; onChange: (v: any[]) => void; products: any[] }) {
+function StepProducts({ value, onChange, products, onProductCreated }: { value: any[]; onChange: (v: any[]) => void; products: any[]; onProductCreated?: (r: any) => void }) {
   const add = () => onChange([...value, { spaProductId: "", name: "", quantity: 1, unit: "", isRequired: true, notes: "" }]);
   const upd = (i: number, patch: any) => onChange(value.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const del = (i: number) => onChange(value.filter((_, j) => j !== i));
   return (
     <div className="space-y-1 rounded border border-dashed p-2">
-      <div className="flex items-center justify-between"><span className="text-xs font-medium text-muted-foreground">Sản phẩm / định mức</span><Button type="button" size="sm" variant="ghost" onClick={add}><Plus className="h-3 w-3" /> Thêm SP</Button></div>
+      <div className="flex items-center justify-between gap-2"><span className="text-xs font-medium text-muted-foreground">Sản phẩm / định mức</span><div className="flex items-center gap-3">{onProductCreated && <QuickCreateButton label="Sản phẩm" endpoint="/api/spa-products" fields={[{ key: "name", label: "Tên sản phẩm", required: true }]} onCreated={onProductCreated} />}<Button type="button" size="sm" variant="ghost" onClick={add}><Plus className="h-3 w-3" /> Thêm SP</Button></div></div>
       {value.map((p, i) => (
         <div key={i} className="grid grid-cols-[1.3fr_.5fr_.5fr_1fr_auto_auto] items-center gap-1.5">
           <Select value={p.spaProductId} onChange={(e) => { const prod = products.find((x) => x.id === e.target.value); upd(i, { spaProductId: e.target.value, name: prod?.name ?? p.name, unit: p.unit || prod?.unit || "" }); }}>

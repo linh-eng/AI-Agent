@@ -11,6 +11,7 @@ import { Input, Label, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { useCan } from "@/components/session-provider";
+import { useOpenNew } from "@/lib/use-open-new";
 import { PERMISSIONS } from "@/lib/rbac";
 import {
   LIBRARY_STATUS_LABEL,
@@ -51,6 +52,7 @@ export default function ProtocolsPage() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [kindFilter]);
   useEffect(() => { apiFetch<Brand[]>("/api/brands").then(setBrands).catch(() => {}); }, []);
+  useOpenNew(() => setOpen(true), canWrite); // ?new=1 → tự mở form Tạo mới
 
   async function create(e: React.FormEvent) {
     e.preventDefault();

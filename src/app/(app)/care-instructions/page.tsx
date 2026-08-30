@@ -10,6 +10,7 @@ import { Input, Label, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { apiFetch } from "@/lib/client";
 import { useCan } from "@/components/session-provider";
+import { useOpenNew } from "@/lib/use-open-new";
 import { PERMISSIONS } from "@/lib/rbac";
 import {
   CARE_KIND_LABEL,
@@ -40,6 +41,7 @@ export default function CareInstructionsPage() {
   useEffect(() => { load(); }, []);
 
   const blank: Care = { id: "", code: "", title: "", kind: "PRE_CARE", category: "", content: "", version: 1, status: "DRAFT" };
+  useOpenNew(() => { setEdit({ ...blank }); setCreating(true); }, canWrite); // ?new=1 → tự mở form Tạo mới
 
   async function save(c: Care) {
     setError(null);
