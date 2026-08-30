@@ -9,6 +9,7 @@ import { canSeeFinance, maskFinance, auditLog } from "@/lib/clinic";
 import { deriveStageStatus, PRE_EXECUTION_PLAN_STATUSES } from "@/lib/treatment-plan";
 import { buildSessionSnapshot } from "@/lib/session-execution";
 import { freezeSessionContributions } from "@/lib/contribution-service";
+import { freezeRecognizedRevenue, reverseRecognizedRevenue } from "@/lib/recognized-revenue";
 
 // Các trường "thực tế" được kiểm khi sửa buổi đã hoàn thành (để ghi diff audit).
 const AUDIT_FIELDS = [
@@ -49,7 +50,7 @@ export const GET = handle(async (_req, { params }) => {
     },
   });
   if (!item) return fail(404, "Không tìm thấy buổi thực hiện");
-  return ok(maskFinance(item, canSeeFinance(session), ["plannedCost", "actualCost"]));
+  return ok(maskFinance(item, canSeeFinance(session), ["plannedCost", "actualCost", "recognizedRevenue"]));
 });
 
 // Ghi nhận thông số/vật tư/before-after/chi phí thực tế của buổi (mục 16, 17, 20) + hoàn thành/sửa (mục 5)
@@ -105,7 +106,14 @@ export const PATCH = handle(async (req, { params }) => {
   if (parsed.status === "COMPLETED" && !wasCompleted) {
     // HR-PH3 — đông cứng đóng góp nhân sự khi buổi freeze (DRAFT → ACTIVE, bất biến).
     if (data.executionFrozenAt) await freezeSessionContributions(params.id);
-    await auditLog({ userId: session.userId, action: "SESSION_COMPLETED", entityType: "TreatmentSession", entityId: params.id, changes: { frozenAt: (data.executionFrozenAt as any) ?? cur.performedAt } });
+    // D4 — ĐÔNG CỨNG doanh thu ghi nhận (idempotent; giá tại thời điểm giao dịch, KHÔNG dùng giá hiện hành).
+    const rr = await freezeRecognizedRevenue(params.id);
+    await auditLog({ userId: session.userId, action: "SESSION_COMPLETED", entityType: "TreatmentSession", entityId: params.id, changes: { frozenAt: (data.executionFrozenAt as any) ?? cur.performedAt, recognizedSource: rr.source } });
+  }
+  // D4 — hủy buổi ĐÃ ghi nhận → BÚT TOÁN ĐẢO (giữ số cũ, loại khỏi tổng).
+  if (parsed.status === "CANCELLED" && cur.status !== "CANCELLED") {
+    const rev = await reverseRecognizedRevenue(params.id, { reason: parsed.note?.trim() || "Hủy buổi sau ghi nhận", by: session.name });
+    if (rev.reversed) await auditLog({ userId: session.userId, action: "SESSION_REVENUE_REVERSED", entityType: "TreatmentSession", entityId: params.id, changes: { reason: parsed.note?.trim() || "Hủy buổi" } });
   }
 
   // Ghi AUDIT khi sửa buổi đã hoàn thành: field nào đổi (trước/sau) + ai/khi/lý do (mục 29).

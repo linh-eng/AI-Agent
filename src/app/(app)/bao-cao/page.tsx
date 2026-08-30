@@ -10,7 +10,7 @@ import { formatNumber, formatCurrency } from "@/lib/utils";
 
 type Report = {
   generatedAt: string;
-  kpi: { revenueMonth: number | null; revenueYear: number | null; totalOutstanding: number | null; bookingsToday: number; newCustomersMonth: number; totalActiveCustomers: number; sessionsMonth: number; openInvoices: number };
+  kpi: { revenueMonth: number | null; revenueYear: number | null; totalOutstanding: number | null; recognizedRevenueMonth: number | null; recognizedRevenueYear: number | null; bookingsToday: number; newCustomersMonth: number; totalActiveCustomers: number; sessionsMonth: number; openInvoices: number };
   revenueSeries: { month: string; value: number }[] | null;
   paymentsByMethod: { label: string; amount: number; count: number }[] | null;
   bookingsByStatus: { label: string; count: number }[];
@@ -67,8 +67,10 @@ export default function SpaReportPage() {
         <div className="space-y-4">
           {/* KPI */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Doanh thu tháng này" value={fin(d.kpi.revenueMonth)} tone="success" />
-            <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Doanh thu năm nay" value={fin(d.kpi.revenueYear)} tone="success" />
+            <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Tiền thực thu (tháng)" value={fin(d.kpi.revenueMonth)} tone="success" />
+            <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Tiền thực thu (năm)" value={fin(d.kpi.revenueYear)} tone="success" />
+            <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Doanh thu ghi nhận (tháng)" value={fin(d.kpi.recognizedRevenueMonth)} />
+            <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Doanh thu ghi nhận (năm)" value={fin(d.kpi.recognizedRevenueYear)} />
             <Kpi icon={<Wallet className="h-5 w-5" />} label={`Công nợ còn lại (${d.kpi.openInvoices} HĐ)`} value={fin(d.kpi.totalOutstanding)} tone="danger" />
             <Kpi icon={<CalendarCheck className="h-5 w-5" />} label="Lịch hẹn hôm nay" value={formatNumber(d.kpi.bookingsToday)} />
             <Kpi icon={<Sparkles className="h-5 w-5" />} label="Buổi thực hiện (tháng)" value={formatNumber(d.kpi.sessionsMonth)} />

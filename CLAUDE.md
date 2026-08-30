@@ -3538,5 +3538,57 @@ KHÔNG migration.** Đề xuất minimal additive (chờ Owner duyệt): chốt 
 vụ/booking tại thời điểm COMPLETED (nullable, giữ field cũ, backfill có kiểm chứng) làm nguồn recognized
 revenue; Invoice/Payment tiếp tục phục vụ Cash Collected/Outstanding/Deposit (tách bạch).
 
-**CHƯA làm (chờ Owner):** D2 migration/backfill production; D4 migration recognized-revenue; FLOW-003
-(name→employeeId) phụ thuộc D2.
+**CHƯA làm (chờ Owner):** D2 migration/backfill production; ~~D4 migration recognized-revenue~~ (đã làm ở
+v0.42.0 dưới đây); FLOW-003 (name→employeeId) phụ thuộc D2.
+
+## AUDIT FIX — BATCH 2 · D4 DOANH THU GHI NHẬN (recognized revenue / accrual) (v0.42.0)
+
+Owner đã **duyệt bản đề xuất → code**. Tách bạch **TIỀN THỰC THU (cash)** ≠ **DOANH THU GHI NHẬN (accrual)**:
+cash = `Payment(voidedAt=null) + Deposit(ALLOCATED)` (đã có); recognized = **giá TẠI THỜI ĐIỂM GIAO DỊCH**
+gắn buổi ĐÃ HOÀN THÀNH, đông cứng bất biến, KHÔNG dùng `Service.standardPrice` hiện hành, KHÔNG dùng cash.
+Migration **`Zn_recognized_revenue`** (8 ADD COLUMN nullable/default, 0 DROP; tổng **50 migration**). tsc sạch ·
+build OK. `test/recognized-revenue.test.ts` (8 test A–I).
+
+### Migration & schema (`Zn_recognized_revenue`)
+`TreatmentSession` +`recognizedRevenue Decimal?` (số đã đông cứng; null = chưa ghi nhận) +`recognizedRevenueSource`
+(BOOKING_ITEM|BOOKING_PRICE|PACKAGE_ALLOCATION|SESSION_PRICE|COMPLIMENTARY|UNKNOWN) +`recognizedRevenueSnapshot Json?`
+(bằng chứng: nguồn id + công thức phân bổ) +`recognizedAt DateTime?` +`isComplimentary Boolean @default(false)`
+(buổi tặng → 0 CÓ CHỦ ĐÍCH, khác null = chưa định giá) +`recognizedReversedAt/ReversalReason/ReversedBy` (bút
+toán ĐẢO khi hoàn/hủy — giữ số cũ, loại khỏi tổng).
+
+### Engine — `src/lib/recognized-revenue.ts`
+- **`resolveRecognizedRevenue(sessionId)`** — deterministic 6 case ưu tiên: (1) COMPLIMENTARY → 0 · (2) BOOKING_ITEM
+  = `BookingItem.priceSnapshot` khớp serviceId (giá bán lần đến) · (3) BOOKING_PRICE = `Booking.price` · (4)
+  PACKAGE_ALLOCATION = giá gói (Invoice total chưa hủy, fallback `plan.totalPrice`) **chia ĐỀU theo SỐ BUỔI**
+  của phác đồ · (5) SESSION_PRICE = `TreatmentSession.price` nhập tay · (6) UNKNOWN → null (KHÔNG bịa số).
+- **`freezeRecognizedRevenue(sessionId)`** — đông cứng khi COMPLETED, **idempotent** (đã ghi → giữ nguyên);
+  đổi giá/gói/booking về sau KHÔNG đổi số đã ghi (bất biến).
+- **`reverseRecognizedRevenue(sessionId,{reason,by})`** — hoàn/hủy sau ghi nhận: set `recognizedReversedAt`,
+  GIỮ số cũ (giữ vết), loại khỏi tổng; chặn đảo 2 lần. **KHÔNG sửa/không xóa.**
+- **`recognizedRevenueForCustomer(customerId)`** — Σ recognized của khách (loại buổi đã đảo).
+
+### Tích hợp (additive — KHÔNG đổi cash/Invoice/Payment)
+- `treatment-sessions/[id]` PATCH: COMPLETED → `freezeRecognizedRevenue` + audit `SESSION_COMPLETED.recognizedSource`;
+  CANCELLED (từ đã ghi nhận) → `reverseRecognizedRevenue` + audit `SESSION_REVENUE_REVERSED`. GET mask
+  `recognizedRevenue` theo `finance.read`. `sessionUpdateSchema` +`isComplimentary`.
+- **Báo cáo** `spa-reports.ts` + `/bao-cao`: thêm KPI **"Doanh thu ghi nhận (tháng/năm)"** (Σ recognized chưa đảo
+  theo `recognizedAt`) BÊN CẠNH **"Tiền thực thu (tháng/năm)"** (đổi nhãn cũ) — 2 con số TÁCH BẠCH. Mask theo
+  `finance.read` (SERVER).
+- **UI** `/sessions/[id]` khối A: checkbox **"Buổi tặng/miễn phí"** (isComplimentary) + dòng hiển thị doanh thu
+  ghi nhận đã đông cứng.
+
+### Chứng minh (test/recognized-revenue.test.ts, 8 test A–I)
+A COMPLIMENTARY=0 có chủ đích (khác null) · B BOOKING_ITEM priceSnapshot khớp serviceId · C BOOKING_PRICE ·
+D PACKAGE_ALLOCATION chia đều invoice/số buổi (8tr/4=2tr) · E SESSION_PRICE fallback / UNKNOWN=null · **G**
+freeze idempotent + BẤT BIẾN (đổi Booking.price sau KHÔNG đổi số đã ghi) · **H** reverse giữ số cũ + loại khỏi
+tổng + chặn đảo 2 lần · **I** complimentary freeze=0 + KHÔNG đụng cash (Payment giữ nguyên).
+
+### CONFLICTS: KHÔNG CÓ
+Additive 8 cột (0 DROP) · recognized revenue TÁCH khỏi cash (Payment/Deposit bất biến) · KHÔNG dùng
+`Service.standardPrice` hiện hành (giá tại thời điểm giao dịch) · đông cứng bất biến + reverse append-only
+(không sửa/xóa) · mask theo `finance.read` (Mục 15). Baseline toàn bộ bất biến.
+
+### CHƯA làm (chờ Owner)
+D2 migration/backfill production (chờ Owner cấp DATABASE_URL read-only để chạy `npm run d2:dryrun`); FLOW-003
+(name→employeeId) phụ thuộc D2. Backfill recognized cho buổi COMPLETED CŨ (trước v0.42.0) chưa chạy — mới áp
+cho buổi hoàn thành SAU khi deploy (buổi cũ recognizedRevenue=null cho tới khi có quyết định backfill của Owner).

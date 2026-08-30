@@ -451,6 +451,7 @@ export const sessionUpdateSchema = z.object({
   plannedCost: money,
   actualCost: money,
   price: money,
+  isComplimentary: z.boolean().optional(), // D4 — buổi tặng/miễn phí (doanh thu ghi nhận = 0 có chủ đích)
   note: z.string().optional().nullable(),
   checkedBy: z.string().optional().nullable(),
   // --- Kế hoạch riêng cho buổi (chỉ sửa khi thiết kế kế hoạch, KHÔNG dùng lúc ghi nhận thực tế) ---

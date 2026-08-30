@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input, Label, Select } from "@/components/ui/input";
 import { apiFetch } from "@/lib/client";
-import { formatDate, formatDateTime, mediaSrc } from "@/lib/utils";
+import { formatDate, formatDateTime, formatCurrency, mediaSrc } from "@/lib/utils";
 import { MediaUpload } from "@/components/media-upload";
 import { SessionMediaShare } from "@/components/session-media-share";
 import { SpaMaterialConsume } from "@/components/spa-material-consume";
@@ -242,6 +242,16 @@ export default function SessionExecutionPage() {
             <Info label="Bắt đầu thực tế" value={s.actualStartAt ? formatDateTime(s.actualStartAt) : "—"} />
             <Info label="Kết thúc thực tế" value={s.actualEndAt ? formatDateTime(s.actualEndAt) : (s.performedAt ? formatDateTime(s.performedAt) : "—")} />
             <Info label="Trạng thái" value={<Badge tone={SESSION_STATUS_TONE[ds]}>{SESSION_STATUS_LABEL[ds]}</Badge>} />
+          </div>
+          {/* D4 — Buổi tặng/miễn phí + Doanh thu ghi nhận (accrual, tách khỏi tiền thực thu) */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 border-t pt-3 text-sm">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={!!s.isComplimentary} disabled={saving || (completed && !edit)} onChange={(e) => save({ isComplimentary: e.target.checked }, {})} />
+              Buổi tặng / miễn phí <span className="text-muted-foreground">(doanh thu ghi nhận = 0)</span>
+            </label>
+            {s.recognizedRevenue != null && (
+              <span>Doanh thu ghi nhận: <b>{formatCurrency(Number(s.recognizedRevenue))}</b>{s.recognizedReversedAt ? <> <Badge tone="muted">Đã đảo</Badge></> : null}</span>
+            )}
           </div>
         </Block>
 

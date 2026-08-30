@@ -39,6 +39,7 @@ export async function buildSpaReport(now: Date = new Date()) {
     sessionsMonth,
     topServicesRaw,
     openInvoices,
+    recognizedMonth, recognizedYear,
   ] = await Promise.all([
     prisma.payment.aggregate({ _sum: { amount: true }, where: { voidedAt: null, paidAt: { gte: monthStart } } }),
     prisma.payment.aggregate({ _sum: { amount: true }, where: { voidedAt: null, paidAt: { gte: yearStart } } }),
@@ -54,6 +55,9 @@ export async function buildSpaReport(now: Date = new Date()) {
     prisma.treatmentSession.count({ where: { performedAt: { gte: monthStart } } }),
     prisma.treatmentSession.groupBy({ by: ["serviceId"], where: { performedAt: { gte: yearStart }, serviceId: { not: null } }, _count: true }),
     prisma.invoice.findMany({ where: { status: { in: ["UNPAID", "PARTIAL"] } }, select: { id: true, total: true, customerId: true, customer: { select: { code: true, fullName: true } } } }),
+    // D4 — DOANH THU GHI NHẬN (accrual): buổi đã ghi nhận, chưa đảo, theo recognizedAt.
+    prisma.treatmentSession.aggregate({ _sum: { recognizedRevenue: true }, where: { recognizedReversedAt: null, recognizedAt: { gte: monthStart } } }),
+    prisma.treatmentSession.aggregate({ _sum: { recognizedRevenue: true }, where: { recognizedReversedAt: null, recognizedAt: { gte: yearStart } } }),
   ]);
 
   // --- Doanh thu 12 tháng (tiền thực thu = payment + deposit allocated) ---
@@ -99,11 +103,15 @@ export async function buildSpaReport(now: Date = new Date()) {
 
   const revenueMonth = num(payMonth._sum.amount) + num(depMonth._sum.amount);
   const revenueYear = num(payYear._sum.amount) + num(depYear._sum.amount);
+  // D4 — doanh thu GHI NHẬN (accrual) — TÁCH khỏi tiền thực thu (cash).
+  const recognizedRevenueMonth = num(recognizedMonth._sum.recognizedRevenue);
+  const recognizedRevenueYear = num(recognizedYear._sum.recognizedRevenue);
 
   return {
     generatedAt: now.toISOString(),
     kpi: {
       revenueMonth, revenueYear, totalOutstanding,
+      recognizedRevenueMonth, recognizedRevenueYear,
       bookingsToday, newCustomersMonth, totalActiveCustomers, sessionsMonth,
       openInvoices: openInvoices.length,
     },
@@ -120,7 +128,7 @@ export function maskSpaReport(r: SpaReport, canFinance: boolean) {
   if (canFinance) return r;
   return {
     ...r,
-    kpi: { ...r.kpi, revenueMonth: null, revenueYear: null, totalOutstanding: null },
+    kpi: { ...r.kpi, revenueMonth: null, revenueYear: null, totalOutstanding: null, recognizedRevenueMonth: null, recognizedRevenueYear: null },
     revenueSeries: null,
     paymentsByMethod: null,
     debtByCustomer: null,

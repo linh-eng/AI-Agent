@@ -1543,6 +1543,16 @@ model TreatmentSession {
   // --- Redesign P4 — Actual execution (đông cứng snapshot khi thực hiện) ---
   executionFrozenAt    DateTime? // Thời điểm đông cứng snapshot thực hiện (null = chưa freeze / legacy)
   executionSnapshot    Json? // Snapshot cấp buổi (roll-up); bất biến sau freeze
+  // --- D4 — DOANH THU GHI NHẬN (recognized revenue), tách khỏi tiền thực thu (cash) ---
+  // Đông cứng khi buổi COMPLETED; nguồn = giá tại thời điểm giao dịch (booking/gói), KHÔNG dùng giá hiện hành.
+  recognizedRevenue        Decimal?  @db.Decimal(18, 2) // số doanh thu ghi nhận (đã đông cứng); null = chưa ghi nhận
+  recognizedRevenueSource  String? // BOOKING_ITEM | BOOKING_PRICE | PACKAGE_ALLOCATION | SESSION_PRICE | COMPLIMENTARY | UNKNOWN
+  recognizedRevenueSnapshot Json? // bằng chứng suy ra (nguồn id + công thức phân bổ)
+  recognizedAt             DateTime? // thời điểm ghi nhận
+  isComplimentary          Boolean   @default(false) // buổi tặng/miễn phí → recognized = 0 CÓ CHỦ ĐÍCH (khác null = chưa định giá)
+  recognizedReversedAt     DateTime? // bút toán ĐẢO khi hoàn/hủy sau ghi nhận (giữ số cũ, loại khỏi tổng)
+  recognizedReversalReason String?
+  recognizedReversedBy     String?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
