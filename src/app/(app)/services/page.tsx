@@ -15,6 +15,7 @@ import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import { EMPLOYEE_ROLE_OPTIONS } from "@/lib/clinic-labels";
 import { QuickCreateButton } from "@/components/quick-create";
+import { ProfitCalculator } from "@/components/profit-calculator";
 
 /* ---------- types ---------- */
 interface Service {
@@ -400,6 +401,9 @@ function ServiceFormModal({ service, cats, techs, protos, resources, products, o
             <div className="space-y-1.5"><Label>Giá chuẩn (₫) *</Label><Input type="number" value={f.standardPrice} onChange={(e) => setF({ ...f, standardPrice: e.target.value })} required /></div>
             <div className="space-y-1.5"><Label>Giá vốn dự kiến (₫)</Label><Input type="number" value={f.expectedCost} onChange={(e) => setF({ ...f, expectedCost: e.target.value })} placeholder="Ước tính" /></div>
           </div>
+          {/* Máy tính giá theo lợi nhuận — nhập giá vốn + biên → "Dùng giá này" điền vào Giá chuẩn. */}
+          <ProfitCalculator embedded defaultCost={String(f.expectedCost ?? "")} applyLabel="Dùng làm Giá chuẩn"
+            onApply={(price) => setF({ ...f, standardPrice: String(price) })} />
           <div className="rounded-md bg-muted/40 p-3 text-sm">
             {floorSummary?.hasFloor ? (
               <div className="flex flex-wrap items-center gap-x-6 gap-y-1">

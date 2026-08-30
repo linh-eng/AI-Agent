@@ -6,13 +6,14 @@
 // KHÔNG thêm entity/logic: chỉ COMPOSE/ĐỌC qua API sẵn có. targetMargin/costSnapshot
 // server đã mask theo finance.read (BLOCKER). Giá đề xuất hiển thị như guardrail.
 // =============================================================================
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Calculator } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input, Label } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
+import { ProfitCalculator } from "@/components/profit-calculator";
 import { apiFetch } from "@/lib/client";
 import { formatCurrency } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
@@ -29,91 +30,6 @@ interface Row {
   versionCount: number;
   publishedVersion: any | null;
   latestVersion: any | null;
-}
-
-// -----------------------------------------------------------------------------
-// Máy tính giá theo LỢI NHUẬN (client-side, decision-support). Nhập chi phí +
-// biên/markup → ra giá bán + lãi. KHÔNG lưu DB, KHÔNG đụng engine giá vốn/giá sàn.
-// -----------------------------------------------------------------------------
-function ProfitCalculator() {
-  const [cost, setCost] = useState("");
-  const [pct, setPct] = useState("");
-  const [mode, setMode] = useState<"MARGIN" | "MARKUP">("MARGIN");
-  const [round, setRound] = useState(true);
-
-  const r = useMemo(() => {
-    const c = Number(cost) || 0;
-    const p = Number(pct) || 0;
-    if (c <= 0 || p < 0) return null;
-    let price: number;
-    if (mode === "MARGIN") {
-      if (p >= 100) return { err: "Biên lợi nhuận phải nhỏ hơn 100%." } as any;
-      price = c / (1 - p / 100);
-    } else {
-      price = c * (1 + p / 100);
-    }
-    if (round) price = Math.ceil(price / 1000) * 1000;
-    const profit = price - c;
-    const realMargin = price > 0 ? (profit / price) * 100 : 0;
-    const realMarkup = c > 0 ? (profit / c) * 100 : 0;
-    return { price, profit, realMargin, realMarkup };
-  }, [cost, pct, mode, round]);
-
-  return (
-    <Card className="mb-4 border-primary/30">
-      <CardContent className="p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <Calculator className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold">Máy tính giá theo lợi nhuận</h3>
-          <span className="text-xs text-muted-foreground">Nhập giá vốn + % lợi nhuận → ra giá bán (công cụ tính nhanh, không lưu).</span>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-4">
-          <div className="space-y-1.5">
-            <Label>Chi phí / giá vốn (đ) *</Label>
-            <Input type="number" inputMode="numeric" placeholder="VD 913000" value={cost} onChange={(e) => setCost(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Cách tính</Label>
-            <select className="h-9 w-full rounded-md border border-input bg-card px-2 text-sm" value={mode} onChange={(e) => setMode(e.target.value as any)}>
-              <option value="MARGIN">Biên lợi nhuận (% trên giá bán)</option>
-              <option value="MARKUP">Cộng lãi (% trên giá vốn)</option>
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>{mode === "MARGIN" ? "Biên lợi nhuận (%) *" : "Cộng lãi (%) *"}</Label>
-            <Input type="number" inputMode="numeric" placeholder="VD 40" value={pct} onChange={(e) => setPct(e.target.value)} />
-          </div>
-          <div className="flex items-end pb-1">
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input type="checkbox" checked={round} onChange={(e) => setRound(e.target.checked)} /> Làm tròn 1.000đ
-            </label>
-          </div>
-        </div>
-
-        {r && "err" in r ? (
-          <p className="mt-3 text-sm text-destructive">{(r as any).err}</p>
-        ) : r ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border bg-primary/5 p-3">
-              <div className="text-xs text-muted-foreground">Giá bán đề xuất</div>
-              <div className="text-xl font-bold text-primary">{formatCurrency(r.price)}</div>
-            </div>
-            <div className="rounded-lg border bg-emerald-50 p-3 dark:bg-emerald-950/30">
-              <div className="text-xs text-muted-foreground">Lãi / đơn</div>
-              <div className="text-xl font-bold text-emerald-600">{formatCurrency(r.profit)}</div>
-            </div>
-            <div className="rounded-lg border p-3">
-              <div className="text-xs text-muted-foreground">Biên thực · Markup thực</div>
-              <div className="text-lg font-semibold">{r.realMargin.toFixed(1)}% · {r.realMarkup.toFixed(1)}%</div>
-            </div>
-          </div>
-        ) : (
-          <p className="mt-3 text-xs text-muted-foreground">Nhập giá vốn và % để xem kết quả. Công thức: Biên → Giá bán = Giá vốn ÷ (1 − biên%); Cộng lãi → Giá bán = Giá vốn × (1 + %).</p>
-        )}
-        <p className="mt-3 text-xs text-muted-foreground">Đây là công cụ tính nhanh. Để lưu giá vốn có version + phát hành giá đề xuất chính thức, bấm <b>Chi tiết</b> ở dịch vụ bên dưới.</p>
-      </CardContent>
-    </Card>
-  );
 }
 
 export default function RecommendedPriceWorkspacePage() {

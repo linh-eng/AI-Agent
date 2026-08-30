@@ -66,6 +66,8 @@ export default function ServiceCostingPage() {
       setService(svc);
       setVersions(vs);
       setSelId((prev) => prev ?? vs.find((v) => v.status === "PUBLISHED")?.id ?? vs[0]?.id ?? null);
+      // Chưa có version giá vốn nào → tự mở sẵn form NHẬP chi phí (khỏi tìm nút).
+      if (vs.length === 0) setShowForm(true);
       setError(null);
     } catch (e: any) {
       setError(e?.message ?? "Không tải được dữ liệu");
@@ -160,7 +162,7 @@ export default function ServiceCostingPage() {
             <CardContent className="p-3">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-sm font-semibold">Phiên bản</div>
-                {canWrite && <Button size="sm" variant="outline" onClick={() => setShowForm((s) => !s)}><Plus className="mr-1 h-3.5 w-3.5" /> Mới</Button>}
+                {canWrite && <Button size="sm" variant="outline" onClick={() => setShowForm((s) => !s)}><Plus className="mr-1 h-3.5 w-3.5" /> Nhập chi phí</Button>}
               </div>
               <div className="space-y-1">
                 {versions.length === 0 && <div className="py-4 text-center text-xs text-muted-foreground">Chưa có version giá vốn.</div>}
