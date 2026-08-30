@@ -74,12 +74,14 @@ describe("BATCH 1 — bằng chứng FLOW", () => {
     expect(r2.status).toBe("COMPLETED");
   });
 
-  it("FLOW-002 · D5 RBAC: BOD có attendance.write; CASHIER KHÔNG; MANAGER có", () => {
-    expect(ROLE_PERMISSIONS[ROLES.BOD]).toContain(PERMISSIONS.ATTENDANCE_WRITE);
-    expect(ROLE_PERMISSIONS[ROLES.MANAGER]).toContain(PERMISSIONS.ATTENDANCE_WRITE);
-    expect(ROLE_PERMISSIONS[ROLES.CASHIER]).not.toContain(PERMISSIONS.ATTENDANCE_WRITE);
-    // BOD vẫn CHỈ ĐỌC lương (không mở payroll.write)
-    expect(ROLE_PERMISSIONS[ROLES.BOD]).not.toContain(PERMISSIONS.PAYROLL_WRITE);
+  it("RBAC lương (owner v0.38.9): BOD/MANAGER/CASHIER đều có attendance.write + payroll.write", () => {
+    // Cập nhật theo quyết định phân quyền chủ DN: Kế toán phụ trách lương; Giám đốc toàn quyền trừ user.manage.
+    for (const role of [ROLES.BOD, ROLES.MANAGER, ROLES.CASHIER]) {
+      expect(ROLE_PERMISSIONS[role]).toContain(PERMISSIONS.ATTENDANCE_WRITE);
+      expect(ROLE_PERMISSIONS[role]).toContain(PERMISSIONS.PAYROLL_WRITE);
+    }
+    // Vai trò đầu ra KHÔNG có chấm công/lương.
+    expect(ROLE_PERMISSIONS[ROLES.SPECIALIST]).not.toContain(PERMISSIONS.ATTENDANCE_WRITE);
   });
 
   // ---- FLOW-004 (D3) ----

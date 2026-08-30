@@ -363,7 +363,8 @@ describe("HR-PH2 · RBAC / self-view", () => {
     const mgr = ROLE_PERMISSIONS[ROLES.MANAGER];
     expect(mgr.includes(PERMISSIONS.PAYROLL_READ as any)).toBe(true);
     expect(mgr.includes(PERMISSIONS.ATTENDANCE_WRITE as any)).toBe(true);
-    for (const role of [ROLES.RECEPTION, ROLES.CUSTOMER_CARE, ROLES.SPECIALIST, ROLES.CASHIER, ROLES.MARKETING])
+    // Kế toán (CASHIER) nay có attendance.write (owner cấp quyền lương) → loại khỏi danh sách "không có".
+    for (const role of [ROLES.RECEPTION, ROLES.CUSTOMER_CARE, ROLES.SPECIALIST, ROLES.MARKETING])
       expect(ROLE_PERMISSIONS[role].includes(PERMISSIONS.ATTENDANCE_WRITE as any)).toBe(false);
   });
 });

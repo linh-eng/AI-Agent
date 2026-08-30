@@ -77,9 +77,8 @@ describe("HR-PH1 · RBAC namespace tách biệt (unit)", () => {
   });
 
   it("B · finance.read KHÔNG kéo theo payroll.read (khác namespace)", () => {
-    // CASHIER & MARKETING có finance.read nhưng KHÔNG có payroll.read.
-    expect(has(ROLES.CASHIER, PERMISSIONS.FINANCE_READ)).toBe(true);
-    expect(has(ROLES.CASHIER, PERMISSIONS.PAYROLL_READ)).toBe(false);
+    // MARKETING có finance.read (phục vụ ROI) nhưng KHÔNG có payroll.read → chứng minh
+    // 2 quyền độc lập, không suy diễn. (Kế toán/CASHIER được owner cấp payroll RIÊNG — xem test dưới.)
     expect(has(ROLES.MARKETING, PERMISSIONS.FINANCE_READ)).toBe(true);
     expect(has(ROLES.MARKETING, PERMISSIONS.PAYROLL_READ)).toBe(false);
     // Hằng số khác nhau (không phải alias).
@@ -93,13 +92,17 @@ describe("HR-PH1 · RBAC namespace tách biệt (unit)", () => {
     expect(has(ROLES.MANAGER, PERMISSIONS.PAYROLL_READ)).toBe(true);
   });
 
-  it("mapping HR mới: MANAGER đủ; BOD read-only; vai trò thấp KHÔNG nhận", () => {
-    for (const p of [PERMISSIONS.ATTENDANCE_WRITE, PERMISSIONS.PAYROLL_WRITE, PERMISSIONS.PAYROLL_APPROVE, PERMISSIONS.COMPENSATION_POLICY_WRITE, PERMISSIONS.COMMISSION_READ])
-      expect(has(ROLES.MANAGER, p)).toBe(true);
-    expect(has(ROLES.BOD, PERMISSIONS.PAYROLL_READ)).toBe(true);
-    expect(has(ROLES.BOD, PERMISSIONS.PAYROLL_WRITE)).toBe(false);
-    expect(has(ROLES.BOD, PERMISSIONS.PAYROLL_APPROVE)).toBe(false);
-    for (const role of [ROLES.RECEPTION, ROLES.CUSTOMER_CARE, ROLES.SPECIALIST, ROLES.CASHIER, ROLES.MARKETING])
+  it("mapping HR (owner v0.38.9): MANAGER+CASHIER+BOD đủ quyền lương; vai trò thấp KHÔNG nhận", () => {
+    // Quản lý (Trợ lý GĐ) + Kế toán: ĐỦ quyền lương (tính/duyệt/chấm công/chính sách).
+    for (const role of [ROLES.MANAGER, ROLES.CASHIER])
+      for (const p of [PERMISSIONS.ATTENDANCE_WRITE, PERMISSIONS.PAYROLL_WRITE, PERMISSIONS.PAYROLL_APPROVE, PERMISSIONS.COMPENSATION_POLICY_WRITE, PERMISSIONS.COMMISSION_READ])
+        expect(has(role, p)).toBe(true);
+    // Giám đốc (BOD): TOÀN QUYỀN như Admin trừ user.manage → có đủ quyền lương.
+    for (const p of [PERMISSIONS.PAYROLL_READ, PERMISSIONS.PAYROLL_WRITE, PERMISSIONS.PAYROLL_APPROVE, PERMISSIONS.ATTENDANCE_WRITE])
+      expect(has(ROLES.BOD, p)).toBe(true);
+    expect(has(ROLES.BOD, PERMISSIONS.USER_MANAGE)).toBe(false); // trừ đúng 1 quyền quản trị user
+    // Vai trò đầu ra / read-only KHÔNG có quyền lương.
+    for (const role of [ROLES.RECEPTION, ROLES.CUSTOMER_CARE, ROLES.SPECIALIST, ROLES.MARKETING])
       for (const p of [PERMISSIONS.PAYROLL_READ, PERMISSIONS.PAYROLL_WRITE, PERMISSIONS.ATTENDANCE_WRITE, PERMISSIONS.COMPENSATION_POLICY_READ, PERMISSIONS.COMMISSION_READ])
         expect(has(role, p)).toBe(false);
     expect(ROLE_PERMISSIONS[ROLES.ADMIN].includes(PERMISSIONS.PAYROLL_APPROVE as any)).toBe(true); // ADMIN qua ALL_PERMISSIONS
@@ -108,7 +111,8 @@ describe("HR-PH1 · RBAC namespace tách biệt (unit)", () => {
   it("G+H · staff.read/write giữ; union đa vai trò hợp nhất", () => {
     expect(has(ROLES.MANAGER, PERMISSIONS.STAFF_WRITE)).toBe(true);
     expect(has(ROLES.RECEPTION, PERMISSIONS.STAFF_WRITE)).toBe(true);
-    const union = new Set<string>([...ROLE_PERMISSIONS[ROLES.SPECIALIST], ...ROLE_PERMISSIONS[ROLES.CASHIER]]);
+    // SPECIALIST (đầu ra) + RECEPTION (lễ tân) — cả hai KHÔNG có payroll → union không có.
+    const union = new Set<string>([...ROLE_PERMISSIONS[ROLES.SPECIALIST], ...ROLE_PERMISSIONS[ROLES.RECEPTION]]);
     expect(union.has(PERMISSIONS.TREATMENT_WRITE)).toBe(true);
     expect(union.has(PERMISSIONS.PAYMENT_WRITE)).toBe(true);
     expect(union.has(PERMISSIONS.PAYROLL_WRITE)).toBe(false); // không role nào trong 2 role này có

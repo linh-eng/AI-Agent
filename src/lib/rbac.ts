@@ -269,16 +269,9 @@ const dedup = (arr: PermissionCode[]): PermissionCode[] => Array.from(new Set(ar
 export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
   ADMIN: ALL_PERMISSIONS,
 
-  // Ban điều hành: TOÀN QUYỀN nghiệp vụ (như Quản lý) + duyệt kho + xem lương thưởng.
-  BOD: dedup([
-    ...CATALOG_READ,
-    ...SPA_FULL_BUSINESS,
-    ...HR_BOD_READONLY,
-    PERMISSIONS.INBOUND_WRITE,
-    PERMISSIONS.OUTBOUND_APPROVE,
-    PERMISSIONS.DISASSEMBLY_APPROVE,
-    PERMISSIONS.STOCKCOUNT_APPROVE,
-  ]),
+  // Giám đốc (Ban Giám đốc): TOÀN QUYỀN như Admin, CHỈ TRỪ quản trị người dùng
+  // (tạo tài khoản/gán vai trò — trục an ninh, giữ riêng cho Admin). Quyết định chủ DN.
+  BOD: dedup(ALL_PERMISSIONS.filter((p) => p !== PERMISSIONS.USER_MANAGE)),
 
   // Mua hàng: tạo PO/đề nghị nhập
   PURCHASING: [...CATALOG_READ, PERMISSIONS.PARTNER_WRITE, PERMISSIONS.INBOUND_WRITE],
@@ -382,8 +375,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     PERMISSIONS.MEDIA_WRITE,
   ],
 
-  // Thu ngân / Kế toán: TOÀN QUYỀN nghiệp vụ (theo quyết định phân quyền của chủ).
-  CASHIER: dedup([...SPA_FULL_BUSINESS]),
+  // Thu ngân / Kế toán: TOÀN QUYỀN nghiệp vụ + phụ trách LƯƠNG (quyết định chủ DN):
+  // xem/tính/duyệt bảng lương, chấm công, chính sách lương/hoa hồng (đầy đủ HR như Quản lý).
+  CASHIER: dedup([...SPA_FULL_BUSINESS, ...HR_MANAGER]),
 
   // Marketing: chiến dịch, nguồn khách, catalog sản phẩm bán lẻ, ROI, báo cáo
   MARKETING: [
