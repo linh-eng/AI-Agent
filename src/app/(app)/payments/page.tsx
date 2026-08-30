@@ -1,12 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { apiFetch } from "@/lib/client";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { PAYMENT_METHOD_LABEL } from "@/lib/clinic-labels";
+import { useCan } from "@/components/session-provider";
+import { PERMISSIONS } from "@/lib/rbac";
 import { Badge } from "@/components/ui/badge";
 
 interface Payment {
@@ -18,6 +22,7 @@ interface Payment {
 }
 
 export default function PaymentsPage() {
+  const canWrite = useCan(PERMISSIONS.PAYMENT_WRITE);
   const [rows, setRows] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,6 +39,7 @@ export default function PaymentsPage() {
       <PageHeader
         title="Thanh toán"
         description="Sổ thu tiền — mỗi khoản gắn với hóa đơn. Ghi nhận thu tiền tại màn hóa đơn."
+        action={canWrite && <Link href="/invoices"><Button variant="outline"><Plus className="h-4 w-4" /> Thu tiền (hóa đơn)</Button></Link>}
       />
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Số lượt thu</div><div className="mt-1 text-2xl font-semibold">{rows.length}</div></CardContent></Card>

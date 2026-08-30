@@ -1,12 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/client";
 import { formatDate, formatCurrency } from "@/lib/utils";
+import { useCan } from "@/components/session-provider";
+import { PERMISSIONS } from "@/lib/rbac";
 import { INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from "@/lib/clinic-labels";
 
 interface Invoice {
@@ -16,6 +20,7 @@ interface Invoice {
 }
 
 export default function InvoicesPage() {
+  const canWrite = useCan(PERMISSIONS.INVOICE_WRITE);
   const [rows, setRows] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("");
@@ -35,6 +40,7 @@ export default function InvoicesPage() {
       <PageHeader
         title="Hóa đơn"
         description="Báo giá đã chốt → hóa đơn → thanh toán. Công nợ được tính theo hóa đơn."
+        action={canWrite && <Link href="/proposals"><Button variant="outline"><Plus className="h-4 w-4" /> Tạo từ báo giá</Button></Link>}
       />
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Tổng số hóa đơn</div><div className="mt-1 text-2xl font-semibold">{rows.length}</div></CardContent></Card>

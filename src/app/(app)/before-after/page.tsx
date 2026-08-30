@@ -2,12 +2,15 @@
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Star, X } from "lucide-react";
+import { Star, X, Plus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label, Select, Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/client";
 import { formatDate } from "@/lib/utils";
+import { useCan } from "@/components/session-provider";
+import { PERMISSIONS } from "@/lib/rbac";
 
 interface Group {
   sessionId: string; sessionName: string | null; sessionNumber: number; performedAt: string | null;
@@ -18,6 +21,7 @@ interface Opt { id: string; name?: string; fullName?: string; code?: string }
 interface Summary { totalReviews: number; avgSatisfaction: number | null; avgTechnician: number | null; wouldReturnRate: number | null; technicians: { technicianName: string; count: number; avgTechnicianScore: number | null }[] }
 
 export default function BeforeAfterPage() {
+  const canWrite = useCan(PERMISSIONS.TREATMENT_WRITE);
   const [groups, setGroups] = useState<Group[]>([]);
   const [services, setServices] = useState<Opt[]>([]);
   const [customers, setCustomers] = useState<Opt[]>([]);
@@ -52,7 +56,8 @@ export default function BeforeAfterPage() {
 
   return (
     <div>
-      <PageHeader title="Before / After & Đánh giá" description="Thư viện ảnh trước–sau theo buổi (lọc & so sánh) và tổng hợp đánh giá kỹ thuật viên." />
+      <PageHeader title="Before / After & Đánh giá" description="Thư viện ảnh trước–sau theo buổi (lọc & so sánh) và tổng hợp đánh giá kỹ thuật viên."
+        action={canWrite && <Link href="/treatment-plans"><Button variant="outline"><Plus className="h-4 w-4" /> Thêm ảnh (ghi buổi)</Button></Link>} />
 
       {/* Tổng hợp đánh giá */}
       {summary && summary.totalReviews > 0 && (
