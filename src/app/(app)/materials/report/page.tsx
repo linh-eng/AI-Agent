@@ -43,7 +43,32 @@ export default function MaterialsReportPage() {
 
   return (
     <div>
-      <PageHeader title="Báo cáo vật tư" description="Tiêu hao theo nhiều chiều (khách/buổi/dịch vụ/công nghệ/protocol/nhân viên) + định mức vs thực tế + chi phí." />
+      <PageHeader title="Báo cáo vật tư" description="Tiêu hao theo vật tư + nhiều chiều (khách/buổi/dịch vụ/công nghệ/protocol/nhân viên) + định mức vs thực tế + chi phí." />
+
+      {/* Tiêu hao THEO VẬT TƯ (tên lọ/sản phẩm) — chiều chính: đã dùng hết bao nhiêu mỗi loại. */}
+      <Card className="mb-4">
+        <CardHeader className="pb-2"><CardTitle className="text-base">Tiêu hao theo vật tư (tên lọ / sản phẩm)</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <THead><TR><TH>Vật tư</TH><TH>Nguồn</TH><TH className="text-right">Số lần dùng</TH><TH className="text-right">Tổng đã dùng</TH>{canFinance && <TH className="text-right">Chi phí</TH>}</TR></THead>
+              <TBody>
+                {(!d.byMaterial || d.byMaterial.length === 0) ? <TR><TD colSpan={canFinance ? 5 : 4} className="py-6 text-center text-muted-foreground">Chưa có tiêu hao vật tư nào được ghi nhận.</TD></TR>
+                  : d.byMaterial.map((r: any, i: number) => (
+                    <TR key={i}>
+                      <TD className="font-medium">{r.label}</TD>
+                      <TD className="text-muted-foreground">{r.source}</TD>
+                      <TD className="text-right tabular-nums">{r.count}</TD>
+                      <TD className="text-right tabular-nums">{r.qty}{r.unit ? ` ${r.unit}` : ""}</TD>
+                      {canFinance && <TD className="text-right">{formatCurrency(r.cost)}</TD>}
+                    </TR>
+                  ))}
+              </TBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Breakdown title="Tiêu hao theo khách hàng" rows={d.byCustomer} canFinance={canFinance} />
         <Breakdown title="Tiêu hao theo buổi" rows={d.bySession} canFinance={canFinance} />

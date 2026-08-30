@@ -85,10 +85,17 @@ export async function materialsReport() {
   const usages = await prisma.materialUsage.findMany({
     include: {
       container: { include: { material: { select: { name: true, expectedPerSession: true } } } },
-      customerMaterial: { select: { name: true } },
+      customerMaterial: { select: { name: true, unit: true } },
       session: { select: { name: true, sessionNumber: true, planId: true } },
     },
   });
+
+  // Tên vật tư + đơn vị + nguồn (Kho vật tư sử dụng | Vật tư khách hàng) cho từng lần tiêu hao.
+  const materialInfo = (u: (typeof usages)[number]) => {
+    if (u.container?.material?.name) return { name: u.container.material.name, unit: u.container.unit ?? "", source: "Kho vật tư sử dụng" };
+    if (u.customerMaterial?.name) return { name: u.customerMaterial.name, unit: u.customerMaterial.unit ?? "", source: "Vật tư khách hàng" };
+    return { name: "", unit: "", source: "" };
+  };
 
   const groupSum = (keyFn: (u: (typeof usages)[number]) => string | null) => {
     const map = new Map<string, { key: string; count: number; qty: number; cost: number }>();
@@ -131,7 +138,22 @@ export async function materialsReport() {
   };
   const label = (arr: any[], nameArr: any[]) => arr.map((r) => ({ ...r, label: nameOf(nameArr, r.key) }));
 
+  // Tiêu hao theo VẬT TƯ (tên lọ/sản phẩm) — chiều quan trọng nhất: dùng hết bao nhiêu mỗi loại.
+  const byMaterialMap = new Map<string, { key: string; label: string; unit: string; source: string; count: number; qty: number; cost: number }>();
+  for (const u of usages) {
+    const info = materialInfo(u);
+    if (!info.name) continue;
+    const cur = byMaterialMap.get(info.name) ?? { key: info.name, label: info.name, unit: info.unit, source: info.source, count: 0, qty: 0, cost: 0 };
+    cur.count += 1;
+    cur.qty += n(u.quantity);
+    cur.cost += n(u.costAllocated);
+    if (!cur.unit) cur.unit = info.unit;
+    byMaterialMap.set(info.name, cur);
+  }
+  const byMaterial = [...byMaterialMap.values()].sort((a, b) => b.cost - a.cost || b.qty - a.qty);
+
   return {
+    byMaterial,
     byCustomer: label(groupSum((u) => u.customerId), custs),
     bySession: groupSum((u) => u.sessionId).map((r) => {
       const rel = usages.find((u) => u.sessionId === r.key);
