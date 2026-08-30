@@ -17,6 +17,7 @@ import { SessionMediaShare } from "@/components/session-media-share";
 import { SpaMaterialConsume } from "@/components/spa-material-consume";
 import { SessionStaff } from "@/components/session-staff";
 import { SessionReview } from "@/components/session-review";
+import { QuickCreateButton, QuickCreateLink } from "@/components/quick-create";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import {
@@ -266,6 +267,8 @@ export default function TreatmentPlanDetailPage() {
         services={services}
         technologies={technologies}
         protocols={protocols}
+        onTechCreated={(r: Opt) => setTechnologies((prev) => [...prev, r])}
+        onProtoCreated={(r: Opt) => setProtocols((prev) => [...prev, r])}
         nextNumber={nextNumber}
         defaultStageId={addStageFor}
         onSubmit={async (body: any) => {
@@ -752,7 +755,7 @@ function VersionModal({ currentVersion, onClose, onSubmit }: any) {
 }
 
 /* ===================== Add session (giữ nguyên, bổ sung ngày dự kiến + khoảng cách) ===================== */
-function AddSessionModal({ open, onClose, onSubmit, error, stages, services, technologies, protocols, nextNumber, defaultStageId }: any) {
+function AddSessionModal({ open, onClose, onSubmit, error, stages, services, technologies, protocols, onTechCreated, onProtoCreated, nextNumber, defaultStageId }: any) {
   const empty = { sessionNumber: nextNumber, name: "", stageId: "", serviceId: "", technologyId: "", brandProtocolId: "", objective: "", plannedDate: "", intervalDays: "", plannedCost: "", price: "", preCare: "", postCare: "", professionalProductsText: "" };
   const [f, setF] = useState<any>(empty);
   const [steps, setSteps] = useState<string[]>([]);
@@ -791,7 +794,8 @@ function AddSessionModal({ open, onClose, onSubmit, error, stages, services, tec
               {stages.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           </div>
-          <div className="space-y-1.5"><Label>Dịch vụ dự kiến</Label>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between"><Label>Dịch vụ dự kiến</Label><QuickCreateLink href="/services?new=1" title="Tạo dịch vụ mới" /></div>
             <Select value={f.serviceId} onChange={(e) => setF({ ...f, serviceId: e.target.value })}>
               <option value="">—</option>
               {services.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -799,13 +803,15 @@ function AddSessionModal({ open, onClose, onSubmit, error, stages, services, tec
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5"><Label>Công nghệ dự kiến</Label>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between"><Label>Công nghệ dự kiến</Label>{onTechCreated && <QuickCreateButton label="Công nghệ" endpoint="/api/technologies" fields={[{ key: "name", label: "Tên công nghệ", required: true }]} onCreated={(r) => { onTechCreated(r); setF((prev: any) => ({ ...prev, technologyId: r.id })); }} />}</div>
             <Select value={f.technologyId} onChange={(e) => setF({ ...f, technologyId: e.target.value })}>
               <option value="">—</option>
               {(technologies ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           </div>
-          <div className="space-y-1.5"><Label>Protocol dự kiến</Label>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between"><Label>Protocol dự kiến</Label>{onProtoCreated && <QuickCreateButton label="Protocol" endpoint="/api/brand-protocols" fields={[{ key: "name", label: "Tên protocol", required: true }]} onCreated={(r) => { onProtoCreated(r); setF((prev: any) => ({ ...prev, brandProtocolId: r.id })); }} />}</div>
             <Select value={f.brandProtocolId} onChange={(e) => setF({ ...f, brandProtocolId: e.target.value })}>
               <option value="">—</option>
               {(protocols ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}

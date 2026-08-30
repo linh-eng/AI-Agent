@@ -18,6 +18,7 @@ import { SessionStaff } from "@/components/session-staff";
 import { SessionContributions } from "@/components/session-contributions";
 import { SessionReview } from "@/components/session-review";
 import { SessionPrescription } from "@/components/session-prescription";
+import { QuickCreateButton, QuickCreateLink } from "@/components/quick-create";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import { SESSION_STATUS_LABEL, SESSION_STATUS_TONE } from "@/lib/clinic-labels";
@@ -285,13 +286,16 @@ export default function SessionExecutionPage() {
         {/* C — Thực hiện thực tế */}
         <Block letter="C" title="Thực hiện thực tế" hint="Ghi dữ liệu THỰC TẾ — không ghi đè kế hoạch. Form chuyên môn tùy Protocol/Công nghệ ở phần Biểu mẫu bên dưới.">
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="space-y-1.5"><Label>Dịch vụ thực tế</Label>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between"><Label>Dịch vụ thực tế</Label>{editable && <QuickCreateLink href="/services?new=1" title="Tạo dịch vụ mới" />}</div>
               {editable ? <Select value={f.serviceId} onChange={(e) => setF({ ...f, serviceId: e.target.value })}><option value="">—</option>{services.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select> : <div className="text-sm">{nameOf("service", f.serviceId)}</div>}
             </div>
-            <div className="space-y-1.5"><Label>Công nghệ thực tế</Label>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between"><Label>Công nghệ thực tế</Label>{editable && <QuickCreateButton label="Công nghệ" endpoint="/api/technologies" fields={[{ key: "name", label: "Tên công nghệ", required: true }]} onCreated={(r) => { setTechnologies((prev) => [...prev, r]); setF((prev: any) => ({ ...prev, technologyId: r.id })); }} />}</div>
               {editable ? <Select value={f.technologyId} onChange={(e) => setF({ ...f, technologyId: e.target.value })}><option value="">—</option>{technologies.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select> : <div className="text-sm">{nameOf("technology", f.technologyId)}</div>}
             </div>
-            <div className="space-y-1.5"><Label>Protocol thực tế</Label>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between"><Label>Protocol thực tế</Label>{editable && <QuickCreateButton label="Protocol" endpoint="/api/brand-protocols" fields={[{ key: "name", label: "Tên protocol", required: true }]} onCreated={(r) => { setProtocols((prev) => [...prev, r]); setF((prev: any) => ({ ...prev, brandProtocolId: r.id })); }} />}</div>
               {editable ? <Select value={f.brandProtocolId} onChange={(e) => setF({ ...f, brandProtocolId: e.target.value })}><option value="">—</option>{protocols.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select> : <div className="text-sm">{nameOf("protocol", f.brandProtocolId)}</div>}
             </div>
           </div>
