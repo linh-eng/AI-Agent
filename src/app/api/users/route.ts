@@ -5,6 +5,7 @@ import { ok, created, handle, fail } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { PERMISSIONS, ROLES } from "@/lib/rbac";
 import { userCreateSchema } from "@/lib/clinic-validation";
+import { sanitizeExtra } from "@/lib/user-permissions";
 import { hashPassword } from "@/lib/auth";
 import { auditLog } from "@/lib/clinic";
 
@@ -20,6 +21,7 @@ export const GET = handle(async () => {
   return ok(users.map((u) => ({
     id: u.id, email: u.email, name: u.name, isActive: u.isActive, createdAt: u.createdAt,
     roles: u.roles.map((r) => ({ code: r.role.code, name: r.role.name })),
+    extraPermissions: u.extraPermissions ?? [],
   })));
 });
 
@@ -31,6 +33,7 @@ export const POST = handle(async (req) => {
 
   const roleCodes = parsed.roleCodes.filter((c) => VALID_ROLE_CODES.has(c));
   const roles = await prisma.role.findMany({ where: { code: { in: roleCodes } }, select: { id: true } });
+  const extraPermissions = sanitizeExtra(parsed.extraPermissions);
 
   const user = await prisma.user.create({
     data: {
@@ -38,6 +41,7 @@ export const POST = handle(async (req) => {
       name: parsed.name,
       passwordHash: await hashPassword(parsed.password),
       isActive: parsed.isActive ?? true,
+      extraPermissions,
       roles: { create: roles.map((r) => ({ roleId: r.id })) },
     },
   });
@@ -46,7 +50,7 @@ export const POST = handle(async (req) => {
     action: "USER_CREATED",
     entityType: "User",
     entityId: user.id,
-    changes: { email, roles: roleCodes },
+    changes: { email, roles: roleCodes, extraPermissions },
   });
   return created({ id: user.id, email: user.email, name: user.name });
 });

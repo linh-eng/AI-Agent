@@ -23,6 +23,8 @@ export interface SessionPayload {
   name: string;
   roles: string[];
   permissions: string[];
+  /** Quyền BỔ SUNG cấp riêng cho tài khoản (ngoài vai trò) — hợp nhất vào permissions. */
+  extraPermissions?: string[];
 }
 
 // ----- Mật khẩu -----
@@ -52,6 +54,7 @@ export async function verifySession(token: string): Promise<SessionPayload | nul
       name: String(payload.name),
       roles: (payload.roles as string[]) ?? [],
       permissions: (payload.permissions as string[]) ?? [],
+      extraPermissions: (payload.extraPermissions as string[]) ?? [],
     };
   } catch {
     return null;

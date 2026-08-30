@@ -241,3 +241,50 @@ describe("Mục 14 · Quản trị người dùng", () => {
     expect(await prisma.auditLog.findFirst({ where: { action: "USER_DELETED", entityId: created!.id } })).toBeTruthy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Quyền BỔ SUNG cấp riêng cho tài khoản (extraPermissions) — ngoài vai trò.
+// ---------------------------------------------------------------------------
+import { verifySession } from "@/lib/auth";
+
+describe("Quyền bổ sung theo tài khoản (extraPermissions)", () => {
+  it("EX1 · tạo user + quyền bổ sung → đăng nhập có quyền đó (ngoài vai trò)", async () => {
+    await asAdmin();
+    const email = `${uniq("nv")}@sophia.com.vn`.toLowerCase();
+    const res = await createUser({ email, name: "KTV+", password: "matkhau123", roleCodes: [ROLES.SPECIALIST], extraPermissions: [PERMISSIONS.PAYMENT_VOID] });
+    expect(res.status).toBe(201);
+    // DB lưu đúng quyền bổ sung.
+    const u = await prisma.user.findUnique({ where: { email } });
+    expect(u!.extraPermissions).toContain(PERMISSIONS.PAYMENT_VOID);
+    // Đăng nhập → token có payment.void (dù vai trò SPECIALIST không có).
+    const lr = await loginRes(email, "matkhau123");
+    expect(lr.status).toBe(200);
+    const payload = await verifySession(lr.token!);
+    expect(payload!.permissions).toContain(PERMISSIONS.PAYMENT_VOID);
+    expect(payload!.extraPermissions).toContain(PERMISSIONS.PAYMENT_VOID);
+  });
+
+  it("EX2 · KHÔNG cấp được user.manage qua quyền bổ sung (lọc ở server)", async () => {
+    await asAdmin();
+    const email = `${uniq("nv")}@sophia.com.vn`.toLowerCase();
+    await createUser({ email, name: "X", password: "matkhau123", roleCodes: [ROLES.RECEPTION], extraPermissions: [PERMISSIONS.USER_MANAGE, "quyen.la.khong.ton.tai", PERMISSIONS.INVOICE_WRITE] });
+    const u = await prisma.user.findUnique({ where: { email } });
+    expect(u!.extraPermissions).not.toContain(PERMISSIONS.USER_MANAGE); // trục an ninh giữ cho Admin
+    expect(u!.extraPermissions).not.toContain("quyen.la.khong.ton.tai"); // quyền lạ bị loại
+    expect(u!.extraPermissions).toContain(PERMISSIONS.INVOICE_WRITE); // quyền hợp lệ giữ lại
+  });
+
+  it("EX3 · PATCH thêm/bớt quyền bổ sung + audit before/after", async () => {
+    await asAdmin();
+    const t = await makeUser([ROLES.SPECIALIST]);
+    await userPatch(jr(`http://t/api/users/${t.user.id}`, "PATCH", { extraPermissions: [PERMISSIONS.PRICE_WRITE] }), { params: { id: t.user.id } });
+    let u = await prisma.user.findUnique({ where: { id: t.user.id } });
+    expect(u!.extraPermissions).toEqual([PERMISSIONS.PRICE_WRITE]);
+    // Bớt về rỗng.
+    await userPatch(jr(`http://t/api/users/${t.user.id}`, "PATCH", { extraPermissions: [] }), { params: { id: t.user.id } });
+    u = await prisma.user.findUnique({ where: { id: t.user.id } });
+    expect(u!.extraPermissions).toEqual([]);
+    const audit = await prisma.auditLog.findFirst({ where: { action: "USER_UPDATED", entityId: t.user.id }, orderBy: { createdAt: "desc" } });
+    expect((audit!.changes as any).extraPermissions).toBeTruthy();
+  });
+});

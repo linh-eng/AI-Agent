@@ -24,6 +24,8 @@ function recomputePermissions(session: SessionPayload): SessionPayload {
   }
   // Hợp nhất quyền có sẵn trong token (fallback cho vai trò không nằm trong code).
   (session.permissions ?? []).forEach((p) => permSet.add(p));
+  // Quyền BỔ SUNG cấp riêng cho tài khoản (ngoài vai trò).
+  (session.extraPermissions ?? []).forEach((p) => permSet.add(p));
   return { ...session, permissions: Array.from(permSet) };
 }
 

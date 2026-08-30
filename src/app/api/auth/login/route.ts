@@ -55,6 +55,9 @@ export const POST = handle(async (req) => {
     if (fromCode) fromCode.forEach((p) => permSet.add(p));
     else ur.role.permissions.forEach((rp) => permSet.add(rp.permission.code));
   }
+  // Quyền BỔ SUNG cấp riêng cho tài khoản (ngoài vai trò) — hợp nhất.
+  const extraPermissions = user.extraPermissions ?? [];
+  extraPermissions.forEach((p) => permSet.add(p));
   const permissions = Array.from(permSet);
 
   const token = await signSession({
@@ -63,6 +66,7 @@ export const POST = handle(async (req) => {
     name: user.name,
     roles,
     permissions,
+    extraPermissions,
   });
 
   cookies().set(SESSION_COOKIE, token, sessionCookieOptions());

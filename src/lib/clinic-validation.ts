@@ -786,12 +786,14 @@ export const userCreateSchema = z.object({
   name: z.string().min(1, "Nhập họ tên"),
   password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
   roleCodes: z.array(z.string()).default([]),
+  extraPermissions: z.array(z.string()).optional(), // quyền bổ sung riêng cho tài khoản
   isActive: z.boolean().optional(),
 });
 export const userUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự").optional().or(z.literal("")),
   roleCodes: z.array(z.string()).optional(),
+  extraPermissions: z.array(z.string()).optional(),
   isActive: z.boolean().optional(),
 });
 
