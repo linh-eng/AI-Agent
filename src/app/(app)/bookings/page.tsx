@@ -16,6 +16,7 @@ import { VN_TZ, formatVnTime, parseVnLocal } from "@/lib/timezone";
 import { useCan } from "@/components/session-provider";
 import { PERMISSIONS } from "@/lib/rbac";
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_TONE } from "@/lib/clinic-labels";
+import { QuickCreateButton, QuickCreateLink } from "@/components/quick-create";
 
 interface Booking {
   id: string; code: string; customerId?: string; scheduledAt: string; durationMinutes?: number | null;
@@ -210,7 +211,7 @@ function BookingsPageInner() {
         <MonthView rows={rows} anchor={anchor} onOpenDay={(d) => { setAnchor(d); setView("day"); }} onOpen={setDetailId} />
       )}
 
-      <BookingFormModal open={open} prefill={prefill} onClose={() => { setOpen(false); setPrefill(null); }} customers={customers} services={services} employees={employees} resources={resources} canOverride={canOverride} onSaved={() => { setOpen(false); setPrefill(null); load(); }} />
+      <BookingFormModal open={open} prefill={prefill} onClose={() => { setOpen(false); setPrefill(null); }} customers={customers} services={services} employees={employees} resources={resources} canOverride={canOverride} onCustomerCreated={(r: any) => setCustomers((p) => [...p, r])} onSaved={() => { setOpen(false); setPrefill(null); load(); }} />
       {detailId && <BookingDetailModal id={detailId} onClose={() => setDetailId(null)} canWrite={canWrite} canOverride={canOverride} employees={employees} resources={resources} onChanged={load} />}
       {resourceMgr && <ResourceManagerModal resources={resources} onClose={() => setResourceMgr(false)} onChanged={loadResources} />}
     </div>
@@ -518,7 +519,7 @@ function ConflictBlock({ conflicts, suggestions, canOverride, overrideReason, se
 /* ===================== Create modal ===================== */
 const EMPTY = { customerId: "", serviceId: "", serviceMinutes: "", scheduledAt: "", expectedEndAt: "", durationMinutes: "", technician: "", master: "", room: "", bed: "", machine: "", planId: "", stageId: "", sessionNumber: "", price: "", deposit: "", note: "" };
 
-function BookingFormModal({ open, prefill, onClose, customers, services, employees, resources, canOverride, onSaved }: { open: boolean; prefill?: Record<string, string> | null; onClose: () => void; customers: Customer[]; services: Service[]; employees: Employee[]; resources: Resource[]; canOverride: boolean; onSaved: () => void }) {
+function BookingFormModal({ open, prefill, onClose, customers, services, employees, resources, canOverride, onSaved, onCustomerCreated }: { open: boolean; prefill?: Record<string, string> | null; onClose: () => void; customers: Customer[]; services: Service[]; employees: Employee[]; resources: Resource[]; canOverride: boolean; onSaved: () => void; onCustomerCreated?: (r: any) => void }) {
   const [form, setForm] = useState({ ...EMPTY });
   const [assistants, setAssistants] = useState<string[]>([]);
   const [extraItems, setExtraItems] = useState<{ serviceId: string; minutes: string }[]>([]); // dịch vụ bổ sung + thời gian riêng từng dịch vụ (item[0] = form.serviceId)
@@ -656,7 +657,9 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
           </div>
         )}
         <div className="space-y-1.5">
-          <Label>Khách hàng *</Label>
+          <div className="flex items-center justify-between"><Label>Khách hàng *</Label>
+            {onCustomerCreated && <QuickCreateButton label="Khách hàng" endpoint="/api/customers" fields={[{ key: "fullName", label: "Họ tên", required: true }, { key: "phone", label: "Số điện thoại" }]} onCreated={(r) => { onCustomerCreated(r); onCustomer(r.id); }} />}
+          </div>
           <Select value={form.customerId} onChange={(e) => onCustomer(e.target.value)} required>
             <option value="">— Chọn khách —</option>
             {customers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.fullName}</option>)}
@@ -671,7 +674,7 @@ function BookingFormModal({ open, prefill, onClose, customers, services, employe
 
         {/* Dịch vụ (không bắt buộc) — mỗi dịch vụ có trường THỜI GIAN riêng bên cạnh */}
         <div className="rounded-md border border-dashed p-3">
-          <div className="mb-2 text-xs font-medium text-muted-foreground">Dịch vụ trong lần đến này (không bắt buộc — có thể nhiều dịch vụ){multiTotalDuration != null ? ` · tổng ~${multiTotalDuration}′` : ""}</div>
+          <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground"><span>Dịch vụ trong lần đến này (không bắt buộc — có thể nhiều dịch vụ){multiTotalDuration != null ? ` · tổng ~${multiTotalDuration}′` : ""}</span><QuickCreateLink href="/services?new=1" title="Tạo dịch vụ mới" /></div>
           {/* Dịch vụ chính (item #1) + thời gian riêng */}
           <div className="mb-2 flex items-center gap-2">
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">1</span>

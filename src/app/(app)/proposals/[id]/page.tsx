@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Plus, Trash2, CheckCircle2, Send } from "lucide-react";
+import { QuickCreateLink } from "@/components/quick-create";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -177,10 +178,14 @@ export default function ProposalDetailPage() {
                           <Button size="icon" variant="ghost" onClick={() => mutate((x) => x[oi].items.splice(ii, 1))}><Trash2 className="h-3.5 w-3.5" /></Button>
                         </div>
                         {it.itemType !== "CUSTOM" && (entities[it.itemType]?.length ?? 0) > 0 && (
-                          <Select className="h-7 text-xs" value={it.refId ?? ""} onChange={(e) => pickEntity(oi, ii, e.target.value)}>
-                            <option value="">— chọn để tự điền —</option>
-                            {(entities[it.itemType] ?? []).map((ent) => <option key={ent.id} value={ent.id}>{ent.name}</option>)}
-                          </Select>
+                          <div className="flex items-center gap-2">
+                            <Select className="h-7 text-xs" value={it.refId ?? ""} onChange={(e) => pickEntity(oi, ii, e.target.value)}>
+                              <option value="">— chọn để tự điền —</option>
+                              {(entities[it.itemType] ?? []).map((ent) => <option key={ent.id} value={ent.id}>{ent.name}</option>)}
+                            </Select>
+                            {({ SERVICE: "/services?new=1", PRODUCT: "/catalog?new=1", TECHNOLOGY: "/technologies?new=1", BRAND_PROTOCOL: "/protocols?new=1" } as Record<string, string>)[it.itemType] &&
+                              <QuickCreateLink href={({ SERVICE: "/services?new=1", PRODUCT: "/catalog?new=1", TECHNOLOGY: "/technologies?new=1", BRAND_PROTOCOL: "/protocols?new=1" } as Record<string, string>)[it.itemType]} title="Tạo mục mới" />}
+                          </div>
                         )}
                         <Input className="h-7 text-xs" placeholder="Tên hạng mục" value={it.name} onChange={(e) => mutate((x) => (x[oi].items[ii].name = e.target.value))} />
                         <div className="flex gap-1">

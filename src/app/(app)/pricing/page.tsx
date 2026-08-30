@@ -12,6 +12,7 @@ import { apiFetch } from "@/lib/client";
 import { formatNumber, formatDate } from "@/lib/utils";
 import { useCan } from "@/components/session-provider";
 import { useOpenNew } from "@/lib/use-open-new";
+import { QuickCreateLink } from "@/components/quick-create";
 import { PERMISSIONS } from "@/lib/rbac";
 import { PRICE_TYPE_LABEL, PRICE_TARGET_LABEL } from "@/lib/clinic-labels";
 
@@ -151,7 +152,10 @@ export default function PricingPage() {
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Mục *</Label>
+            <div className="flex items-center justify-between"><Label>Mục *</Label>
+              {({ SERVICE: "/services?new=1", PRODUCT: "/catalog?new=1", TECHNOLOGY: "/technologies?new=1", PACKAGE: "/protocols?new=1" } as Record<string, string>)[form.targetType] && !form.supersedesId &&
+                <QuickCreateLink href={({ SERVICE: "/services?new=1", PRODUCT: "/catalog?new=1", TECHNOLOGY: "/technologies?new=1", PACKAGE: "/protocols?new=1" } as Record<string, string>)[form.targetType]} title="Tạo mục mới" />}
+            </div>
             {ENTITY_ENDPOINT[form.targetType] ? (
               <Select value={form.targetId} disabled={!!form.supersedesId} onChange={(e) => pickTarget(e.target.value)} required>
                 <option value="">— Chọn —</option>
