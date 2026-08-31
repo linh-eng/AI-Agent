@@ -242,7 +242,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <aside class="side">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.4</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.5</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="userbox" id="userbox"></div>
@@ -270,7 +270,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <div class="login-card">
     <div class="login-top">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.4</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.5</span></div>
     </div>
     <div class="login-body">
       <h2>Đăng nhập hệ thống</h2>
@@ -2367,7 +2367,7 @@ function siteDocBlock(t){
     ['Địa điểm',[s.diaDiemTen,s.diaChi].filter(Boolean).join(' — ')],['Tòa / Tầng / Phòng',[s.toaBlock,s.tang,s.phongKV].filter(Boolean).join(' · ')],['Điểm mốc',s.diemMoc],
     ['Người nhận',[s.nguoiNhanTen,s.nguoiNhanCD,s.nguoiNhanSdt].filter(Boolean).join(' · ')],['Dự phòng',s.nguoiNhanDP],['Khung giờ nhận',s.khungGio],['Ngày hẹn',fmtDT(s.ngayHen)],
     ['Đăng ký ra vào',s.dangKyRaVao],['Giấy tờ mang',(s.giayTo||[]).join(', ')],['Thang máy hàng',s.thangMayHang],['Giới hạn giờ VC',s.gioiHanGio],['Đỗ xe / bốc dỡ',s.doXe],['ATLĐ',s.atld],
-    ['Phạm vi công việc',s.phamViCV],['Ngoài phạm vi',s.khongThuoc],['Tiêu chuẩn nghiệm thu',s.tieuChuanNT],['Cam kết với KH',s.camKetKH],['Chứng từ bàn giao',[...(s.chungTuBG||[]),...(s.chungTuKhac?[s.chungTuKhac]:[])].join(', ')]
+    ['Yêu cầu cấu hình / TSKT',s.yeuCauCauHinh],['Phạm vi công việc',s.phamViCV],['Ngoài phạm vi',s.khongThuoc],['Tiêu chuẩn nghiệm thu',s.tieuChuanNT],['Cam kết với KH',s.camKetKH],['Chứng từ bàn giao',[...(s.chungTuBG||[]),...(s.chungTuKhac?[s.chungTuKhac]:[])].join(', ')],['Yêu cầu đặc biệt của KH',s.yeuCauDacBiet]
   ])}${dev.length?`<div style="font-weight:600;margin-top:8px">Danh mục thiết bị / hạng mục</div><table><tr><th>STT</th><th>Mã Hàng</th><th>Tên Hàng Hóa</th><th>Số Lượng</th></tr>${dev.map((x,i)=>`<tr><td>${i+1}</td><td>${xmlEsc(x.ma)}</td><td>${xmlEsc(x.ten)}</td><td>${xmlEsc(x.sl)}</td></tr>`).join("")}</table>`:''}`;
 }
 function printMenu(id){
@@ -2396,11 +2396,13 @@ function printYeuCau(id){const t=DB.tickets.find(x=>x.id===id);if(!t)return;
 // 2) Phiếu giao việc
 function printGiaoViec(id){const t=DB.tickets.find(x=>x.id===id);if(!t)return;const[rp,rh]=slaOf(t.uutien);
   const kh=t.keHoach||{};const cl=Array.isArray(kh.checklist)?kh.checklist:[];
+  const ycdb=(t.site&&t.site.yeuCauDacBiet)?String(t.site.yeuCauDacBiet).trim():'';
+  const ycBox=ycdb?`<div style="border:2px solid #c0392b;background:#fdeeee;border-radius:8px;padding:10px 12px;margin:12px 0"><div style="font-weight:800;color:#c0392b;font-size:13px;margin-bottom:3px">⚠️ YÊU CẦU ĐẶC BIỆT CỦA KHÁCH HÀNG</div><div style="font-size:13px;white-space:pre-wrap">${xmlEsc(ycdb)}</div></div>`:'';
   const b=docHeader("Phiếu giao việc",t.id)+kv([
     ['Loại công việc',loaiText(t)],['Mức ưu tiên',t.uutien],['SLA',`Phản hồi ${rp}′ · Xử lý ${rh}h`],['Đơn vị / KH',t.donvi],['Người yêu cầu',t.nguoiYC],
     ['Nhóm / Đội',t.doi],['Người thực hiện',t.assignee],['Người phối hợp',t.phoihop],['Thời hạn mong muốn',fmtDT(t.tGiaoYC)],
     ['Bắt đầu → hoàn tất DK',[fmtDT(kh.tBatDauDK),fmtDT(kh.tHoanTatDK)].filter(Boolean).join(' → ')],['Phương án',kh.phuongAn]
-  ])+`<h3>Nội dung công việc</h3><div style="border:1px solid #ccc;padding:8px;min-height:44px">${xmlEsc(t.noidung)}</div>`
+  ])+ycBox+`<h3>Nội dung công việc</h3><div style="border:1px solid #ccc;padding:8px;min-height:44px">${xmlEsc(t.noidung)}</div>`
   +(cl.length?`<h3>Đầu việc con (checklist)</h3><table><tr><th style="width:34px">TT</th><th>Nội dung</th><th style="width:70px">Xong</th></tr>${cl.map((x,i)=>`<tr><td>${i+1}</td><td>${xmlEsc(x.text||x.noidung||'')}</td><td>${x.done?'✔':''}</td></tr>`).join("")}</table>`:'')
   +siteDocBlock(t)+signBlock("NGƯỜI GIAO VIỆC","NGƯỜI THỰC HIỆN");
   printDoc("Phiếu giao việc "+t.id,b);
