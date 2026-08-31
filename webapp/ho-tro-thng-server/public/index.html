@@ -242,7 +242,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <aside class="side">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.5</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.6</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="userbox" id="userbox"></div>
@@ -270,7 +270,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <div class="login-card">
     <div class="login-top">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.5</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.6</span></div>
     </div>
     <div class="login-body">
       <h2>Đăng nhập hệ thống</h2>
@@ -399,7 +399,9 @@ function startPoll(){setInterval(async()=>{
   if(!ME)return;
   refreshNotifs();
   if(document.getElementById("overlay").classList.contains("show"))return;
-  try{const old=JSON.stringify(DB);await refresh();if(JSON.stringify(DB)!==old){buildNav();render();}setOnline(true);}catch(e){setOnline(false);}
+  // đang gõ trong ô nhập (vd ô tìm kiếm) -> cập nhật dữ liệu ngầm, KHÔNG render lại để tránh mất chữ / ngắt bộ gõ
+  const ae=document.activeElement; const typing=ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);
+  try{const old=JSON.stringify(DB);await refresh();if(!typing&&JSON.stringify(DB)!==old){buildNav();render();}setOnline(true);}catch(e){setOnline(false);}
 },15000);}
 
 /* ============================ THÔNG BÁO TRONG ỨNG DỤNG (🔔) ============================ */
@@ -628,30 +630,49 @@ function renderDash(){
 
 /* ---------- TICKETS ---------- */
 let TFILTER={q:"",st:"",pr:""};
+// Tìm kiếm: bỏ dấu + không phân biệt hoa/thường (gõ "phong" ra "Phong")
+function stripDiac(s){ return String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D'); }
+function normSearch(s){ return stripDiac(s).toLowerCase(); }
+function ticketMatch(t){
+  if(TFILTER.st&&baseStatus(t.trangthai)!==baseStatus(TFILTER.st))return false;
+  if(TFILTER.pr&&t.uutien!==TFILTER.pr)return false;
+  if(TFILTER.q){ const terms=normSearch(TFILTER.q).split(/\s+/).filter(Boolean);
+    if(terms.length){ const hay=normSearch([t.id,t.nguoiYC,t.donvi,t.noidung,t.assignee||'',t.nguoiDuocYCName||'',loaiText(t)].join(' '));
+      if(!terms.every(x=>hay.includes(x)))return false; } }
+  return true;
+}
+function ticketRowHTML(t){
+  const s=slaStatus(t);const [rp]=t.uutien.split(" ");
+  return `<tr onclick="openDetail('${t.id}')">
+    <td class="mono">${t.id}</td>
+    <td><div class="ell" title="${esc(t.noidung)}">${esc(t.noidung)}</div><div class="muted" style="font-size:11.5px">${esc(loaiText(t))}</div></td>
+    <td>${esc(t.donvi)}<div class="muted" style="font-size:11.5px">${esc(t.nguoiYC)}</div></td>
+    <td><span class="pr ${rp}">${esc(t.uutien)}</span></td>
+    <td>${t.assignee?esc(t.assignee):'<span class="muted">Chưa gán</span>'}</td>
+    <td>${stPill(t.trangthai)}${(()=>{const pp=planProgress(t);return pp?`<div class="muted" style="font-size:11px;margin-top:3px">Đầu việc ${pp.done}/${pp.total} (${pp.pct}%)</div>`:'';})()}</td>
+    <td><span class="pill ${s.color}"><span class="dot"></span>${s.label}</span><div class="muted" style="font-size:11px;margin-top:3px">${s.used}h / ${s.deadline}h</div></td>
+  </tr>`;
+}
+function ticketBodyHTML(rows){ return rows.length?rows.map(ticketRowHTML).join(""):`<tr><td colspan="7"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg><div>Không có ticket phù hợp từ khóa / bộ lọc.</div></div></td></tr>`; }
+// Chỉ cập nhật danh sách (KHÔNG dựng lại ô tìm kiếm) — giữ con trỏ & bộ gõ tiếng Việt khi đang gõ
+function updateTicketList(){
+  const rows=DB.tickets.filter(ticketMatch);
+  const tb=document.getElementById('ticketBody'); if(tb) tb.innerHTML=ticketBodyHTML(rows);
+  const c=document.getElementById('ticketCount'); if(c) c.textContent=`Hiển thị ${rows.length}/${DB.tickets.length} ticket · Nhấp vào dòng để xem & cập nhật chi tiết.`;
+}
 function renderTickets(){
-  const rows=DB.tickets.filter(t=>{
-    if(TFILTER.st&&baseStatus(t.trangthai)!==baseStatus(TFILTER.st))return false;
-    if(TFILTER.pr&&t.uutien!==TFILTER.pr)return false;
-    if(TFILTER.q){const s=(t.id+" "+t.nguoiYC+" "+t.donvi+" "+t.noidung+" "+(t.assignee||"")).toLowerCase();if(!s.includes(TFILTER.q.toLowerCase()))return false;}
-    return true;
-  });
+  // giữ tiêu điểm + con trỏ ở ô tìm kiếm khi render lại (đổi bộ lọc / đồng bộ định kỳ)
+  const act=document.activeElement, keepFocus=act&&act.id==='ticketSearch';
+  const selS=keepFocus?act.selectionStart:null, selE=keepFocus?act.selectionEnd:null;
+  const rows=DB.tickets.filter(ticketMatch);
   const opt=(arr,v)=>arr.map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join("");
-  const body=rows.length?rows.map(t=>{
-    const s=slaStatus(t);const [rp]=t.uutien.split(" ");
-    return `<tr onclick="openDetail('${t.id}')">
-      <td class="mono">${t.id}</td>
-      <td><div class="ell" title="${esc(t.noidung)}">${esc(t.noidung)}</div><div class="muted" style="font-size:11.5px">${esc(loaiText(t))}</div></td>
-      <td>${esc(t.donvi)}<div class="muted" style="font-size:11.5px">${esc(t.nguoiYC)}</div></td>
-      <td><span class="pr ${rp}">${esc(t.uutien)}</span></td>
-      <td>${t.assignee?esc(t.assignee):'<span class="muted">Chưa gán</span>'}</td>
-      <td>${stPill(t.trangthai)}${(()=>{const pp=planProgress(t);return pp?`<div class="muted" style="font-size:11px;margin-top:3px">Đầu việc ${pp.done}/${pp.total} (${pp.pct}%)</div>`:'';})()}</td>
-      <td><span class="pill ${s.color}"><span class="dot"></span>${s.label}</span><div class="muted" style="font-size:11px;margin-top:3px">${s.used}h / ${s.deadline}h</div></td>
-    </tr>`;
-  }).join(""):`<tr><td colspan="7"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg><div>Chưa có ticket phù hợp bộ lọc.</div></div></td></tr>`;
   document.getElementById("view").innerHTML=`
     <div class="toolbar">
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input placeholder="Tìm mã, người YC, nội dung…" value="${esc(TFILTER.q)}" oninput="TFILTER.q=this.value;renderTickets()"></div>
+        <input id="ticketSearch" placeholder="Tìm mã ticket, tên người, nội dung… (gõ không dấu vẫn ra)" value="${esc(TFILTER.q)}" autocomplete="off"
+          oninput="TFILTER.q=this.value; if(!this._composing) updateTicketList()"
+          oncompositionstart="this._composing=true"
+          oncompositionend="this._composing=false; TFILTER.q=this.value; updateTicketList()"></div>
       <select class="field-sel" onchange="TFILTER.st=this.value;renderTickets()"><option value="">Tất cả trạng thái</option>${opt(CAT.trangthai,TFILTER.st)}</select>
       <select class="field-sel" onchange="TFILTER.pr=this.value;renderTickets()"><option value="">Tất cả ưu tiên</option>${opt(CAT.uutien,TFILTER.pr)}</select>
       <div class="spacer" style="flex:1"></div>
@@ -660,8 +681,9 @@ function renderTickets(){
     </div>
     <div class="panel"><div class="table-wrap"><table>
       <thead><tr><th>Mã Ticket</th><th>Nội dung / Loại</th><th>Đơn vị YC</th><th>Ưu tiên</th><th>Người xử lý</th><th>Trạng thái</th><th>SLA xử lý</th></tr></thead>
-      <tbody>${body}</tbody></table></div></div>
-    <div class="muted" style="margin-top:12px;font-size:12.5px">Hiển thị ${rows.length}/${DB.tickets.length} ticket · Nhấp vào dòng để xem & cập nhật chi tiết.</div>`;
+      <tbody id="ticketBody">${ticketBodyHTML(rows)}</tbody></table></div></div>
+    <div class="muted" id="ticketCount" style="margin-top:12px;font-size:12.5px">Hiển thị ${rows.length}/${DB.tickets.length} ticket · Nhấp vào dòng để xem & cập nhật chi tiết.</div>`;
+  if(keepFocus){ const inp=document.getElementById('ticketSearch'); if(inp){ inp.focus(); try{ inp.setSelectionRange(selS,selE); }catch(e){} } }
 }
 function stColor(s){const b=baseStatus(s);
   if(b==="Hoàn tất")return "green";
