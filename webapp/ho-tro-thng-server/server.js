@@ -17,7 +17,7 @@ catch (e) {
   process.exit(1);
 }
 
-const APP_VERSION = "v3.9.6"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
+const APP_VERSION = "v3.9.7"; // đổi mỗi lần cập nhật để dễ kiểm tra bản đang chạy
 const PORT = process.env.PORT || 3000;
 const HOST = "0.0.0.0";
 const ROOT = __dirname;
@@ -28,8 +28,8 @@ const SESSION_MS = 8 * 60 * 60 * 1000;
 
 /* ============================ QUYỀN THEO VAI TRÒ ============================ */
 const ROLES = {
-  admin:    { label: "Quản trị hệ thống",               viewAll:1, create:1, edit:1, del:1, ps:1, approve:1, users:1 },
-  dieuphoi: { label: "Điều phối / Trưởng bộ phận Hỗ trợ", viewAll:1, create:1, edit:1, del:1, ps:1, approve:1 },
+  admin:    { label: "Quản trị hệ thống",               viewAll:1, create:1, edit:1, del:1, ps:1, approve:1, users:1, editReq:1 },
+  dieuphoi: { label: "Điều phối / Trưởng bộ phận Hỗ trợ", viewAll:1, create:1, edit:1, del:1, ps:1, approve:1, editReq:1 },
   xuly:     { label: "Nhân viên xử lý",                  viewAll:1, create:1, edit:1, ps:1 },
   yeucau:   { label: "Người yêu cầu (phòng ban)",         create:1 },
   giamdoc:  { label: "Ban giám đốc (chỉ xem)",            viewAll:1, readonly:1 },
@@ -550,10 +550,11 @@ const server = http.createServer(async (req, res) => {
           const ownerResubmit = can(me, "create") && cur.createdBy === me.username && baseStatus(cur.trangthai) === "Trả lại bổ sung";
           if (!can(me, "edit") && !ownerResubmit) return sendJSON(res, 403, { error: "Không có quyền sửa ticket" });
           const t = await readBody(req); t.id = id; t.createdBy = cur.createdBy;
-          // Chỉ người TẠO yêu cầu (hoặc Quản trị) mới được sửa "Thông tin yêu cầu" (Bước 1).
-          // Người khác (người được yêu cầu, người xử lý…) sửa gì ở Bước 1 sẽ bị giữ nguyên theo bản gốc.
+          // Chỉ người TẠO yêu cầu, hoặc người CÓ THẨM QUYỀN (Quản trị / Điều phối - quyền editReq)
+          // mới được sửa "Thông tin yêu cầu" (Bước 1). Người khác (người được giao việc, người xử lý…)
+          // sửa gì ở Bước 1 sẽ bị giữ nguyên theo bản gốc.
           const isReq = (me.username === cur.createdBy) || (cur.nguoiYC && String(cur.nguoiYC).trim() === String(me.name||"").trim());
-          if (!isReq && !can(me, "users")) {
+          if (!isReq && !can(me, "editReq")) {
             const REQ_FIELDS = ["loai","loaiKhac","luong","moTaThem","donvi","nguoiYC","sdt","email","nguoiDuocYC","nguoiDuocYCName","nguoiDuocYCSdt","riengTu","watchers","noidung","soluong","dvt","quycach","diadiemGiao","diadiemNhan"];
             REQ_FIELDS.forEach(f => { t[f] = cur[f]; });
           }

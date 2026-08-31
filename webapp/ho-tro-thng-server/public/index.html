@@ -242,7 +242,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <aside class="side">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.6</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.7</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="userbox" id="userbox"></div>
@@ -270,7 +270,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <div class="login-card">
     <div class="login-top">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.6</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.7</span></div>
     </div>
     <div class="login-body">
       <h2>Đăng nhập hệ thống</h2>
@@ -1365,7 +1365,7 @@ function drawForm(){
       <span class="muted" style="font-size:12px">Ảnh, PDF, Word, Excel… tối đa ${(CFG&&CFG.maxUpload)||10} MB/tệp.</span></div></div></div>` : '';
   const steps=[step0,step1,step2,step3];
   // Khóa "Thông tin yêu cầu" (Bước 1): chỉ người tạo yêu cầu / Quản trị mới sửa được
-  const reqLock = !isNew && !(isRequester(t) || can('users'));
+  const reqLock = !isNew && !(isRequester(t) || can('editReq'));
   const lockNote = reqLock ? `<div class="note" style="margin:0 0 12px;border-color:var(--amber);background:var(--amber-bg,#fdf3e0)">🔒 <b>Thông tin yêu cầu</b> chỉ do <b>người tạo yêu cầu</b> chỉnh sửa. Bạn vẫn cập nhật được phần phân công / xử lý / nghiệm thu bên dưới.</div>` : '';
   const step0Locked = reqLock ? `<fieldset disabled style="border:0;margin:0;padding:0;min-inline-size:auto">${lockNote}${step0}</fieldset>` : step0;
   const o=document.getElementById("overlay");
