@@ -26,18 +26,20 @@ const EXTRA_PERM_GROUPS: { group: string; items: { code: string; label: string }
     { code: "booking.override", label: "Đặt đè lịch (trùng lịch)" },
     { code: "followup.write", label: "Quản lý quy trình CSKH" },
   ]},
-  { group: "Tài chính", items: [
-    { code: "payment.write", label: "Thu tiền" },
+  { group: "Tài chính · Hóa đơn", items: [
+    { code: "payment.write", label: "Thu tiền / lên bill" },
     { code: "payment.void", label: "Hủy phiếu thu" },
-    { code: "invoice.write", label: "Lập hóa đơn" },
+    { code: "invoice.write", label: "Lập / xuất hóa đơn" },
     { code: "deposit.write", label: "Thu / phân bổ cọc" },
-    { code: "finance.read", label: "Xem giá vốn / dữ liệu tài chính" },
   ]},
-  { group: "Thiết lập & giá", items: [
-    { code: "service.write", label: "Sửa dịch vụ / SOP" },
-    { code: "price.write", label: "Sửa bảng giá" },
-    { code: "pricefloor.write", label: "Sửa giá vốn / giá sàn" },
+  { group: "Giá bán ra & giá mua vào", items: [
+    { code: "price.write", label: "Nhập giá BÁN RA (bảng giá)" },
+    { code: "pricefloor.write", label: "Nhập giá vốn / giá MUA VÀO" },
+    { code: "finance.read", label: "Xem giá vốn / giá mua vào" },
     { code: "pricefloor.override", label: "Duyệt bán dưới giá sàn" },
+  ]},
+  { group: "Thiết lập chuyên môn", items: [
+    { code: "service.write", label: "Sửa dịch vụ / SOP" },
     { code: "protocol.write", label: "Sửa protocol" },
     { code: "marketing.write", label: "Marketing (chiến dịch)" },
     { code: "setting.write", label: "Cài đặt thương hiệu" },
