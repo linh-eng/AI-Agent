@@ -49,6 +49,10 @@ a{color:var(--green-700)}
 .menu-btn:hover{border-color:var(--green-400)}
 .menu-btn svg{width:22px;height:22px;color:var(--ink)}
 .nav-backdrop{display:none}
+/* Thanh điều hướng dưới cùng (mobile) + nút Tạo ticket nổi (FAB) */
+.tabbar{display:none}
+.fab{display:none}
+.fab.hidden{display:none!important}
 
 /* buttons */
 .btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:9px 15px;border-radius:10px;font-weight:600;font-size:13.5px;display:inline-flex;align-items:center;gap:8px;transition:.15s}
@@ -208,7 +212,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   .topbar{padding:10px 14px;gap:10px}
   .topbar h1{font-size:16px}
   .topbar .sub{display:none}
-  .content{padding:16px 14px 76px}
+  .content{padding:16px 14px calc(88px + env(safe-area-inset-bottom))}
   body{overflow-x:hidden}
   .topbar>div{min-width:0}
   .topbar h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -231,6 +235,36 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   .modal-f{padding:12px 14px;flex-wrap:wrap}
   .modal-f .btn{flex:1 1 auto;justify-content:center}
   .notifpanel{position:fixed;left:8px;right:8px;top:58px;width:auto}
+  /* Chạm thoải mái: input không gây zoom trên iOS (>=16px), nút to hơn */
+  input,select,textarea{font-size:16px}
+  .btn{padding:11px 15px;min-height:44px}
+  .btn.sm{padding:9px 12px;font-size:13px;min-height:40px}
+  .field-sel{padding:11px 12px;min-height:44px}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tabs button{padding:11px 13px;white-space:nowrap;flex:none}
+  .actbar .row .btn{flex:1 1 100%;min-height:46px}
+  #btnNewTop{display:none!important}   /* đã có nút Tạo nổi (FAB) ở dưới */
+  /* ===== Thanh điều hướng dưới cùng (thumb zone) ===== */
+  .tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--card);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(6,61,43,.10);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+  .tabbar button{position:relative;flex:1;background:transparent;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 2px;min-height:54px;color:var(--ink-3);font-size:10.5px;font-weight:600;border-radius:12px}
+  .tabbar button.active{color:var(--green-700)}
+  .tabbar button.active .ti{background:var(--green-50)}
+  .tabbar .ti{width:44px;height:28px;display:grid;place-items:center;border-radius:14px;position:relative}
+  .tabbar button svg{width:22px;height:22px}
+  .tabbar .tb-badge{position:absolute;top:-3px;right:2px;background:var(--red);color:#fff;border-radius:20px;font-size:9.5px;font-weight:700;min-width:15px;height:15px;display:grid;place-items:center;padding:0 3px}
+  /* ===== Nút Tạo ticket nổi (FAB) ===== */
+  .fab{display:grid;place-items:center;position:fixed;right:16px;bottom:calc(70px + env(safe-area-inset-bottom));z-index:55;width:56px;height:56px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--green-500),var(--green-700));color:#fff;box-shadow:0 12px 26px -8px var(--green-700)}
+  .fab svg{width:26px;height:26px}
+  /* ===== Danh sách ticket dạng THẺ (thay bảng cuộn ngang) ===== */
+  table.ticket-table thead{display:none}
+  table.ticket-table,table.ticket-table tbody{display:block;width:100%}
+  table.ticket-table tr{display:block;border:1px solid var(--line);border-radius:14px;margin-bottom:12px;padding:12px 14px;background:var(--card);box-shadow:var(--shadow)}
+  table.ticket-table td{display:flex;align-items:center;justify-content:space-between;gap:12px;border:0;padding:5px 0;font-size:13.5px}
+  table.ticket-table td::before{content:attr(data-label);color:var(--ink-3);font-size:12px;font-weight:600;flex:none}
+  table.ticket-table td.mono{font-size:16px;font-weight:800;color:var(--green-800);border-bottom:1px solid var(--line-2);padding-bottom:9px;margin-bottom:3px}
+  table.ticket-table td.mono::before{content:"";}
+  table.ticket-table td .ell{white-space:normal;text-align:right;max-width:74%}
+  table.ticket-table td .muted{text-align:right}
 }
 @media(max-width:430px){
   .kpis{grid-template-columns:1fr}
@@ -285,7 +319,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
   <aside class="side">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.8</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.9</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="userbox" id="userbox"></div>
@@ -309,13 +343,15 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green-300);outli
 
 <div class="overlay" id="overlay"></div>
 <div class="overlay" id="overlay2" style="z-index:70"></div>
+<nav class="tabbar" id="tabbar"></nav>
+<button class="fab hidden" id="fab" onclick="openForm()" aria-label="Tạo ticket"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg></button>
 <div class="toast" id="toast"></div>
 
 <div class="login" id="login">
   <div class="login-card">
     <div class="login-top">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" fill="#fff" opacity=".95"/><path d="M9 12l2 2 4-4" stroke="#0f6e4e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.8</span></div>
+      <div><b>Hỗ trợ THNG</b><span>Support Desk · v3.9.9</span></div>
     </div>
     <div class="login-body">
       <h2>Đăng nhập hệ thống</h2>
@@ -594,7 +630,18 @@ function buildNav(){
     const badge=p.id==="tickets"?`<span class="badge">${DB.tickets.length}</span>`:p.id==="ps"?`<span class="badge">${DB.ps.length}</span>`:"";
     return `<button class="${p.id===PAGE?'active':''}" onclick="go('${p.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">${p.icon}</svg>${p.label}${badge}</button>`;
   }).join("");
-  buildUserBox();
+  buildUserBox(); buildTabbar();
+  const fab=document.getElementById('fab'); if(fab) fab.classList.toggle('hidden', !can('create'));
+}
+function buildTabbar(){
+  const tb=document.getElementById('tabbar'); if(!tb) return;
+  const prim=[['dash','Tổng quan'],['tickets','Ticket'],['ps','Phát sinh'],['report','Báo cáo']].filter(([id])=>pagesForMe().some(p=>p.id===id));
+  const iconOf=id=>{ const p=PAGES.find(x=>x.id===id); return p?p.icon:''; };
+  const badgeOf=id=>{ const d=(typeof DB!=='undefined')?DB:null; if(!d)return 0; return id==='tickets'?(d.tickets?d.tickets.length:0):id==='ps'?(d.ps?d.ps.length:0):0; };
+  let html=prim.map(([id,lbl])=>{ const bd=badgeOf(id);
+    return `<button class="${id===PAGE?'active':''}" onclick="go('${id}')"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">${iconOf(id)}</svg>${bd?`<span class="tb-badge">${bd>99?'99+':bd}</span>`:''}</span><span>${lbl}</span></button>`; }).join('');
+  html+=`<button onclick="toggleNav()"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></span><span>Thêm</span></button>`;
+  tb.innerHTML=html;
 }
 function buildUserBox(){
   const el=document.getElementById("userbox");if(!el||!ME)return;
@@ -692,13 +739,13 @@ function ticketMatch(t){
 function ticketRowHTML(t){
   const s=slaStatus(t);const [rp]=t.uutien.split(" ");
   return `<tr onclick="openDetail('${t.id}')">
-    <td class="mono">${t.id}</td>
-    <td><div class="ell" title="${esc(t.noidung)}">${esc(t.noidung)}</div><div class="muted" style="font-size:11.5px">${esc(loaiText(t))}</div></td>
-    <td>${esc(t.donvi)}<div class="muted" style="font-size:11.5px">${esc(t.nguoiYC)}</div></td>
-    <td><span class="pr ${rp}">${esc(t.uutien)}</span></td>
-    <td>${t.assignee?esc(t.assignee):'<span class="muted">Chưa gán</span>'}</td>
-    <td>${stPill(t.trangthai)}${(()=>{const pp=planProgress(t);return pp?`<div class="muted" style="font-size:11px;margin-top:3px">Đầu việc ${pp.done}/${pp.total} (${pp.pct}%)</div>`:'';})()}</td>
-    <td><span class="pill ${s.color}"><span class="dot"></span>${s.label}</span><div class="muted" style="font-size:11px;margin-top:3px">${s.used}h / ${s.deadline}h</div></td>
+    <td class="mono" data-label="Mã">${t.id}</td>
+    <td data-label="Nội dung"><div class="ell" title="${esc(t.noidung)}">${esc(t.noidung)}</div><div class="muted" style="font-size:11.5px">${esc(loaiText(t))}</div></td>
+    <td data-label="Đơn vị">${esc(t.donvi)}<div class="muted" style="font-size:11.5px">${esc(t.nguoiYC)}</div></td>
+    <td data-label="Ưu tiên"><span class="pr ${rp}">${esc(t.uutien)}</span></td>
+    <td data-label="Người xử lý">${t.assignee?esc(t.assignee):'<span class="muted">Chưa gán</span>'}</td>
+    <td data-label="Trạng thái">${stPill(t.trangthai)}${(()=>{const pp=planProgress(t);return pp?`<div class="muted" style="font-size:11px;margin-top:3px">Đầu việc ${pp.done}/${pp.total} (${pp.pct}%)</div>`:'';})()}</td>
+    <td data-label="SLA xử lý"><span class="pill ${s.color}"><span class="dot"></span>${s.label}</span><div class="muted" style="font-size:11px;margin-top:3px">${s.used}h / ${s.deadline}h</div></td>
   </tr>`;
 }
 function ticketBodyHTML(rows){ return rows.length?rows.map(ticketRowHTML).join(""):`<tr><td colspan="7"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg><div>Không có ticket phù hợp từ khóa / bộ lọc.</div></div></td></tr>`; }
@@ -727,7 +774,7 @@ function renderTickets(){
       <button class="btn sm" onclick="exportCSV()">Xuất Excel</button>
       ${can('create')?`<button class="btn primary sm" onclick="openForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 5v14M5 12h14"/></svg>Tạo ticket</button>`:''}
     </div>
-    <div class="panel"><div class="table-wrap"><table>
+    <div class="panel"><div class="table-wrap"><table class="ticket-table">
       <thead><tr><th>Mã Ticket</th><th>Nội dung / Loại</th><th>Đơn vị YC</th><th>Ưu tiên</th><th>Người xử lý</th><th>Trạng thái</th><th>SLA xử lý</th></tr></thead>
       <tbody id="ticketBody">${ticketBodyHTML(rows)}</tbody></table></div></div>
     <div class="muted" id="ticketCount" style="margin-top:12px;font-size:12.5px">Hiển thị ${rows.length}/${DB.tickets.length} ticket · Nhấp vào dòng để xem & cập nhật chi tiết.</div>`;
