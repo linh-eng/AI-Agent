@@ -326,7 +326,7 @@ function ServiceFormModal({ service, cats, techs, protos, resources, products, o
   }
 
   return (
-    <Modal open onClose={onClose} title={editing ? `Sửa dịch vụ ${service!.code}` : "Thêm dịch vụ"} className="max-w-3xl">
+    <Modal open onClose={onClose} title={editing ? `Sửa dịch vụ ${service!.code}` : "Thêm dịch vụ"} className="max-w-5xl">
       <form onSubmit={submit} className="space-y-4">
         {/* A. Thông tin cơ bản */}
         <Block letter="A" title="Thông tin cơ bản">
