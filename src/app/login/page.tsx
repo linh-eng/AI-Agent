@@ -71,10 +71,6 @@ function LoginForm() {
               {loading ? "Đang đăng nhập..." : "Đăng nhập"}
             </Button>
           </form>
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            Tài khoản demo: <span className="font-medium">quanly@sophia.com.vn</span> / mật khẩu{" "}
-            <span className="font-medium">quanly123</span>
-          </p>
         </CardContent>
       </Card>
     </div>
